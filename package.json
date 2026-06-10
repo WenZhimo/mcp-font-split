@@ -1,0 +1,24 @@
+{
+  "name": "mcp-font-split",
+  "version": "0.1.0",
+  "description": "MCP server wrapping cn-font-split for agent-callable font subsetting",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "WenZhimo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WenZhimo/mcp-font-split.git"
+  },
+  "homepage": "https://github.com/WenZhimo/mcp-font-split",
+  "bin": {
+    "mcp-font-split": "src/server.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "smoke": "node src/smoke-test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "cn-font-split": "^7.4.2"
+  }
+}
