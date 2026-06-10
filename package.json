@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
-    "cn-font-split": "^7.4.2"
+    "cn-font-split": "^7.4.2",
+    "wawoff2": "^2.0.1"
   }
 }

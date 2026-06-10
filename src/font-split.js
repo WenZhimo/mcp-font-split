@@ -1,8 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { inflateSync } from 'node:zlib';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { StaticWasm, fontSplit } from 'cn-font-split/dist/wasm/index.mjs';
+
+const require = createRequire(import.meta.url);
+const woff2Decompress = require('wawoff2/decompress');
+const woff2Compress = require('wawoff2/compress');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const PROJECT_ROOT = path.resolve(__dirname, '..');
@@ -377,6 +382,157 @@ function fileExists(filePath) {
   return fs.stat(filePath).then(() => true).catch(() => false);
 }
 
+async function decompressWoff2(buffer) {
+  const result = await woff2Decompress(Buffer.from(buffer));
+  return new Uint8Array(result);
+}
+
+async function compressWoff2(buffer) {
+  const result = await woff2Compress(Buffer.from(buffer));
+  return new Uint8Array(result);
+}
+
+function stripOversizedKern(buffer) {
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const magic = view.getUint32(0);
+  if (magic === 0x774F4646 || magic === 0x774F4632 || magic === 0x74746366) {
+    return { buffer, stripped: false };
+  }
+
+  const numTables = view.getUint16(4);
+  let kernIndex = -1;
+  let kernLength = 0;
+
+  for (let i = 0; i < numTables; i++) {
+    const off = 12 + i * 16;
+    const tag = String.fromCharCode(buffer[off], buffer[off + 1], buffer[off + 2], buffer[off + 3]);
+    if (tag === 'kern') {
+      kernIndex = i;
+      kernLength = view.getUint32(off + 12);
+      break;
+    }
+  }
+
+  if (kernIndex === -1 || kernLength < buffer.byteLength * 0.8) {
+    return { buffer, stripped: false };
+  }
+
+  // Rebuild sfnt without kern table
+  const newNumTables = numTables - 1;
+  const headerSize = 12 + newNumTables * 16;
+  const tables = [];
+
+  for (let i = 0; i < numTables; i++) {
+    if (i === kernIndex) continue;
+    const off = 12 + i * 16;
+    const tableOffset = view.getUint32(off + 8);
+    const tableLength = view.getUint32(off + 12);
+    tables.push({
+      tag: buffer.slice(off, off + 4),
+      checksum: view.getUint32(off + 4),
+      data: buffer.slice(tableOffset, tableOffset + tableLength),
+    });
+  }
+
+  let totalSize = headerSize;
+  for (const t of tables) {
+    totalSize += t.data.byteLength;
+    totalSize += (4 - (totalSize % 4)) % 4;
+  }
+
+  const result = new Uint8Array(totalSize);
+  const rv = new DataView(result.buffer);
+  rv.setUint32(0, magic);
+  rv.setUint16(4, newNumTables);
+  let sr = 1, es = 0;
+  while (sr * 2 <= newNumTables) { sr *= 2; es++; }
+  sr *= 16;
+  rv.setUint16(6, sr);
+  rv.setUint16(8, es);
+  rv.setUint16(10, newNumTables * 16 - sr);
+
+  let dataOffset = headerSize;
+  for (let i = 0; i < tables.length; i++) {
+    const recOff = 12 + i * 16;
+    result.set(tables[i].tag, recOff);
+    rv.setUint32(recOff + 4, tables[i].checksum);
+    rv.setUint32(recOff + 8, dataOffset);
+    rv.setUint32(recOff + 12, tables[i].data.byteLength);
+    result.set(tables[i].data, dataOffset);
+    dataOffset += tables[i].data.byteLength;
+    dataOffset += (4 - (dataOffset % 4)) % 4;
+  }
+
+  return { buffer: result, stripped: true };
+}
+
+function getGlyphCount(buffer) {
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const magic = view.getUint32(0);
+  let headerOffset = 0;
+  if (magic === 0x74746366) headerOffset = view.getUint32(12);
+
+  const numTables = view.getUint16(headerOffset + 4);
+  for (let i = 0; i < numTables; i++) {
+    const off = headerOffset + 12 + i * 16;
+    const tag = String.fromCharCode(buffer[off], buffer[off + 1], buffer[off + 2], buffer[off + 3]);
+    if (tag === 'maxp') {
+      const tableOffset = view.getUint32(off + 8);
+      return view.getUint16(tableOffset + 4);
+    }
+  }
+  return -1;
+}
+
+async function writeGeneratedFiles(baseDir, generated) {
+  for (const item of generated) {
+    const outputPath = path.resolve(baseDir, item.name);
+    if (!isInside(baseDir, outputPath)) {
+      throw new Error(`Generated file path escapes output directory: ${item.name}`);
+    }
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+    await fs.writeFile(outputPath, item.data);
+  }
+}
+
+async function emitSmallGlyphFallback({ inputBytes, splitDir, fontFamily, fontBaseName, args, reason = 'too few glyphs for useful subsetting' }) {
+  const woff2Name = `${fontBaseName}.woff2`;
+  const cssName = args.cssFileName || 'result.css';
+  const css = [
+    '@font-face {',
+    `  font-family: ${JSON.stringify(fontFamily)};`,
+    `  src: url("./${woff2Name}") format("woff2");`,
+    args.fontWeight ? `  font-weight: ${args.fontWeight};` : null,
+    args.fontStyle ? `  font-style: ${args.fontStyle};` : null,
+    `  font-display: ${args.fontDisplay || 'swap'};`,
+    '}',
+    '',
+  ].filter(Boolean).join('\n');
+
+  const generated = [
+    { name: woff2Name, data: await compressWoff2(inputBytes) },
+    { name: cssName, data: Buffer.from(css, 'utf8') },
+  ];
+
+  if (args.testHtml) {
+    const previewText = args.previewText || 'ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789';
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${fontFamily}</title>
+  <link rel="stylesheet" href="./${cssName}" />
+  <style>body { font-family: ${JSON.stringify(fontFamily)}, sans-serif; padding: 24px; white-space: pre-wrap; }</style>
+</head>
+<body>${previewText.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</body>
+</html>`;
+    generated.push({ name: 'index.html', data: Buffer.from(html, 'utf8') });
+  }
+
+  await writeGeneratedFiles(splitDir, generated);
+  return { generated, skipped: true, reason };
+}
+
 async function ensureFontFile(fontPath) {
   const resolved = await resolveWorkspacePath(fontPath, { mustExist: true });
   const stat = await fs.stat(resolved);
@@ -395,23 +551,23 @@ export async function splitFont(args) {
   const fontFileName = path.basename(input);
   let inputBytes = new Uint8Array(await fs.readFile(input));
 
-  // Decompress WOFF1 to sfnt before processing
+  // Normalize to sfnt before processing
   const magic = new DataView(inputBytes.buffer, inputBytes.byteOffset, 4).getUint32(0);
   if (magic === 0x774F4646) {
     inputBytes = decompressWoff1(inputBytes);
+  } else if (magic === 0x774F4632) {
+    inputBytes = await decompressWoff2(inputBytes);
   }
+
+  // Strip pathological kern table before passing into cn-font-split
+  const kernNormalized = stripOversizedKern(inputBytes);
+  inputBytes = kernNormalized.buffer;
+  const hadOversizedKern = kernNormalized.stripped;
 
   // Determine root directory name: prefer font family from binary, fallback to file base name
   const familyName = args.fontFamily || extractFontFamily(inputBytes) || fontBaseName;
   const safeFamilyName = sanitizeDirName(familyName);
 
-  // Output layout:
-  //   <outputRoot>/<familyName>/
-  //     ├── <fontFileName>          ← original font file
-  //     └── <fontBaseName>/         ← split output subfolder
-  //           ├── *.woff2
-  //           ├── result.css
-  //           └── ...
   const rootDir = await resolveWorkspacePath(
     args.outDir || path.join('split-output', safeFamilyName),
   );
@@ -423,17 +579,47 @@ export async function splitFont(args) {
   await fs.copyFile(input, destFontPath);
 
   const before = new Set((await summarizeFiles(rootDir)).map((file) => file.path));
-  const config = buildFontSplitConfig(inputBytes, splitDir, args);
-  const wasm = await getWasmRuntime();
-  const generated = (await fontSplit(config, wasm.WasiHandle, { logger: () => {} })).filter(Boolean);
 
-  for (const item of generated) {
-    const outputPath = path.resolve(splitDir, item.name);
-    if (!isInside(splitDir, outputPath)) {
-      throw new Error(`Generated file path escapes output directory: ${item.name}`);
+  // Very small Latin-only fonts don't need subsetting; emit a single woff2 + minimal CSS/HTML
+  const glyphCount = getGlyphCount(inputBytes);
+  let generated;
+  let skipped = false;
+  let skipReason = null;
+  if (glyphCount > 0 && glyphCount <= 50) {
+    const fallback = await emitSmallGlyphFallback({
+      inputBytes,
+      splitDir,
+      fontFamily: familyName,
+      fontBaseName,
+      args,
+      reason: 'too few glyphs for useful subsetting',
+    });
+    generated = fallback.generated;
+    skipped = fallback.skipped;
+    skipReason = fallback.reason;
+  } else {
+    const config = buildFontSplitConfig(inputBytes, splitDir, args);
+    const wasm = await getWasmRuntime();
+    try {
+      generated = (await fontSplit(config, wasm.WasiHandle, { logger: () => {} })).filter(Boolean);
+      await writeGeneratedFiles(splitDir, generated);
+    } catch (error) {
+      if (hadOversizedKern) {
+        const fallback = await emitSmallGlyphFallback({
+          inputBytes,
+          splitDir,
+          fontFamily: familyName,
+          fontBaseName,
+          args,
+          reason: 'cn-font-split failed after oversized kern normalization; emitted single woff2 fallback',
+        });
+        generated = fallback.generated;
+        skipped = fallback.skipped;
+        skipReason = fallback.reason;
+      } else {
+        throw error;
+      }
     }
-    await fs.mkdir(path.dirname(outputPath), { recursive: true });
-    await fs.writeFile(outputPath, item.data);
   }
 
   const files = await summarizeFiles(rootDir);
@@ -447,6 +633,9 @@ export async function splitFont(args) {
     splitDir: toRelativeWorkspacePath(splitDir),
     durationMs: Date.now() - startedAt,
     generatedFileCount: generated.length,
+    glyphCount,
+    skipped,
+    skipReason,
     fileCount: files.length,
     createdFileCount: createdFiles.length,
     files,
@@ -459,7 +648,13 @@ export async function splitFontBatch(args) {
   const stat = await fs.stat(inputDir);
   if (!stat.isDirectory()) throw new Error(`inputDir is not a directory: ${args.inputDir}`);
 
-  const allFiles = await listFilesRecursive(inputDir, { maxFiles: args.maxFiles || 5000 });
+  const outputRoot = args.outputRoot || 'split-output';
+  const outputRootName = path.basename(outputRoot);
+
+  const allFiles = await listFilesRecursive(inputDir, {
+    maxFiles: args.maxFiles || 5000,
+    excludeDirs: [outputRootName],
+  });
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
 
   // Deduplicate: same base name with multiple formats → keep highest priority format
@@ -475,9 +670,7 @@ export async function splitFontBatch(args) {
   }
   const deduplicated = [...byBaseName.values()];
   const skippedCount = fontFiles.length - deduplicated.length;
-
   const selected = deduplicated.slice(0, args.limit || 20);
-  const outputRoot = args.outputRoot || 'split-output';
 
   const results = [];
   const errors = [];
