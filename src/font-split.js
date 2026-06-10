@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { inflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { StaticWasm, fontSplit } from 'cn-font-split/dist/wasm/index.mjs';
 
@@ -8,16 +9,23 @@ export const PROJECT_ROOT = path.resolve(__dirname, '..');
 export const DEFAULT_WORKSPACE_ROOT = path.resolve(PROJECT_ROOT, '..');
 const FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.ttc', '.otc', '.woff', '.woff2']);
 let wasmRuntimePromise;
+let wasmPath;
 
 async function getWasmRuntime() {
+  if (!wasmPath) {
+    wasmPath = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/dist/libffi-wasm32-wasip1.wasm');
+  }
   if (!wasmRuntimePromise) {
     wasmRuntimePromise = (async () => {
-      const wasmPath = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/dist/libffi-wasm32-wasip1.wasm');
       const wasmBuffer = await fs.readFile(wasmPath);
       return new StaticWasm(wasmBuffer);
     })();
   }
   return wasmRuntimePromise;
+}
+
+function resetWasmRuntime() {
+  wasmRuntimePromise = null;
 }
 
 function workspaceRoot() {
@@ -50,13 +58,14 @@ export function toRelativeWorkspacePath(absolutePath) {
   return path.relative(workspaceRoot(), absolutePath).replaceAll(path.sep, '/');
 }
 
-async function listFilesRecursive(root, { maxFiles = 5000 } = {}) {
+async function listFilesRecursive(root, { maxFiles = 5000, excludeDirs = [] } = {}) {
   const results = [];
+  const excludeSet = new Set([...excludeDirs, 'node_modules', '.git', 'split-output', 'font-split-mcp']);
   async function walk(dir) {
     if (results.length >= maxFiles) return;
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      if (excludeSet.has(entry.name)) continue;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         await walk(fullPath);
@@ -303,6 +312,71 @@ function sanitizeDirName(name) {
   return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim();
 }
 
+function decompressWoff1(buffer) {
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const signature = view.getUint32(0);
+  if (signature !== 0x774F4646) return buffer; // not WOFF1, return as-is
+
+  const sfntFlavor = view.getUint32(4);
+  const numTables = view.getUint16(12);
+  const totalSfntSize = view.getUint32(16);
+
+  // Build sfnt offset table
+  const sfntHeaderSize = 12 + numTables * 16;
+  const sfnt = new Uint8Array(totalSfntSize);
+  const sfntView = new DataView(sfnt.buffer);
+
+  // Write sfnt header
+  sfntView.setUint32(0, sfntFlavor);
+  sfntView.setUint16(4, numTables);
+  // searchRange, entrySelector, rangeShift
+  let searchRange = 1;
+  let entrySelector = 0;
+  while (searchRange * 2 <= numTables) { searchRange *= 2; entrySelector++; }
+  searchRange *= 16;
+  sfntView.setUint16(6, searchRange);
+  sfntView.setUint16(8, entrySelector);
+  sfntView.setUint16(10, numTables * 16 - searchRange);
+
+  let dataOffset = sfntHeaderSize;
+
+  for (let i = 0; i < numTables; i++) {
+    const woffEntry = 44 + i * 20;
+    const tag = view.getUint32(woffEntry);
+    const offset = view.getUint32(woffEntry + 4);
+    const compLength = view.getUint32(woffEntry + 8);
+    const origLength = view.getUint32(woffEntry + 12);
+    const origChecksum = view.getUint32(woffEntry + 16);
+
+    let tableData;
+    if (compLength === origLength) {
+      tableData = buffer.slice(offset, offset + origLength);
+    } else {
+      tableData = inflateSync(buffer.slice(offset, offset + compLength));
+    }
+
+    // Write sfnt table record
+    const recordOffset = 12 + i * 16;
+    sfntView.setUint32(recordOffset, tag);
+    sfntView.setUint32(recordOffset + 4, origChecksum);
+    sfntView.setUint32(recordOffset + 8, dataOffset);
+    sfntView.setUint32(recordOffset + 12, origLength);
+
+    // Write table data
+    sfnt.set(tableData instanceof Uint8Array ? tableData : new Uint8Array(tableData), dataOffset);
+
+    // Align to 4 bytes
+    dataOffset += origLength;
+    while (dataOffset % 4 !== 0) dataOffset++;
+  }
+
+  return new Uint8Array(sfnt.buffer, 0, dataOffset);
+}
+
+function fileExists(filePath) {
+  return fs.stat(filePath).then(() => true).catch(() => false);
+}
+
 async function ensureFontFile(fontPath) {
   const resolved = await resolveWorkspacePath(fontPath, { mustExist: true });
   const stat = await fs.stat(resolved);
@@ -319,7 +393,13 @@ export async function splitFont(args) {
   const input = await ensureFontFile(args.fontPath);
   const fontBaseName = path.basename(input, path.extname(input));
   const fontFileName = path.basename(input);
-  const inputBytes = new Uint8Array(await fs.readFile(input));
+  let inputBytes = new Uint8Array(await fs.readFile(input));
+
+  // Decompress WOFF1 to sfnt before processing
+  const magic = new DataView(inputBytes.buffer, inputBytes.byteOffset, 4).getUint32(0);
+  if (magic === 0x774F4646) {
+    inputBytes = decompressWoff1(inputBytes);
+  }
 
   // Determine root directory name: prefer font family from binary, fallback to file base name
   const familyName = args.fontFamily || extractFontFamily(inputBytes) || fontBaseName;
@@ -381,23 +461,66 @@ export async function splitFontBatch(args) {
 
   const allFiles = await listFilesRecursive(inputDir, { maxFiles: args.maxFiles || 5000 });
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
-  const selected = fontFiles.slice(0, args.limit || 20);
+
+  // Deduplicate: same base name with multiple formats → keep highest priority format
+  const FORMAT_PRIORITY = { '.otf': 0, '.ttf': 1, '.woff2': 2, '.ttc': 3, '.otc': 4, '.woff': 5 };
+  const byBaseName = new Map();
+  for (const file of fontFiles) {
+    const ext = path.extname(file).toLowerCase();
+    const base = file.slice(0, -ext.length);
+    const existing = byBaseName.get(base);
+    if (!existing || (FORMAT_PRIORITY[ext] ?? 9) < (FORMAT_PRIORITY[path.extname(existing).toLowerCase()] ?? 9)) {
+      byBaseName.set(base, file);
+    }
+  }
+  const deduplicated = [...byBaseName.values()];
+  const skippedCount = fontFiles.length - deduplicated.length;
+
+  const selected = deduplicated.slice(0, args.limit || 20);
   const outputRoot = args.outputRoot || 'split-output';
 
   const results = [];
+  const errors = [];
+  let skippedExisting = 0;
   for (const file of selected) {
     const relative = toRelativeWorkspacePath(file);
-    // Read font to extract family name for directory grouping
-    const inputBytes = new Uint8Array(await fs.readFile(file));
-    const familyName = extractFontFamily(inputBytes) || path.basename(file, path.extname(file));
-    const safeFamilyName = sanitizeDirName(familyName);
+    try {
+      // Use source folder name as family grouping (matches user's directory structure)
+      const relativeToInput = path.relative(inputDir, file);
+      const segments = relativeToInput.split(path.sep);
+      let familyDirName;
+      if (segments.length > 1) {
+        familyDirName = segments[0];
+      } else {
+        // File is directly in inputDir root — fallback to binary extraction
+        const inputBytes = new Uint8Array(await fs.readFile(file));
+        familyDirName = extractFontFamily(inputBytes) || path.basename(file, path.extname(file));
+      }
+      const safeFamilyName = sanitizeDirName(familyDirName);
+      const outDir = path.join(outputRoot, safeFamilyName);
+      const fontBaseName = path.basename(file, path.extname(file));
 
-    const result = await splitFont({
-      ...args,
-      fontPath: relative,
-      outDir: path.join(outputRoot, safeFamilyName),
-    });
-    results.push(result);
+      // Incremental: skip if already processed
+      const resolvedOutDir = await resolveWorkspacePath(outDir);
+      const marker = path.join(resolvedOutDir, fontBaseName, 'result.css');
+      if (await fileExists(marker)) {
+        skippedExisting++;
+        args.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'skipped' });
+        continue;
+      }
+
+      const result = await splitFont({
+        ...args,
+        fontPath: relative,
+        outDir,
+      });
+      results.push(result);
+      args.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'done' });
+    } catch (error) {
+      resetWasmRuntime();
+      errors.push({ file: relative, error: error instanceof Error ? error.message : String(error) });
+      args.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'error' });
+    }
   }
 
   return {
@@ -405,7 +528,12 @@ export async function splitFontBatch(args) {
     inputDir: toRelativeWorkspacePath(inputDir),
     outputRoot,
     discoveredFontCount: fontFiles.length,
+    deduplicatedCount: deduplicated.length,
+    skippedDuplicates: skippedCount,
+    skippedExisting,
     processedFontCount: results.length,
+    errorCount: errors.length,
+    errors,
     results,
   };
 }
