@@ -147,7 +147,29 @@ async function readRuntimeVersionEntries(versionFilePath) {
   }
 }
 
+function minimumMajorFromEngineRange(range) {
+  if (typeof range !== 'string') return null;
+  const match = range.match(/>=\s*(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
+function getNodeRuntimeInfo() {
+  const requiredVersion = packageJson.engines?.node || null;
+  const requiredMajor = minimumMajorFromEngineRange(requiredVersion);
+  const major = Number(process.versions.node.split('.')[0]);
+  const ok = Number.isFinite(major) && (requiredMajor === null || major >= requiredMajor);
+  return {
+    version: process.version,
+    versionWithoutPrefix: process.versions.node,
+    major,
+    requiredVersion,
+    requiredMajor,
+    ok,
+  };
+}
+
 function buildRuntimeRecommendedActions({
+  nodeRuntime,
   workspace,
   workspaceRootPath,
   wasm,
@@ -157,6 +179,14 @@ function buildRuntimeRecommendedActions({
   wasmPathConfigured,
 }) {
   const actions = [];
+
+  if (nodeRuntime.ok === false) {
+    actions.push({
+      code: 'upgrade-node-runtime',
+      severity: 'error',
+      message: `Run mcp-font-split with Node ${nodeRuntime.requiredVersion || 'required by package.json'} before starting the MCP server. Current runtime: ${nodeRuntime.version}`,
+    });
+  }
 
   if (!workspace.exists || !workspace.isDirectory) {
     actions.push({
@@ -209,6 +239,7 @@ export async function getRuntimeStatus() {
   const configuredWasmPath = process.env.FONT_SPLIT_WASM_PATH || null;
   const root = workspaceRoot();
   const runtimePath = getWasmRuntimePath();
+  const nodeRuntime = getNodeRuntimeInfo();
   const workspace = await pathStatus(root);
   const wasm = await pathStatus(runtimePath);
   const cnFontSplitPackage = await pathStatus(CN_FONT_SPLIT_PACKAGE_JSON);
@@ -216,6 +247,7 @@ export async function getRuntimeStatus() {
   const cnFontSplitPackageInfo = await readPackageVersion(CN_FONT_SPLIT_PACKAGE_JSON);
   const cnFontSplitRuntimeInfo = await readRuntimeVersionEntries(CN_FONT_SPLIT_VERSION_FILE);
   const recommendedActions = buildRuntimeRecommendedActions({
+    nodeRuntime,
     workspace,
     workspaceRootPath: root,
     wasm,
@@ -225,6 +257,13 @@ export async function getRuntimeStatus() {
     wasmPathConfigured: configuredWasmPath !== null,
   });
   const checks = [
+    {
+      name: 'node-runtime',
+      ok: nodeRuntime.ok,
+      message: nodeRuntime.ok
+        ? `Node ${nodeRuntime.version} satisfies ${nodeRuntime.requiredVersion || 'package requirements'}`
+        : `Node ${nodeRuntime.version} does not satisfy ${nodeRuntime.requiredVersion || 'package requirements'}`,
+    },
     {
       name: 'workspace-root',
       ok: workspace.exists && workspace.isDirectory,
@@ -250,6 +289,7 @@ export async function getRuntimeStatus() {
     platform: process.platform,
     arch: process.arch,
     projectRoot: PROJECT_ROOT,
+    node: nodeRuntime,
     workspace: {
       root,
       fontSplitRootConfigured: configuredRoot !== null,
@@ -295,7 +335,7 @@ export function getAgentGuidance(args = {}) {
       id: 'runtime-ready',
       appliesTo: ['overview', 'single', 'batch', 'inspect'],
       check: 'Before splitting, get_runtime_status.ok is true, or every recommendedActions[] item has been handled.',
-      responseFields: ['ok', 'recommendedActions', 'workspace', 'wasm', 'cnFontSplit'],
+      responseFields: ['ok', 'recommendedActions', 'node', 'workspace', 'wasm', 'cnFontSplit'],
     },
     {
       id: 'input-scan-complete',
@@ -371,7 +411,7 @@ export function getAgentGuidance(args = {}) {
     },
     tools: [
       { name: 'get_agent_guidance', useWhen: 'Orient an AI coding assistant before choosing a font-splitting workflow.' },
-      { name: 'get_runtime_status', useWhen: 'Check workspace, mcp-font-split package, cn-font-split package/runtime, Node, and WASM availability without writing files.' },
+      { name: 'get_runtime_status', useWhen: 'Check workspace, Node engine compatibility, mcp-font-split package, cn-font-split package/runtime, and WASM availability without writing files.' },
       { name: 'inspect_font_inputs', useWhen: 'Preflight source fonts without writing output.' },
       { name: 'split_font', useWhen: 'Process one known font file.' },
       { name: 'split_font_batch', useWhen: 'Scan, dedupe, name, skip-check, and process many fonts.' },
@@ -403,6 +443,7 @@ export function getAgentGuidance(args = {}) {
     verificationChecklist,
     responseFieldsToCheck: [
       'ok',
+      'node',
       'workspace',
       'wasm',
       'wasm.fontSplitWasmPathConfigured',

@@ -82,6 +82,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('recommendedActions')) {
     throw new Error('Expected agent guidance to recommend checking remediation actions.');
   }
+  if (!result.responseFieldsToCheck?.includes('node')) {
+    throw new Error('Expected agent guidance to recommend checking Node runtime details.');
+  }
   if (!result.responseFieldsToCheck?.includes('wasm.fontSplitWasmPathConfigured')) {
     throw new Error('Expected agent guidance to recommend checking custom WASM path status.');
   }
@@ -99,6 +102,9 @@ if (scenario === 'single') {
   }
   if (!result.checks?.every((check) => check.ok === true)) {
     throw new Error('Expected runtime status checks to pass.');
+  }
+  if (result.node?.ok !== true || !result.checks.some((check) => check.name === 'node-runtime')) {
+    throw new Error('Expected runtime status to validate the Node runtime.');
   }
   if (!result.cnFontSplit?.packageVersion) {
     throw new Error('Expected runtime status to include cn-font-split package version.');

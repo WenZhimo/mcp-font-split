@@ -14,7 +14,7 @@
 | 工具 | 作用 |
 |------|------|
 | `get_agent_guidance` | 返回面向 AI 编程助理的机器可读工作流指南 |
-| `get_runtime_status` | 返回工作区、包版本、Node、平台和 WASM 可用性的只读诊断信息 |
+| `get_runtime_status` | 返回工作区、Node engine 兼容性、包版本、平台和 WASM 可用性的只读诊断信息 |
 | `split_font` | 处理单个字体文件 |
 | `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count 和坏字体清单 |
 | `split_font_batch` | 批量扫描目录、去重、分组并处理字体文件 |
@@ -68,7 +68,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 是否通过 `FONT_SPLIT_WASM_PATH` 使用了自定义 WASM 文件
 - mcp-font-split 包名和版本
 - cn-font-split 包版本和已记录的 WASM runtime 版本
-- Node 版本、平台和 CPU 架构
+- Node 版本、是否满足 `package.json` engines 要求、平台和 CPU 架构
 - 支持的字体扩展名
 
 当 agent 遇到安装、路径或 WASM 相关问题时，应先调用 `get_runtime_status`，再决定是否提示用户修正环境。
