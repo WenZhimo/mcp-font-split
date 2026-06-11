@@ -47,6 +47,24 @@
 | `splitFailureAction` | `error`, `single-woff2` | `error` | 分割失败时报错，还是回退为单 WOFF2。 |
 | `strictMode` | boolean | `false` | 一键严格默认值。批量模式下，未显式设置的 `skipMode` 会变为 `manifest`，未显式设置的 `batchErrorMode` 会变为 `fail-after`；显式参数仍可覆盖。 |
 
+高级 cn-font-split 参数：
+
+| 字段 | 类型 / 可选值 | 默认值 | 说明 |
+|------|---------------|--------|------|
+| `chunkSizeTolerance` | 正数 | cn-font-split 默认值 | 传给 cn-font-split 的分片大小容差。 |
+| `maxAllowSubsetsCount` | 正整数 | cn-font-split 默认值 | cn-font-split 允许生成的最大 subset 数。 |
+| `languageAreas` | boolean | cn-font-split 默认值 | 启用 cn-font-split 的语言区域优化。 |
+| `previewText` | string | 不设置 | 在支持时用于生成预览资产的文本。 |
+| `previewName` | string | 不设置 | 在支持时用于生成预览资产的名称。 |
+| `renameOutputFont` | string | 不设置 | 输出字体文件名模板，例如 `font_[hash:6].[ext]`。 |
+| `buildMode` | string | cn-font-split 默认值 | cn-font-split 构建模式。 |
+| `multiThreads` | boolean | cn-font-split 默认值 | 在运行时支持时启用多线程处理。 |
+| `fontFeature` | boolean | cn-font-split 默认值 | 启用字体特性处理。 |
+| `reduceMins` | boolean | cn-font-split 默认值 | 在支持时降低最小 subset 大小。 |
+| `autoSubset` | boolean | cn-font-split 默认值 | 让 cn-font-split 自动创建 subsets。 |
+| `subsetRemainChars` | boolean | cn-font-split 默认值 | 在支持时包含未显式声明的剩余字符。 |
+| `subsets` | codepoint 数组的数组 | 不设置 | 显式指定每个 subset 保留的 Unicode codepoint 组。 |
+
 关键返回字段：
 
 | 字段 | 含义 |
@@ -97,6 +115,8 @@
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 处理前的去重策略。 |
 | `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `collect` | 单字体错误的处理策略。 |
 | `debugBatchDecisions` | boolean | `false` | 输出结构化调试日志，覆盖 dedupe、naming、skip 和 error 决策。 |
+
+`split_font_batch` 也接受 `split_font` 的处理参数，但不接受 `fontPath` 和 `outDir`。批量模式会把这些处理参数应用到每个选中的字体，并使用 `inputDir` / `outputRoot` 控制路径。
 
 批量响应会包含 `scannedFileCount`、`maxFiles` 和 `maxFilesHit`。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。
 

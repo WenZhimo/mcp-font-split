@@ -47,6 +47,24 @@ Common optional fields:
 | `splitFailureAction` | `error`, `single-woff2` | `error` | Whether split failures should error or fall back to one WOFF2. |
 | `strictMode` | boolean | `false` | Convenience strict defaults. In batch mode, unset `skipMode` becomes `manifest` and unset `batchErrorMode` becomes `fail-after`; explicit options still override it. |
 
+Advanced cn-font-split options:
+
+| Field | Type / values | Default | Description |
+|-------|---------------|---------|-------------|
+| `chunkSizeTolerance` | positive number | cn-font-split default | Allowed chunk-size tolerance passed to cn-font-split. |
+| `maxAllowSubsetsCount` | positive integer | cn-font-split default | Maximum subset count allowed by cn-font-split. |
+| `languageAreas` | boolean | cn-font-split default | Enable cn-font-split language-area optimization. |
+| `previewText` | string | unset | Text used for generated preview assets when supported. |
+| `previewName` | string | unset | Name for generated preview assets when supported. |
+| `renameOutputFont` | string | unset | Output font filename template, for example `font_[hash:6].[ext]`. |
+| `buildMode` | string | cn-font-split default | cn-font-split build mode. |
+| `multiThreads` | boolean | cn-font-split default | Enable multi-thread processing when supported by the runtime. |
+| `fontFeature` | boolean | cn-font-split default | Enable font feature processing. |
+| `reduceMins` | boolean | cn-font-split default | Reduce minimum subset sizes when supported. |
+| `autoSubset` | boolean | cn-font-split default | Let cn-font-split automatically create subsets. |
+| `subsetRemainChars` | boolean | cn-font-split default | Include remaining undeclared characters when supported. |
+| `subsets` | array of codepoint arrays | unset | Explicit unicode codepoint groups to keep in each subset. |
+
 Key result fields:
 
 | Field | Meaning |
@@ -97,6 +115,8 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Pre-processing dedupe strategy. |
 | `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `collect` | Per-font error handling strategy. |
 | `debugBatchDecisions` | boolean | `false` | Emit structured decision logs for dedupe, naming, skip, and errors. |
+
+`split_font_batch` also accepts the split options from `split_font`, except `fontPath` and `outDir`. Batch mode applies those processing options to every selected font and uses `inputDir` / `outputRoot` for paths.
 
 Batch responses include `scannedFileCount`, `maxFiles`, and `maxFilesHit`. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete.
 
