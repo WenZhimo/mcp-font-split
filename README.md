@@ -359,7 +359,10 @@ claude mcp add font-split -- node "/path/to/mcp-font-split/src/server.js"
 
 ```sh
 npm start
+npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
+
+`batch:run` is a safe standalone batch helper for agents and maintainers. It defaults to `strictMode: true`, `includeResults: false`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, and `splitFailureAction: "single-woff2"`. Positional arguments are `inputDir`, `outputRoot`, `limit`, and `maxFiles`; the same values can be supplied with `FONT_SPLIT_INPUT_DIR`, `FONT_SPLIT_OUTPUT_ROOT`, `FONT_SPLIT_LIMIT`, `FONT_SPLIT_MAX_FILES`, and `FONT_SPLIT_DRY_RUN`.
 
 ### Smoke checks
 

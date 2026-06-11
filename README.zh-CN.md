@@ -357,7 +357,10 @@ claude mcp add font-split -- node "/path/to/mcp-font-split/src/server.js"
 
 ```sh
 npm start
+npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
+
+`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。它默认使用 `strictMode: true`、`includeResults: false`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"` 和 `splitFailureAction: "single-woff2"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_DRY_RUN` 提供相同配置。
 
 ### Smoke 检查
 
