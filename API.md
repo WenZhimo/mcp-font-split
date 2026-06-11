@@ -10,7 +10,7 @@ Return machine-readable usage guidance for AI coding assistants.
 |-------|---------------|---------|-------------|
 | `workflow` | `overview`, `single`, `batch`, `inspect` | `overview` | Guidance focus. |
 
-The response includes workspace path rules, supported extensions, default policies, recommended batch options, response fields to inspect, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response includes workspace path rules, supported extensions, default policies, recommended batch options, response fields to inspect, a verification checklist, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
 
 ## `get_runtime_status`
 

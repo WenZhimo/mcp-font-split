@@ -55,10 +55,11 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 支持扩展名
 - 默认批量策略
 - 推荐批量参数
+- 完成验证清单
 - 推荐工具调用顺序
 - 调用方应该检查的关键响应字段
 
-当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。
+当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。响应里的 `verificationChecklist[]` 是给 agent 用的防误判清单；在向用户宣称完成前，应检查其中适用于当前工作流的项目。
 
 `get_runtime_status` 也是只读工具。它会检查：
 

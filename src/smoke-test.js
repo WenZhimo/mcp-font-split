@@ -85,6 +85,12 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('wasm.fontSplitWasmPathConfigured')) {
     throw new Error('Expected agent guidance to recommend checking custom WASM path status.');
   }
+  const checklistIds = new Set((result.verificationChecklist || []).map((item) => item.id));
+  for (const requiredId of ['runtime-ready', 'process-outcome-checked', 'fallback-disclosed', 'output-audited']) {
+    if (!checklistIds.has(requiredId)) {
+      throw new Error(`Expected agent guidance verification checklist to include ${requiredId}.`);
+    }
+  }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'runtime-status') {
   const result = await getRuntimeStatus();

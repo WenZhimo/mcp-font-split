@@ -290,6 +290,44 @@ export function getAgentGuidance(args = {}) {
     'Use dryRun with includeResults true to preview batch naming, dedupe, and skip decisions without writing output.',
     'For repeatable automation, prefer strictMode true or explicit skipMode manifest plus batchErrorMode fail-after.',
   ];
+  const verificationChecklist = [
+    {
+      id: 'runtime-ready',
+      appliesTo: ['overview', 'single', 'batch', 'inspect'],
+      check: 'Before splitting, get_runtime_status.ok is true, or every recommendedActions[] item has been handled.',
+      responseFields: ['ok', 'recommendedActions', 'workspace', 'wasm', 'cnFontSplit'],
+    },
+    {
+      id: 'input-scan-complete',
+      appliesTo: ['overview', 'batch', 'inspect'],
+      check: 'Before trusting a source scan, inspect_font_inputs.maxFilesHit is false; rerun with a higher maxFiles when true.',
+      responseFields: ['maxFilesHit', 'supportedFontCount', 'invalidFontCount', 'missingIdentityCount'],
+    },
+    {
+      id: 'batch-plan-reviewed',
+      appliesTo: ['overview', 'batch'],
+      check: 'For unfamiliar batch runs, review a dryRun plan before writing output.',
+      responseFields: ['dryRun', 'planIncluded', 'plannedCount', 'wouldProcessCount', 'skippedDuplicates'],
+    },
+    {
+      id: 'process-outcome-checked',
+      appliesTo: ['single', 'batch'],
+      check: 'After processing, inspect resultType, outputMode, performedSplit, usedFallback, warnings, errorCount, and errors before claiming success.',
+      responseFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'errorCount', 'errors'],
+    },
+    {
+      id: 'fallback-disclosed',
+      appliesTo: ['single', 'batch'],
+      check: 'If usedFallback is true or outputMode is single-woff2/copy-original, say that the result was not a normal multi-subset split.',
+      responseFields: ['usedFallback', 'outputMode', 'resultType'],
+    },
+    {
+      id: 'output-audited',
+      appliesTo: ['overview', 'batch', 'inspect'],
+      check: 'After batch processing, inspect the output directory and verify maxFilesHit is false before treating the audit as complete.',
+      responseFields: ['maxFilesHit', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
+    },
+  ];
 
   const workflows = {
     overview: [
@@ -362,6 +400,7 @@ export function getAgentGuidance(args = {}) {
       includeFamilies: false,
       maxFiles: 200000,
     },
+    verificationChecklist,
     responseFieldsToCheck: [
       'ok',
       'workspace',

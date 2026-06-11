@@ -31,7 +31,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 
 | Tool | Description |
 |------|-------------|
-| `get_agent_guidance` | Return AI-agent-oriented workflow guidance, path rules, defaults, and response fields to check. |
+| `get_agent_guidance` | Return AI-agent-oriented workflow guidance, path rules, defaults, response fields to check, and a verification checklist. |
 | `get_runtime_status` | Return read-only diagnostics for workspace, package versions, Node, platform, cn-font-split runtime, and WASM availability. |
 | `split_font` | Process one font file. Depending on options, it may create subset WOFF2 chunks, a single WOFF2 fallback, or a copy-original metadata entry. |
 | `inspect_font_inputs` | Scan input fonts without writing output; reports parse status, identity keys, glyph counts, and invalid font-like files. |
@@ -46,7 +46,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 Key defaults and policy choices:
 
 - Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server.
-- For AI coding assistants, call `get_agent_guidance` first when the workflow is unclear. It returns recommended tool order, default policies, path rules, and response fields that should be inspected before claiming success.
+- For AI coding assistants, call `get_agent_guidance` first when the workflow is unclear. It returns recommended tool order, default policies, path rules, response fields, and a verification checklist that should be inspected before claiming success.
 - Use `get_runtime_status` when setup is uncertain; it checks the resolved workspace, package versions, cn-font-split runtime version, and WASM file without writing anything, then returns `recommendedActions[]` for agent-friendly remediation.
 - Batch scanning skips dependencies, generated output directories, `__MACOSX`, and AppleDouble `._*` resource-fork files.
 - `.woff` and `.woff2` inputs are decompressed to sfnt-like data before processing.
