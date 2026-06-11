@@ -1,6 +1,6 @@
 # API 参考
 
-本 MCP Server 暴露 5 个工具。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。
+本 MCP Server 暴露 6 个工具。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。
 
 ## `get_agent_guidance`
 
@@ -11,6 +11,12 @@
 | `workflow` | `overview`, `single`, `batch`, `inspect` | `overview` | 指南侧重点。 |
 
 响应会包含工作区路径规则、支持扩展名、默认策略、推荐批量参数、需要检查的响应字段，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+
+## `get_runtime_status`
+
+返回只读运行时诊断摘要。
+
+这个工具会检查解析后的字体工作区、包版本、Node 运行时、平台、支持扩展名，以及 cn-font-split WASM 文件。响应包含 `ok`、`checks[]`、`workspace` 和 `wasm` 字段，方便 agent 在调用分割工具前先定位环境问题。
 
 ## `split_font`
 

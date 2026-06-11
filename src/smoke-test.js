@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { getAgentGuidance, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
+import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
 import { errorText } from './mcp-response.js';
 
 const scenario = process.argv[2] || 'single';
@@ -68,8 +68,20 @@ if (scenario === 'single') {
   if (result.agentOptimized !== true || result.workflow !== 'batch' || !result.tools.some((tool) => tool.name === 'inspect_font_inputs')) {
     throw new Error('Expected agent guidance to describe the batch workflow and preflight tool.');
   }
+  if (!result.tools.some((tool) => tool.name === 'get_runtime_status')) {
+    throw new Error('Expected agent guidance to describe the runtime status tool.');
+  }
   if (result.recommendedInspectOptions?.includeFiles !== false || result.recommendedInspectOptions?.includeFamilies !== false) {
     throw new Error('Expected agent guidance to recommend compact output inspection.');
+  }
+  console.log(JSON.stringify(result, null, 2));
+} else if (scenario === 'runtime-status') {
+  const result = await getRuntimeStatus();
+  if (result.ok !== true || !result.workspace?.isDirectory || !result.wasm?.isFile) {
+    throw new Error('Expected runtime status to confirm workspace and WASM availability.');
+  }
+  if (!result.checks?.every((check) => check.ok === true)) {
+    throw new Error('Expected runtime status checks to pass.');
   }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'font-inputs') {

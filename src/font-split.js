@@ -22,13 +22,18 @@ const PACKAGE_VERSION = packageJson.version;
 let wasmRuntimePromise;
 let wasmPath;
 
-async function getWasmRuntime() {
+function getWasmRuntimePath() {
   if (!wasmPath) {
     wasmPath = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/dist/libffi-wasm32-wasip1.wasm');
   }
+  return wasmPath;
+}
+
+async function getWasmRuntime() {
+  const runtimePath = getWasmRuntimePath();
   if (!wasmRuntimePromise) {
     wasmRuntimePromise = (async () => {
-      const wasmBuffer = await fs.readFile(wasmPath);
+      const wasmBuffer = await fs.readFile(runtimePath);
       return new StaticWasm(wasmBuffer);
     })();
   }
@@ -69,6 +74,68 @@ export function toRelativeWorkspacePath(absolutePath) {
   return path.relative(workspaceRoot(), absolutePath).replaceAll(path.sep, '/');
 }
 
+async function pathStatus(targetPath) {
+  try {
+    const stat = await fs.stat(targetPath);
+    return {
+      exists: true,
+      isFile: stat.isFile(),
+      isDirectory: stat.isDirectory(),
+      sizeBytes: stat.size,
+    };
+  } catch (error) {
+    return {
+      exists: false,
+      isFile: false,
+      isDirectory: false,
+      sizeBytes: 0,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function getRuntimeStatus() {
+  const configuredRoot = process.env.FONT_SPLIT_ROOT || null;
+  const root = workspaceRoot();
+  const runtimePath = getWasmRuntimePath();
+  const workspace = await pathStatus(root);
+  const wasm = await pathStatus(runtimePath);
+  const checks = [
+    {
+      name: 'workspace-root',
+      ok: workspace.exists && workspace.isDirectory,
+      message: workspace.exists && workspace.isDirectory ? 'workspace root is available' : 'workspace root is missing or not a directory',
+    },
+    {
+      name: 'wasm-runtime',
+      ok: wasm.exists && wasm.isFile,
+      message: wasm.exists && wasm.isFile ? 'cn-font-split WASM runtime is available' : 'cn-font-split WASM runtime is missing',
+    },
+  ];
+
+  return {
+    ok: checks.every((check) => check.ok),
+    packageName: packageJson.name,
+    packageVersion: PACKAGE_VERSION,
+    nodeVersion: process.version,
+    platform: process.platform,
+    arch: process.arch,
+    projectRoot: PROJECT_ROOT,
+    workspace: {
+      root,
+      fontSplitRootConfigured: configuredRoot !== null,
+      configuredRoot,
+      ...workspace,
+    },
+    wasm: {
+      path: runtimePath,
+      ...wasm,
+    },
+    supportedExtensions: [...FONT_EXTENSIONS],
+    checks,
+  };
+}
+
 export function getAgentGuidance(args = {}) {
   const workflow = ['overview', 'single', 'batch', 'inspect'].includes(args.workflow) ? args.workflow : 'overview';
   const configuredRoot = process.env.FONT_SPLIT_ROOT || null;
@@ -84,6 +151,7 @@ export function getAgentGuidance(args = {}) {
   const workflows = {
     overview: [
       'Call get_agent_guidance to orient yourself.',
+      'Call get_runtime_status when diagnosing setup, workspace, or WASM availability.',
       'Call inspect_font_inputs for a no-write source preflight.',
       'Call split_font_batch with dryRun true to preview output layout.',
       'Call split_font_batch with includeResults false for full-library processing.',
@@ -102,6 +170,7 @@ export function getAgentGuidance(args = {}) {
       'Call inspect_split_output on the outputRoot when done; use includeFiles false and includeFamilies false for large outputs.',
     ],
     inspect: [
+      'Call get_runtime_status to verify workspace and WASM availability when setup is uncertain.',
       'Call inspect_font_inputs to audit source directories before processing.',
       'Call inspect_split_output to audit generated output directories; set includeFiles false and includeFamilies false when only summary counts are needed.',
       'If maxFilesHit is true, rerun with a higher maxFiles before treating the summary as complete.',
@@ -121,6 +190,7 @@ export function getAgentGuidance(args = {}) {
     },
     tools: [
       { name: 'get_agent_guidance', useWhen: 'Orient an AI coding assistant before choosing a font-splitting workflow.' },
+      { name: 'get_runtime_status', useWhen: 'Check workspace, package, Node, and WASM runtime availability without writing files.' },
       { name: 'inspect_font_inputs', useWhen: 'Preflight source fonts without writing output.' },
       { name: 'split_font', useWhen: 'Process one known font file.' },
       { name: 'split_font_batch', useWhen: 'Scan, dedupe, name, skip-check, and process many fonts.' },

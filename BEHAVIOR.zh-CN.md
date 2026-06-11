@@ -9,11 +9,12 @@
 
 ## 1. 工具能力总览
 
-当前 MCP 服务暴露 5 个工具：
+当前 MCP 服务暴露 6 个工具：
 
 | 工具 | 作用 |
 |------|------|
 | `get_agent_guidance` | 返回面向 AI 编程助理的机器可读工作流指南 |
+| `get_runtime_status` | 返回工作区、包版本、Node、平台和 WASM 可用性的只读诊断信息 |
 | `split_font` | 处理单个字体文件 |
 | `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count 和坏字体清单 |
 | `split_font_batch` | 批量扫描目录、去重、分组并处理字体文件 |
@@ -45,9 +46,9 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 ### 2.1.1 AI agent 专用适配
 
-本项目是给 AI 编程助理调用的 MCP Server，因此除了普通参数 schema，还提供了 `get_agent_guidance`。
+本项目是给 AI 编程助理调用的 MCP Server，因此除了普通参数 schema，还提供了 `get_agent_guidance` 和 `get_runtime_status`。
 
-这个工具不读写字体文件，只返回：
+`get_agent_guidance` 不读写字体文件，只返回：
 
 - 当前 `FONT_SPLIT_ROOT` 解析结果
 - 路径使用规则
@@ -58,6 +59,16 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 调用方应该检查的关键响应字段
 
 当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。
+
+`get_runtime_status` 也是只读工具。它会检查：
+
+- 当前解析到的工作区是否存在且是目录
+- cn-font-split WASM 文件是否存在且是文件
+- 包名和版本
+- Node 版本、平台和 CPU 架构
+- 支持的字体扩展名
+
+当 agent 遇到安装、路径或 WASM 相关问题时，应先调用 `get_runtime_status`，再决定是否提示用户修正环境。
 
 所有相对路径都相对于 `FONT_SPLIT_ROOT` 解释。
 

@@ -2,7 +2,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { getAgentGuidance, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
+import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
 import { errorText, jsonText } from './mcp-response.js';
 
 const FontSplitOptions = {
@@ -58,6 +58,22 @@ server.registerTool(
   async (args) => {
     try {
       return jsonText(getAgentGuidance(args));
+    } catch (error) {
+      return errorText(error);
+    }
+  },
+);
+
+server.registerTool(
+  'get_runtime_status',
+  {
+    title: 'Get runtime status',
+    description: 'Call this when an AI coding assistant needs to diagnose setup before processing fonts. It checks the font workspace, package version, Node runtime, and cn-font-split WASM availability without writing files.',
+    inputSchema: {},
+  },
+  async () => {
+    try {
+      return jsonText(await getRuntimeStatus());
     } catch (error) {
       return errorText(error);
     }

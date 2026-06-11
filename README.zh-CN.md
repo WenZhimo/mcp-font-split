@@ -19,6 +19,7 @@
 - 批量扫描并处理字体目录。
 - 在大批量处理前预检输入目录，先发现坏字体或身份解析问题。
 - 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南选择安全工作流。
+- 提供 `get_runtime_status`，让 agent 在处理前确认工作区和 WASM 是否可用。
 - 在输出目录中保留原字体副本。
 - 为每个处理过的字体写入 `split-meta.json`。
 - 检查输出目录，返回基础文件统计和结构化 family/font 汇总。
@@ -29,6 +30,7 @@
 | 工具 | 说明 |
 |------|------|
 | `get_agent_guidance` | 返回面向 AI agent 的工作流指南、路径规则、默认策略和需要检查的响应字段。 |
+| `get_runtime_status` | 返回工作区、包版本、Node、平台和 WASM 可用性的只读诊断信息。 |
 | `split_font` | 处理单个字体。根据参数，结果可能是真正分片、单 WOFF2 fallback，或 copy-original 元数据登记。 |
 | `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count 和坏字体清单。 |
 | `split_font_batch` | 扫描目录、按 `batchDedupeMode` 去重、按家族目录分组，并处理每个选中的字体。 |
@@ -43,6 +45,7 @@
 
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。
 - 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它会返回推荐工具顺序、默认策略、路径规则和必须检查的响应字段。
+- 当安装或运行环境不确定时，使用 `get_runtime_status`；它会只读检查解析后的工作区和 cn-font-split WASM 文件。
 - 批量扫描会跳过依赖目录、已生成输出目录、`__MACOSX` 和 AppleDouble `._*` 资源叉文件。
 - `.woff` / `.woff2` 输入会先解压成 sfnt-like 数据，再进入处理流程。
 - 批量模式会按照 `batchDedupeMode` 去重；默认 `font-identity` 会在任意格式之间比较等价字体身份，并按 `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff` 的优先级保留一个代表。
@@ -364,6 +367,7 @@ npm run check:syntax
 npm run check:smoke
 npm run smoke
 npm run smoke:agent-guidance
+npm run smoke:runtime-status
 npm run smoke:incremental
 npm run smoke:font-inputs
 npm run smoke:scan-limits

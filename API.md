@@ -1,6 +1,6 @@
 # API Reference
 
-This server exposes five MCP tools. All paths are resolved inside `FONT_SPLIT_ROOT`; if that environment variable is not set, paths are resolved from the process working directory.
+This server exposes six MCP tools. All paths are resolved inside `FONT_SPLIT_ROOT`; if that environment variable is not set, paths are resolved from the process working directory.
 
 ## `get_agent_guidance`
 
@@ -11,6 +11,12 @@ Return machine-readable usage guidance for AI coding assistants.
 | `workflow` | `overview`, `single`, `batch`, `inspect` | `overview` | Guidance focus. |
 
 The response includes workspace path rules, supported extensions, default policies, recommended batch options, response fields to inspect, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+
+## `get_runtime_status`
+
+Return a read-only runtime diagnostic summary.
+
+This tool checks the resolved font workspace, package version, Node runtime, platform, supported extensions, and the cn-font-split WASM file. It returns `ok`, `checks[]`, `workspace`, and `wasm` fields so agents can diagnose setup problems before calling a splitting tool.
 
 ## `split_font`
 
