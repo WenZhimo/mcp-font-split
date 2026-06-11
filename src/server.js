@@ -28,6 +28,10 @@ const FontSplitOptions = {
   autoSubset: z.boolean().optional().describe('Automatically create subsets.'),
   subsetRemainChars: z.boolean().optional().describe('Automatically include remaining undeclared characters.'),
   subsets: z.array(z.array(z.number().int().nonnegative())).optional().describe('Explicit unicode codepoint groups to keep in each subset.'),
+  oversizedKernAction: z.enum(['preserve', 'strip']).optional().describe('How to handle oversized kern tables. Default: preserve. Use strip to explicitly allow removing an oversized kern table before splitting.'),
+  smallGlyphAction: z.enum(['subset', 'single-woff2']).optional().describe('How to handle very small fonts. Default: subset. Use single-woff2 to explicitly allow a one-file fallback instead of subset splitting.'),
+  smallGlyphThreshold: z.number().int().positive().optional().describe('Glyph-count threshold used when smallGlyphAction is single-woff2. Default: 50.'),
+  splitFailureAction: z.enum(['error', 'single-woff2']).optional().describe('What to do if cn-font-split fails. Default: error. Use single-woff2 to explicitly allow a one-file fallback after split failure.'),
 };
 
 const server = new McpServer({

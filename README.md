@@ -14,6 +14,26 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 
 ## Features
 
+> [!WARNING]
+> Before using this tool, read the full behavior and risk notes in the Chinese document: [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md)
+
+## Important behavior and defaults
+
+> [!WARNING]
+> This tool does **not** behave like a transparent “split whatever I give you without policy decisions” wrapper.
+>
+> In particular:
+> - `split_font_batch` groups outputs by the source folder name first, not primarily by the internal font family metadata.
+> - Same-basename multi-format fonts are automatically deduplicated by priority: `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff`.
+> - `.woff` / `.woff2` inputs are decompressed to sfnt-like data before splitting.
+> - Batch incremental skipping only checks whether `<family>/<fontBaseName>/result.css` already exists; it does **not** compare changed options.
+> - `ok: true` does **not** always mean multi-subset splitting happened; check `outputMode`, `skipped`, and `skipReason`.
+>
+> The most important policy change in the current version:
+> - Oversized `kern` stripping is **opt-in** via `oversizedKernAction: "strip"`.
+> - Small-font single-WOFF2 downgrade is **opt-in** via `smallGlyphAction: "single-woff2"`.
+> - Split-failure single-WOFF2 fallback is **opt-in** via `splitFailureAction: "single-woff2"`.
+
 - Split TTF/OTF/TTC/WOFF/WOFF2 fonts into optimized web-font subsets (woff2 chunks + CSS)
 - Auto-detect font family name from the binary and group output by family
 - Batch processing of font directories
@@ -75,6 +95,27 @@ npm start
 | Variable | Description |
 |----------|-------------|
 | `FONT_SPLIT_ROOT` | Override the default font workspace root directory |
+
+### Behavior control examples
+
+Conservative/default behavior: do not silently strip oversized `kern`, do not silently downgrade small fonts, and surface split failures.
+
+```json
+{
+  "fontPath": "SomeFamily/SomeFont.ttf"
+}
+```
+
+Compatibility / tolerant behavior: explicitly allow the old practical fallbacks.
+
+```json
+{
+  "fontPath": "SomeFamily/SomeFont.ttf",
+  "oversizedKernAction": "strip",
+  "smallGlyphAction": "single-woff2",
+  "splitFailureAction": "single-woff2"
+}
+```
 
 ## Credits & Acknowledgments
 

@@ -65,12 +65,17 @@ export function toRelativeWorkspacePath(absolutePath) {
 
 async function listFilesRecursive(root, { maxFiles = 5000, excludeDirs = [] } = {}) {
   const results = [];
-  const excludeSet = new Set([...excludeDirs, 'node_modules', '.git', 'split-output', 'font-split-mcp']);
+  const baseExclude = ['node_modules', '.git', 'font-split-mcp'];
+  const shouldExclude = (name) => {
+    if (baseExclude.includes(name)) return true;
+    if (name === 'split-output' || name.startsWith('split-output-')) return true;
+    return excludeDirs.includes(name);
+  };
   async function walk(dir) {
     if (results.length >= maxFiles) return;
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
-      if (excludeSet.has(entry.name)) continue;
+      if (shouldExclude(entry.name)) continue;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         await walk(fullPath);
@@ -116,6 +121,17 @@ function normalizeOptionalNumber(value) {
 
 function normalizeOptionalBoolean(value) {
   return typeof value === 'boolean' ? value : undefined;
+}
+
+function normalizeProcessingOptions(args) {
+  return {
+    oversizedKernAction: args.oversizedKernAction === 'strip' ? 'strip' : 'preserve',
+    smallGlyphAction: args.smallGlyphAction === 'single-woff2' ? 'single-woff2' : 'subset',
+    smallGlyphThreshold: Number.isFinite(args.smallGlyphThreshold) && args.smallGlyphThreshold > 0
+      ? Math.floor(args.smallGlyphThreshold)
+      : 50,
+    splitFailureAction: args.splitFailureAction === 'single-woff2' ? 'single-woff2' : 'error',
+  };
 }
 
 function buildFontSplitConfig(input, outDir, args) {
@@ -392,6 +408,50 @@ async function compressWoff2(buffer) {
   return new Uint8Array(result);
 }
 
+function inspectOversizedKern(buffer, thresholdRatio = 0.8) {
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const magic = view.getUint32(0);
+  if (magic === 0x774F4646 || magic === 0x774F4632 || magic === 0x74746366) {
+    return {
+      supported: false,
+      hasKern: false,
+      kernBytes: 0,
+      fontBytes: buffer.byteLength,
+      ratio: 0,
+      thresholdRatio,
+      oversized: false,
+    };
+  }
+
+  const numTables = view.getUint16(4);
+  for (let i = 0; i < numTables; i++) {
+    const off = 12 + i * 16;
+    const tag = String.fromCharCode(buffer[off], buffer[off + 1], buffer[off + 2], buffer[off + 3]);
+    if (tag !== 'kern') continue;
+    const kernBytes = view.getUint32(off + 12);
+    const ratio = buffer.byteLength > 0 ? kernBytes / buffer.byteLength : 0;
+    return {
+      supported: true,
+      hasKern: true,
+      kernBytes,
+      fontBytes: buffer.byteLength,
+      ratio,
+      thresholdRatio,
+      oversized: ratio >= thresholdRatio,
+    };
+  }
+
+  return {
+    supported: true,
+    hasKern: false,
+    kernBytes: 0,
+    fontBytes: buffer.byteLength,
+    ratio: 0,
+    thresholdRatio,
+    oversized: false,
+  };
+}
+
 function stripOversizedKern(buffer) {
   const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   const magic = view.getUint32(0);
@@ -546,25 +606,31 @@ async function ensureFontFile(fontPath) {
 
 export async function splitFont(args) {
   const startedAt = Date.now();
+  const processingOptions = normalizeProcessingOptions(args);
   const input = await ensureFontFile(args.fontPath);
   const fontBaseName = path.basename(input, path.extname(input));
   const fontFileName = path.basename(input);
   let inputBytes = new Uint8Array(await fs.readFile(input));
+  const inputFormat = path.extname(input).toLowerCase().slice(1) || 'unknown';
 
-  // Normalize to sfnt before processing
+  let decompressedFrom = null;
   const magic = new DataView(inputBytes.buffer, inputBytes.byteOffset, 4).getUint32(0);
   if (magic === 0x774F4646) {
     inputBytes = decompressWoff1(inputBytes);
+    decompressedFrom = 'woff';
   } else if (magic === 0x774F4632) {
     inputBytes = await decompressWoff2(inputBytes);
+    decompressedFrom = 'woff2';
   }
 
-  // Strip pathological kern table before passing into cn-font-split
-  const kernNormalized = stripOversizedKern(inputBytes);
-  inputBytes = kernNormalized.buffer;
-  const hadOversizedKern = kernNormalized.stripped;
+  const kernInspection = inspectOversizedKern(inputBytes);
+  let oversizedKernStripped = false;
+  if (processingOptions.oversizedKernAction === 'strip' && kernInspection.oversized) {
+    const kernNormalized = stripOversizedKern(inputBytes);
+    inputBytes = kernNormalized.buffer;
+    oversizedKernStripped = kernNormalized.stripped;
+  }
 
-  // Determine root directory name: prefer font family from binary, fallback to file base name
   const familyName = args.fontFamily || extractFontFamily(inputBytes) || fontBaseName;
   const safeFamilyName = sanitizeDirName(familyName);
 
@@ -574,29 +640,38 @@ export async function splitFont(args) {
   const splitDir = path.join(rootDir, fontBaseName);
   await fs.mkdir(splitDir, { recursive: true });
 
-  // Copy original font to root
   const destFontPath = path.join(rootDir, fontFileName);
   await fs.copyFile(input, destFontPath);
 
   const before = new Set((await summarizeFiles(rootDir)).map((file) => file.path));
 
-  // Very small Latin-only fonts don't need subsetting; emit a single woff2 + minimal CSS/HTML
   const glyphCount = getGlyphCount(inputBytes);
   let generated;
   let skipped = false;
   let skipReason = null;
-  if (glyphCount > 0 && glyphCount <= 50) {
+  let outputMode = 'subset';
+  let splitFailureFallbackApplied = false;
+  let splitFailureMessage = null;
+
+  const shouldEmitSmallGlyphFallback = (
+    glyphCount > 0
+    && glyphCount <= processingOptions.smallGlyphThreshold
+    && processingOptions.smallGlyphAction === 'single-woff2'
+  );
+
+  if (shouldEmitSmallGlyphFallback) {
     const fallback = await emitSmallGlyphFallback({
       inputBytes,
       splitDir,
       fontFamily: familyName,
       fontBaseName,
       args,
-      reason: 'too few glyphs for useful subsetting',
+      reason: 'small glyph fallback explicitly enabled',
     });
     generated = fallback.generated;
     skipped = fallback.skipped;
     skipReason = fallback.reason;
+    outputMode = 'single-woff2';
   } else {
     const config = buildFontSplitConfig(inputBytes, splitDir, args);
     const wasm = await getWasmRuntime();
@@ -604,18 +679,21 @@ export async function splitFont(args) {
       generated = (await fontSplit(config, wasm.WasiHandle, { logger: () => {} })).filter(Boolean);
       await writeGeneratedFiles(splitDir, generated);
     } catch (error) {
-      if (hadOversizedKern) {
+      splitFailureMessage = error instanceof Error ? error.message : String(error);
+      if (processingOptions.splitFailureAction === 'single-woff2') {
         const fallback = await emitSmallGlyphFallback({
           inputBytes,
           splitDir,
           fontFamily: familyName,
           fontBaseName,
           args,
-          reason: 'cn-font-split failed after oversized kern normalization; emitted single woff2 fallback',
+          reason: 'split failure fallback explicitly enabled',
         });
         generated = fallback.generated;
         skipped = fallback.skipped;
         skipReason = fallback.reason;
+        outputMode = 'single-woff2';
+        splitFailureFallbackApplied = true;
       } else {
         throw error;
       }
@@ -636,10 +714,35 @@ export async function splitFont(args) {
     glyphCount,
     skipped,
     skipReason,
+    outputMode,
+    decompressedFrom,
+    oversizedKernDetected: kernInspection.oversized,
+    oversizedKernStripped,
+    splitFailureFallbackApplied,
     fileCount: files.length,
     createdFileCount: createdFiles.length,
     files,
     createdFiles,
+    processing: {
+      inputFormat,
+      decompressedFrom,
+      oversizedKern: {
+        ...kernInspection,
+        action: processingOptions.oversizedKernAction,
+        stripped: oversizedKernStripped,
+      },
+      smallGlyph: {
+        glyphCount,
+        threshold: processingOptions.smallGlyphThreshold,
+        action: processingOptions.smallGlyphAction,
+        downgraded: outputMode === 'single-woff2' && skipReason === 'small glyph fallback explicitly enabled',
+      },
+      splitFailure: {
+        action: processingOptions.splitFailureAction,
+        fallbackApplied: splitFailureFallbackApplied,
+        failureMessage: splitFailureMessage,
+      },
+    },
   };
 }
 
@@ -657,7 +760,6 @@ export async function splitFontBatch(args) {
   });
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
 
-  // Deduplicate: same base name with multiple formats → keep highest priority format
   const FORMAT_PRIORITY = { '.otf': 0, '.ttf': 1, '.woff2': 2, '.ttc': 3, '.otc': 4, '.woff': 5 };
   const byBaseName = new Map();
   for (const file of fontFiles) {
@@ -674,18 +776,25 @@ export async function splitFontBatch(args) {
 
   const results = [];
   const errors = [];
+  const processingSummary = {
+    decompressedInputs: 0,
+    oversizedKernDetected: 0,
+    oversizedKernStripped: 0,
+    smallGlyphDowngrades: 0,
+    failureFallbacks: 0,
+    subsetOutputs: 0,
+    singleWoff2Outputs: 0,
+  };
   let skippedExisting = 0;
   for (const file of selected) {
     const relative = toRelativeWorkspacePath(file);
     try {
-      // Use source folder name as family grouping (matches user's directory structure)
       const relativeToInput = path.relative(inputDir, file);
       const segments = relativeToInput.split(path.sep);
       let familyDirName;
       if (segments.length > 1) {
         familyDirName = segments[0];
       } else {
-        // File is directly in inputDir root — fallback to binary extraction
         const inputBytes = new Uint8Array(await fs.readFile(file));
         familyDirName = extractFontFamily(inputBytes) || path.basename(file, path.extname(file));
       }
@@ -693,7 +802,6 @@ export async function splitFontBatch(args) {
       const outDir = path.join(outputRoot, safeFamilyName);
       const fontBaseName = path.basename(file, path.extname(file));
 
-      // Incremental: skip if already processed
       const resolvedOutDir = await resolveWorkspacePath(outDir);
       const marker = path.join(resolvedOutDir, fontBaseName, 'result.css');
       if (await fileExists(marker)) {
@@ -708,6 +816,16 @@ export async function splitFontBatch(args) {
         outDir,
       });
       results.push(result);
+      if (result.decompressedFrom) processingSummary.decompressedInputs++;
+      if (result.oversizedKernDetected) processingSummary.oversizedKernDetected++;
+      if (result.oversizedKernStripped) processingSummary.oversizedKernStripped++;
+      if (result.splitFailureFallbackApplied) processingSummary.failureFallbacks++;
+      if (result.outputMode === 'single-woff2') {
+        processingSummary.singleWoff2Outputs++;
+        if (result.processing?.smallGlyph?.downgraded) processingSummary.smallGlyphDowngrades++;
+      } else {
+        processingSummary.subsetOutputs++;
+      }
       args.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'done' });
     } catch (error) {
       resetWasmRuntime();
@@ -727,6 +845,7 @@ export async function splitFontBatch(args) {
     processedFontCount: results.length,
     errorCount: errors.length,
     errors,
+    processingSummary,
     results,
   };
 }

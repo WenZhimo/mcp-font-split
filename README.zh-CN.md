@@ -10,6 +10,26 @@
 
 ## 功能
 
+> [!WARNING]
+> 使用前请先阅读：[工具完整行为说明（含高风险 / 非直觉行为）](./BEHAVIOR.zh-CN.md)
+
+## 重要：实际行为与可选自动降级
+
+> [!WARNING]
+> 这个工具**不是**“输入什么就原样透明分割什么”的封装。
+>
+> 当前仍然存在这些重要行为：
+> - `split_font_batch` 会优先按源文件夹名分组，而不是优先按字体内部 family name 分组。
+> - 同名多格式字体会按固定优先级自动去重：`.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff`。
+> - `.woff` / `.woff2` 会先解压成 sfnt-like 数据，再交给核心分割流程。
+> - 批量增量跳过只检查 `<family>/<fontBaseName>/result.css` 是否已存在，不比较参数变化。
+> - `ok: true` 不代表一定发生了真正的多子集分割；请结合 `outputMode`、`skipped`、`skipReason` 一起判断。
+>
+> 当前版本最重要的策略变化：
+> - 超大 `kern` 表删除改为**显式 opt-in**：`oversizedKernAction: "strip"`
+> - 小字形字体单文件 WOFF2 降级改为**显式 opt-in**：`smallGlyphAction: "single-woff2"`
+> - 分割失败后的单文件 WOFF2 fallback 改为**显式 opt-in**：`splitFailureAction: "single-woff2"`
+
 - 将 TTF/OTF/TTC/WOFF/WOFF2 字体分割为优化的 web 字体子集（woff2 分片 + CSS）
 - 自动从字体二进制中提取字体家族名，按家族分组输出
 - 批量处理字体目录
@@ -71,6 +91,27 @@ npm start
 | 变量名 | 说明 |
 |--------|------|
 | `FONT_SPLIT_ROOT` | 覆盖默认的字体工作空间根目录 |
+
+### 行为控制示例
+
+保守 / 默认行为：不静默删除超大 `kern`，不静默把小字体降级成单个 WOFF2，分割失败直接报错。
+
+```json
+{
+  "fontPath": "SomeFamily/SomeFont.ttf"
+}
+```
+
+兼容 / 宽松行为：显式允许旧版本那类“尽量处理成功”的自动策略。
+
+```json
+{
+  "fontPath": "SomeFamily/SomeFont.ttf",
+  "oversizedKernAction": "strip",
+  "smallGlyphAction": "single-woff2",
+  "splitFailureAction": "single-woff2"
+}
+```
 
 ## 致谢与来源
 
