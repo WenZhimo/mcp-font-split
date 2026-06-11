@@ -12,7 +12,7 @@ const packageJson = require('../package.json');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const PROJECT_ROOT = path.resolve(__dirname, '..');
-export const DEFAULT_WORKSPACE_ROOT = path.resolve(PROJECT_ROOT, '..');
+export const DEFAULT_WORKSPACE_ROOT = path.resolve(process.cwd());
 const FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.ttc', '.otc', '.woff', '.woff2']);
 const MANIFEST_FILE_NAME = 'split-meta.json';
 const MANIFEST_VERSION = 1;

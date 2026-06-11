@@ -5,8 +5,8 @@ import { z } from 'zod';
 import { inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
 
 const FontSplitOptions = {
-  fontPath: z.string().describe('Font file path relative to the font workspace, or an absolute path inside it.'),
-  outDir: z.string().optional().describe('Output directory relative to the font workspace. Defaults to split-output/<font-file-name>.'),
+  fontPath: z.string().describe('Font file path relative to FONT_SPLIT_ROOT, or an absolute path inside it. If FONT_SPLIT_ROOT is not configured, ask the user which font workspace directory to use before processing private/local fonts.'),
+  outDir: z.string().optional().describe('Output directory relative to FONT_SPLIT_ROOT. Defaults to split-output/<font-file-name>.'),
   fontFamily: z.string().optional().describe('CSS font-family value.'),
   fontWeight: z.string().optional().describe('CSS font-weight value.'),
   fontStyle: z.string().optional().describe('CSS font-style value.'),

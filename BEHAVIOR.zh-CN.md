@@ -30,11 +30,16 @@
 ### 2.1 只允许访问工作区内的路径
 
 工具只允许访问 `FONT_SPLIT_ROOT` 指定的目录。
-默认值为：
+
+如果没有设置 `FONT_SPLIT_ROOT`，默认值为 MCP Server 进程启动时的当前工作目录。
+
+建议使用者根据自己的字体存放位置显式设置：
 
 ```text
-C:/Users/LENOVO/Downloads/字体
+FONT_SPLIT_ROOT=/path/to/your/font-workspace
 ```
+
+如果使用者是 AI agent，不应猜测或硬编码用户的本机路径；在处理用户私有/本地字体前，应该先询问用户希望把 `FONT_SPLIT_ROOT` 设置到哪个目录。
 
 所有相对路径都相对于 `FONT_SPLIT_ROOT` 解释。
 

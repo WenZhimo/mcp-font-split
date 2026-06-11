@@ -39,7 +39,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 
 Key defaults and policy choices:
 
-- Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root.
+- Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server.
 - `.woff` and `.woff2` inputs are decompressed to sfnt-like data before processing.
 - Batch mode deduplicates same-basename multi-format fonts by priority: `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff`.
 - Batch grouping defaults to `batchGroupBy: "auto"`, which preserves the directory-first behavior for nested inputs.
@@ -257,7 +257,7 @@ npm run smoke:small-skip
 
 | Variable | Description |
 |----------|-------------|
-| `FONT_SPLIT_ROOT` | Override the default font workspace root directory. |
+| `FONT_SPLIT_ROOT` | Font workspace root directory. Set this explicitly for your own font location; if unset, the server defaults to the current working directory used to start the MCP Server. If the caller is an AI agent, it should ask the user which directory to use instead of guessing or hard-coding a local private path. |
 
 ## Credits & Acknowledgments
 
