@@ -101,6 +101,7 @@
 
 `batchErrorMode` 默认是 `collect`，会保持兼容：即使存在单字体错误，也返回 `ok: true` 和 `errors[]`。自动化场景可以用 `fail-fast` 在首个错误时抛错，或用 `fail-after` 处理完选中字体后如果有错误再抛错。
 `strictMode: true` 只改变未显式设置的批量默认值，不会禁止显式覆盖。
+当 `fail-fast` 或 `fail-after` 通过 MCP Server 抛错时，错误响应文本是 JSON，包含 `ok: false`、`name`、`error` 和 `details`，因此 agent 仍可读取 `details.errors[]` 与 `details.summary`。
 
 全量字体库的简洁响应示例：
 

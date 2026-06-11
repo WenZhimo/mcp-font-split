@@ -101,6 +101,7 @@ If identity extraction fails for a file, batch dedupe falls back to that file's 
 
 `batchErrorMode` defaults to `collect`, which keeps compatibility by returning `ok: true` with `errors[]`. Use `fail-fast` to throw on the first per-font error, or `fail-after` to finish selected fonts and then throw if any errors occurred.
 `strictMode: true` changes only unresolved batch defaults; it does not prevent explicit overrides.
+When `fail-fast` or `fail-after` throws through the MCP server, the error response text is JSON with `ok: false`, `name`, `error`, and `details` so agents can still read `details.errors[]` and `details.summary`.
 
 Compact full-library example:
 

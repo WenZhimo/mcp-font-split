@@ -165,6 +165,8 @@ split-output/
 - `fail-fast`：遇到第一个单字体错误就抛错。
 - `fail-after`：继续处理选中的字体，最后如果存在任何单字体错误则抛错。
 
+当 `fail-fast` 或 `fail-after` 通过 MCP 抛错时，错误文本是 JSON，包含 `ok: false`、`name`、`error` 和 `details`；AI agent 应解析它来恢复 `details.errors[]` 和 `details.summary`。
+
 ## 如何解释返回结果
 
 `split_font` 返回兼容字段，也返回更明确的分类字段：
@@ -363,6 +365,7 @@ npm run smoke:incremental
 npm run smoke:font-inputs
 npm run smoke:scan-limits
 npm run smoke:inspect-compact
+npm run smoke:mcp-error
 npm run smoke:inspect
 npm run smoke:small-skip
 ```

@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { getAgentGuidance, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
+import { errorText } from './mcp-response.js';
 
 const scenario = process.argv[2] || 'single';
 const fontPath = process.argv[3] || '0xA000/0xA000-Regular.ttf';
@@ -155,6 +156,25 @@ if (scenario === 'single') {
     throw new Error('Expected compact output inspection to retain summary counts.');
   }
   console.log(JSON.stringify(compact, null, 2));
+} else if (scenario === 'mcp-error') {
+  const detailedError = new Error('batch failed');
+  detailedError.name = 'BatchSplitError';
+  detailedError.details = {
+    mode: 'fail-after',
+    errors: [{ file: 'bad.ttf', error: 'not a font' }],
+    summary: { errorCount: 1 },
+  };
+  const detailed = errorText(detailedError);
+  const parsed = JSON.parse(detailed.content[0].text);
+  if (detailed.isError !== true || parsed.name !== 'BatchSplitError' || parsed.details?.errors?.[0]?.file !== 'bad.ttf') {
+    throw new Error('Expected MCP error response to preserve structured details.');
+  }
+
+  const plain = errorText(new Error('plain failure'));
+  if (plain.content[0].text !== 'plain failure') {
+    throw new Error('Expected plain MCP error response to stay concise.');
+  }
+  console.log(JSON.stringify({ detailed: parsed, plain: plain.content[0].text }, null, 2));
 } else if (scenario === 'batch-compact') {
   const inputDir = process.argv[3] || '0xA000';
   const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-batch-compact-output';

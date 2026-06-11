@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { getAgentGuidance, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
+import { errorText, jsonText } from './mcp-response.js';
 
 const FontSplitOptions = {
   fontPath: z.string().describe('Font file path relative to FONT_SPLIT_ROOT, or an absolute path inside it. If FONT_SPLIT_ROOT is not configured, ask the user which font workspace directory to use before processing private/local fonts.'),
@@ -44,29 +45,6 @@ const server = new McpServer({
   name: 'font-split-mcp',
   version: '0.1.0',
 });
-
-function jsonText(value) {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(value, null, 2),
-      },
-    ],
-  };
-}
-
-function errorText(error) {
-  return {
-    isError: true,
-    content: [
-      {
-        type: 'text',
-        text: error instanceof Error ? error.message : String(error),
-      },
-    ],
-  };
-}
 
 server.registerTool(
   'get_agent_guidance',

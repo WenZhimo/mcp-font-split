@@ -167,6 +167,8 @@ In batch mode, the output directory key is the bare `fontBaseName` unless anothe
 - `fail-fast`: throw on the first per-font error.
 - `fail-after`: keep processing selected fonts, then throw if any per-font errors occurred.
 
+When `fail-fast` or `fail-after` throws through MCP, the error text is JSON containing `ok: false`, `name`, `error`, and `details`; AI agents should parse it to recover `details.errors[]` and `details.summary`.
+
 ## Result interpretation
 
 `split_font` returns compatibility fields plus explicit classification fields:
@@ -365,6 +367,7 @@ npm run smoke:incremental
 npm run smoke:font-inputs
 npm run smoke:scan-limits
 npm run smoke:inspect-compact
+npm run smoke:mcp-error
 npm run smoke:inspect
 npm run smoke:small-skip
 ```

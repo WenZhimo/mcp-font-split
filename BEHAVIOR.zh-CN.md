@@ -280,6 +280,8 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `fail-fast`：遇到第一个单字体错误后立即抛出 `BatchSplitError`。
 - `fail-after`：继续处理选中的字体；如果最终存在任何单字体错误，则抛出 `BatchSplitError`，错误对象包含 `details.errors` 和 `details.summary`。
 
+通过 MCP Server 返回时，带 `details` 的错误会被序列化为 JSON 文本，包含 `ok: false`、`name`、`error` 和 `details`。这能避免 AI agent 只看到一句错误消息却丢失失败文件清单。
+
 ### 4.11 `limit` / `maxFiles` / `includeResults` / `dryRun`（批量专用）
 
 - `limit`：去重后最多处理多少个字体；默认 `20`，MCP 入口最大 `50000`。
