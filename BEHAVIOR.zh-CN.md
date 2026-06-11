@@ -70,6 +70,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 支持的字体扩展名
 
 当 agent 遇到安装、路径或 WASM 相关问题时，应先调用 `get_runtime_status`，再决定是否提示用户修正环境。
+如果响应里的 `recommendedActions[]` 非空，agent 应优先根据其中的 `code`、`severity`、`message` 和可选 `command` 处理环境问题。
 
 所有相对路径都相对于 `FONT_SPLIT_ROOT` 解释。
 

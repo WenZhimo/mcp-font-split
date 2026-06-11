@@ -16,7 +16,7 @@ The response includes workspace path rules, supported extensions, default polici
 
 Return a read-only runtime diagnostic summary.
 
-This tool checks the resolved font workspace, package version, Node runtime, platform, supported extensions, the cn-font-split package, and the cn-font-split WASM file. It returns `ok`, `checks[]`, `workspace`, `wasm`, and `cnFontSplit` fields so agents can diagnose setup problems before calling a splitting tool.
+This tool checks the resolved font workspace, package version, Node runtime, platform, supported extensions, the cn-font-split package, and the cn-font-split WASM file. It returns `ok`, `checks[]`, `workspace`, `wasm`, `cnFontSplit`, and `recommendedActions[]` fields so agents can diagnose setup problems before calling a splitting tool.
 
 ## `split_font`
 

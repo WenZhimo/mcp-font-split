@@ -79,6 +79,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('cnFontSplit.runtimeVersion')) {
     throw new Error('Expected agent guidance to recommend checking cn-font-split runtime details.');
   }
+  if (!result.responseFieldsToCheck?.includes('recommendedActions')) {
+    throw new Error('Expected agent guidance to recommend checking remediation actions.');
+  }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'runtime-status') {
   const result = await getRuntimeStatus();
@@ -90,6 +93,9 @@ if (scenario === 'single') {
   }
   if (!result.cnFontSplit?.packageVersion) {
     throw new Error('Expected runtime status to include cn-font-split package version.');
+  }
+  if (!Array.isArray(result.recommendedActions)) {
+    throw new Error('Expected runtime status to include recommendedActions.');
   }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'font-inputs') {

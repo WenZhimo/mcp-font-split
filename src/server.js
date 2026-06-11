@@ -76,7 +76,7 @@ server.registerTool(
   'get_runtime_status',
   {
     title: 'Get runtime status',
-    description: 'Call this when an AI coding assistant needs to diagnose setup before processing fonts. It checks the font workspace, package versions, Node runtime, cn-font-split runtime details, and WASM availability without writing files.',
+    description: 'Call this when an AI coding assistant needs to diagnose setup before processing fonts. It checks the font workspace, package versions, Node runtime, cn-font-split runtime details, and WASM availability without writing files, then returns recommendedActions for remediation.',
     inputSchema: {},
   },
   async () => {

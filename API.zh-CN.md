@@ -16,7 +16,7 @@
 
 返回只读运行时诊断摘要。
 
-这个工具会检查解析后的字体工作区、包版本、Node 运行时、平台、支持扩展名、cn-font-split 包信息，以及 cn-font-split WASM 文件。响应包含 `ok`、`checks[]`、`workspace`、`wasm` 和 `cnFontSplit` 字段，方便 agent 在调用分割工具前先定位环境问题。
+这个工具会检查解析后的字体工作区、包版本、Node 运行时、平台、支持扩展名、cn-font-split 包信息，以及 cn-font-split WASM 文件。响应包含 `ok`、`checks[]`、`workspace`、`wasm`、`cnFontSplit` 和 `recommendedActions[]` 字段，方便 agent 在调用分割工具前先定位环境问题。
 
 ## `split_font`
 

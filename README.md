@@ -47,7 +47,7 @@ Key defaults and policy choices:
 
 - Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server.
 - For AI coding assistants, call `get_agent_guidance` first when the workflow is unclear. It returns recommended tool order, default policies, path rules, and response fields that should be inspected before claiming success.
-- Use `get_runtime_status` when setup is uncertain; it checks the resolved workspace, package versions, cn-font-split runtime version, and WASM file without writing anything.
+- Use `get_runtime_status` when setup is uncertain; it checks the resolved workspace, package versions, cn-font-split runtime version, and WASM file without writing anything, then returns `recommendedActions[]` for agent-friendly remediation.
 - Batch scanning skips dependencies, generated output directories, `__MACOSX`, and AppleDouble `._*` resource-fork files.
 - `.woff` and `.woff2` inputs are decompressed to sfnt-like data before processing.
 - Batch mode deduplicates fonts according to `batchDedupeMode`; by default `font-identity` keeps one representative for equivalent fonts across formats using the priority `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff`.

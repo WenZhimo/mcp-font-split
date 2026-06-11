@@ -139,6 +139,60 @@ async function readRuntimeVersionEntries(versionFilePath) {
   }
 }
 
+function buildRuntimeRecommendedActions({
+  workspace,
+  workspaceRootPath,
+  wasm,
+  cnFontSplitPackage,
+  cnFontSplitPackageInfo,
+  cnFontSplitRuntimeInfo,
+}) {
+  const actions = [];
+
+  if (!workspace.exists || !workspace.isDirectory) {
+    actions.push({
+      code: 'fix-workspace-root',
+      severity: 'error',
+      message: `Set FONT_SPLIT_ROOT to an existing directory, or start the MCP server from the intended font workspace. Current root: ${workspaceRootPath}`,
+    });
+  }
+
+  if (!cnFontSplitPackage.exists || !cnFontSplitPackage.isFile || !cnFontSplitPackageInfo.version) {
+    actions.push({
+      code: 'install-dependencies',
+      severity: 'error',
+      message: 'Install npm dependencies so cn-font-split package metadata is available.',
+      command: 'npm install',
+    });
+  }
+
+  if (!wasm.exists || !wasm.isFile) {
+    actions.push({
+      code: 'install-wasm-runtime',
+      severity: 'error',
+      message: 'Install the cn-font-split WASM runtime before splitting fonts.',
+      command: 'npm run install:wasm',
+    });
+  }
+
+  if (cnFontSplitRuntimeInfo.error) {
+    actions.push({
+      code: 'inspect-wasm-runtime-version',
+      severity: 'warning',
+      message: `Could not read the cn-font-split runtime version file: ${cnFontSplitRuntimeInfo.error}`,
+    });
+  } else if (wasm.exists && wasm.isFile && !cnFontSplitRuntimeInfo.wasmVersion) {
+    actions.push({
+      code: 'record-wasm-runtime-version',
+      severity: 'warning',
+      message: 'The WASM file exists, but its cn-font-split runtime release is not recorded.',
+      command: 'npm run install:wasm -- --force',
+    });
+  }
+
+  return actions;
+}
+
 export async function getRuntimeStatus() {
   const configuredRoot = process.env.FONT_SPLIT_ROOT || null;
   const root = workspaceRoot();
@@ -149,6 +203,14 @@ export async function getRuntimeStatus() {
   const cnFontSplitVersionFile = await pathStatus(CN_FONT_SPLIT_VERSION_FILE);
   const cnFontSplitPackageInfo = await readPackageVersion(CN_FONT_SPLIT_PACKAGE_JSON);
   const cnFontSplitRuntimeInfo = await readRuntimeVersionEntries(CN_FONT_SPLIT_VERSION_FILE);
+  const recommendedActions = buildRuntimeRecommendedActions({
+    workspace,
+    workspaceRootPath: root,
+    wasm,
+    cnFontSplitPackage,
+    cnFontSplitPackageInfo,
+    cnFontSplitRuntimeInfo,
+  });
   const checks = [
     {
       name: 'workspace-root',
@@ -198,6 +260,7 @@ export async function getRuntimeStatus() {
     },
     supportedExtensions: [...FONT_EXTENSIONS],
     checks,
+    recommendedActions,
   };
 }
 
@@ -291,6 +354,7 @@ export function getAgentGuidance(args = {}) {
       'cnFontSplit',
       'cnFontSplit.packageVersion',
       'cnFontSplit.runtimeVersion',
+      'recommendedActions',
       'resultType',
       'outputMode',
       'performedSplit',
