@@ -73,6 +73,14 @@ try {
   console.log(`Discovered: ${result.discoveredFontCount} | After dedupe: ${result.deduplicatedCount} (skipped ${result.skippedDuplicates} duplicates)`);
   console.log(`Processed: ${result.processedFontCount} | Skipped existing: ${result.skippedExisting} | Errors: ${result.errorCount}`);
   console.log(`Mode: ${result.dryRun ? 'dry-run' : 'write'} | Results included: ${result.resultsIncluded}`);
+  console.log(`Batch warnings: ${result.batchWarningCount}`);
+
+  if (result.batchWarnings?.length > 0) {
+    console.log('\nBatch warning details:');
+    for (const warning of result.batchWarnings) {
+      console.log(`  ${warning.code}: ${warning.message}`);
+    }
+  }
 
   if (result.errors.length > 0) {
     console.log('\nFailed fonts:');

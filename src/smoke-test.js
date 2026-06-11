@@ -1,10 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
 import { errorText } from './mcp-response.js';
 
+const execFileAsync = promisify(execFile);
 const scenario = process.argv[2] || 'single';
 const fontPath = process.argv[3] || '0xA000/0xA000-Regular.ttf';
 const outDir = process.argv[4] || 'font-split-mcp/.font-split-smoke-output';
@@ -186,6 +189,29 @@ if (scenario === 'single') {
   }
 
   console.log(JSON.stringify({ inputInspect, batchPlan, outputInspect }, null, 2));
+} else if (scenario === 'batch-run-cli') {
+  const inputDir = process.argv[3] || '.font-split-batch-run-cli';
+  const outputRoot = process.argv[4] || '.font-split-batch-run-cli-output';
+  console.log('Batch runner CLI smoke:', inputDir, '->', outputRoot);
+  await fs.rm(inputDir, { recursive: true, force: true });
+  await fs.rm(outputRoot, { recursive: true, force: true });
+  await fs.mkdir(inputDir, { recursive: true });
+  await fs.writeFile(path.join(inputDir, 'a-note.txt'), 'not a font');
+  await fs.writeFile(path.join(inputDir, 'b-not-a-font.ttf'), 'not a real font');
+
+  const { stdout } = await execFileAsync(process.execPath, ['batch-run.js', inputDir, outputRoot, '1', '1', '--dry-run'], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      FONT_SPLIT_INCLUDE_RESULTS: 'false',
+    },
+  });
+  for (const expectedText of ['Batch warnings:', 'dry-run-no-write', 'input-scan-truncated', 'batch-plan-omitted']) {
+    if (!stdout.includes(expectedText)) {
+      throw new Error(`Expected batch-run CLI output to include ${expectedText}.`);
+    }
+  }
+  console.log(stdout);
 } else if (scenario === 'inspect-compact') {
   const inputDir = process.argv[3] || 'font-split-mcp/.font-split-inspect-compact';
   console.log('Compact output inspection smoke:', inputDir);

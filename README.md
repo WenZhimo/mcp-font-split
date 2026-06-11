@@ -369,7 +369,7 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` is a safe standalone batch helper for agents and maintainers. It defaults to `strictMode: true`, `includeResults: false`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, and `splitFailureAction: "single-woff2"`. Positional arguments are `inputDir`, `outputRoot`, `limit`, and `maxFiles`; the same values can be supplied with `FONT_SPLIT_INPUT_DIR`, `FONT_SPLIT_OUTPUT_ROOT`, `FONT_SPLIT_LIMIT`, `FONT_SPLIT_MAX_FILES`, and `FONT_SPLIT_DRY_RUN`. Advanced overrides are available through `FONT_SPLIT_STRICT_MODE`, `FONT_SPLIT_INCLUDE_RESULTS`, `FONT_SPLIT_SKIP_MODE`, `FONT_SPLIT_BATCH_GROUP_BY`, `FONT_SPLIT_BATCH_NAMING_MODE`, `FONT_SPLIT_BATCH_DEDUPE_MODE`, `FONT_SPLIT_BATCH_ERROR_MODE`, `FONT_SPLIT_SPLIT_FAILURE_ACTION`, and `FONT_SPLIT_CHUNK_SIZE`.
+`batch:run` is a safe standalone batch helper for agents and maintainers. It defaults to `strictMode: true`, `includeResults: false`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, and `splitFailureAction: "single-woff2"`. Positional arguments are `inputDir`, `outputRoot`, `limit`, and `maxFiles`; the same values can be supplied with `FONT_SPLIT_INPUT_DIR`, `FONT_SPLIT_OUTPUT_ROOT`, `FONT_SPLIT_LIMIT`, `FONT_SPLIT_MAX_FILES`, and `FONT_SPLIT_DRY_RUN`. It prints `batchWarnings[]` codes/messages in the console summary. Advanced overrides are available through `FONT_SPLIT_STRICT_MODE`, `FONT_SPLIT_INCLUDE_RESULTS`, `FONT_SPLIT_SKIP_MODE`, `FONT_SPLIT_BATCH_GROUP_BY`, `FONT_SPLIT_BATCH_NAMING_MODE`, `FONT_SPLIT_BATCH_DEDUPE_MODE`, `FONT_SPLIT_BATCH_ERROR_MODE`, `FONT_SPLIT_SPLIT_FAILURE_ACTION`, and `FONT_SPLIT_CHUNK_SIZE`.
 
 ### Smoke checks
 
@@ -383,6 +383,7 @@ npm run smoke:runtime-status
 npm run smoke:incremental
 npm run smoke:font-inputs
 npm run smoke:scan-limits
+npm run smoke:batch-run
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
 npm run smoke:inspect
