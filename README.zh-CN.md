@@ -205,6 +205,8 @@ split-output/
 
 - `maxFiles` 可以调整输出扫描上限；默认是 `200000`，避免大型批量输出在检查时被截断。
 - `maxFilesHit` 只有当 `maxFiles` 之外确实还有更多输出文件时才为 true。
+- `includeFiles: false` 会省略扁平 `files[]`，但保留摘要计数。
+- `includeFamilies: false` 会省略结构化 `families[]`，但保留 family 和输出模式计数。
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`
@@ -360,6 +362,7 @@ npm run smoke:agent-guidance
 npm run smoke:incremental
 npm run smoke:font-inputs
 npm run smoke:scan-limits
+npm run smoke:inspect-compact
 npm run smoke:inspect
 npm run smoke:small-skip
 ```

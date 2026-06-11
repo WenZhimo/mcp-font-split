@@ -511,10 +511,14 @@ split-meta.json
 
 `maxFilesHit` 只有当 `maxFiles` 之外确实还有更多输出文件时才为 `true`。如果它为 `true`，不要把本次输出审计视为完整结果，应调高 `maxFiles` 后重跑。
 
+`includeFiles: false` 会省略扁平 `files[]` 清单；`includeFamilies: false` 会省略结构化 `families[]` 清单。它们只影响响应体大小，不影响 `fileCount`、`familyCount`、`fontEntryCount`、manifest 数量或输出模式计数。
+
 保留基础统计：
 
 - `fileCount`
 - `maxFilesHit`
+- `filesIncluded`
+- `familiesIncluded`
 - `totalBytes`
 - `byExtension`
 - `files`

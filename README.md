@@ -207,6 +207,8 @@ In batch mode, the output directory key is the bare `fontBaseName` unless anothe
 
 - `maxFiles` can raise or lower the output scan cap; it defaults to `200000` so large batch outputs are not truncated during inspection.
 - `maxFilesHit` is true only when more output files exist beyond `maxFiles`.
+- `includeFiles: false` omits flat `files[]` while keeping summary counters.
+- `includeFamilies: false` omits structured `families[]` while keeping family and output-mode counters.
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`
@@ -362,6 +364,7 @@ npm run smoke:agent-guidance
 npm run smoke:incremental
 npm run smoke:font-inputs
 npm run smoke:scan-limits
+npm run smoke:inspect-compact
 npm run smoke:inspect
 npm run smoke:small-skip
 ```

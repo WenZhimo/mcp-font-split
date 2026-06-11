@@ -129,6 +129,8 @@
 |------|------|--------|------|
 | `outDir` | string | `split-output` | 要检查的输出目录。 |
 | `maxFiles` | 正整数，MCP 最大 `200000` | `200000` | 输出检查阶段最多扫描多少个文件。 |
+| `includeFiles` | boolean | `true` | 是否返回扁平 `files[]` 清单；大库只看摘要时可设为 `false`。 |
+| `includeFamilies` | boolean | `true` | 是否返回结构化 `families[]` 清单；大库只看摘要时可设为 `false`。 |
 
 重要返回字段：
 
@@ -136,6 +138,7 @@
 |------|------|
 | `familyCount` | 检测到的 family 目录数量。 |
 | `maxFilesHit` | 只有当 `maxFiles` 之外确实还存在更多输出文件时才为 `true`。 |
+| `filesIncluded` / `familiesIncluded` | 响应中是否包含 `files[]` 和 `families[]`。 |
 | `fontEntryCount` | 检测到的字体输出条目数量。 |
 | `manifestCount` | 带 `split-meta.json` 的条目数量。 |
 | `legacyOutputCount` | 没有 manifest、只能保守推断的旧输出数量。 |

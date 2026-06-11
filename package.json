@@ -24,6 +24,7 @@
     "smoke:scan-limits": "node src/smoke-test.js scan-limits",
     "smoke:incremental": "node src/smoke-test.js batch-incremental",
     "smoke:batch-compact": "node src/smoke-test.js batch-compact",
+    "smoke:inspect-compact": "node src/smoke-test.js inspect-compact",
     "smoke:inspect": "node src/smoke-test.js inspect",
     "smoke:small-skip": "node src/smoke-test.js small-skip"
   },

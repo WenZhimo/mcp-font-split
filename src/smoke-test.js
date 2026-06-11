@@ -67,6 +67,9 @@ if (scenario === 'single') {
   if (result.agentOptimized !== true || result.workflow !== 'batch' || !result.tools.some((tool) => tool.name === 'inspect_font_inputs')) {
     throw new Error('Expected agent guidance to describe the batch workflow and preflight tool.');
   }
+  if (result.recommendedInspectOptions?.includeFiles !== false || result.recommendedInspectOptions?.includeFamilies !== false) {
+    throw new Error('Expected agent guidance to recommend compact output inspection.');
+  }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'font-inputs') {
   const inputDir = process.argv[3] || 'font-split-mcp/.font-split-input-inspect';
@@ -129,6 +132,29 @@ if (scenario === 'single') {
   }
 
   console.log(JSON.stringify({ inputInspect, batchPlan, outputInspect }, null, 2));
+} else if (scenario === 'inspect-compact') {
+  const inputDir = process.argv[3] || 'font-split-mcp/.font-split-inspect-compact';
+  console.log('Compact output inspection smoke:', inputDir);
+  await fs.rm(inputDir, { recursive: true, force: true });
+  await fs.mkdir(path.join(inputDir, 'Nested'), { recursive: true });
+  await fs.writeFile(path.join(inputDir, 'sample.txt'), 'sample');
+  await fs.writeFile(path.join(inputDir, 'Nested', 'result.css'), 'body{}');
+
+  const compact = await inspectSplitOutput({
+    outDir: inputDir,
+    includeFiles: false,
+    includeFamilies: false,
+  });
+  if (compact.filesIncluded !== false || compact.familiesIncluded !== false) {
+    throw new Error('Expected compact output inspection to mark files and families as omitted.');
+  }
+  if (Object.hasOwn(compact, 'files') || Object.hasOwn(compact, 'families')) {
+    throw new Error('Expected compact output inspection to omit files[] and families[].');
+  }
+  if (compact.fileCount !== 2 || compact.familyCount < 1) {
+    throw new Error('Expected compact output inspection to retain summary counts.');
+  }
+  console.log(JSON.stringify(compact, null, 2));
 } else if (scenario === 'batch-compact') {
   const inputDir = process.argv[3] || '0xA000';
   const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-batch-compact-output';

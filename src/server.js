@@ -154,6 +154,8 @@ server.registerTool(
     inputSchema: {
       outDir: z.string().optional().describe('Output directory to inspect, relative to the font workspace. Defaults to split-output.'),
       maxFiles: z.number().int().positive().max(200000).optional().describe('Maximum output files to inspect. Defaults to 200000.'),
+      includeFiles: z.boolean().optional().describe('Include flat files[] entries in the response. Default: true. Set false for compact summaries.'),
+      includeFamilies: z.boolean().optional().describe('Include structured families[] inventory in the response. Default: true. Set false for compact summaries.'),
     },
   },
   async (args) => {

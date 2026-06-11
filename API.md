@@ -129,6 +129,8 @@ Inspect a generated output directory.
 |-------|------|---------|-------------|
 | `outDir` | string | `split-output` | Output directory to inspect. |
 | `maxFiles` | positive integer, MCP max `200000` | `200000` | Maximum output files to scan. |
+| `includeFiles` | boolean | `true` | Include flat `files[]`; set `false` for compact summaries. |
+| `includeFamilies` | boolean | `true` | Include structured `families[]`; set `false` for compact summaries. |
 
 Important result fields:
 
@@ -136,6 +138,7 @@ Important result fields:
 |-------|---------|
 | `familyCount` | Number of detected family directories. |
 | `maxFilesHit` | `true` only when more output files existed beyond `maxFiles`. |
+| `filesIncluded` / `familiesIncluded` | Whether `files[]` and `families[]` are present. |
 | `fontEntryCount` | Number of detected per-font output entries. |
 | `manifestCount` | Number of entries with `split-meta.json`. |
 | `legacyOutputCount` | Number of entries inferred without manifest. |

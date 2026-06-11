@@ -87,7 +87,7 @@ export function getAgentGuidance(args = {}) {
       'Call inspect_font_inputs for a no-write source preflight.',
       'Call split_font_batch with dryRun true to preview output layout.',
       'Call split_font_batch with includeResults false for full-library processing.',
-      'Call inspect_split_output after processing to audit generated output.',
+      'Call inspect_split_output after processing; use includeFiles false and includeFamilies false for compact summaries.',
     ],
     single: [
       'Call split_font with one fontPath.',
@@ -99,11 +99,11 @@ export function getAgentGuidance(args = {}) {
       'Call split_font_batch with dryRun true and includeResults true to review planned paths.',
       'Use batchNamingMode numeric-suffix and batchDedupeMode font-identity unless the user asks for another policy.',
       'Use includeResults false for large real runs.',
-      'Call inspect_split_output on the outputRoot when done.',
+      'Call inspect_split_output on the outputRoot when done; use includeFiles false and includeFamilies false for large outputs.',
     ],
     inspect: [
       'Call inspect_font_inputs to audit source directories before processing.',
-      'Call inspect_split_output to audit generated output directories.',
+      'Call inspect_split_output to audit generated output directories; set includeFiles false and includeFamilies false when only summary counts are needed.',
       'If maxFilesHit is true, rerun with a higher maxFiles before treating the summary as complete.',
     ],
   };
@@ -144,6 +144,11 @@ export function getAgentGuidance(args = {}) {
       includeResults: false,
       splitFailureAction: 'single-woff2',
     },
+    recommendedInspectOptions: {
+      includeFiles: false,
+      includeFamilies: false,
+      maxFiles: 200000,
+    },
     responseFieldsToCheck: [
       'ok',
       'resultType',
@@ -158,6 +163,8 @@ export function getAgentGuidance(args = {}) {
       'planIncluded',
       'manifestCount',
       'legacyOutputCount',
+      'filesIncluded',
+      'familiesIncluded',
     ],
     pathRules: commonPathRules,
     recommendedWorkflow: workflows[workflow],
@@ -1786,6 +1793,8 @@ export async function inspectSplitOutput(args) {
   const outDir = await resolveWorkspacePath(args.outDir || 'split-output', { mustExist: true });
   const outDirRelative = toRelativeWorkspacePath(outDir);
   const maxFiles = args.maxFiles || 200000;
+  const includeFiles = args.includeFiles !== false;
+  const includeFamilies = args.includeFamilies !== false;
   const outputSummary = await summarizeFilesDetailed(outDir, { maxFiles });
   const files = outputSummary.files;
   const byExtension = {};
@@ -1885,7 +1894,7 @@ export async function inspectSplitOutput(args) {
     fileCount: files.length,
     totalBytes,
     byExtension,
-    files,
+    filesIncluded: includeFiles,
     familyCount: families.length,
     fontEntryCount,
     manifestCount,
@@ -1893,6 +1902,8 @@ export async function inspectSplitOutput(args) {
     singleWoff2OutputCount,
     copyOriginalOutputCount,
     legacyOutputCount,
-    families,
+    familiesIncluded: includeFamilies,
+    ...(includeFiles ? { files } : {}),
+    ...(includeFamilies ? { families } : {}),
   };
 }
