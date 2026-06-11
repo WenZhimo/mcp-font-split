@@ -83,6 +83,9 @@ if (scenario === 'single') {
   if (!result.checks?.every((check) => check.ok === true)) {
     throw new Error('Expected runtime status checks to pass.');
   }
+  if (!result.cnFontSplit?.packageVersion) {
+    throw new Error('Expected runtime status to include cn-font-split package version.');
+  }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'font-inputs') {
   const inputDir = process.argv[3] || 'font-split-mcp/.font-split-input-inspect';

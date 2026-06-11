@@ -2,7 +2,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import { createWriteStream } from 'node:fs';
-import { copyFile, mkdir, readFile, rename, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +16,7 @@ const cnFontSplitRoot = join(projectRoot, 'node_modules', 'cn-font-split');
 const cnFontSplitPackageJson = join(cnFontSplitRoot, 'package.json');
 const outputDir = join(cnFontSplitRoot, 'dist');
 const outputPath = join(outputDir, WASM_FILE);
+const versionFilePath = join(outputDir, 'version');
 const force = process.argv.includes('--force') || process.env.CN_FONT_SPLIT_WASM_FORCE === '1';
 
 function isRedirect(statusCode) {
@@ -159,6 +160,24 @@ async function readCnFontSplitPackageVersion() {
   return packageJson.version || 'unknown';
 }
 
+async function writeRuntimeVersion(releaseVersion) {
+  let entries = [];
+  try {
+    entries = (await readFile(versionFilePath, 'utf8'))
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((line) => !line.startsWith('wasm32-wasip1@'));
+  } catch (error) {
+    if (!error || error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  entries.push(`wasm32-wasip1@${releaseVersion}`);
+  await writeFile(versionFilePath, `${entries.join('\n')}\n`, 'utf8');
+}
+
 async function resolveReleaseVersion() {
   const pinnedVersion = getArgValue('--version') || process.env.CN_FONT_SPLIT_WASM_VERSION;
   if (pinnedVersion) {
@@ -202,6 +221,7 @@ async function main() {
     await downloadFile(downloadUrl, tempPath);
     const stats = await assertFile(tempPath, WASM_FILE);
     await rename(tempPath, outputPath);
+    await writeRuntimeVersion(releaseVersion);
     console.log(`Installed ${WASM_FILE} (${stats.size} bytes) at ${outputPath}`);
   } catch (error) {
     await rm(tempPath, { force: true });

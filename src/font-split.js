@@ -14,6 +14,8 @@ const packageJson = require('../package.json');
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const PROJECT_ROOT = path.resolve(__dirname, '..');
 export const DEFAULT_WORKSPACE_ROOT = path.resolve(process.cwd());
+const CN_FONT_SPLIT_PACKAGE_JSON = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/package.json');
+const CN_FONT_SPLIT_VERSION_FILE = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/dist/version');
 const FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.ttc', '.otc', '.woff', '.woff2']);
 const FORMAT_PRIORITY = { '.otf': 0, '.ttf': 1, '.woff2': 2, '.ttc': 3, '.otc': 4, '.woff': 5 };
 const MANIFEST_FILE_NAME = 'split-meta.json';
@@ -94,12 +96,59 @@ async function pathStatus(targetPath) {
   }
 }
 
+async function readPackageVersion(packageJsonPath) {
+  try {
+    const parsed = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
+    return {
+      version: parsed.version || null,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      version: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function readRuntimeVersionEntries(versionFilePath) {
+  try {
+    const entries = (await fs.readFile(versionFilePath, 'utf8'))
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const wasmEntry = entries.find((entry) => entry.startsWith('wasm32-wasip1@')) || null;
+    return {
+      entries,
+      wasmVersion: wasmEntry ? wasmEntry.slice('wasm32-wasip1@'.length) : null,
+      error: null,
+    };
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      return {
+        entries: [],
+        wasmVersion: null,
+        error: null,
+      };
+    }
+    return {
+      entries: [],
+      wasmVersion: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export async function getRuntimeStatus() {
   const configuredRoot = process.env.FONT_SPLIT_ROOT || null;
   const root = workspaceRoot();
   const runtimePath = getWasmRuntimePath();
   const workspace = await pathStatus(root);
   const wasm = await pathStatus(runtimePath);
+  const cnFontSplitPackage = await pathStatus(CN_FONT_SPLIT_PACKAGE_JSON);
+  const cnFontSplitVersionFile = await pathStatus(CN_FONT_SPLIT_VERSION_FILE);
+  const cnFontSplitPackageInfo = await readPackageVersion(CN_FONT_SPLIT_PACKAGE_JSON);
+  const cnFontSplitRuntimeInfo = await readRuntimeVersionEntries(CN_FONT_SPLIT_VERSION_FILE);
   const checks = [
     {
       name: 'workspace-root',
@@ -110,6 +159,11 @@ export async function getRuntimeStatus() {
       name: 'wasm-runtime',
       ok: wasm.exists && wasm.isFile,
       message: wasm.exists && wasm.isFile ? 'cn-font-split WASM runtime is available' : 'cn-font-split WASM runtime is missing',
+    },
+    {
+      name: 'cn-font-split-package',
+      ok: cnFontSplitPackage.exists && cnFontSplitPackage.isFile && Boolean(cnFontSplitPackageInfo.version),
+      message: cnFontSplitPackageInfo.version ? `cn-font-split package ${cnFontSplitPackageInfo.version} is available` : 'cn-font-split package metadata is missing',
     },
   ];
 
@@ -130,6 +184,17 @@ export async function getRuntimeStatus() {
     wasm: {
       path: runtimePath,
       ...wasm,
+    },
+    cnFontSplit: {
+      packageJsonPath: CN_FONT_SPLIT_PACKAGE_JSON,
+      packageVersion: cnFontSplitPackageInfo.version,
+      packageError: cnFontSplitPackageInfo.error,
+      packageJson: cnFontSplitPackage,
+      runtimeVersionPath: CN_FONT_SPLIT_VERSION_FILE,
+      runtimeVersion: cnFontSplitRuntimeInfo.wasmVersion,
+      runtimeVersionEntries: cnFontSplitRuntimeInfo.entries,
+      runtimeVersionError: cnFontSplitRuntimeInfo.error,
+      runtimeVersionFile: cnFontSplitVersionFile,
     },
     supportedExtensions: [...FONT_EXTENSIONS],
     checks,
