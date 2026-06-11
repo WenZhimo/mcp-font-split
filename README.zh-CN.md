@@ -366,7 +366,7 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。它默认使用 `strictMode: true`、`includeResults: false`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"` 和 `splitFailureAction: "single-woff2"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_DRY_RUN` 提供相同配置。
+`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。它默认使用 `strictMode: true`、`includeResults: false`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"` 和 `splitFailureAction: "single-woff2"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_DRY_RUN` 提供相同配置。高级覆盖项可使用 `FONT_SPLIT_STRICT_MODE`、`FONT_SPLIT_INCLUDE_RESULTS`、`FONT_SPLIT_SKIP_MODE`、`FONT_SPLIT_BATCH_GROUP_BY`、`FONT_SPLIT_BATCH_NAMING_MODE`、`FONT_SPLIT_BATCH_DEDUPE_MODE`、`FONT_SPLIT_BATCH_ERROR_MODE`、`FONT_SPLIT_SPLIT_FAILURE_ACTION` 和 `FONT_SPLIT_CHUNK_SIZE`。
 
 ### Smoke 检查
 
