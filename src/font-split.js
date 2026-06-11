@@ -352,8 +352,8 @@ export function getAgentGuidance(args = {}) {
     {
       id: 'process-outcome-checked',
       appliesTo: ['single', 'batch'],
-      check: 'After processing, inspect resultType, outputMode, performedSplit, usedFallback, warnings, errorCount, and errors before claiming success.',
-      responseFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'errorCount', 'errors'],
+      check: 'After processing, inspect resultType, outputMode, performedSplit, usedFallback, warnings, batchWarnings, errorCount, and errors before claiming success.',
+      responseFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'batchWarnings', 'errorCount', 'errors'],
     },
     {
       id: 'fallback-disclosed',
@@ -456,6 +456,8 @@ export function getAgentGuidance(args = {}) {
       'performedSplit',
       'usedFallback',
       'warnings',
+      'batchWarnings',
+      'batchWarningCount',
       'errorCount',
       'errors',
       'maxFilesHit',
@@ -647,6 +649,47 @@ function buildWarnings({ decompressedFrom, oversizedKernDetected, oversizedKernS
   if (oversizedKernDetected && !oversizedKernStripped) warnings.push('oversized kern table detected but preserved');
   if (oversizedKernStripped) warnings.push('oversized kern table stripped before splitting');
   if ((usedFallback || skipped) && skipReason) warnings.push(skipReason);
+  return warnings;
+}
+
+function buildBatchWarnings({
+  dryRun,
+  includeResults,
+  inputScanTruncated,
+  maxFiles,
+  deduplicatedCount,
+  selectedCount,
+  skippedExisting,
+  errorCount,
+  batchErrorMode,
+}) {
+  const warnings = [];
+  const push = (code, message) => warnings.push({ code, message });
+
+  if (dryRun) {
+    push('dry-run-no-write', 'dryRun is true; no output files were written.');
+  }
+  if (inputScanTruncated) {
+    push('input-scan-truncated', `Input scan hit maxFiles (${maxFiles}); rerun with a higher maxFiles before treating counts as complete.`);
+  }
+  if (selectedCount < deduplicatedCount) {
+    push('batch-limit-truncated', `Batch limit selected ${selectedCount} of ${deduplicatedCount} deduplicated fonts.`);
+  }
+  if (!includeResults) {
+    push(
+      dryRun ? 'batch-plan-omitted' : 'batch-results-omitted',
+      dryRun
+        ? 'Dry-run plan details are omitted because includeResults is false.'
+        : 'Per-font result details are omitted because includeResults is false.',
+    );
+  }
+  if (skippedExisting > 0) {
+    push('existing-output-skipped', `${skippedExisting} selected fonts were skipped because existing output matched the selected skipMode.`);
+  }
+  if (errorCount > 0 && batchErrorMode === 'collect') {
+    push('errors-collected', 'Per-font errors were collected in errors[]; inspect them before claiming the batch fully succeeded.');
+  }
+
   return warnings;
 }
 
@@ -1990,6 +2033,18 @@ export async function splitFontBatch(args) {
     }
   }
 
+  const batchWarnings = buildBatchWarnings({
+    dryRun,
+    includeResults,
+    inputScanTruncated: inputScan.truncated,
+    maxFiles,
+    deduplicatedCount,
+    selectedCount: selected.length,
+    skippedExisting,
+    errorCount: errors.length,
+    batchErrorMode: batchOptions.batchErrorMode,
+  });
+
   const response = {
     ok: true,
     inputDir: toRelativeWorkspacePath(inputDir),
@@ -2014,6 +2069,8 @@ export async function splitFontBatch(args) {
     processedFontCount: results.length,
     errorCount: errors.length,
     errors,
+    batchWarningCount: batchWarnings.length,
+    batchWarnings,
     resultsIncluded: includeResults,
     processingSummary,
     ...(dryRun ? {

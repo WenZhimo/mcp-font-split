@@ -507,6 +507,8 @@ split-meta.json
 - `reprocessedBecauseSourceChanged`
 - `reprocessedBecauseOptionsChanged`
 - `processedFontCount`
+- `batchWarningCount`
+- `batchWarnings[]`：批量摘要级提示，每项包含 `code` 和 `message`
 - `errorCount`
 - `processingSummary`
 

@@ -150,6 +150,8 @@
 
 `dryRun: true` 且 `includeResults: true` 时，响应使用 `planned[]` 而不是 `results[]`。每个计划条目包含 `input`、`groupName`、`splitDir`、`copiedOriginalPath`、`wouldProcess` 和 `skipReason`。
 
+批量响应包含 `batchWarningCount` 和 `batchWarnings[]`，用于提示 dry-run 未写文件、扫描被 `maxFiles` 截断、`limit` 截断、每字体详情被省略、已有输出被跳过、错误被收集等摘要级状态。每个 warning 都包含机器可读的 `code` 和人类可读的 `message`。
+
 ## `inspect_split_output`
 
 检查已生成的输出目录。

@@ -196,6 +196,7 @@ split-output/
 - `resultsIncluded`：是否包含每个字体的 `results[]` 详情
 - `scannedFileCount`、`maxFiles`、`maxFilesHit`
 - `dryRun`、`plannedCount`、`wouldProcessCount`、`planIncluded`
+- `batchWarningCount`、`batchWarnings[]`，每项包含机器可读的 `code` 和 `message`
 - `batchErrorMode`、`errorCount`、`errors[]`
 - `skippedExisting`、`skippedLegacy`、`skippedByManifest`
 - `reprocessedBecauseSourceChanged`、`reprocessedBecauseOptionsChanged`

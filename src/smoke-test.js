@@ -88,6 +88,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('wasm.fontSplitWasmPathConfigured')) {
     throw new Error('Expected agent guidance to recommend checking custom WASM path status.');
   }
+  if (!result.responseFieldsToCheck?.includes('batchWarnings')) {
+    throw new Error('Expected agent guidance to recommend checking batch warnings.');
+  }
   const checklistIds = new Set((result.verificationChecklist || []).map((item) => item.id));
   for (const requiredId of ['runtime-ready', 'process-outcome-checked', 'fallback-disclosed', 'output-audited']) {
     if (!checklistIds.has(requiredId)) {
@@ -169,6 +172,12 @@ if (scenario === 'single') {
   });
   if (batchPlan.scannedFileCount !== 1 || batchPlan.maxFilesHit !== true || batchPlan.processedFontCount !== 0) {
     throw new Error('Expected splitFontBatch dry-run to report accurate scan truncation without processing.');
+  }
+  const batchWarningCodes = new Set((batchPlan.batchWarnings || []).map((warning) => warning.code));
+  for (const expectedWarning of ['dry-run-no-write', 'input-scan-truncated', 'batch-plan-omitted']) {
+    if (!batchWarningCodes.has(expectedWarning)) {
+      throw new Error(`Expected splitFontBatch dry-run warning ${expectedWarning}.`);
+    }
   }
 
   const outputInspect = await inspectSplitOutput({ outDir: inputDir, maxFiles: 1 });

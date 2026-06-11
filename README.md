@@ -198,6 +198,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `resultsIncluded`: whether per-font `results[]` objects are present
 - `scannedFileCount`, `maxFiles`, `maxFilesHit`
 - `dryRun`, `plannedCount`, `wouldProcessCount`, `planIncluded`
+- `batchWarningCount`, `batchWarnings[]` with machine-readable `code` and `message`
 - `batchErrorMode`, `errorCount`, `errors[]`
 - `skippedExisting`, `skippedLegacy`, `skippedByManifest`
 - `reprocessedBecauseSourceChanged`, `reprocessedBecauseOptionsChanged`
