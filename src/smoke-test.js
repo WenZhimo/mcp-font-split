@@ -74,6 +74,9 @@ if (scenario === 'single') {
   if (result.recommendedInspectOptions?.includeFiles !== false || result.recommendedInspectOptions?.includeFamilies !== false) {
     throw new Error('Expected agent guidance to recommend compact output inspection.');
   }
+  if (!result.responseFieldsToCheck?.includes('cnFontSplit.runtimeVersion')) {
+    throw new Error('Expected agent guidance to recommend checking cn-font-split runtime details.');
+  }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'runtime-status') {
   const result = await getRuntimeStatus();

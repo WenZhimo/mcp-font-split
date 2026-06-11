@@ -216,7 +216,7 @@ export function getAgentGuidance(args = {}) {
   const workflows = {
     overview: [
       'Call get_agent_guidance to orient yourself.',
-      'Call get_runtime_status when diagnosing setup, workspace, or WASM availability.',
+      'Call get_runtime_status when diagnosing setup, workspace, cn-font-split package, or WASM runtime availability.',
       'Call inspect_font_inputs for a no-write source preflight.',
       'Call split_font_batch with dryRun true to preview output layout.',
       'Call split_font_batch with includeResults false for full-library processing.',
@@ -235,7 +235,7 @@ export function getAgentGuidance(args = {}) {
       'Call inspect_split_output on the outputRoot when done; use includeFiles false and includeFamilies false for large outputs.',
     ],
     inspect: [
-      'Call get_runtime_status to verify workspace and WASM availability when setup is uncertain.',
+      'Call get_runtime_status to verify workspace, cn-font-split package, and WASM runtime availability when setup is uncertain.',
       'Call inspect_font_inputs to audit source directories before processing.',
       'Call inspect_split_output to audit generated output directories; set includeFiles false and includeFamilies false when only summary counts are needed.',
       'If maxFilesHit is true, rerun with a higher maxFiles before treating the summary as complete.',
@@ -255,7 +255,7 @@ export function getAgentGuidance(args = {}) {
     },
     tools: [
       { name: 'get_agent_guidance', useWhen: 'Orient an AI coding assistant before choosing a font-splitting workflow.' },
-      { name: 'get_runtime_status', useWhen: 'Check workspace, package, Node, and WASM runtime availability without writing files.' },
+      { name: 'get_runtime_status', useWhen: 'Check workspace, mcp-font-split package, cn-font-split package/runtime, Node, and WASM availability without writing files.' },
       { name: 'inspect_font_inputs', useWhen: 'Preflight source fonts without writing output.' },
       { name: 'split_font', useWhen: 'Process one known font file.' },
       { name: 'split_font_batch', useWhen: 'Scan, dedupe, name, skip-check, and process many fonts.' },
@@ -286,6 +286,11 @@ export function getAgentGuidance(args = {}) {
     },
     responseFieldsToCheck: [
       'ok',
+      'workspace',
+      'wasm',
+      'cnFontSplit',
+      'cnFontSplit.packageVersion',
+      'cnFontSplit.runtimeVersion',
       'resultType',
       'outputMode',
       'performedSplit',
