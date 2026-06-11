@@ -29,9 +29,11 @@ const FontSplitOptions = {
   subsetRemainChars: z.boolean().optional().describe('Automatically include remaining undeclared characters.'),
   subsets: z.array(z.array(z.number().int().nonnegative())).optional().describe('Explicit unicode codepoint groups to keep in each subset.'),
   oversizedKernAction: z.enum(['preserve', 'strip']).optional().describe('How to handle oversized kern tables. Default: preserve. Use strip to explicitly allow removing an oversized kern table before splitting.'),
-  smallGlyphAction: z.enum(['subset', 'single-woff2']).optional().describe('How to handle very small fonts. Default: subset. Use single-woff2 to explicitly allow a one-file fallback instead of subset splitting.'),
+  smallGlyphAction: z.enum(['subset', 'single-woff2', 'copy-original']).optional().describe('How to handle very small fonts. Default: subset. Use single-woff2 to emit a one-file fallback, or copy-original to copy the original and write metadata without generating web-font output.'),
   smallGlyphThreshold: z.number().int().positive().optional().describe('Glyph-count threshold used when smallGlyphAction is single-woff2. Default: 50.'),
   splitFailureAction: z.enum(['error', 'single-woff2']).optional().describe('What to do if cn-font-split fails. Default: error. Use single-woff2 to explicitly allow a one-file fallback after split failure.'),
+  skipMode: z.enum(['legacy-css', 'manifest', 'force']).optional().describe('Batch incremental mode. legacy-css preserves the old result.css existence check, manifest compares source and effective options, and force always reprocesses.'),
+  batchGroupBy: z.enum(['auto', 'source-dir', 'font-family']).optional().describe('Batch family grouping mode. auto preserves current behavior, source-dir groups by the source folder, and font-family groups by font metadata.'),
 };
 
 const server = new McpServer({
@@ -104,7 +106,7 @@ server.registerTool(
   'inspect_split_output',
   {
     title: 'Inspect split font output',
-    description: 'Call this to summarize generated cn-font-split output files in an output directory.',
+    description: 'Call this to summarize and structurally inspect generated cn-font-split output files in an output directory.',
     inputSchema: {
       outDir: z.string().optional().describe('Output directory to inspect, relative to the font workspace. Defaults to split-output.'),
     },

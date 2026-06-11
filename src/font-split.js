@@ -8,11 +8,15 @@ import { StaticWasm, fontSplit } from 'cn-font-split/dist/wasm/index.mjs';
 const require = createRequire(import.meta.url);
 const woff2Decompress = require('wawoff2/decompress');
 const woff2Compress = require('wawoff2/compress');
+const packageJson = require('../package.json');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const PROJECT_ROOT = path.resolve(__dirname, '..');
 export const DEFAULT_WORKSPACE_ROOT = path.resolve(PROJECT_ROOT, '..');
 const FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.ttc', '.otc', '.woff', '.woff2']);
+const MANIFEST_FILE_NAME = 'split-meta.json';
+const MANIFEST_VERSION = 1;
+const PACKAGE_VERSION = packageJson.version;
 let wasmRuntimePromise;
 let wasmPath;
 
@@ -124,13 +128,214 @@ function normalizeOptionalBoolean(value) {
 }
 
 function normalizeProcessingOptions(args) {
+  const smallGlyphAction = args.smallGlyphAction === 'skip' ? 'copy-original' : args.smallGlyphAction;
+  const smallGlyphActions = ['subset', 'single-woff2', 'copy-original'];
   return {
     oversizedKernAction: args.oversizedKernAction === 'strip' ? 'strip' : 'preserve',
-    smallGlyphAction: args.smallGlyphAction === 'single-woff2' ? 'single-woff2' : 'subset',
+    smallGlyphAction: smallGlyphActions.includes(smallGlyphAction) ? smallGlyphAction : 'subset',
     smallGlyphThreshold: Number.isFinite(args.smallGlyphThreshold) && args.smallGlyphThreshold > 0
       ? Math.floor(args.smallGlyphThreshold)
       : 50,
     splitFailureAction: args.splitFailureAction === 'single-woff2' ? 'single-woff2' : 'error',
+  };
+}
+
+function normalizeBatchOptions(args) {
+  return {
+    skipMode: ['legacy-css', 'manifest', 'force'].includes(args.skipMode) ? args.skipMode : 'legacy-css',
+    batchGroupBy: ['auto', 'source-dir', 'font-family'].includes(args.batchGroupBy) ? args.batchGroupBy : 'auto',
+  };
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function buildEffectiveConfigSnapshot(args, processingOptions) {
+  const snapshot = {
+    processingOptions,
+  };
+
+  const optionalStrings = [
+    'fontFamily', 'fontWeight', 'fontStyle', 'fontDisplay', 'cssFileName',
+    'previewText', 'previewName', 'renameOutputFont', 'buildMode',
+  ];
+  for (const key of optionalStrings) {
+    const value = normalizeOptionalString(args[key]);
+    if (value !== undefined) snapshot[key] = value;
+  }
+
+  const optionalNumbers = [
+    'chunkSize', 'chunkSizeTolerance', 'maxAllowSubsetsCount',
+  ];
+  for (const key of optionalNumbers) {
+    const value = normalizeOptionalNumber(args[key]);
+    if (value !== undefined) snapshot[key] = value;
+  }
+
+  const optionalBooleans = [
+    'languageAreas', 'testHtml', 'reporter', 'multiThreads', 'fontFeature',
+    'reduceMins', 'autoSubset', 'subsetRemainChars',
+  ];
+  for (const key of optionalBooleans) {
+    const value = normalizeOptionalBoolean(args[key]);
+    if (value !== undefined) snapshot[key] = value;
+  }
+
+  if (Array.isArray(args.subsets) && args.subsets.length > 0) {
+    snapshot.subsets = args.subsets;
+  }
+
+  return snapshot;
+}
+
+function classifyResultType({ outputMode, splitFailureFallbackApplied, skipReason }) {
+  if (outputMode === 'copy-original') return 'copy-original-small-glyph';
+  if (outputMode !== 'single-woff2') return 'subset';
+  if (splitFailureFallbackApplied) return 'single-woff2-split-failure';
+  if (skipReason === 'small glyph fallback explicitly enabled') return 'single-woff2-small-glyph';
+  return 'single-woff2';
+}
+
+function buildWarnings({ decompressedFrom, oversizedKernDetected, oversizedKernStripped, usedFallback, skipped, skipReason }) {
+  const warnings = [];
+  if (decompressedFrom) warnings.push(`input was decompressed from ${decompressedFrom}`);
+  if (oversizedKernDetected && !oversizedKernStripped) warnings.push('oversized kern table detected but preserved');
+  if (oversizedKernStripped) warnings.push('oversized kern table stripped before splitting');
+  if ((usedFallback || skipped) && skipReason) warnings.push(skipReason);
+  return warnings;
+}
+
+function manifestPathForSplitDir(splitDir) {
+  return path.join(splitDir, MANIFEST_FILE_NAME);
+}
+
+async function writeSplitManifest(splitDir, manifest) {
+  await fs.writeFile(manifestPathForSplitDir(splitDir), JSON.stringify(manifest, null, 2));
+}
+
+async function readSplitManifest(splitDir) {
+  try {
+    return JSON.parse(await fs.readFile(manifestPathForSplitDir(splitDir), 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+function buildSplitManifest({ inputRelativePath, inputStat, groupName, outDirRelative, splitDirRelative, effectiveConfig, result }) {
+  return {
+    manifestVersion: MANIFEST_VERSION,
+    toolVersion: PACKAGE_VERSION,
+    source: {
+      input: inputRelativePath,
+      sizeBytes: inputStat.size,
+      mtimeMs: inputStat.mtimeMs,
+    },
+    grouping: {
+      groupName,
+      outDir: outDirRelative,
+      splitDir: splitDirRelative,
+    },
+    effectiveConfig,
+    result: {
+      outputMode: result.outputMode,
+      resultType: result.resultType,
+      glyphCount: result.glyphCount,
+      skipped: result.skipped,
+      skipReason: result.skipReason,
+      copiedOriginalPath: result.copiedOriginalPath,
+      decompressedFrom: result.decompressedFrom,
+      oversizedKernDetected: result.oversizedKernDetected,
+      oversizedKernStripped: result.oversizedKernStripped,
+      splitFailureFallbackApplied: result.splitFailureFallbackApplied,
+      performedSplit: result.performedSplit,
+      usedFallback: result.usedFallback,
+    },
+  };
+}
+
+async function resolveBatchFamilyDirName({ file, inputDir, groupingMode }) {
+  const relativeToInput = path.relative(inputDir, file);
+  const segments = relativeToInput.split(path.sep);
+  if (groupingMode === 'source-dir') {
+    return segments.length > 1 ? segments[0] : path.basename(file, path.extname(file));
+  }
+
+  const inputBytes = new Uint8Array(await fs.readFile(file));
+  const metadataFamily = extractFontFamily(inputBytes) || path.basename(file, path.extname(file));
+  if (groupingMode === 'font-family') {
+    return metadataFamily;
+  }
+
+  if (segments.length > 1) return segments[0];
+  return metadataFamily;
+}
+
+async function shouldSkipExistingOutput({ skipMode, resolvedOutDir, fontBaseName, inputRelativePath, inputStat, effectiveConfig }) {
+  const splitDir = path.join(resolvedOutDir, fontBaseName);
+  const marker = path.join(splitDir, 'result.css');
+  if (skipMode === 'force') {
+    return { shouldSkip: false, reason: 'force' };
+  }
+
+  if (skipMode === 'legacy-css') {
+    return { shouldSkip: await fileExists(marker), reason: 'legacy-css' };
+  }
+
+  const manifest = await readSplitManifest(splitDir);
+  if (!manifest) return { shouldSkip: false, reason: 'missing-manifest' };
+  const sameSource = manifest.source?.input === inputRelativePath
+    && manifest.source?.sizeBytes === inputStat.size
+    && manifest.source?.mtimeMs === inputStat.mtimeMs;
+  const sameConfig = stableStringify(manifest.effectiveConfig) === stableStringify(effectiveConfig);
+  const sameTool = manifest.toolVersion === PACKAGE_VERSION && manifest.manifestVersion === MANIFEST_VERSION;
+  return { shouldSkip: sameSource && sameConfig && sameTool, reason: sameSource && sameConfig && sameTool ? 'manifest' : 'stale-manifest', manifest };
+}
+
+function inferLegacyResultType(fontEntry) {
+  if (fontEntry.manifest?.result?.resultType) return fontEntry.manifest.result.resultType;
+  if (!fontEntry.hasCss && fontEntry.hasManifest) return 'copy-original-small-glyph';
+  if (!fontEntry.hasCss) return 'unknown';
+  if (fontEntry.hasReporter || fontEntry.hasProto || fontEntry.woff2Count > 1) return 'subset';
+  if (fontEntry.woff2Count === 1) return 'single-woff2';
+  return 'unknown';
+}
+
+function buildFontEntryInspection(groupName, splitDirName, originalFiles, outputFiles, manifest) {
+  const byExtension = {};
+  for (const file of outputFiles) {
+    byExtension[file.extension || '(none)'] = (byExtension[file.extension || '(none)'] || 0) + 1;
+  }
+  const woff2Count = byExtension['.woff2'] || 0;
+  const hasCss = outputFiles.some((file) => path.basename(file.path) === 'result.css');
+  const hasHtml = outputFiles.some((file) => path.basename(file.path) === 'index.html');
+  const hasReporter = outputFiles.some((file) => path.basename(file.path) === 'reporter.bin');
+  const hasProto = outputFiles.some((file) => path.basename(file.path) === 'index.proto');
+  const resultType = inferLegacyResultType({ manifest, hasCss, hasReporter, hasProto, woff2Count });
+  return {
+    groupName,
+    fontBaseName: splitDirName,
+    splitDir: outputFiles[0] ? outputFiles[0].path.split('/').slice(0, -1).join('/') : null,
+    originalFiles,
+    outputFiles,
+    fileCount: outputFiles.length,
+    byExtension,
+    woff2Count,
+    hasCss,
+    hasHtml,
+    hasReporter,
+    hasProto,
+    hasManifest: Boolean(manifest),
+    manifest,
+    outputMode: manifest?.result?.outputMode || (resultType === 'subset' ? 'subset' : resultType.startsWith('single-woff2') ? 'single-woff2' : resultType === 'copy-original-small-glyph' ? 'copy-original' : 'unknown'),
+    resultType,
   };
 }
 
@@ -593,6 +798,11 @@ async function emitSmallGlyphFallback({ inputBytes, splitDir, fontFamily, fontBa
   return { generated, skipped: true, reason };
 }
 
+async function clearSplitDirForCopyOriginal(splitDir) {
+  await fs.rm(splitDir, { recursive: true, force: true });
+  await fs.mkdir(splitDir, { recursive: true });
+}
+
 async function ensureFontFile(fontPath) {
   const resolved = await resolveWorkspacePath(fontPath, { mustExist: true });
   const stat = await fs.stat(resolved);
@@ -608,6 +818,8 @@ export async function splitFont(args) {
   const startedAt = Date.now();
   const processingOptions = normalizeProcessingOptions(args);
   const input = await ensureFontFile(args.fontPath);
+  const inputStat = await fs.stat(input);
+  const inputRelativePath = toRelativeWorkspacePath(input);
   const fontBaseName = path.basename(input, path.extname(input));
   const fontFileName = path.basename(input);
   let inputBytes = new Uint8Array(await fs.readFile(input));
@@ -633,9 +845,10 @@ export async function splitFont(args) {
 
   const familyName = args.fontFamily || extractFontFamily(inputBytes) || fontBaseName;
   const safeFamilyName = sanitizeDirName(familyName);
+  const groupName = args.groupName || safeFamilyName;
 
   const rootDir = await resolveWorkspacePath(
-    args.outDir || path.join('split-output', safeFamilyName),
+    args.outDir || path.join('split-output', groupName),
   );
   const splitDir = path.join(rootDir, fontBaseName);
   await fs.mkdir(splitDir, { recursive: true });
@@ -658,8 +871,19 @@ export async function splitFont(args) {
     && glyphCount <= processingOptions.smallGlyphThreshold
     && processingOptions.smallGlyphAction === 'single-woff2'
   );
+  const shouldCopyOriginalSmallGlyph = (
+    glyphCount > 0
+    && glyphCount <= processingOptions.smallGlyphThreshold
+    && processingOptions.smallGlyphAction === 'copy-original'
+  );
 
-  if (shouldEmitSmallGlyphFallback) {
+  if (shouldCopyOriginalSmallGlyph) {
+    await clearSplitDirForCopyOriginal(splitDir);
+    generated = [];
+    skipped = true;
+    skipReason = 'small glyph copy-original explicitly enabled';
+    outputMode = 'copy-original';
+  } else if (shouldEmitSmallGlyphFallback) {
     const fallback = await emitSmallGlyphFallback({
       inputBytes,
       splitDir,
@@ -700,13 +924,27 @@ export async function splitFont(args) {
     }
   }
 
+  const usedFallback = outputMode === 'single-woff2';
+  const performedSplit = outputMode === 'subset';
+  const resultType = classifyResultType({ outputMode, splitFailureFallbackApplied, skipReason });
+  const warnings = buildWarnings({
+    decompressedFrom,
+    oversizedKernDetected: kernInspection.oversized,
+    oversizedKernStripped,
+    usedFallback,
+    skipped,
+    skipReason,
+  });
+  const effectiveConfig = buildEffectiveConfigSnapshot(args, processingOptions);
+
   const files = await summarizeFiles(rootDir);
   const createdFiles = files.filter((file) => !before.has(file.path));
 
-  return {
+  const result = {
     ok: true,
-    input: toRelativeWorkspacePath(input),
+    input: inputRelativePath,
     fontFamily: familyName,
+    groupName,
     outDir: toRelativeWorkspacePath(rootDir),
     splitDir: toRelativeWorkspacePath(splitDir),
     durationMs: Date.now() - startedAt,
@@ -715,6 +953,11 @@ export async function splitFont(args) {
     skipped,
     skipReason,
     outputMode,
+    resultType,
+    performedSplit,
+    usedFallback,
+    copiedOriginalPath: toRelativeWorkspacePath(destFontPath),
+    warnings,
     decompressedFrom,
     oversizedKernDetected: kernInspection.oversized,
     oversizedKernStripped,
@@ -735,7 +978,9 @@ export async function splitFont(args) {
         glyphCount,
         threshold: processingOptions.smallGlyphThreshold,
         action: processingOptions.smallGlyphAction,
-        downgraded: outputMode === 'single-woff2' && skipReason === 'small glyph fallback explicitly enabled',
+        matchedThreshold: glyphCount > 0 && glyphCount <= processingOptions.smallGlyphThreshold,
+        downgraded: resultType === 'single-woff2-small-glyph',
+        skippedSplit: resultType === 'copy-original-small-glyph',
       },
       splitFailure: {
         action: processingOptions.splitFailureAction,
@@ -744,6 +989,21 @@ export async function splitFont(args) {
       },
     },
   };
+
+  const manifest = buildSplitManifest({
+    inputRelativePath,
+    inputStat,
+    groupName,
+    outDirRelative: result.outDir,
+    splitDirRelative: result.splitDir,
+    effectiveConfig,
+    result,
+  });
+  await writeSplitManifest(splitDir, manifest);
+  result.manifestPath = toRelativeWorkspacePath(manifestPathForSplitDir(splitDir));
+  result.manifestWritten = true;
+
+  return result;
 }
 
 export async function splitFontBatch(args) {
@@ -751,6 +1011,8 @@ export async function splitFontBatch(args) {
   const stat = await fs.stat(inputDir);
   if (!stat.isDirectory()) throw new Error(`inputDir is not a directory: ${args.inputDir}`);
 
+  const batchOptions = normalizeBatchOptions(args);
+  const processingOptions = normalizeProcessingOptions(args);
   const outputRoot = args.outputRoot || 'split-output';
   const outputRootName = path.basename(outputRoot);
 
@@ -781,39 +1043,63 @@ export async function splitFontBatch(args) {
     oversizedKernDetected: 0,
     oversizedKernStripped: 0,
     smallGlyphDowngrades: 0,
+    smallGlyphCopyOriginals: 0,
     failureFallbacks: 0,
     subsetOutputs: 0,
     singleWoff2Outputs: 0,
+    copyOriginalOutputs: 0,
   };
   let skippedExisting = 0;
+  let skippedLegacy = 0;
+  let skippedByManifest = 0;
+  let reprocessedBecauseSourceChanged = 0;
+  let reprocessedBecauseOptionsChanged = 0;
+
   for (const file of selected) {
     const relative = toRelativeWorkspacePath(file);
     try {
-      const relativeToInput = path.relative(inputDir, file);
-      const segments = relativeToInput.split(path.sep);
-      let familyDirName;
-      if (segments.length > 1) {
-        familyDirName = segments[0];
-      } else {
-        const inputBytes = new Uint8Array(await fs.readFile(file));
-        familyDirName = extractFontFamily(inputBytes) || path.basename(file, path.extname(file));
-      }
-      const safeFamilyName = sanitizeDirName(familyDirName);
-      const outDir = path.join(outputRoot, safeFamilyName);
+      const groupName = sanitizeDirName(await resolveBatchFamilyDirName({
+        file,
+        inputDir,
+        groupingMode: batchOptions.batchGroupBy,
+      }));
+      const outDir = path.join(outputRoot, groupName);
       const fontBaseName = path.basename(file, path.extname(file));
-
       const resolvedOutDir = await resolveWorkspacePath(outDir);
-      const marker = path.join(resolvedOutDir, fontBaseName, 'result.css');
-      if (await fileExists(marker)) {
+      const inputStat = await fs.stat(file);
+      const effectiveConfig = buildEffectiveConfigSnapshot({ ...args, groupName }, processingOptions);
+      const skipDecision = await shouldSkipExistingOutput({
+        skipMode: batchOptions.skipMode,
+        resolvedOutDir,
+        fontBaseName,
+        inputRelativePath: relative,
+        inputStat,
+        effectiveConfig,
+      });
+
+      if (skipDecision.shouldSkip) {
         skippedExisting++;
+        if (skipDecision.reason === 'legacy-css') skippedLegacy++;
+        if (skipDecision.reason === 'manifest') skippedByManifest++;
         args.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'skipped' });
         continue;
+      }
+      if (skipDecision.reason === 'stale-manifest' && skipDecision.manifest) {
+        const sameSource = skipDecision.manifest.source?.input === relative
+          && skipDecision.manifest.source?.sizeBytes === inputStat.size
+          && skipDecision.manifest.source?.mtimeMs === inputStat.mtimeMs;
+        if (sameSource) {
+          reprocessedBecauseOptionsChanged++;
+        } else {
+          reprocessedBecauseSourceChanged++;
+        }
       }
 
       const result = await splitFont({
         ...args,
         fontPath: relative,
         outDir,
+        groupName,
       });
       results.push(result);
       if (result.decompressedFrom) processingSummary.decompressedInputs++;
@@ -823,6 +1109,9 @@ export async function splitFontBatch(args) {
       if (result.outputMode === 'single-woff2') {
         processingSummary.singleWoff2Outputs++;
         if (result.processing?.smallGlyph?.downgraded) processingSummary.smallGlyphDowngrades++;
+      } else if (result.outputMode === 'copy-original') {
+        processingSummary.copyOriginalOutputs++;
+        if (result.processing?.smallGlyph?.skippedSplit) processingSummary.smallGlyphCopyOriginals++;
       } else {
         processingSummary.subsetOutputs++;
       }
@@ -838,10 +1127,16 @@ export async function splitFontBatch(args) {
     ok: true,
     inputDir: toRelativeWorkspacePath(inputDir),
     outputRoot,
+    skipMode: batchOptions.skipMode,
+    batchGroupBy: batchOptions.batchGroupBy,
     discoveredFontCount: fontFiles.length,
     deduplicatedCount: deduplicated.length,
     skippedDuplicates: skippedCount,
     skippedExisting,
+    skippedLegacy,
+    skippedByManifest,
+    reprocessedBecauseSourceChanged,
+    reprocessedBecauseOptionsChanged,
     processedFontCount: results.length,
     errorCount: errors.length,
     errors,
@@ -852,6 +1147,7 @@ export async function splitFontBatch(args) {
 
 export async function inspectSplitOutput(args) {
   const outDir = await resolveWorkspacePath(args.outDir || 'split-output', { mustExist: true });
+  const outDirRelative = toRelativeWorkspacePath(outDir);
   const files = await summarizeFiles(outDir);
   const byExtension = {};
   let totalBytes = 0;
@@ -860,12 +1156,99 @@ export async function inspectSplitOutput(args) {
     byExtension[file.extension || '(none)'] = (byExtension[file.extension || '(none)'] || 0) + 1;
   }
 
+  const relativeEntries = files.map((file) => ({
+    ...file,
+    relativePath: file.path === outDirRelative ? '' : file.path.slice(`${outDirRelative}/`.length),
+  }));
+  const maxDepth = relativeEntries.reduce((depth, file) => Math.max(depth, file.relativePath.split('/').filter(Boolean).length), 0);
+  const singleFamilyLayout = maxDepth <= 2;
+
+  const familyMap = new Map();
+  const ensureFamily = (familyName) => {
+    if (!familyMap.has(familyName)) {
+      familyMap.set(familyName, { originals: [], splitDirs: new Map() });
+    }
+    return familyMap.get(familyName);
+  };
+
+  for (const file of relativeEntries) {
+    const relativeParts = file.relativePath.split('/').filter(Boolean);
+    if (relativeParts.length === 0) continue;
+
+    if (singleFamilyLayout) {
+      const familyName = path.basename(outDirRelative);
+      const family = ensureFamily(familyName);
+      if (relativeParts.length === 1 && FONT_EXTENSIONS.has(file.extension)) {
+        family.originals.push(file);
+        continue;
+      }
+      if (relativeParts.length >= 2) {
+        const splitDirName = relativeParts[0];
+        if (!family.splitDirs.has(splitDirName)) family.splitDirs.set(splitDirName, []);
+        family.splitDirs.get(splitDirName).push(file);
+      }
+      continue;
+    }
+
+    const familyName = relativeParts[0];
+    const family = ensureFamily(familyName);
+    if (relativeParts.length === 2 && FONT_EXTENSIONS.has(file.extension)) {
+      family.originals.push(file);
+      continue;
+    }
+    if (relativeParts.length >= 3) {
+      const splitDirName = relativeParts[1];
+      if (!family.splitDirs.has(splitDirName)) family.splitDirs.set(splitDirName, []);
+      family.splitDirs.get(splitDirName).push(file);
+    }
+  }
+
+  const families = [];
+  let fontEntryCount = 0;
+  let manifestCount = 0;
+  let subsetOutputCount = 0;
+  let singleWoff2OutputCount = 0;
+  let copyOriginalOutputCount = 0;
+  let legacyOutputCount = 0;
+
+  for (const [familyName, family] of [...familyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const fontEntries = [];
+    for (const [splitDirName, outputFiles] of [...family.splitDirs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+      const splitDirPath = singleFamilyLayout
+        ? path.join(outDir, splitDirName)
+        : path.join(outDir, familyName, splitDirName);
+      const manifest = await readSplitManifest(splitDirPath);
+      const originalFiles = family.originals.filter((file) => path.basename(file.path, file.extension) === splitDirName);
+      const entry = buildFontEntryInspection(familyName, splitDirName, originalFiles, outputFiles, manifest);
+      fontEntries.push(entry);
+      fontEntryCount++;
+      if (entry.hasManifest) manifestCount++; else legacyOutputCount++;
+      if (entry.outputMode === 'subset') subsetOutputCount++;
+      if (entry.outputMode === 'single-woff2') singleWoff2OutputCount++;
+      if (entry.outputMode === 'copy-original') copyOriginalOutputCount++;
+    }
+    families.push({
+      familyName,
+      originalFiles: family.originals,
+      fontEntryCount: fontEntries.length,
+      fontEntries,
+    });
+  }
+
   return {
     ok: true,
-    outDir: toRelativeWorkspacePath(outDir),
+    outDir: outDirRelative,
     fileCount: files.length,
     totalBytes,
     byExtension,
     files,
+    familyCount: families.length,
+    fontEntryCount,
+    manifestCount,
+    subsetOutputCount,
+    singleWoff2OutputCount,
+    copyOriginalOutputCount,
+    legacyOutputCount,
+    families,
   };
 }

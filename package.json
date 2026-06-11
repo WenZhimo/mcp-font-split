@@ -15,7 +15,10 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "smoke": "node src/smoke-test.js"
+    "smoke": "node src/smoke-test.js",
+    "smoke:incremental": "node src/smoke-test.js batch-incremental",
+    "smoke:inspect": "node src/smoke-test.js inspect",
+    "smoke:small-skip": "node src/smoke-test.js small-skip"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",

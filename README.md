@@ -12,56 +12,208 @@
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that wraps [cn-font-split](https://github.com/KonghaYao/cn-font-split) as agent-callable tools for font subsetting and web-font generation.
 
+> [!WARNING]
+> Before using this tool, read the full behavior and risk notes in [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md). This wrapper contains policy choices around batch grouping, incremental skipping, WOFF normalization, fallback output, and metadata manifests.
+
 ## Features
 
-> [!WARNING]
-> Before using this tool, read the full behavior and risk notes in the Chinese document: [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md)
-
-## Important behavior and defaults
-
-> [!WARNING]
-> This tool does **not** behave like a transparent “split whatever I give you without policy decisions” wrapper.
->
-> In particular:
-> - `split_font_batch` groups outputs by the source folder name first, not primarily by the internal font family metadata.
-> - Same-basename multi-format fonts are automatically deduplicated by priority: `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff`.
-> - `.woff` / `.woff2` inputs are decompressed to sfnt-like data before splitting.
-> - Batch incremental skipping only checks whether `<family>/<fontBaseName>/result.css` already exists; it does **not** compare changed options.
-> - `ok: true` does **not** always mean multi-subset splitting happened; check `outputMode`, `skipped`, and `skipReason`.
->
-> The most important policy change in the current version:
-> - Oversized `kern` stripping is **opt-in** via `oversizedKernAction: "strip"`.
-> - Small-font single-WOFF2 downgrade is **opt-in** via `smallGlyphAction: "single-woff2"`.
-> - Split-failure single-WOFF2 fallback is **opt-in** via `splitFailureAction: "single-woff2"`.
-
-- Split TTF/OTF/TTC/WOFF/WOFF2 fonts into optimized web-font subsets (woff2 chunks + CSS)
-- Auto-detect font family name from the binary and group output by family
-- Batch processing of font directories
-- Inspect and summarize generated output
-- Cross-platform via WASM backend (no native compilation needed)
+- Split TTF/OTF/TTC/OTC/WOFF/WOFF2 fonts into web-font output files.
+- Batch-process font directories under the configured workspace.
+- Preserve original font files in the output family directory.
+- Write `split-meta.json` manifests for processed fonts.
+- Inspect output directories with flat file stats and structured family/font summaries.
+- Run cross-platform through the cn-font-split WASM backend.
 
 ## Tools
 
 | Tool | Description |
 |------|-------------|
-| `split_font` | Split one font file into web-font chunks |
-| `split_font_batch` | Batch split fonts under a directory |
-| `inspect_split_output` | Summarize generated output files |
+| `split_font` | Process one font file. Depending on options, it may create subset WOFF2 chunks, a single WOFF2 fallback, or a copy-original metadata entry. |
+| `split_font_batch` | Scan a directory, deduplicate same-basename formats, group fonts into family directories, and process each selected font. |
+| `inspect_split_output` | Summarize output files and classify family/font entries using `split-meta.json` when available. |
 
-## Output Layout
+## Important behavior summary
 
-```
+> [!WARNING]
+> `ok: true` means the tool completed the selected policy. It does **not** always mean that multi-subset splitting happened. Prefer `resultType`, `outputMode`, `performedSplit`, `usedFallback`, `skipped`, and `warnings` when interpreting results.
+
+Key defaults and policy choices:
+
+- Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root.
+- `.woff` and `.woff2` inputs are decompressed to sfnt-like data before processing.
+- Batch mode deduplicates same-basename multi-format fonts by priority: `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff`.
+- Batch grouping defaults to `batchGroupBy: "auto"`, which preserves the directory-first behavior for nested inputs.
+- Batch incremental skipping defaults to `skipMode: "legacy-css"`, which preserves the old `result.css` marker behavior.
+- Safer batch reruns should use `skipMode: "manifest"` or `skipMode: "force"`.
+- Oversized `kern` stripping is opt-in via `oversizedKernAction: "strip"`.
+- Split-failure single-WOFF2 fallback is opt-in via `splitFailureAction: "single-woff2"`.
+- Small glyph fonts are controlled by `smallGlyphAction`: `subset`, `single-woff2`, or `copy-original`.
+
+## Output layout
+
+Normal subset output:
+
+```text
 split-output/
-  <FontFamily>/
-    <FontFile>.ttf            # original font preserved
-    <FontFile>/               # split output subfolder
+  <FamilyName>/
+    <OriginalFontFile>          # copied original font
+    <FontBaseName>/             # processed output directory
       *.woff2
       result.css
-      index.html
-      reporter.bin
+      index.html?               # when testHtml=true
+      reporter.bin?             # when reporter=true and subset output is produced
+      index.proto?              # produced by the core splitter on normal subset paths
+      split-meta.json           # manifest for this run
 ```
 
-Fonts in the same family are grouped under one directory.
+Single-WOFF2 fallback output:
+
+```text
+split-output/
+  <FamilyName>/
+    <OriginalFontFile>
+    <FontBaseName>/
+      <FontBaseName>.woff2
+      result.css
+      index.html?
+      split-meta.json
+```
+
+Small-font `copy-original` output:
+
+```text
+split-output/
+  <FamilyName>/
+    <OriginalFontFile>
+    <FontBaseName>/
+      split-meta.json
+```
+
+`copy-original` intentionally does not generate `.woff2` or `result.css`; it records that the font was handled and skipped from subsetting.
+
+## Key options
+
+### Single-font and batch processing options
+
+| Option | Values | Default | Meaning |
+|--------|--------|---------|---------|
+| `oversizedKernAction` | `preserve`, `strip` | `preserve` | Detect oversized `kern` tables by default; only remove them when explicitly set to `strip`. |
+| `smallGlyphAction` | `subset`, `single-woff2`, `copy-original` | `subset` | Decide what to do when `glyphCount <= smallGlyphThreshold`. |
+| `smallGlyphThreshold` | positive integer | `50` | Glyph-count threshold for small-font policy decisions. |
+| `splitFailureAction` | `error`, `single-woff2` | `error` | Surface cn-font-split failures by default; optionally recover with a single WOFF2 fallback. |
+
+`smallGlyphAction` details:
+
+- `subset`: still try normal cn-font-split processing.
+- `single-woff2`: generate one WOFF2 file plus CSS instead of chunks.
+- `copy-original`: copy the source font into the output family directory, create the font output directory, write `split-meta.json`, and do not generate web-font files.
+
+### Batch-only options
+
+| Option | Values | Default | Meaning |
+|--------|--------|---------|---------|
+| `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | Choose how batch mode decides whether output is already current. |
+| `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | Choose the family directory naming strategy for batch mode. |
+
+`skipMode` details:
+
+- `legacy-css`: skip if `<family>/<fontBaseName>/result.css` exists. This preserves old behavior but does not detect option changes.
+- `manifest`: skip only when `split-meta.json` matches source path, source size, source mtime, effective options, manifest version, and tool version.
+- `force`: never skip existing output.
+
+`batchGroupBy` details:
+
+- `auto`: nested fonts use the first source-directory segment; root-level fonts use internal family metadata.
+- `source-dir`: always use the first source-directory segment when available.
+- `font-family`: always use internal font family metadata when available, with basename fallback.
+
+## Result interpretation
+
+`split_font` returns compatibility fields plus explicit classification fields:
+
+- `outputMode`: `subset`, `single-woff2`, or `copy-original`
+- `resultType`: `subset`, `single-woff2-small-glyph`, `single-woff2-split-failure`, `single-woff2`, or `copy-original-small-glyph`
+- `performedSplit`: true only when multi-subset splitting was performed
+- `usedFallback`: true for single-WOFF2 fallback paths
+- `skipped`: true when the splitter was intentionally bypassed
+- `skipReason`: reason for bypass/fallback, when present
+- `warnings`: human-readable notes about non-transparent behavior
+- `manifestPath` / `manifestWritten`: manifest output status
+
+`split_font_batch` additionally returns aggregate counters such as:
+
+- `skippedExisting`, `skippedLegacy`, `skippedByManifest`
+- `reprocessedBecauseSourceChanged`, `reprocessedBecauseOptionsChanged`
+- `processingSummary.subsetOutputs`
+- `processingSummary.singleWoff2Outputs`
+- `processingSummary.copyOriginalOutputs`
+- `processingSummary.smallGlyphDowngrades`
+- `processingSummary.smallGlyphCopyOriginals`
+- `processingSummary.failureFallbacks`
+
+`inspect_split_output` keeps flat file stats and adds structured output inventory:
+
+- `familyCount`
+- `fontEntryCount`
+- `manifestCount`
+- `subsetOutputCount`
+- `singleWoff2OutputCount`
+- `copyOriginalOutputCount`
+- `legacyOutputCount`
+- `families[]`
+
+## Examples
+
+Conservative single-font behavior:
+
+```json
+{
+  "fontPath": "SomeFamily/SomeFont.ttf"
+}
+```
+
+Tolerant single-font behavior:
+
+```json
+{
+  "fontPath": "SomeFamily/SomeFont.ttf",
+  "oversizedKernAction": "strip",
+  "smallGlyphAction": "single-woff2",
+  "splitFailureAction": "single-woff2"
+}
+```
+
+Small-font copy-original behavior:
+
+```json
+{
+  "fontPath": "SomeFamily/AsciiOnly.ttf",
+  "smallGlyphAction": "copy-original"
+}
+```
+
+Recommended batch behavior for archive-per-family source folders:
+
+```json
+{
+  "inputDir": ".",
+  "outputRoot": "split-output",
+  "batchGroupBy": "source-dir",
+  "skipMode": "manifest",
+  "smallGlyphAction": "copy-original"
+}
+```
+
+Metadata-driven batch grouping:
+
+```json
+{
+  "inputDir": ".",
+  "outputRoot": "split-output",
+  "batchGroupBy": "font-family",
+  "skipMode": "manifest"
+}
+```
 
 ## Installation
 
@@ -78,7 +230,7 @@ gh release download 7.6.8 --repo KonghaYao/cn-font-split \
 
 ## Usage
 
-### As MCP Server (Claude Code)
+### As MCP Server
 
 ```sh
 claude mcp add font-split -- node "/path/to/mcp-font-split/src/server.js"
@@ -90,32 +242,22 @@ claude mcp add font-split -- node "/path/to/mcp-font-split/src/server.js"
 npm start
 ```
 
-### Environment Variables
+### Smoke checks
+
+```sh
+npm run smoke
+npm run smoke:incremental
+npm run smoke:inspect
+npm run smoke:small-skip
+```
+
+`smoke:small-skip` currently exercises the `copy-original` small-font policy; the script name is kept for compatibility.
+
+### Environment variables
 
 | Variable | Description |
 |----------|-------------|
-| `FONT_SPLIT_ROOT` | Override the default font workspace root directory |
-
-### Behavior control examples
-
-Conservative/default behavior: do not silently strip oversized `kern`, do not silently downgrade small fonts, and surface split failures.
-
-```json
-{
-  "fontPath": "SomeFamily/SomeFont.ttf"
-}
-```
-
-Compatibility / tolerant behavior: explicitly allow the old practical fallbacks.
-
-```json
-{
-  "fontPath": "SomeFamily/SomeFont.ttf",
-  "oversizedKernAction": "strip",
-  "smallGlyphAction": "single-woff2",
-  "splitFailureAction": "single-woff2"
-}
-```
+| `FONT_SPLIT_ROOT` | Override the default font workspace root directory. |
 
 ## Credits & Acknowledgments
 
