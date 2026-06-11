@@ -64,6 +64,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 - 当前解析到的工作区是否存在且是目录
 - cn-font-split WASM 文件是否存在且是文件
+- 是否通过 `FONT_SPLIT_WASM_PATH` 使用了自定义 WASM 文件
 - mcp-font-split 包名和版本
 - cn-font-split 包版本和已记录的 WASM runtime 版本
 - Node 版本、平台和 CPU 架构

@@ -82,6 +82,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('recommendedActions')) {
     throw new Error('Expected agent guidance to recommend checking remediation actions.');
   }
+  if (!result.responseFieldsToCheck?.includes('wasm.fontSplitWasmPathConfigured')) {
+    throw new Error('Expected agent guidance to recommend checking custom WASM path status.');
+  }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'runtime-status') {
   const result = await getRuntimeStatus();
@@ -93,6 +96,9 @@ if (scenario === 'single') {
   }
   if (!result.cnFontSplit?.packageVersion) {
     throw new Error('Expected runtime status to include cn-font-split package version.');
+  }
+  if (result.wasm?.fontSplitWasmPathConfigured !== false) {
+    throw new Error('Expected runtime status to report the default WASM path mode.');
   }
   if (!Array.isArray(result.recommendedActions)) {
     throw new Error('Expected runtime status to include recommendedActions.');

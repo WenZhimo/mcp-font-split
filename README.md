@@ -397,6 +397,7 @@ npm run smoke:small-skip
 | Variable | Description |
 |----------|-------------|
 | `FONT_SPLIT_ROOT` | Font workspace root directory. Set this explicitly for your own font location; if unset, the server defaults to the current working directory used to start the MCP Server. If the caller is an AI agent, it should ask the user which directory to use instead of guessing or hard-coding a local private path. |
+| `FONT_SPLIT_WASM_PATH` | Optional absolute or relative path to a custom `libffi-wasm32-wasip1.wasm` runtime. If unset, the bundled `cn-font-split/dist` path under this package's dependencies is used. |
 
 ## Credits & Acknowledgments
 

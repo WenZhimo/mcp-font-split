@@ -18,6 +18,8 @@ Return a read-only runtime diagnostic summary.
 
 This tool checks the resolved font workspace, package version, Node runtime, platform, supported extensions, the cn-font-split package, and the cn-font-split WASM file. It returns `ok`, `checks[]`, `workspace`, `wasm`, `cnFontSplit`, and `recommendedActions[]` fields so agents can diagnose setup problems before calling a splitting tool.
 
+If `FONT_SPLIT_WASM_PATH` is set, the `wasm` object reports `fontSplitWasmPathConfigured: true`, the raw `configuredPath`, and the resolved runtime `path`.
+
 ## `split_font`
 
 Split one font file into cn-font-split output.

@@ -24,9 +24,17 @@ const PACKAGE_VERSION = packageJson.version;
 let wasmRuntimePromise;
 let wasmPath;
 
+function resolveWasmRuntimePath() {
+  return process.env.FONT_SPLIT_WASM_PATH
+    ? path.resolve(process.env.FONT_SPLIT_WASM_PATH)
+    : path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/dist/libffi-wasm32-wasip1.wasm');
+}
+
 function getWasmRuntimePath() {
-  if (!wasmPath) {
-    wasmPath = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/dist/libffi-wasm32-wasip1.wasm');
+  const resolvedWasmPath = resolveWasmRuntimePath();
+  if (wasmPath !== resolvedWasmPath) {
+    wasmPath = resolvedWasmPath;
+    wasmRuntimePromise = null;
   }
   return wasmPath;
 }
@@ -146,6 +154,7 @@ function buildRuntimeRecommendedActions({
   cnFontSplitPackage,
   cnFontSplitPackageInfo,
   cnFontSplitRuntimeInfo,
+  wasmPathConfigured,
 }) {
   const actions = [];
 
@@ -170,7 +179,7 @@ function buildRuntimeRecommendedActions({
     actions.push({
       code: 'install-wasm-runtime',
       severity: 'error',
-      message: 'Install the cn-font-split WASM runtime before splitting fonts.',
+      message: 'Install the cn-font-split WASM runtime before splitting fonts, or set FONT_SPLIT_WASM_PATH to an existing WASM file.',
       command: 'npm run install:wasm',
     });
   }
@@ -185,8 +194,10 @@ function buildRuntimeRecommendedActions({
     actions.push({
       code: 'record-wasm-runtime-version',
       severity: 'warning',
-      message: 'The WASM file exists, but its cn-font-split runtime release is not recorded.',
-      command: 'npm run install:wasm -- --force',
+      message: wasmPathConfigured
+        ? 'A custom FONT_SPLIT_WASM_PATH is configured, so the cn-font-split runtime release could not be inferred from the packaged version file.'
+        : 'The WASM file exists, but its cn-font-split runtime release is not recorded.',
+      ...(wasmPathConfigured ? {} : { command: 'npm run install:wasm -- --force' }),
     });
   }
 
@@ -195,6 +206,7 @@ function buildRuntimeRecommendedActions({
 
 export async function getRuntimeStatus() {
   const configuredRoot = process.env.FONT_SPLIT_ROOT || null;
+  const configuredWasmPath = process.env.FONT_SPLIT_WASM_PATH || null;
   const root = workspaceRoot();
   const runtimePath = getWasmRuntimePath();
   const workspace = await pathStatus(root);
@@ -210,6 +222,7 @@ export async function getRuntimeStatus() {
     cnFontSplitPackage,
     cnFontSplitPackageInfo,
     cnFontSplitRuntimeInfo,
+    wasmPathConfigured: configuredWasmPath !== null,
   });
   const checks = [
     {
@@ -245,6 +258,8 @@ export async function getRuntimeStatus() {
     },
     wasm: {
       path: runtimePath,
+      fontSplitWasmPathConfigured: configuredWasmPath !== null,
+      configuredPath: configuredWasmPath,
       ...wasm,
     },
     cnFontSplit: {
@@ -351,6 +366,7 @@ export function getAgentGuidance(args = {}) {
       'ok',
       'workspace',
       'wasm',
+      'wasm.fontSplitWasmPathConfigured',
       'cnFontSplit',
       'cnFontSplit.packageVersion',
       'cnFontSplit.runtimeVersion',

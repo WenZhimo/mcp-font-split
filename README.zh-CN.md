@@ -395,6 +395,7 @@ npm run smoke:small-skip
 | 变量名 | 说明 |
 |--------|------|
 | `FONT_SPLIT_ROOT` | 字体工作区根目录。请根据自己的字体存放位置显式设置；未设置时默认使用 MCP Server 进程启动时的当前工作目录。如果使用者是 AI，应先询问用户希望使用哪个目录，不要猜测或硬编码用户的本机路径。 |
+| `FONT_SPLIT_WASM_PATH` | 可选的自定义 `libffi-wasm32-wasip1.wasm` 运行时路径，支持绝对路径或相对路径。未设置时使用本包依赖中的默认 `cn-font-split/dist` 路径。 |
 
 ## 致谢与来源
 
