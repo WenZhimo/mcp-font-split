@@ -361,6 +361,9 @@ npm start
 ### Smoke checks
 
 ```sh
+npm run check
+npm run check:syntax
+npm run check:smoke
 npm run smoke
 npm run smoke:agent-guidance
 npm run smoke:incremental
@@ -371,6 +374,8 @@ npm run smoke:mcp-error
 npm run smoke:inspect
 npm run smoke:small-skip
 ```
+
+`npm run check` is the recommended agent/CI entry point. It runs syntax checks plus smoke scenarios that create their own tiny inputs and do not require a real font library.
 
 `smoke:small-skip` currently exercises the `copy-original` small-font policy; the script name is kept for compatibility. `smoke:incremental` also prints a sample `splitDir` so you can verify the collision-safe batch naming stays stable across reruns.
 
