@@ -45,7 +45,6 @@ Common optional fields:
 | `smallGlyphAction` | `subset`, `single-woff2`, `copy-original` | `subset` | What to do when `glyphCount <= smallGlyphThreshold`. |
 | `smallGlyphThreshold` | positive integer | `50` | Glyph threshold for `single-woff2` and `copy-original` small-font handling. |
 | `splitFailureAction` | `error`, `single-woff2` | `error` | Whether split failures should error or fall back to one WOFF2. |
-| `strictMode` | boolean | `false` | Convenience strict defaults. In batch mode, unset `skipMode` becomes `manifest` and unset `batchErrorMode` becomes `fail-after`; explicit options still override it. |
 
 Advanced cn-font-split options:
 
@@ -109,6 +108,7 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 | `maxFiles` | positive integer, MCP max `50000` | `5000` | Maximum source files to scan. |
 | `includeResults` | boolean | `true` | Include per-font `results[]`; set `false` for compact large-batch responses. |
 | `dryRun` | boolean | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
+| `strictMode` | boolean | `false` | Convenience strict defaults. Unset `skipMode` becomes `manifest` and unset `batchErrorMode` becomes `fail-after`; explicit options still override it. |
 | `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | Existing-output skip policy. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | First-level family directory strategy. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Per-font output directory naming strategy. |

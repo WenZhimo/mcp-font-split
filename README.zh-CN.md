@@ -113,7 +113,6 @@ split-output/
 | `smallGlyphAction` | `subset`, `single-woff2`, `copy-original` | `subset` | 当 `glyphCount <= smallGlyphThreshold` 时的处理策略。 |
 | `smallGlyphThreshold` | 正整数 | `50` | 小字形策略使用的字形数阈值。 |
 | `splitFailureAction` | `error`, `single-woff2` | `error` | 默认暴露 cn-font-split 错误；可显式回退为单 WOFF2。 |
-| `strictMode` | `true`, `false` | `false` | 一键严格默认值。批量模式下，未显式设置的 `skipMode` 会变为 `manifest`，未显式设置的 `batchErrorMode` 会变为 `fail-after`；显式参数仍优先生效。 |
 
 `smallGlyphAction` 说明：
 
@@ -134,6 +133,7 @@ split-output/
 | `maxFiles` | 正整数，MCP 最大 `50000` | `5000` | 扫描阶段最多读取多少个源文件，再过滤字体扩展名。 |
 | `includeResults` | `true`, `false` | `true` | 是否返回每个字体的详细 `results[]`。大批量只需要摘要和错误时可设为 `false`。 |
 | `dryRun` | `true`, `false` | `false` | 只预览扫描、去重、命名和 skip 决策，不写任何输出文件。 |
+| `strictMode` | `true`, `false` | `false` | 一键严格默认值。未显式设置的 `skipMode` 会变为 `manifest`，未显式设置的 `batchErrorMode` 会变为 `fail-after`；显式参数仍优先生效。 |
 
 `skipMode` 说明：
 

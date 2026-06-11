@@ -45,7 +45,6 @@
 | `smallGlyphAction` | `subset`, `single-woff2`, `copy-original` | `subset` | 当 `glyphCount <= smallGlyphThreshold` 时如何处理。 |
 | `smallGlyphThreshold` | 正整数 | `50` | `single-woff2` 和 `copy-original` 小字形处理的判断阈值。 |
 | `splitFailureAction` | `error`, `single-woff2` | `error` | 分割失败时报错，还是回退为单 WOFF2。 |
-| `strictMode` | boolean | `false` | 一键严格默认值。批量模式下，未显式设置的 `skipMode` 会变为 `manifest`，未显式设置的 `batchErrorMode` 会变为 `fail-after`；显式参数仍可覆盖。 |
 
 高级 cn-font-split 参数：
 
@@ -109,6 +108,7 @@
 | `maxFiles` | 正整数，MCP 最大 `50000` | `5000` | 扫描阶段最多读取多少个源文件。 |
 | `includeResults` | boolean | `true` | 是否返回每个字体的 `results[]` 详情；全量跑建议设为 `false`。 |
 | `dryRun` | boolean | `false` | 只预览扫描、去重、命名和 skip 决策，不写任何输出文件。 |
+| `strictMode` | boolean | `false` | 一键严格默认值。未显式设置的 `skipMode` 会变为 `manifest`，未显式设置的 `batchErrorMode` 会变为 `fail-after`；显式参数仍可覆盖。 |
 | `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | 已有输出的跳过策略。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 第一层 family 目录策略。 |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 每个字体输出目录的命名策略。 |

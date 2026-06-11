@@ -9,7 +9,7 @@ import { errorText, jsonText } from './mcp-response.js';
 const require = createRequire(import.meta.url);
 const packageJson = require('../package.json');
 
-const FontSplitOptions = {
+const SplitFontOptions = {
   fontPath: z.string().describe('Font file path relative to FONT_SPLIT_ROOT, or an absolute path inside it. If FONT_SPLIT_ROOT is not configured, ask the user which font workspace directory to use before processing private/local fonts.'),
   outDir: z.string().optional().describe('Output directory relative to FONT_SPLIT_ROOT. Defaults to split-output/<font-family>.'),
   fontFamily: z.string().optional().describe('CSS font-family value.'),
@@ -37,8 +37,12 @@ const FontSplitOptions = {
   smallGlyphAction: z.enum(['subset', 'single-woff2', 'copy-original']).optional().describe('How to handle very small fonts. Default: subset. Use single-woff2 to emit a one-file fallback, or copy-original to copy the original and write metadata without generating web-font output.'),
   smallGlyphThreshold: z.number().int().positive().optional().describe('Glyph-count threshold used by smallGlyphAction fallback modes. Default: 50.'),
   splitFailureAction: z.enum(['error', 'single-woff2']).optional().describe('What to do if cn-font-split fails. Default: error. Use single-woff2 to explicitly allow a one-file fallback after split failure.'),
+};
+
+const BatchPolicyOptions = {
   strictMode: z.boolean().optional().describe('Convenience strict defaults. In batch mode, unset skipMode becomes manifest and unset batchErrorMode becomes fail-after. Explicit options still override this. Default: false.'),
   skipMode: z.enum(['legacy-css', 'manifest', 'force']).optional().describe('Batch incremental mode. legacy-css preserves the old result.css existence check, manifest compares source and effective options, and force always reprocesses.'),
+  batchGroupBy: z.enum(['auto', 'source-dir', 'font-family']).optional().describe('Batch family directory grouping mode. Default: auto. auto preserves directory-first behavior for nested inputs, source-dir groups by source directory, and font-family groups by internal font metadata.'),
   batchNamingMode: z.enum(['plain', 'numeric-suffix', 'source-suffix']).optional().describe('Batch output naming mode. Default: numeric-suffix. plain keeps bare fontBaseName, numeric-suffix appends -1/-2 only on real conflicts, and source-suffix appends a source-derived suffix.'),
   batchDedupeMode: z.enum(['none', 'same-path', 'font-identity']).optional().describe('Batch dedupe mode. Default: font-identity. none disables dedupe, same-path preserves old same-stem dedupe, and font-identity dedupes equivalent fonts across formats.'),
   batchErrorMode: z.enum(['collect', 'fail-fast', 'fail-after']).optional().describe('Batch error mode. Default: collect. collect returns ok:true with errors[], fail-fast throws on the first per-font error, and fail-after throws after processing selected fonts if any errors occurred.'),
@@ -89,7 +93,7 @@ server.registerTool(
   {
     title: 'Split a font into web-font chunks',
     description: 'Call this when the user wants to split one local TTF/OTF/TTC/OTC/WOFF/WOFF2 font into cn-font-split web font output files. All paths must stay inside the configured font workspace.',
-    inputSchema: FontSplitOptions,
+    inputSchema: SplitFontOptions,
   },
   async (args) => {
     try {
@@ -112,7 +116,8 @@ server.registerTool(
       maxFiles: z.number().int().positive().max(50000).optional().describe('Maximum files to scan. Defaults to 5000.'),
       includeResults: z.boolean().optional().describe('Include per-font result objects in the response. Default: true. Set false for large batch runs that only need summary counts and errors.'),
       dryRun: z.boolean().optional().describe('Preview scan, dedupe, naming, and skip decisions without writing output files. Default: false.'),
-      ...Object.fromEntries(Object.entries(FontSplitOptions).filter(([key]) => !['fontPath', 'outDir'].includes(key))),
+      ...Object.fromEntries(Object.entries(SplitFontOptions).filter(([key]) => !['fontPath', 'outDir'].includes(key))),
+      ...BatchPolicyOptions,
     },
   },
   async (args) => {

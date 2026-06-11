@@ -1,5 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
 import { errorText } from './mcp-response.js';
 
@@ -193,6 +195,37 @@ if (scenario === 'single') {
     throw new Error('Expected plain MCP error response to stay concise.');
   }
   console.log(JSON.stringify({ detailed: parsed, plain: plain.content[0].text }, null, 2));
+} else if (scenario === 'mcp-schema') {
+  const client = new Client({ name: 'mcp-schema-smoke', version: '0.0.0' });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ['src/server.js'],
+    cwd: process.cwd(),
+  });
+  await client.connect(transport);
+  try {
+    const result = await client.listTools();
+    const tools = Object.fromEntries(result.tools.map((tool) => [tool.name, tool]));
+    const splitFontProps = tools.split_font?.inputSchema?.properties || {};
+    const batchProps = tools.split_font_batch?.inputSchema?.properties || {};
+    const batchOnly = ['strictMode', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'debugBatchDecisions'];
+    const leaked = batchOnly.filter((key) => Object.hasOwn(splitFontProps, key));
+    const missing = batchOnly.filter((key) => !Object.hasOwn(batchProps, key));
+    if (leaked.length > 0) {
+      throw new Error(`split_font leaked batch-only properties: ${leaked.join(', ')}`);
+    }
+    if (missing.length > 0) {
+      throw new Error(`split_font_batch is missing batch-only properties: ${missing.join(', ')}`);
+    }
+    console.log(JSON.stringify({
+      ok: true,
+      splitFontPropertyCount: Object.keys(splitFontProps).length,
+      splitFontBatchPropertyCount: Object.keys(batchProps).length,
+      splitFontBatchHasBatchGroupBy: Object.hasOwn(batchProps, 'batchGroupBy'),
+    }, null, 2));
+  } finally {
+    await client.close();
+  }
 } else if (scenario === 'batch-compact') {
   const inputDir = process.argv[3] || '0xA000';
   const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-batch-compact-output';

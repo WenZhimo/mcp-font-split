@@ -115,7 +115,6 @@ In batch mode, the bare name is used first. Only true collisions allocate stable
 | `smallGlyphAction` | `subset`, `single-woff2`, `copy-original` | `subset` | Decide what to do when `glyphCount <= smallGlyphThreshold`. |
 | `smallGlyphThreshold` | positive integer | `50` | Glyph-count threshold for small-font policy decisions. |
 | `splitFailureAction` | `error`, `single-woff2` | `error` | Surface cn-font-split failures by default; optionally recover with a single WOFF2 fallback. |
-| `strictMode` | `true`, `false` | `false` | Convenience strict defaults. In batch mode, unset `skipMode` becomes `manifest` and unset `batchErrorMode` becomes `fail-after`; explicit options still win. |
 
 `smallGlyphAction` details:
 
@@ -136,6 +135,7 @@ In batch mode, the bare name is used first. Only true collisions allocate stable
 | `maxFiles` | positive integer, MCP max `50000` | `5000` | Maximum source files to scan before filtering fonts. |
 | `includeResults` | `true`, `false` | `true` | Include per-font result objects. Set `false` for large runs that only need summary counters and errors. |
 | `dryRun` | `true`, `false` | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
+| `strictMode` | `true`, `false` | `false` | Convenience strict defaults. Unset `skipMode` becomes `manifest` and unset `batchErrorMode` becomes `fail-after`; explicit options still win. |
 
 `skipMode` details:
 
