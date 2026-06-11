@@ -334,6 +334,8 @@ split-output/
 
 ## 安装
 
+需要 Node.js 18 或更高版本。
+
 ```sh
 git clone https://github.com/WenZhimo/mcp-font-split.git
 cd mcp-font-split

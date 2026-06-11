@@ -5,6 +5,19 @@
   "type": "module",
   "license": "Apache-2.0",
   "author": "WenZhimo",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src/",
+    "batch-run.js",
+    "API.md",
+    "API.zh-CN.md",
+    "BEHAVIOR.zh-CN.md",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/WenZhimo/mcp-font-split.git"

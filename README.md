@@ -336,6 +336,8 @@ Disable dedupe entirely:
 
 ## Installation
 
+Requires Node.js 18 or newer.
+
 ```sh
 git clone https://github.com/WenZhimo/mcp-font-split.git
 cd mcp-font-split
