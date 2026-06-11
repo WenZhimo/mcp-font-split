@@ -1,9 +1,13 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
 import { errorText, jsonText } from './mcp-response.js';
+
+const require = createRequire(import.meta.url);
+const packageJson = require('../package.json');
 
 const FontSplitOptions = {
   fontPath: z.string().describe('Font file path relative to FONT_SPLIT_ROOT, or an absolute path inside it. If FONT_SPLIT_ROOT is not configured, ask the user which font workspace directory to use before processing private/local fonts.'),
@@ -43,7 +47,7 @@ const FontSplitOptions = {
 
 const server = new McpServer({
   name: 'font-split-mcp',
-  version: '0.1.0',
+  version: packageJson.version,
 });
 
 server.registerTool(
