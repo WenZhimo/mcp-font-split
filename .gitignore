@@ -1,5 +1,8 @@
 node_modules/
-.font-split-smoke-output/
+
+# Local smoke/debug/batch outputs generated while testing this MCP server.
+.font-split-*/
 split-output/
+split-output-*/
 .cargo-bin/
 *.log
