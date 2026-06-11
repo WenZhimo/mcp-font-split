@@ -1,6 +1,6 @@
 # mcp-font-split
 
-[中文文档](./README.zh-CN.md)
+[中文文档](./README.zh-CN.md) | [API Reference](./API.md)
 
 > **AI-Generated Code Disclaimer / AI 生成代码声明**
 >
@@ -19,6 +19,8 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 
 - Split TTF/OTF/TTC/OTC/WOFF/WOFF2 fonts into web-font output files.
 - Batch-process font directories under the configured workspace.
+- Preflight input directories to find invalid font-like files before large batch runs.
+- Provide `get_agent_guidance` so AI coding assistants can choose a safe workflow from machine-readable guidance.
 - Preserve original font files in the output family directory.
 - Write `split-meta.json` manifests for processed fonts.
 - Inspect output directories with flat file stats and structured family/font summaries.
@@ -28,8 +30,10 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 
 | Tool | Description |
 |------|-------------|
+| `get_agent_guidance` | Return AI-agent-oriented workflow guidance, path rules, defaults, and response fields to check. |
 | `split_font` | Process one font file. Depending on options, it may create subset WOFF2 chunks, a single WOFF2 fallback, or a copy-original metadata entry. |
-| `split_font_batch` | Scan a directory, deduplicate same-basename formats, group fonts into family directories, and process each selected font. |
+| `inspect_font_inputs` | Scan input fonts without writing output; reports parse status, identity keys, glyph counts, and invalid font-like files. |
+| `split_font_batch` | Scan a directory, deduplicate according to `batchDedupeMode`, group fonts into family directories, and process each selected font. |
 | `inspect_split_output` | Summarize output files and classify family/font entries using `split-meta.json` when available. |
 
 ## Important behavior summary
@@ -40,11 +44,16 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 Key defaults and policy choices:
 
 - Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server.
+- For AI coding assistants, call `get_agent_guidance` first when the workflow is unclear. It returns recommended tool order, default policies, path rules, and response fields that should be inspected before claiming success.
+- Batch scanning skips dependencies, generated output directories, `__MACOSX`, and AppleDouble `._*` resource-fork files.
 - `.woff` and `.woff2` inputs are decompressed to sfnt-like data before processing.
-- Batch mode deduplicates same-basename multi-format fonts by priority: `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff`.
+- Batch mode deduplicates fonts according to `batchDedupeMode`; by default `font-identity` keeps one representative for equivalent fonts across formats using the priority `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff`.
 - Batch grouping defaults to `batchGroupBy: "auto"`, which preserves the directory-first behavior for nested inputs.
+- Batch naming defaults to `batchNamingMode: "numeric-suffix"`: bare `fontBaseName` first, then stable `-1`, `-2`, `-3` only on real collisions.
+- Equivalent OTF/TTF pairs are deduplicated in batch mode when they resolve to the same font identity, keeping only one representative.
 - Batch incremental skipping defaults to `skipMode: "legacy-css"`, which preserves the old `result.css` marker behavior.
 - Safer batch reruns should use `skipMode: "manifest"` or `skipMode: "force"`.
+- `strictMode: true` is a shortcut for safer batch defaults: `skipMode: "manifest"` and `batchErrorMode: "fail-after"` when those fields are not explicitly set.
 - Oversized `kern` stripping is opt-in via `oversizedKernAction: "strip"`.
 - Split-failure single-WOFF2 fallback is opt-in via `splitFailureAction: "single-woff2"`.
 - Small glyph fonts are controlled by `smallGlyphAction`: `subset`, `single-woff2`, or `copy-original`.
@@ -56,8 +65,8 @@ Normal subset output:
 ```text
 split-output/
   <FamilyName>/
-    <OriginalFontFile>          # copied original font
-    <FontBaseName>/             # processed output directory
+    <OriginalFontFile> or <OriginalFontFile-1>  # copied original font when needed
+    <FontBaseName>/ or <FontBaseName-1>/        # processed output directory only on true collision
       *.woff2
       result.css
       index.html?               # when testHtml=true
@@ -71,8 +80,8 @@ Single-WOFF2 fallback output:
 ```text
 split-output/
   <FamilyName>/
-    <OriginalFontFile>
-    <FontBaseName>/
+    <OriginalFontFile> or <OriginalFontFile-1>
+    <FontBaseName>/ or <FontBaseName-1>/
       <FontBaseName>.woff2
       result.css
       index.html?
@@ -84,10 +93,12 @@ Small-font `copy-original` output:
 ```text
 split-output/
   <FamilyName>/
-    <OriginalFontFile>
-    <FontBaseName>/
+    <OriginalFontFile> or <OriginalFontFile-1>
+    <FontBaseName>/ or <FontBaseName-1>/
       split-meta.json
 ```
+
+In batch mode, the bare name is used first. Only true collisions allocate stable numeric suffixes (`-1`, `-2`, ...), and those suffixes are reused on reruns through manifest matching.
 
 `copy-original` intentionally does not generate `.woff2` or `result.css`; it records that the font was handled and skipped from subsetting.
 
@@ -101,6 +112,7 @@ split-output/
 | `smallGlyphAction` | `subset`, `single-woff2`, `copy-original` | `subset` | Decide what to do when `glyphCount <= smallGlyphThreshold`. |
 | `smallGlyphThreshold` | positive integer | `50` | Glyph-count threshold for small-font policy decisions. |
 | `splitFailureAction` | `error`, `single-woff2` | `error` | Surface cn-font-split failures by default; optionally recover with a single WOFF2 fallback. |
+| `strictMode` | `true`, `false` | `false` | Convenience strict defaults. In batch mode, unset `skipMode` becomes `manifest` and unset `batchErrorMode` becomes `fail-after`; explicit options still win. |
 
 `smallGlyphAction` details:
 
@@ -114,18 +126,46 @@ split-output/
 |--------|--------|---------|---------|
 | `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | Choose how batch mode decides whether output is already current. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | Choose the family directory naming strategy for batch mode. |
+| `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Choose how batch mode names per-font output directories when collisions exist. |
+| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Choose how batch mode deduplicates equivalent fonts before processing. |
+| `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `collect` | Choose whether per-font errors are collected in the response or thrown for automation. |
+| `limit` | positive integer, MCP max `50000` | `20` | Maximum fonts to process after dedupe. Raise it explicitly for full-library runs. |
+| `maxFiles` | positive integer, MCP max `50000` | `5000` | Maximum source files to scan before filtering fonts. |
+| `includeResults` | `true`, `false` | `true` | Include per-font result objects. Set `false` for large runs that only need summary counters and errors. |
+| `dryRun` | `true`, `false` | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
 
 `skipMode` details:
 
-- `legacy-css`: skip if `<family>/<fontBaseName>/result.css` exists. This preserves old behavior but does not detect option changes.
+- `legacy-css`: skip if the current batch output directory's `result.css` exists. This preserves old behavior but does not detect option changes.
 - `manifest`: skip only when `split-meta.json` matches source path, source size, source mtime, effective options, manifest version, and tool version.
 - `force`: never skip existing output.
+
+In batch mode, the output directory key is the bare `fontBaseName` unless another source has already claimed it. In that case the tool allocates a stable numeric suffix and reuses it on later reruns by manifest source matching.
 
 `batchGroupBy` details:
 
 - `auto`: nested fonts use the first source-directory segment; root-level fonts use internal family metadata.
 - `source-dir`: always use the first source-directory segment when available.
 - `font-family`: always use internal font family metadata when available, with basename fallback.
+
+`batchNamingMode` details:
+
+- `plain`: always use the bare `fontBaseName` and original filename, without automatic collision suffixes.
+- `numeric-suffix`: use the bare name first, then allocate stable `-1`, `-2`, ... suffixes only when another source has already claimed that name.
+- `source-suffix`: append a source-derived `--<ext>-<hash8>` suffix to make outputs distinct even before a collision occurs.
+
+`batchDedupeMode` details:
+
+- `none`: do not deduplicate before processing.
+- `same-path`: preserve the old same-path, same-stem multi-format dedupe behavior.
+- `font-identity`: deduplicate equivalent fonts across formats by comparing normalized font identity and keeping the highest-priority representative. The key uses typographic family/subfamily when available, falls back to legacy family/subfamily, then full name or PostScript name; glyph count is diagnostic only and does not split otherwise equivalent OTF/TTF/WOFF inputs.
+- If identity extraction fails, dedupe falls back to a path-based key and leaves the actual failure for the processing phase and `batchErrorMode`.
+
+`batchErrorMode` details:
+
+- `collect`: keep processing and return `ok: true` with `errors[]` and `errorCount`; this preserves compatibility.
+- `fail-fast`: throw on the first per-font error.
+- `fail-after`: keep processing selected fonts, then throw if any per-font errors occurred.
 
 ## Result interpretation
 
@@ -140,8 +180,20 @@ split-output/
 - `warnings`: human-readable notes about non-transparent behavior
 - `manifestPath` / `manifestWritten`: manifest output status
 
+`inspect_font_inputs` is a no-write preflight for source directories:
+
+- `supportedFontCount`, `validFontCount`, `invalidFontCount`
+- `missingIdentityCount`
+- `maxFilesHit`: true only when more files exist beyond `maxFiles`
+- `invalidFonts[]`
+- optional `files[]` entries with `container`, `identity`, `identityKey`, `identityBasis`, and `glyphCount`
+
 `split_font_batch` additionally returns aggregate counters such as:
 
+- `resultsIncluded`: whether per-font `results[]` objects are present
+- `scannedFileCount`, `maxFiles`, `maxFilesHit`
+- `dryRun`, `plannedCount`, `wouldProcessCount`, `planIncluded`
+- `batchErrorMode`, `errorCount`, `errors[]`
 - `skippedExisting`, `skippedLegacy`, `skippedByManifest`
 - `reprocessedBecauseSourceChanged`, `reprocessedBecauseOptionsChanged`
 - `processingSummary.subsetOutputs`
@@ -153,6 +205,8 @@ split-output/
 
 `inspect_split_output` keeps flat file stats and adds structured output inventory:
 
+- `maxFiles` can raise or lower the output scan cap; it defaults to `200000` so large batch outputs are not truncated during inspection.
+- `maxFilesHit` is true only when more output files exist beyond `maxFiles`.
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`
@@ -199,8 +253,43 @@ Recommended batch behavior for archive-per-family source folders:
   "inputDir": ".",
   "outputRoot": "split-output",
   "batchGroupBy": "source-dir",
+  "batchNamingMode": "numeric-suffix",
+  "batchDedupeMode": "font-identity",
   "skipMode": "manifest",
   "smallGlyphAction": "copy-original"
+}
+```
+
+Full-library batch run with compact response:
+
+```json
+{
+  "inputDir": ".",
+  "outputRoot": "split-output",
+  "limit": 50000,
+  "maxFiles": 50000,
+  "includeResults": false,
+  "strictMode": true,
+  "batchNamingMode": "numeric-suffix",
+  "batchDedupeMode": "font-identity",
+  "skipMode": "manifest",
+  "splitFailureAction": "single-woff2"
+}
+```
+
+Preview a full-library run without writing files:
+
+```json
+{
+  "inputDir": ".",
+  "outputRoot": "split-output",
+  "limit": 50000,
+  "maxFiles": 50000,
+  "dryRun": true,
+  "includeResults": true,
+  "batchNamingMode": "numeric-suffix",
+  "batchDedupeMode": "font-identity",
+  "skipMode": "manifest"
 }
 ```
 
@@ -211,7 +300,30 @@ Metadata-driven batch grouping:
   "inputDir": ".",
   "outputRoot": "split-output",
   "batchGroupBy": "font-family",
+  "batchNamingMode": "numeric-suffix",
+  "batchDedupeMode": "font-identity",
   "skipMode": "manifest"
+}
+```
+
+Fully preserve old-style batch behavior:
+
+```json
+{
+  "inputDir": ".",
+  "outputRoot": "split-output",
+  "batchNamingMode": "plain",
+  "batchDedupeMode": "same-path"
+}
+```
+
+Disable dedupe entirely:
+
+```json
+{
+  "inputDir": ".",
+  "outputRoot": "split-output",
+  "batchDedupeMode": "none"
 }
 ```
 
@@ -246,12 +358,15 @@ npm start
 
 ```sh
 npm run smoke
+npm run smoke:agent-guidance
 npm run smoke:incremental
+npm run smoke:font-inputs
+npm run smoke:scan-limits
 npm run smoke:inspect
 npm run smoke:small-skip
 ```
 
-`smoke:small-skip` currently exercises the `copy-original` small-font policy; the script name is kept for compatibility.
+`smoke:small-skip` currently exercises the `copy-original` small-font policy; the script name is kept for compatibility. `smoke:incremental` also prints a sample `splitDir` so you can verify the collision-safe batch naming stays stable across reruns.
 
 ### Environment variables
 

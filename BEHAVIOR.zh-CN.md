@@ -9,11 +9,13 @@
 
 ## 1. 工具能力总览
 
-当前 MCP 服务暴露 3 个工具：
+当前 MCP 服务暴露 5 个工具：
 
 | 工具 | 作用 |
 |------|------|
+| `get_agent_guidance` | 返回面向 AI 编程助理的机器可读工作流指南 |
 | `split_font` | 处理单个字体文件 |
+| `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count 和坏字体清单 |
 | `split_font_batch` | 批量扫描目录、去重、分组并处理字体文件 |
 | `inspect_split_output` | 汇总和结构化检查输出目录 |
 
@@ -41,6 +43,22 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 如果使用者是 AI agent，不应猜测或硬编码用户的本机路径；在处理用户私有/本地字体前，应该先询问用户希望把 `FONT_SPLIT_ROOT` 设置到哪个目录。
 
+### 2.1.1 AI agent 专用适配
+
+本项目是给 AI 编程助理调用的 MCP Server，因此除了普通参数 schema，还提供了 `get_agent_guidance`。
+
+这个工具不读写字体文件，只返回：
+
+- 当前 `FONT_SPLIT_ROOT` 解析结果
+- 路径使用规则
+- 支持扩展名
+- 默认批量策略
+- 推荐批量参数
+- 推荐工具调用顺序
+- 调用方应该检查的关键响应字段
+
+当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。
+
 所有相对路径都相对于 `FONT_SPLIT_ROOT` 解释。
 
 如果 `FONT_SPLIT_ROOT` 变化，相同的：
@@ -54,11 +72,13 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 ### 2.2 批量扫描会主动忽略这些目录
 
-`split_font_batch` 递归扫描时会跳过：
+`inspect_font_inputs` 和 `split_font_batch` 递归扫描时会跳过：
 
 - `node_modules`
 - `.git`
 - `font-split-mcp`
+- `__MACOSX`
+- 所有以 `._` 开头的 AppleDouble 资源叉文件
 - `split-output`
 - 所有 `split-output-*` 目录
 
@@ -66,6 +86,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 - 避免扫描工具自身源码和依赖
 - 避免把已生成的输出再次当作输入
+- 避免把 macOS 压缩包里的资源叉伪文件误当成字体
 
 ---
 
@@ -82,6 +103,21 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 > [!NOTE]
 > “支持识别”不等于“原样传给 cn-font-split”。`.woff` / `.woff2` 会先被解压成 sfnt-like 数据。
+
+### 3.1 输入预检
+
+`inspect_font_inputs` 只扫描输入目录并尝试读取基础字体元数据，不会创建输出目录，也不会调用 cn-font-split 分割器。
+
+它用于在大批量处理前发现：
+
+- 扩展名像字体但无法解析的文件
+- 可解析但缺少批量去重 identity key 的字体
+- 每个字体的容器类型、identity key 和 `glyphCount`
+
+限制：
+
+- 预检通过不保证后续分割一定成功，因为 cn-font-split 仍可能在真正分片阶段失败
+- 预检失败的字体会进入 `invalidFonts[]`，不会让整个检查工具直接中断
 
 ---
 
@@ -153,7 +189,16 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 - `single-woff2` 会把失败恢复成 `ok: true`，调用方必须检查 `resultType`、`usedFallback` 和 `warnings`
 
-### 4.5 `skipMode`（批量专用）
+### 4.5 `strictMode`
+
+`strictMode: true` 是一键严格默认值：
+
+- 批量模式下，如果没有显式设置 `skipMode`，默认变为 `manifest`
+- 批量模式下，如果没有显式设置 `batchErrorMode`，默认变为 `fail-after`
+- 显式参数优先级高于 `strictMode`，所以仍可手动覆盖
+- 单文件模式下，当前默认已经偏严格：`splitFailureAction` 默认 `error`，`smallGlyphAction` 默认 `subset`
+
+### 4.6 `skipMode`（批量专用）
 
 可选值：
 
@@ -163,16 +208,18 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 行为：
 
-- `legacy-css`：只要 `<family>/<fontBaseName>/result.css` 存在就跳过
+- `legacy-css`：只要当前批量输出目录里的 `result.css` 存在就跳过
 - `manifest`：读取 `split-meta.json`，比较源文件和有效参数，只有一致才跳过
 - `force`：永远不跳过，始终重跑
+
+说明：`skipMode` 与 `batchNamingMode` / `batchDedupeMode` 组合使用；当后两者变化时，manifest 模式会把它们当作有效配置变化。
 
 风险：
 
 - `legacy-css` 兼容旧行为，但不感知参数变化、源文件变化、工具版本变化
 - `manifest` 更安全，但旧输出目录第一次使用时通常会重跑以生成 manifest
 
-### 4.6 `batchGroupBy`（批量专用）
+### 4.7 `batchGroupBy`（批量专用）
 
 可选值：
 
@@ -190,6 +237,56 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 - `auto` / `source-dir` 更适合“一个目录就是一个字体家族”的整理方式
 - `font-family` 更相信字体 metadata，但 metadata 可能不符合用户整理意图
+
+### 4.8 `batchNamingMode`（批量专用）
+
+可选值：
+
+- `plain`
+- `numeric-suffix`（默认）
+- `source-suffix`
+
+行为：
+
+- `plain`：始终使用裸 `fontBaseName` 和原始文件名，不自动追加冲突后缀
+- `numeric-suffix`：默认先用裸名；只有真实冲突时才分配稳定的 `-1`、`-2`、`-3`
+- `source-suffix`：显式使用基于来源的稳定后缀，让不同来源在未真正冲突前也先分开
+
+### 4.9 `batchDedupeMode`（批量专用）
+
+可选值：
+
+- `none`
+- `same-path`
+- `font-identity`（默认）
+
+行为：
+
+- `none`：完全不去重
+- `same-path`：保留旧的“同路径同 stem 多格式去重”行为
+- `font-identity`：按归一化后的字体身份跨任意格式去重，保留优先级最高的代表。身份键优先使用 typographic family/subfamily，缺失时回退到 legacy family/subfamily，再回退到 full name 或 PostScript name；`glyphCount` 只作为诊断信息，不参与等价判定。
+
+### 4.10 `batchErrorMode`（批量专用）
+
+可选值：
+
+- `collect`（默认）
+- `fail-fast`
+- `fail-after`
+
+行为：
+
+- `collect`：单字体错误会进入 `errors[]`，批量工具仍返回 `ok: true`，调用方必须检查 `errorCount`。
+- `fail-fast`：遇到第一个单字体错误后立即抛出 `BatchSplitError`。
+- `fail-after`：继续处理选中的字体；如果最终存在任何单字体错误，则抛出 `BatchSplitError`，错误对象包含 `details.errors` 和 `details.summary`。
+
+### 4.11 `limit` / `maxFiles` / `includeResults` / `dryRun`（批量专用）
+
+- `limit`：去重后最多处理多少个字体；默认 `20`，MCP 入口最大 `50000`。
+- `maxFiles`：递归扫描阶段最多读取多少个源文件；默认 `5000`，MCP 入口最大 `50000`。
+- `maxFilesHit`：批量响应中的机器可读截断信号；只有当 `maxFiles` 之外确实还存在更多源文件时才为 `true`。
+- `includeResults`：是否在批量响应中返回每个字体的 `results[]` 详情；默认 `true`。设为 `false` 时仍返回汇总统计、错误列表和 `resultsIncluded: false`，适合全量字体库处理。
+- `dryRun`：只执行扫描、去重、命名和 skip 判断，不调用 `split_font`，也不写任何输出文件。`includeResults: true` 时返回 `planned[]` 计划清单。
 
 ---
 
@@ -222,15 +319,19 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 1. 递归扫描 `inputDir`
 2. 跳过工具自身、依赖和输出目录
 3. 过滤支持的字体扩展名
-4. 对同路径同 basename 的多格式字体去重
+4. 按 `batchDedupeMode` 决定是否去重，以及如何在不同格式之间去重
 5. 根据 `batchGroupBy` 计算家族目录名
-6. 根据 `skipMode` 判断是否跳过已有输出
-7. 未跳过时调用 `split_font`
-8. 汇总成功、错误、跳过和处理模式统计
+6. 按 `batchNamingMode` 解析批量输出目录名
+7. 根据 `skipMode` 判断是否跳过已有输出
+8. 未跳过时调用 `split_font`
+9. 汇总成功、错误、跳过和处理模式统计
+10. 如果 `includeResults: false`，响应中省略每个字体的 `results[]` 详情，只保留汇总和错误
+11. 如果 `dryRun: true`，第 8 步不会真正执行，而是返回 `planned[]`、`plannedCount` 和 `wouldProcessCount`
+12. 如果 `batchErrorMode` 是 `fail-fast` 或 `fail-after`，按对应策略把单字体错误升级为批量工具错误
 
-### 6.1 同名多格式去重优先级
+### 6.1 批量去重策略
 
-当前优先级：
+格式优先级仍然是：
 
 1. `.otf`
 2. `.ttf`
@@ -239,12 +340,36 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 5. `.otc`
 6. `.woff`
 
+但是否使用这套优先级、以及应用范围，取决于 `batchDedupeMode`：
+
+- `none`：完全不去重
+- `same-path`：只对同路径同 stem 的多格式文件按上面优先级去重
+- `font-identity`：对任意格式，只要归一化后的字体身份相同，就按上面优先级保留一个代表
+- 如果身份解析失败，会回退到基于路径 stem 的 key；这会避免扫描/去重阶段直接中断，真正的坏字体错误由处理阶段和 `batchErrorMode` 决定如何呈现
+
 例如：
 
-- `Foo.otf` + `Foo.ttf` → 只处理 `Foo.otf`
-- `Foo.ttf` + `Foo.woff2` → 只处理 `Foo.ttf`
+- `Foo.otf` + `Foo.ttf` 在 `same-path` / `font-identity` 下通常只保留 `Foo.otf`
+- `Foo.ttf` + `Foo.woff2` 在 `font-identity` 下如果字体身份等价，也可以只保留一个代表
+- `batchDedupeMode = none` 时，这些文件都不会被预先去重
 
-这个行为目前不能通过参数关闭。
+### 6.2 批量输出目录自动防冲突
+
+批量模式下，第一层 family 目录规则不变，但第二层字体输出目录默认仍然优先使用裸 `fontBaseName`。
+
+当前行为是：
+
+- 保留 `batchGroupBy` 决定的家族目录
+- 默认先尝试直接使用 `<fontBaseName>`
+- 如果同一 family 目录里已有别的源文件占用了这个名字，才继续分配稳定的数字后缀：`-1`、`-2`、`-3`
+- 这个数字后缀会通过 manifest 绑定到源文件，后续 rerun 时会稳定复用
+
+结果是：
+
+- 没冲突时：`split-output/tiny5/Tiny5-CRTBold/`
+- 真冲突时：`split-output/tiny5/Tiny5-CRTBold-1/`
+
+同时，OTF / TTF / WOFF / WOFF2 如果在字体身份上等价（优先看 family/subfamily，缺失时回退到 full name 或 PostScript name），会在批量阶段先去重，只保留一个代表；`glyphCount` 不参与等价判定，因此不会仅仅因为容器差异或小幅 glyph count 差异就各自产生一个输出目录。
 
 ---
 
@@ -255,8 +380,8 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 ```text
 split-output/
   <FamilyName>/
-    <OriginalFontFile>
-    <FontBaseName>/
+    <OriginalFontFile> 或 <OriginalFontFile-1>
+    <FontBaseName>/ 或 <FontBaseName-1>/
       *.woff2
       result.css
       index.html?
@@ -270,8 +395,8 @@ split-output/
 ```text
 split-output/
   <FamilyName>/
-    <OriginalFontFile>
-    <FontBaseName>/
+    <OriginalFontFile> 或 <OriginalFontFile-1>
+    <FontBaseName>/ 或 <FontBaseName-1>/
       <FontBaseName>.woff2
       result.css
       index.html?
@@ -283,11 +408,17 @@ split-output/
 ```text
 split-output/
   <FamilyName>/
-    <OriginalFontFile>
-    <FontBaseName>/
+    <OriginalFontFile> 或 <OriginalFontFile-1>
+    <FontBaseName>/ 或 <FontBaseName-1>/
       split-meta.json
 ```
 
+说明：
+
+- 单文件 `split_font` 仍然通常使用裸 `fontBaseName`
+- 批量 `split_font_batch` 默认优先使用裸名
+- 只有真实冲突时，才会为目录名和原字体副本名分配 `-1`、`-2` 这类稳定数字后缀
+- 数字后缀不会按每次扫描顺序重排，而是会通过 manifest 在后续 rerun 中稳定复用
 `copy-original` 不生成：
 
 - `.woff2`
@@ -376,9 +507,14 @@ split-meta.json
 
 ### 9.3 `inspect_split_output`
 
+`maxFiles` 默认是 `200000`。它只影响输出检查阶段的文件扫描上限，不影响批量处理阶段的 `maxFiles`。
+
+`maxFilesHit` 只有当 `maxFiles` 之外确实还有更多输出文件时才为 `true`。如果它为 `true`，不要把本次输出审计视为完整结果，应调高 `maxFiles` 后重跑。
+
 保留基础统计：
 
 - `fileCount`
+- `maxFilesHit`
 - `totalBytes`
 - `byExtension`
 - `files`
@@ -440,6 +576,8 @@ split-meta.json
 }
 ```
 
+但要注意：即使家族分组仍然是目录优先，批量模式下第二层字体输出目录也可能带有稳定的数字后缀，以避免同一 family 目录里的同名字体互相覆盖。
+
 ### 10.5 `ok: true` 不是“真正分片成功”的同义词
 
 `ok: true` 可能对应：
@@ -454,12 +592,10 @@ split-meta.json
 
 ## 11. 当前仍然存在的限制
 
-1. 没有“一键严格模式”。
-2. 同名多格式去重策略不能关闭。
-3. WOFF/WOFF2 解压不能关闭。
-4. `copy-original` 输出没有 web-font CSS，不能直接作为 web-font 使用。
-5. 对 TTC/OTC 的 glyph count 基于当前实现读取逻辑，集合字体可能需要额外确认。
-6. `inspect_split_output` 对无 manifest 的旧输出只能保守推断。
+1. WOFF/WOFF2 解压不能关闭。
+2. `copy-original` 输出没有 web-font CSS，不能直接作为 web-font 使用。
+3. 对 TTC/OTC 的 glyph count 基于当前实现读取逻辑，集合字体可能需要额外确认。
+4. `inspect_split_output` 对无 manifest 的旧输出只能保守推断。
 
 ---
 
