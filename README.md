@@ -341,13 +341,17 @@ Requires Node.js 18 or newer.
 ```sh
 git clone https://github.com/WenZhimo/mcp-font-split.git
 cd mcp-font-split
-npm install --ignore-scripts
-
-# Download the WASM backend:
-gh release download 7.6.8 --repo KonghaYao/cn-font-split \
-  --pattern 'libffi-wasm32-wasip1.wasm' \
-  --dir './node_modules/cn-font-split/dist' --clobber
+npm install
 ```
+
+If lifecycle scripts are disabled in your environment, install dependencies and then download the cn-font-split WASM backend:
+
+```sh
+npm install --ignore-scripts
+npm run install:wasm
+```
+
+Use `npm run install:wasm -- --version 7.6.8` when you need to pin a specific cn-font-split runtime release.
 
 ## Usage
 

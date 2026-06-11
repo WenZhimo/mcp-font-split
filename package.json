@@ -10,6 +10,7 @@
   },
   "files": [
     "src/",
+    "scripts/",
     "batch-run.js",
     "API.md",
     "API.zh-CN.md",
@@ -29,8 +30,9 @@
   "scripts": {
     "start": "node src/server.js",
     "batch:run": "node batch-run.js",
+    "install:wasm": "node scripts/install-cn-font-split-wasm.js",
     "check": "npm run check:syntax && npm run check:smoke",
-    "check:syntax": "node --check batch-run.js && node --check src/font-split.js && node --check src/server.js && node --check src/smoke-test.js && node --check src/mcp-response.js",
+    "check:syntax": "node --check batch-run.js && node --check scripts/install-cn-font-split-wasm.js && node --check src/font-split.js && node --check src/server.js && node --check src/smoke-test.js && node --check src/mcp-response.js",
     "check:smoke": "npm run smoke:agent-guidance && npm run smoke:runtime-status && npm run smoke:font-inputs -- .font-split-input-inspect && npm run smoke:scan-limits -- .font-split-scan-limits && npm run smoke:inspect-compact -- .font-split-inspect-compact && npm run smoke:mcp-error && npm run smoke:batch-error-mode -- .font-split-error-mode-input .font-split-error-mode-output && npm run smoke:batch-strict -- .font-split-strict-input .font-split-strict-output",
     "smoke": "node src/smoke-test.js",
     "smoke:agent-guidance": "node src/smoke-test.js agent-guidance",

@@ -339,13 +339,17 @@ split-output/
 ```sh
 git clone https://github.com/WenZhimo/mcp-font-split.git
 cd mcp-font-split
-npm install --ignore-scripts
-
-# 下载 WASM 后端：
-gh release download 7.6.8 --repo KonghaYao/cn-font-split \
-  --pattern 'libffi-wasm32-wasip1.wasm' \
-  --dir './node_modules/cn-font-split/dist' --clobber
+npm install
 ```
+
+如果你的环境禁用了 npm lifecycle scripts，可以先安装依赖，再下载 cn-font-split WASM 后端：
+
+```sh
+npm install --ignore-scripts
+npm run install:wasm
+```
+
+如果需要固定特定 cn-font-split 运行时版本，可以使用 `npm run install:wasm -- --version 7.6.8`。
 
 ## 使用方式
 
