@@ -67,8 +67,8 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 当 agent 需要完整 warning code 目录、响应字段目录或示例时，应设置 `detailLevel: "full"`，或用 `sections` 精确请求，例如 `["warning-catalog", "field-catalog"]`。
 
 当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。响应里的 `verificationChecklist[]` 是给 agent 用的防误判清单；在向用户宣称完成前，应检查其中适用于当前工作流的项目。
-`directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段和非直觉行为。它不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
-`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions` 和 warning 字段为准。
+`directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段和非直觉行为。推荐参数会优先使用 `workflowPreset`，只保留路径、规模或目录形态造成的差异覆盖。它不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
+`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。示例调用也采用 preset-first 风格。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions` 和 warning 字段为准。
 `safeInvocationTemplates[]` 是可复制的安全起步调用模板；其中包括运行时诊断、输入预检、源目录结构不匹配时的 dry-run 整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和输出审计。每个模板都会声明 `writesFiles`、`sourceDestructive`、可自定义参数和必须检查的响应字段。模板里的 `args` 会尽量保持最小；`workflowPreset` 已提供的默认项不会重复写入模板，需要完整展开时查看同一响应中的 `workflowPresets[]`。
 `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
 
@@ -669,7 +669,7 @@ split-meta.json
 | `dedupeLimitedByParsing` | 是否因跳过解析而无法执行真实 identity 去重 |
 | `layout.layoutKind` | `empty` / `flat` / `nested` / `mixed` |
 | `recommendedBatchOptions` | 根据目录结构建议的后续批量参数 |
-| `recommendedNextActions[]` | 面向 agent 的后续动作建议，包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields` |
+| `recommendedNextActions[]` | 面向 agent 的后续动作建议，包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields`；`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对该 preset 的差异覆盖 |
 | `organizationWarnings[]` | 摘要级风险和状态提示 |
 | `planActionSummary` | 计划动作汇总；即使 `includePlan: false` 也会返回 |
 | `plan[]` | 可选的逐字体复制/跳过计划 |

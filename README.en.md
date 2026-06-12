@@ -52,7 +52,7 @@ Key defaults and policy choices:
 
 - Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server. Tool responses and `recommendedNextActions[].suggestedArgs` use `.` for the workspace root, never an empty string.
 - For AI coding assistants, call `get_agent_guidance` first when the workflow is unclear. It returns compact guidance by default: recommended tool order, default policies, path rules, response fields, and a verification checklist that should be inspected before claiming success. `guidanceView` reports which sections were included or omitted.
-- `get_agent_guidance` also returns `directoryWorkflowDecisionMatrix[]`, a machine-readable decision table for choosing direct batch splitting, dry-run organization, copy-only organization, or structure-only planning.
+- `get_agent_guidance` also returns `directoryWorkflowDecisionMatrix[]`, a machine-readable decision table for choosing direct batch splitting, dry-run organization, copy-only organization, or structure-only planning. The decision table and examples prefer `workflowPreset` and only add path, scale, or directory-shape overrides.
 - `get_agent_guidance` includes `safeInvocationTemplates[]`, copyable starting calls for runtime checks, source preflight, directory-mismatch planning, copy-only staging, batch dry-run preview, reviewed batch processing, and compact output audits. Each template declares whether it writes files and whether it can modify source files; templates keep arguments minimal, and defaults supplied by `workflowPreset` can be inspected in `workflowPresets[]`.
 - When an agent needs the full warning-code or response-field catalogs, call `get_agent_guidance` with `detailLevel: "full"`, or request only `sections: ["warning-catalog", "field-catalog"]`.
 - Use `get_runtime_status` when setup is uncertain; it checks the resolved workspace, Node engine compatibility, package versions, cn-font-split runtime version, and WASM file without writing anything, then returns `recommendedActions[]` for agent-friendly remediation.
@@ -336,7 +336,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `planActionSummary`: always returned; counts plan actions such as `would-copy`, `copied`, `skipped-duplicate`, `skipped-invalid`, `skipped-target-exists`, and `error`, even when `includePlan: false`
 - optional `plan[]` entries with `source`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`
 
-Treat `recommendedNextActions[]` as a checklist, not automation. Agents should still inspect the action's `inspectFields`, especially when an action recommends writing files or rerunning with different parsing options.
+Treat `recommendedNextActions[]` as a checklist, not automation. Agents should still inspect the action's `inspectFields`, especially when an action recommends writing files or rerunning with different parsing options. `suggestedArgs` prefer `workflowPreset` and only keep overrides that differ from that preset.
 Treat `planActionSummary` as a compact overview, not approval to write files without reviewing the detailed plan when it is included.
 
 `inspect_split_output` keeps flat file stats and adds structured output inventory:

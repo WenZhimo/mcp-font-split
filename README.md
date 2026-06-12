@@ -52,7 +52,7 @@
 
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。工具响应和 `recommendedNextActions[].suggestedArgs` 中会用 `.` 表示工作区根目录，不会用空字符串表示根目录。
 - 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、必须检查的响应字段和完成验证清单。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
-- `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。
+- `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。决策表和示例也会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖参数。
 - `get_agent_guidance` 包含 `safeInvocationTemplates[]`，提供运行时检查、输入预检、目录不匹配整理计划、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和紧凑输出审计等可复制起步调用。每个模板都会声明是否写文件、是否可能修改源文件；模板会尽量保持最小参数，`workflowPreset` 已提供的默认项可从 `workflowPresets[]` 查看。
 - 需要 warning code 或响应字段的完整机器可读目录时，调用 `get_agent_guidance` 并设置 `detailLevel: "full"`，或只请求 `sections: ["warning-catalog", "field-catalog"]`。
 - 当安装或运行环境不确定时，使用 `get_runtime_status`；它会只读检查解析后的工作区、Node engine 兼容性、包版本、cn-font-split 运行时版本和 WASM 文件，并返回便于 agent 执行/提示的 `recommendedActions[]`。
@@ -336,7 +336,7 @@ fonts/
 - `planActionSummary`：始终返回；按动作统计 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists` 和 `error` 等数量，即使 `includePlan: false` 省略明细也会保留
 - 可选 `plan[]` 条目，包含 `source`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`
 
-应把 `recommendedNextActions[]` 当作检查清单，而不是自动执行结果。Agent 仍然要检查每项里的 `inspectFields`，尤其是当某个动作建议写文件或用不同解析参数重跑时。
+应把 `recommendedNextActions[]` 当作检查清单，而不是自动执行结果。Agent 仍然要检查每项里的 `inspectFields`，尤其是当某个动作建议写文件或用不同解析参数重跑时。`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对 preset 的差异覆盖。
 应把 `planActionSummary` 当作压缩概览，而不是无需审查详细计划就可以写文件的许可。
 
 `inspect_split_output` 保留基础文件统计，并增加结构化输出清单：

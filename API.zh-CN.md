@@ -16,9 +16,9 @@
 
 当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["warning-catalog", "field-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
 
-`directoryWorkflowDecisionMatrix[]` 是面向常见目录场景的机器可读决策表。每个条目包含 `id`、`useWhen`、`firstTool`、默认写入/源目录安全标记、`recommendedOptions`、可选后续工具/参数、`mustInspectFields` 和 `nonIntuitiveBehavior`。
+`directoryWorkflowDecisionMatrix[]` 是面向常见目录场景的机器可读决策表。每个条目包含 `id`、`useWhen`、`firstTool`、默认写入/源目录安全标记、`recommendedOptions`、可选后续工具/参数、`mustInspectFields` 和 `nonIntuitiveBehavior`。其中的参数会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖项。
 
-`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，提供具体源目录树模式，例如扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。
+`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，提供具体源目录树模式，例如扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。示例调用也遵循 preset-first 风格。
 
 `safeInvocationTemplates[]` 提供常见 agent 工作流的可复制起步调用，包括运行时诊断、紧凑输入预检、源目录结构不匹配时的整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理，以及紧凑输出审计。每个模板都会声明是否写文件、是否可能修改源文件、哪些参数应该由调用方自定义，以及必须检查哪些响应字段。模板会刻意保持 `args` 精简：`workflowPreset` 已提供的默认项不会在每个模板中重复展开，需要查看完整展开值时使用 `workflowPresets[]`。
 
@@ -219,7 +219,7 @@
 | `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含扩展名计数、无扩展文件的 `<none>` 计数，以及少量示例路径。它用于解释为什么嘈杂源目录里有很多压缩包、文档、图片、生成产物或无扩展文件，但不会被复制或拆分。 |
 | `layout.layoutKind` | `empty`、`flat`、`nested` 或 `mixed`。`mixed` 表示输入根目录和子目录里都发现了字体。 |
 | `recommendedBatchOptions` | 根据目录形态建议的 `split_font_batch` 参数；嵌套或混合目录通常建议 `batchGroupBy: "source-dir"`，扁平目录通常建议 `font-family`。 |
-| `recommendedNextActionCount` / `recommendedNextActions[]` | 面向 agent 的机器可读后续动作。每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields`。 |
+| `recommendedNextActionCount` / `recommendedNextActions[]` | 面向 agent 的机器可读后续动作。每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields`。`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对该 preset 的差异覆盖。 |
 | `organizationWarningCount` / `organizationWarnings[]` | 摘要级提示，例如 `organization-dry-run`、`organization-writes-output`、`output-overwrite-enabled`、`mixed-layout-detected`、`invalid-fonts-skipped`、`output-inside-input`。 |
 | `planActionSummary` | 始终返回。按 `action` 统计计划动作数量，包括 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists`、`would-skip-target-exists` 和 `error`。当 `includePlan: false` 省略明细时，用它快速判断计划形态。 |
 | `plan[]` | 可选的逐字体复制/跳过计划。复制条目包含 `source`、`target`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`。 |
