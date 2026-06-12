@@ -1606,15 +1606,63 @@ if (scenario === 'single') {
   await fs.writeFile(path.join(inputDir, 'a-note.txt'), 'not a font');
   await fs.writeFile(path.join(inputDir, 'b-not-a-font.ttf'), 'not a real font');
 
-  const { stdout } = await execFileAsync(process.execPath, ['batch-run.js', inputDir, outputRoot, '1', '1', '--dry-run'], {
+  const assertCliOutputIncludes = (stdout, expectedTexts, context) => {
+    for (const expectedText of expectedTexts) {
+      if (!stdout.includes(expectedText)) {
+        throw new Error(`${context}: expected batch-run CLI output to include ${expectedText}.`);
+      }
+    }
+  };
+
+  const { stdout: safePreviewStdout } = await execFileAsync(process.execPath, ['batch-run.js', inputDir, outputRoot, '1', '1', '--dry-run'], {
     cwd: process.cwd(),
   });
-  for (const expectedText of ['"workflowPreset": "safe-preview"', 'Batch warnings:', 'dry-run-no-write', 'input-scan-truncated', 'Results included: true']) {
-    if (!stdout.includes(expectedText)) {
-      throw new Error(`Expected batch-run CLI output to include ${expectedText}.`);
-    }
+  assertCliOutputIncludes(safePreviewStdout, [
+    '"workflowPreset": "safe-preview"',
+    'Batch warnings:',
+    'dry-run-no-write',
+    'input-scan-truncated',
+    'Results included: true',
+  ], 'safe-preview flag run');
+
+  const { stdout: structureFirstStdout } = await execFileAsync(process.execPath, ['batch-run.js', inputDir, outputRoot, '1', '1'], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      FONT_SPLIT_WORKFLOW_PRESET: 'structure-first',
+    },
+  });
+  assertCliOutputIncludes(structureFirstStdout, [
+    '"workflowPreset": "structure-first"',
+    'Mode: dry-run',
+    'Results included: false',
+    'input-scan-truncated',
+    'batch-plan-omitted',
+  ], 'structure-first env preset run');
+
+  const { stdout: includeResultsOverrideStdout } = await execFileAsync(process.execPath, ['batch-run.js', inputDir, outputRoot, '1', '1'], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      FONT_SPLIT_WORKFLOW_PRESET: 'structure-first',
+      FONT_SPLIT_INCLUDE_RESULTS: 'true',
+    },
+  });
+  assertCliOutputIncludes(includeResultsOverrideStdout, [
+    '"workflowPreset": "structure-first"',
+    '"includeResults": true',
+    'Mode: dry-run',
+    'Results included: true',
+  ], 'includeResults env override run');
+  if (includeResultsOverrideStdout.includes('batch-plan-omitted')) {
+    throw new Error('includeResults env override run: expected includeResults true to keep dry-run plan details.');
   }
-  console.log(stdout);
+
+  console.log(JSON.stringify({
+    safePreview: safePreviewStdout,
+    structureFirst: structureFirstStdout,
+    includeResultsOverride: includeResultsOverrideStdout,
+  }, null, 2));
 } else if (scenario === 'batch-identity-dedupe') {
   const inputDir = process.argv[3] || '.font-split-batch-identity-input';
   const outputRoot = process.argv[4] || '.font-split-batch-identity-output';

@@ -542,7 +542,7 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。默认真实运行使用 `workflowPreset: "reviewed-write"`；带 `--dry-run` 或 `FONT_SPLIT_DRY_RUN=true` 时使用 `workflowPreset: "safe-preview"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_WORKFLOW_PRESET` 提供相同配置。环境变量覆盖项只有显式设置时才会覆盖 preset 默认值，包括 `FONT_SPLIT_DRY_RUN`、`FONT_SPLIT_INCLUDE_RESULTS`、`FONT_SPLIT_SKIP_MODE`、`FONT_SPLIT_BATCH_GROUP_BY`、`FONT_SPLIT_BATCH_NAMING_MODE`、`FONT_SPLIT_BATCH_DEDUPE_MODE`、`FONT_SPLIT_BATCH_ERROR_MODE`、`FONT_SPLIT_SPLIT_FAILURE_ACTION` 和 `FONT_SPLIT_CHUNK_SIZE`。它会在控制台摘要里打印 `batchWarnings[]` 的 code/message。
+`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。默认真实运行使用 `workflowPreset: "reviewed-write"`；带 `--dry-run` 或 `FONT_SPLIT_DRY_RUN=true` 时使用 `workflowPreset: "safe-preview"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_WORKFLOW_PRESET` 提供相同配置。环境变量覆盖项只有显式设置时才会覆盖 preset 默认值，包括 `FONT_SPLIT_DRY_RUN`、`FONT_SPLIT_INCLUDE_RESULTS`、`FONT_SPLIT_SKIP_MODE`、`FONT_SPLIT_BATCH_GROUP_BY`、`FONT_SPLIT_BATCH_NAMING_MODE`、`FONT_SPLIT_BATCH_DEDUPE_MODE`、`FONT_SPLIT_BATCH_ERROR_MODE`、`FONT_SPLIT_SPLIT_FAILURE_ACTION` 和 `FONT_SPLIT_CHUNK_SIZE`。它会在控制台摘要里打印 `batchWarnings[]` 的 code/message；`npm run smoke:batch-run` 会验证 `--dry-run`、`FONT_SPLIT_WORKFLOW_PRESET` 和 `FONT_SPLIT_INCLUDE_RESULTS` 的覆盖行为。
 
 ### Smoke 检查
 
