@@ -123,6 +123,28 @@ function buildMinimalTtf({ familyName = 'Fixture Sans', subfamilyName = 'Regular
   return font;
 }
 
+function assertInspectFieldsExist(action, responsesByTool, context) {
+  if (!action) {
+    throw new Error(`${context}: expected action for inspectFields check.`);
+  }
+  if (!Array.isArray(action.inspectFields)) return;
+  const response = responsesByTool[action.tool];
+  if (!response) return;
+  const missing = action.inspectFields.filter((field) => {
+    const topLevelField = field.split('.')[0];
+    return !Object.hasOwn(response, topLevelField);
+  });
+  if (missing.length > 0) {
+    throw new Error(`${context}: action ${action.id} (${action.tool}) references missing inspectFields: ${missing.join(', ')}`);
+  }
+}
+
+function assertRecommendedNextActionInspectFields(actions, responsesByTool, context) {
+  for (const action of actions || []) {
+    assertInspectFieldsExist(action, responsesByTool, context);
+  }
+}
+
 if (scenario === 'single') {
   console.log('Splitting:', fontPath, '->', outDir);
   const result = await splitFont({
@@ -429,6 +451,9 @@ if (scenario === 'single') {
       throw new Error(`Expected ${expectedAction} to require planActionSummary inspection.`);
     }
   }
+  assertRecommendedNextActionInspectFields(result.recommendedNextActions, {
+    organize_font_directory: result,
+  }, 'organize-dry-run');
   if (await fsExists(outputDir)) {
     throw new Error('Expected organization dry-run not to create outputDir.');
   }
@@ -497,6 +522,23 @@ if (scenario === 'single') {
   if (manifest.summary?.copiedCount !== 1 || manifest.entries?.[0]?.source !== `${inputDir}/FamilyA/not-a-font.ttf`) {
     throw new Error('Expected organization manifest to record the copied source.');
   }
+  const copiedInspect = await inspectFontInputs({
+    inputDir: outputDir,
+    includeFiles: false,
+    maxFiles: 10,
+  });
+  const copiedBatchPreview = await splitFontBatch({
+    inputDir: outputDir,
+    outputRoot: `${outputDir}-split-preview`,
+    dryRun: true,
+    includeResults: true,
+    maxFiles: 10,
+    silent: true,
+  });
+  assertRecommendedNextActionInspectFields(copied.recommendedNextActions, {
+    inspect_font_inputs: copiedInspect,
+    split_font_batch: copiedBatchPreview,
+  }, 'organize-copy');
 
   await fs.writeFile(sourcePath, 'replacement font-like file');
   const overwritten = await organizeFontDirectory({
@@ -593,6 +635,23 @@ if (scenario === 'single') {
   if (manifest.summary?.copiedCount !== 1 || manifest.entries?.[0]?.groupName !== 'Fixture Sans') {
     throw new Error('Expected valid-font organization manifest to record metadata-derived grouping.');
   }
+  const organizedInspection = await inspectFontInputs({
+    inputDir: outputDir,
+    includeFiles: false,
+    maxFiles: 10,
+  });
+  const organizedBatchPreview = await splitFontBatch({
+    inputDir: outputDir,
+    outputRoot: `${outputDir}-split-preview`,
+    dryRun: true,
+    includeResults: true,
+    maxFiles: 10,
+    silent: true,
+  });
+  assertRecommendedNextActionInspectFields(result.recommendedNextActions, {
+    inspect_font_inputs: organizedInspection,
+    split_font_batch: organizedBatchPreview,
+  }, 'organize-valid-font');
   console.log(JSON.stringify({ inspection, result }, null, 2));
 } else if (scenario === 'organize-structure-only') {
   const inputDir = process.argv[3] || '.font-split-organize-structure-input';
@@ -632,6 +691,22 @@ if (scenario === 'single') {
   if (result.plan?.[0]?.status !== 'not-parsed' || result.plan?.[0]?.groupName !== 'not-a-font') {
     throw new Error('Expected structure-only organization plan to use path-based fallback details.');
   }
+  for (const expectedAction of ['rerun-with-font-parsing', 'review-plan-before-writing']) {
+    assertInspectFieldsExist((result.recommendedNextActions || []).find((action) => action.id === expectedAction), {
+      organize_font_directory: result,
+    }, 'organize-structure-only');
+  }
+  const structureBatchPreview = await splitFontBatch({
+    inputDir,
+    outputRoot: `${outputDir}-split-preview`,
+    dryRun: true,
+    includeResults: true,
+    maxFiles: 10,
+    silent: true,
+  });
+  assertInspectFieldsExist((result.recommendedNextActions || []).find((action) => action.id === 'preview-batch-split-original-layout'), {
+    split_font_batch: structureBatchPreview,
+  }, 'organize-structure-only');
   if (await fsExists(outputDir)) {
     throw new Error('Expected structure-only dry-run not to create outputDir.');
   }
@@ -667,6 +742,17 @@ if (scenario === 'single') {
   if (!avoidAction.inspectFields?.includes('batchWarnings')) {
     throw new Error('Expected avoid-reprocessing next action to require batch warning inspection.');
   }
+  const insideBatchPreview = await splitFontBatch({
+    inputDir,
+    outputRoot: `${inputDir}-split-preview`,
+    dryRun: true,
+    includeResults: true,
+    maxFiles: 10,
+    silent: true,
+  });
+  assertInspectFieldsExist(avoidAction, {
+    split_font_batch: insideBatchPreview,
+  }, 'organize-output-inside-input');
   if (await fsExists(outputDir)) {
     throw new Error('Expected output-inside-input dry-run not to create outputDir.');
   }
