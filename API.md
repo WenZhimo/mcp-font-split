@@ -291,9 +291,12 @@ Important result fields:
 |-------|---------|
 | `familyCount` | Number of detected family directories. |
 | `maxFilesHit` | `true` only when more output files existed beyond `maxFiles`. |
+| `auditStatus` | Compact audit gate: `pass`, `action-required`, or `incomplete`. Treat real output audits as complete only when this is `pass`. |
+| `auditPassed` | Boolean shortcut for `auditStatus === "pass"`. |
+| `auditBlockingReasons[]` | Machine-readable blockers such as `output-scan-truncated` or `output-structure-issues`; structure blockers include `issueCodes` from `structureSummary.issues[]`. |
 | `filesIncluded` / `familiesIncluded` | Whether `files[]` and `families[]` are present. |
 | `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, legacy output inference, and output structure issues. |
-| `structureSummary` | Machine-readable output-structure audit. After real batch writes, treat the output directory as complete only when `structureSummary.conforms: true` and `maxFilesHit: false`. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
+| `structureSummary` | Machine-readable output-structure audit. After real batch writes, treat the output directory as complete only when `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false`. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
 | `fontEntryCount` | Number of detected per-font output entries. |
 | `manifestCount` | Number of entries with `split-meta.json`. |
 | `legacyOutputCount` | Number of entries inferred without manifest. |

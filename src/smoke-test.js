@@ -231,6 +231,27 @@ function assertObjectOmitsKeys(object, omittedKeys, context) {
   }
 }
 
+function assertOutputAuditStatus(result, expected, context) {
+  if (
+    result.auditStatus !== expected.auditStatus
+    || result.auditPassed !== expected.auditPassed
+    || !Array.isArray(result.auditBlockingReasons)
+  ) {
+    throw new Error(`${context}: expected compact audit status ${expected.auditStatus}.`);
+  }
+  if (expected.reasonCode) {
+    const reason = result.auditBlockingReasons.find((item) => item.code === expected.reasonCode);
+    if (!reason) {
+      throw new Error(`${context}: expected auditBlockingReasons to include ${expected.reasonCode}.`);
+    }
+    if (expected.issueCode && !(reason.issueCodes || []).includes(expected.issueCode)) {
+      throw new Error(`${context}: expected ${expected.reasonCode} to reference issue code ${expected.issueCode}.`);
+    }
+  } else if (result.auditBlockingReasons.length !== 0) {
+    throw new Error(`${context}: expected no auditBlockingReasons for passing audit.`);
+  }
+}
+
 function assertActionSuggestedArgsOmit(action, omittedKeys, context) {
   assertObjectOmitsKeys(action?.suggestedArgs, omittedKeys, context);
 }
@@ -607,6 +628,13 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('inspectionWarnings')) {
     throw new Error('Expected agent guidance to recommend checking inspection warnings.');
   }
+  if (
+    !result.responseFieldsToCheck?.includes('auditStatus')
+    || !result.responseFieldsToCheck?.includes('auditPassed')
+    || !result.responseFieldsToCheck?.includes('auditBlockingReasons')
+  ) {
+    throw new Error('Expected agent guidance to tell agents to check compact output audit status fields.');
+  }
   if (!result.responseFieldsToCheck?.includes('organizationWarnings')) {
     throw new Error('Expected agent guidance to recommend checking organization warnings.');
   }
@@ -763,15 +791,20 @@ if (scenario === 'single') {
   }
   assertTemplateOmitsArgs(batchProcessTemplate, ['dryRun', 'includeResults', 'skipMode', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'], 'batch-process-reviewed-plan');
   const outputAuditTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'output-audit-compact');
-  if (!outputAuditTemplate?.inspectFields?.includes('structureSummary')) {
-    throw new Error('Expected output audit template to require structureSummary inspection.');
+  if (
+    !outputAuditTemplate?.inspectFields?.includes('auditStatus')
+    || !outputAuditTemplate?.inspectFields?.includes('auditPassed')
+    || !outputAuditTemplate?.inspectFields?.includes('auditBlockingReasons')
+    || !outputAuditTemplate?.inspectFields?.includes('structureSummary')
+  ) {
+    throw new Error('Expected output audit template to require compact audit status and structureSummary inspection.');
   }
   const workflowPlan = result.recommendedWorkflowPlan;
   if (
     workflowPlan?.id !== 'batch-workflow'
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-dry-run-preview' && step.writesFiles === false)
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true)
-    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('structureSummary'))
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('auditStatus') && step.inspectFields?.includes('structureSummary'))
   ) {
     throw new Error('Expected batch recommendedWorkflowPlan to order preview, reviewed write, and output audit steps.');
   }
@@ -820,6 +853,9 @@ if (scenario === 'single') {
     safetySummary: 'split_font_batch',
     unsupportedFileSummary: 'organize_font_directory',
     structureSummary: 'inspect_split_output',
+    auditStatus: 'inspect_split_output',
+    auditPassed: 'inspect_split_output',
+    auditBlockingReasons: 'inspect_split_output',
     sourceDestructive: 'split_font_batch',
     outputTreeInsideInputTree: 'split_font_batch',
     batchWarnings: 'split_font_batch',
@@ -951,8 +987,13 @@ if (scenario === 'single') {
     throw new Error('Expected layout verification checklist to include recommendedBatchPreviewArgs.');
   }
   const outputChecklist = (result.verificationChecklist || []).find((item) => item.id === 'output-audited');
-  if (!outputChecklist?.responseFields?.includes('structureSummary')) {
-    throw new Error('Expected output verification checklist to include structureSummary.');
+  if (
+    !outputChecklist?.responseFields?.includes('auditStatus')
+    || !outputChecklist?.responseFields?.includes('auditPassed')
+    || !outputChecklist?.responseFields?.includes('auditBlockingReasons')
+    || !outputChecklist?.responseFields?.includes('structureSummary')
+  ) {
+    throw new Error('Expected output verification checklist to include compact audit status fields and structureSummary.');
   }
   const corpusSuiteChecklist = (result.verificationChecklist || []).find((item) => item.id === 'local-real-corpus-suite-passed');
   if (
@@ -1088,6 +1129,11 @@ if (scenario === 'single') {
   if (outputInspect.fileCount !== 1 || outputInspect.maxFilesHit !== true) {
     throw new Error('Expected inspectSplitOutput to report accurate scan truncation.');
   }
+  assertOutputAuditStatus(outputInspect, {
+    auditStatus: 'incomplete',
+    auditPassed: false,
+    reasonCode: 'output-scan-truncated',
+  }, 'scan-limits truncated output audit');
   if (!outputInspect.inspectionWarnings?.some((warning) => warning.code === 'output-scan-truncated')) {
     throw new Error('Expected inspectSplitOutput to warn about output scan truncation.');
   }
@@ -2085,6 +2131,11 @@ if (scenario === 'single') {
   if (compact.fileCount !== 2 || compact.familyCount < 1) {
     throw new Error('Expected compact output inspection to retain summary counts.');
   }
+  assertOutputAuditStatus(compact, {
+    auditStatus: 'action-required',
+    auditPassed: false,
+    reasonCode: 'output-structure-issues',
+  }, 'inspect-compact output audit');
   const compactWarningCodes = new Set((compact.inspectionWarnings || []).map((warning) => warning.code));
   for (const expectedWarning of ['output-files-omitted', 'output-families-omitted', 'legacy-output-detected']) {
     if (!compactWarningCodes.has(expectedWarning)) {
@@ -2140,6 +2191,10 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected clean structured output to conform to the documented directory layout.');
   }
+  assertOutputAuditStatus(clean, {
+    auditStatus: 'pass',
+    auditPassed: true,
+  }, 'inspect-structure clean output audit');
   if ((clean.inspectionWarnings || []).some((warning) => warning.code === 'output-structure-issues')) {
     throw new Error('Expected clean structured output not to raise structure warnings.');
   }
@@ -2158,6 +2213,12 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected stray output files to fail the structure audit.');
   }
+  assertOutputAuditStatus(noisy, {
+    auditStatus: 'action-required',
+    auditPassed: false,
+    reasonCode: 'output-structure-issues',
+    issueCode: 'unexpected-output-files',
+  }, 'inspect-structure noisy output audit');
 
   await fs.mkdir(path.join(outDir, 'FamilyA', 'FixtureSans-Regular', 'extra'), { recursive: true });
   await fs.writeFile(path.join(outDir, 'FamilyA', 'FixtureSans-Regular', 'extra', 'deep.txt'), 'wrong depth');
@@ -2173,6 +2234,12 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected files below the documented output depth to fail the structure audit.');
   }
+  assertOutputAuditStatus(wrongDepth, {
+    auditStatus: 'action-required',
+    auditPassed: false,
+    reasonCode: 'output-structure-issues',
+    issueCode: 'unexpected-output-depth',
+  }, 'inspect-structure wrong-depth output audit');
 
   const batchInputDir = `${outDir}-batch-input`;
   const batchOutputRoot = `${outDir}-batch-output`;
@@ -2216,6 +2283,9 @@ if (scenario === 'single') {
     || batchWrite.outputTreeInsideInputTree !== false
     || batchWrite.mayOverwriteOutputTree !== true
     || batchWrite.processedFontCount !== 1
+    || batchInspect.auditStatus !== 'pass'
+    || batchInspect.auditPassed !== true
+    || batchInspect.auditBlockingReasons?.length !== 0
     || batchInspect.structureSummary?.conforms !== true
     || batchInspect.structureSummary?.layoutKind !== 'family-tree'
     || batchInspect.structureSummary?.manifestCoverageOk !== true
@@ -2226,6 +2296,7 @@ if (scenario === 'single') {
     || auditAction?.suggestedArgs?.outDir !== batchOutputRoot
     || auditAction?.suggestedArgs?.includeFiles !== false
     || auditAction?.suggestedArgs?.includeFamilies !== false
+    || !auditAction.inspectFields?.includes('auditStatus')
     || !auditAction.inspectFields?.includes('structureSummary')
   ) {
     throw new Error('Expected real batch copy-original output to match the documented output directory structure.');
@@ -2306,7 +2377,7 @@ if (scenario === 'single') {
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'outputTreeInsideInputTree', 'batchWarnings']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'outputTreeInsideInputTree']);
-    expectDescriptionIncludes('inspect_split_output', ['structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
+    expectDescriptionIncludes('inspect_split_output', ['auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
       guidancePropertyCount: Object.keys(guidanceProps).length,
@@ -2372,6 +2443,9 @@ if (scenario === 'single') {
       'writesOutputTree',
       'outputTreeInsideInputTree',
       'mayOverwriteOutputTree',
+      'auditStatus',
+      'auditPassed',
+      'auditBlockingReasons',
       'structureSummary',
       'maxFilesHit',
       'unsupportedFileSummary',
@@ -2435,6 +2509,9 @@ if (scenario === 'single') {
     '`recommendedNextActions[]`',
     '`planActionSummary`',
     '`unsupportedFileSummary`',
+    '`auditStatus`',
+    '`auditPassed`',
+    '`auditBlockingReasons[]`',
     '`structureSummary`',
     '`maxFilesHit`',
     '`batchWarnings[]`',
@@ -3163,6 +3240,8 @@ if (scenario === 'single') {
   if (
     singleAudit.fontEntryCount < 1
     || singleAudit.manifestCount < 1
+    || singleAudit.auditStatus !== 'pass'
+    || singleAudit.auditPassed !== true
     || singleAudit.structureSummary?.conforms !== true
     || singleActionWarnings.length > 0
   ) {
@@ -3220,6 +3299,8 @@ if (scenario === 'single') {
     .filter((warning) => !['output-files-omitted', 'output-families-omitted'].includes(warning.code));
   if (
     batchAudit.maxFilesHit !== false
+    || batchAudit.auditStatus !== 'pass'
+    || batchAudit.auditPassed !== true
     || batchAudit.structureSummary?.conforms !== true
     || batchActionWarnings.length > 0
     || batchAudit.fontEntryCount < 1
@@ -3273,6 +3354,9 @@ if (scenario === 'single') {
       outDir: singleAudit.outDir,
       fontEntryCount: singleAudit.fontEntryCount,
       manifestCount: singleAudit.manifestCount,
+      auditStatus: singleAudit.auditStatus,
+      auditPassed: singleAudit.auditPassed,
+      auditBlockingReasons: singleAudit.auditBlockingReasons,
       structureSummary: singleAudit.structureSummary,
       inspectionWarnings: singleAudit.inspectionWarnings,
     },
@@ -3300,6 +3384,9 @@ if (scenario === 'single') {
       subsetOutputCount: batchAudit.subsetOutputCount,
       singleWoff2OutputCount: batchAudit.singleWoff2OutputCount,
       copyOriginalOutputCount: batchAudit.copyOriginalOutputCount,
+      auditStatus: batchAudit.auditStatus,
+      auditPassed: batchAudit.auditPassed,
+      auditBlockingReasons: batchAudit.auditBlockingReasons,
       inspectionWarnings: batchAudit.inspectionWarnings,
       structureSummary: batchAudit.structureSummary,
     },

@@ -909,6 +909,21 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Machine-readable check for whether output files fit the documented split-output directory structure, including unexpected files, manifest coverage, and per-entry output-mode requirements.',
     agentAction: 'Require structureSummary.conforms true before claiming the output directory is structurally valid; inspect issues[] and unexpectedFileExamples[] when false.',
   },
+  auditStatus: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Compact output audit status: pass, incomplete, or action-required.',
+    agentAction: 'Require auditStatus pass, auditPassed true, maxFilesHit false, and structureSummary.conforms true before reporting an output audit as complete.',
+  },
+  auditPassed: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Boolean shortcut for auditStatus === pass.',
+    agentAction: 'Treat false as a signal to inspect auditBlockingReasons and structureSummary before reporting completion.',
+  },
+  auditBlockingReasons: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Compact list of machine-readable reasons that prevent the output audit from passing.',
+    agentAction: 'Inspect each code and follow issueCodes when structureSummary contains detailed structure failures.',
+  },
   subsetOutputCount: {
     sourceTools: ['inspect_split_output'],
     meaning: 'Number of inspected output entries that look like normal subset output.',
@@ -1054,8 +1069,8 @@ const SAFE_INVOCATION_TEMPLATES = [
       includeFamilies: false,
     },
     customizableFields: ['outDir', 'maxFiles', 'includeFiles', 'includeFamilies'],
-    inspectFields: ['maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
-    nextStep: 'Require structureSummary.conforms true; if maxFilesHit is true or legacy/structure issues are detected, disclose uncertainty or rerun with more detail.',
+    inspectFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
+    nextStep: 'Require auditStatus pass and structureSummary.conforms true; if maxFilesHit is true or legacy/structure issues are detected, disclose uncertainty or rerun with more detail.',
   },
 ];
 const RECOMMENDED_WORKFLOW_PLAN_VERSION = 1;
@@ -1068,8 +1083,8 @@ function buildRecommendedWorkflowPlan(workflow) {
     writesFiles: false,
     sourceDestructive: false,
     goal: 'Audit the generated output directory before reporting completion.',
-    inspectFields: ['structureSummary', 'maxFilesHit', 'inspectionWarnings', 'manifestCount', 'legacyOutputCount'],
-    completeWhen: 'structureSummary.conforms is true, maxFilesHit is false, and inspectionWarnings contain no action-required structure or truncation issues.',
+    inspectFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'manifestCount', 'legacyOutputCount'],
+    completeWhen: 'auditStatus is pass, auditPassed is true, structureSummary.conforms is true, maxFilesHit is false, and inspectionWarnings contain no action-required structure or truncation issues.',
   };
   const plans = {
     overview: {
@@ -1176,8 +1191,8 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Audit the single-font output directory when reporting generated files.',
-          inspectFields: ['structureSummary', 'manifestCount', 'inspectionWarnings'],
-          completeWhen: 'structureSummary.conforms is true, or any structure limitation is disclosed.',
+          inspectFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'manifestCount', 'inspectionWarnings'],
+          completeWhen: 'auditStatus is pass and structureSummary.conforms is true, or any structure limitation is disclosed.',
         },
       ],
       decisionPoints: [
@@ -1265,7 +1280,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           id: 'need-details',
           when: 'A compact scan shows warnings, missing manifests, invalid fonts, or structure issues.',
           action: 'Rerun with includeFiles:true or includeFamilies:true only for the narrowed area that needs detail.',
-          inspectFields: ['inspectionWarnings', 'structureSummary', 'filesIncluded', 'familiesIncluded'],
+          inspectFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'inspectionWarnings', 'structureSummary', 'filesIncluded', 'familiesIncluded'],
         },
       ],
     },
@@ -1512,8 +1527,8 @@ export function getAgentGuidance(args = {}) {
     {
       id: 'output-audited',
       appliesTo: ['overview', 'batch', 'inspect'],
-      check: 'After batch processing, inspect the output directory and require structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating the audit as complete.',
-      responseFields: ['maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
+      check: 'After batch processing, inspect the output directory and require auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating the audit as complete.',
+      responseFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
     },
     {
       id: 'local-real-corpus-suite-passed',
@@ -1534,7 +1549,7 @@ export function getAgentGuidance(args = {}) {
       'Call organize_font_directory with dryRun true if directory layout is flat/mixed/unfamiliar or if the user asks to stage fonts into a cleaner structure.',
       'Call split_font_batch with dryRun true to preview output layout.',
       'Call split_font_batch with includeResults false for full-library processing.',
-      'Call inspect_split_output after processing; require structureSummary.conforms true and use includeFiles false / includeFamilies false for compact summaries.',
+      'Call inspect_split_output after processing; require auditStatus pass and structureSummary.conforms true; use includeFiles false / includeFamilies false for compact summaries.',
     ],
     single: [
       'Call split_font with one fontPath.',
@@ -1547,12 +1562,12 @@ export function getAgentGuidance(args = {}) {
       'Call split_font_batch with workflowPreset safe-preview to review planned paths without writing.',
       'Use batchNamingMode numeric-suffix and batchDedupeMode font-identity unless the user asks for another policy.',
       'Use includeResults false for large real runs.',
-      'Call inspect_split_output on the outputRoot when done; require structureSummary.conforms true and use includeFiles false / includeFamilies false for large outputs.',
+      'Call inspect_split_output on the outputRoot when done; require auditStatus pass and structureSummary.conforms true; use includeFiles false / includeFamilies false for large outputs.',
     ],
     inspect: [
       'Call get_runtime_status to verify workspace, cn-font-split package, and WASM runtime availability when setup is uncertain.',
       'Call inspect_font_inputs to audit source directories before processing.',
-      'Call inspect_split_output to audit generated output directories; require structureSummary.conforms true and set includeFiles false / includeFamilies false when only summary counts are needed.',
+      'Call inspect_split_output to audit generated output directories; require auditStatus pass and structureSummary.conforms true; set includeFiles false / includeFamilies false when only summary counts are needed.',
       'If maxFilesHit is true, rerun with a higher maxFiles before treating the summary as complete.',
     ],
     organize: [
@@ -1890,6 +1905,9 @@ export function getAgentGuidance(args = {}) {
       'planIncluded',
       'manifestCount',
       'legacyOutputCount',
+      'auditStatus',
+      'auditPassed',
+      'auditBlockingReasons',
       'structureSummary',
       'subsetOutputCount',
       'singleWoff2OutputCount',
@@ -2274,6 +2292,32 @@ function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, in
   return warnings;
 }
 
+function buildOutputAuditStatus({ maxFilesHit, maxFiles, structureSummary }) {
+  const auditBlockingReasons = [];
+  if (maxFilesHit) {
+    auditBlockingReasons.push({
+      code: 'output-scan-truncated',
+      message: `Output inspection hit maxFiles (${maxFiles}); rerun with a higher maxFiles before treating the audit as complete.`,
+    });
+  }
+  if (structureSummary?.conforms !== true) {
+    auditBlockingReasons.push({
+      code: 'output-structure-issues',
+      message: 'Output structure issues were detected; inspect structureSummary before treating the output as valid.',
+      issueCodes: (structureSummary?.issues || []).map((issue) => issue.code),
+    });
+  }
+
+  const auditStatus = maxFilesHit
+    ? 'incomplete'
+    : auditBlockingReasons.length > 0 ? 'action-required' : 'pass';
+  return {
+    auditStatus,
+    auditPassed: auditStatus === 'pass',
+    auditBlockingReasons,
+  };
+}
+
 function buildOrganizationWarnings({
   dryRun,
   parseFonts,
@@ -2498,8 +2542,8 @@ function buildBatchNextActions({
       tool: 'inspect_split_output',
       reason: 'A real batch write can create or update output files; inspect the output directory before reporting completion.',
       suggestedArgs: buildBatchAuditArgs({ outputRoot }),
-      inspectFields: ['maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
-      successCriteria: 'Require structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
+      inspectFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
+      successCriteria: 'Require auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
     });
   }
 
@@ -4946,12 +4990,18 @@ export async function inspectSplitOutput(args) {
     legacyOutputCount,
     structureIssueCount: structureSummary.issueCount,
   });
+  const auditStatusSummary = buildOutputAuditStatus({
+    maxFilesHit: outputSummary.truncated,
+    maxFiles,
+    structureSummary,
+  });
 
   return {
     ok: true,
     outDir: outDirRelative,
     maxFiles,
     maxFilesHit: outputSummary.truncated,
+    ...auditStatusSummary,
     fileCount: files.length,
     totalBytes,
     byExtension,

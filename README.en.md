@@ -346,10 +346,13 @@ Treat `planActionSummary` as a compact overview, not approval to write files wit
 
 - `maxFiles` can raise or lower the output scan cap; it defaults to `200000` so large batch outputs are not truncated during inspection.
 - `maxFilesHit` is true only when more output files exist beyond `maxFiles`.
+- `auditStatus` is the compact audit gate: `pass`, `action-required`, or `incomplete`. Treat a real output audit as complete only when it is `pass`.
+- `auditPassed` is a boolean shortcut for `auditStatus === "pass"`.
+- `auditBlockingReasons[]` lists machine-readable blockers; structure blockers include `issueCodes` from `structureSummary.issues[]`.
 - `includeFiles: false` omits flat `files[]` while keeping summary counters.
 - `includeFamilies: false` omits structured `families[]` while keeping family and output-mode counters.
 - `inspectionWarningCount` and `inspectionWarnings[]` summarize truncation, omitted detail arrays, legacy output inference, and structure issues with machine-readable `code` values.
-- `structureSummary` checks whether the output directory matches the documented structure; after real batch writes, call `inspect_split_output` and require `structureSummary.conforms: true` before treating an output tree as free of stray files, missing manifests, or missing files required by the declared output mode.
+- `structureSummary` checks whether the output directory matches the documented structure; after real batch writes, call `inspect_split_output` and require `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false` before treating an output tree as free of stray files, missing manifests, or missing files required by the declared output mode.
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`

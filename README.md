@@ -346,10 +346,13 @@ fonts/
 
 - `maxFiles` 可以调整输出扫描上限；默认是 `200000`，避免大型批量输出在检查时被截断。
 - `maxFilesHit` 只有当 `maxFiles` 之外确实还有更多输出文件时才为 true。
+- `auditStatus` 是紧凑审计门禁，取值为 `pass`、`action-required` 或 `incomplete`；真实输出审计只有在它为 `pass` 时才应视为完成。
+- `auditPassed` 是 `auditStatus === "pass"` 的布尔快捷字段。
+- `auditBlockingReasons[]` 会列出阻止审计通过的机器可读原因；结构问题会带上来自 `structureSummary.issues[]` 的 `issueCodes`。
 - `includeFiles: false` 会省略扁平 `files[]`，但保留摘要计数。
 - `includeFamilies: false` 会省略结构化 `families[]`，但保留 family 和输出模式计数。
 - `inspectionWarningCount` 和 `inspectionWarnings[]` 会用机器可读 `code` 汇总截断、详情数组省略、legacy 输出推断和结构问题等状态。
-- `structureSummary` 检查输出目录是否符合文档化结构；真实批量写入后应调用 `inspect_split_output`，只有 `structureSummary.conforms: true` 时，才表示没有发现杂项文件、manifest 缺失或输出模式文件缺失等结构问题。
+- `structureSummary` 检查输出目录是否符合文档化结构；真实批量写入后应调用 `inspect_split_output`，只有 `auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才表示没有发现杂项文件、manifest 缺失或输出模式文件缺失等结构问题。
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`

@@ -73,7 +73,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 `directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。示例调用也采用 preset-first 风格。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs` 和 warning 字段为准。
 `safeInvocationTemplates[]` 是可复制的安全起步调用模板；其中包括运行时诊断、输入预检、源目录结构不匹配时的 dry-run 整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和输出审计。每个模板都会声明 `writesFiles`、`sourceDestructive`、可自定义参数和必须检查的响应字段。模板里的 `args` 会尽量保持最小；`workflowPreset` 已提供的默认项不会重复写入模板，需要完整展开时查看同一响应中的 `workflowPresets[]`。
 `recommendedWorkflowPlan` 是当前 `workflow` 的有序路线图；它不会复制每个模板的参数，而是用 `templateId` 引用 `safeInvocationTemplates[]`，把输入预检、目录形态决策、批量预览、审查后写入和输出审计串成阶段。它用于降低 agent 漏掉审计步骤的风险，但不能替代每个阶段的响应字段检查。
-`toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
+`toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`auditStatus`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
 
 `get_runtime_status` 也是只读工具。它会检查：
 
@@ -673,7 +673,7 @@ split-meta.json
 - `oversizedKernDetected`
 - `oversizedKernStripped`
 
-`recommendedNextActions[]` 是检查清单，不会自动执行。真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
+`recommendedNextActions[]` 是检查清单，不会自动执行。真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
 
 常见 `batchWarnings[].code`：
 
@@ -735,12 +735,17 @@ split-meta.json
 
 `includeFiles: false` 会省略扁平 `files[]` 清单；`includeFamilies: false` 会省略结构化 `families[]` 清单。它们只影响响应体大小，不影响 `fileCount`、`familyCount`、`fontEntryCount`、manifest 数量、输出模式计数或 `structureSummary`。
 
-`structureSummary` 是输出目录结构验收摘要。它会检查输出是否是文档化的 `single-family` 或 `family-tree` 结构，是否有无法归类到 family/font entry 的杂项文件，每个字体条目是否都有 `split-meta.json`，以及 manifest 声明为 `subset` / `single-woff2` / `copy-original` 时是否具备对应文件。真实批量写入后，只有 `structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为结构合格。若为 false，优先查看 `structureSummary.issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 会出现 `output-structure-issues`。
+`auditStatus` 是输出审计的紧凑门禁，取值为 `pass`、`action-required` 或 `incomplete`。`auditPassed` 是 `auditStatus === "pass"` 的布尔快捷字段。`auditBlockingReasons[]` 会列出阻止通过的机器可读原因，例如 `output-scan-truncated` 或 `output-structure-issues`；结构问题会带上来自 `structureSummary.issues[]` 的 `issueCodes`。
+
+`structureSummary` 是输出目录结构验收摘要。它会检查输出是否是文档化的 `single-family` 或 `family-tree` 结构，是否有无法归类到 family/font entry 的杂项文件，每个字体条目是否都有 `split-meta.json`，以及 manifest 声明为 `subset` / `single-woff2` / `copy-original` 时是否具备对应文件。真实批量写入后，只有 `auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为结构合格。若为 false，优先查看 `auditBlockingReasons[]`、`structureSummary.issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 会出现 `output-structure-issues`。
 
 保留基础统计：
 
 - `fileCount`
 - `maxFilesHit`
+- `auditStatus`
+- `auditPassed`
+- `auditBlockingReasons`
 - `filesIncluded`
 - `familiesIncluded`
 - `totalBytes`
