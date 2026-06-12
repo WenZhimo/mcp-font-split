@@ -569,6 +569,7 @@ npm run smoke:real-corpus-integration -- <font-corpus-dir>
 npm run smoke:real-corpus-write -- <font-corpus-dir>
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
+npm run smoke:api-docs
 npm run smoke:inspect
 npm run smoke:small-skip
 ```
@@ -582,6 +583,8 @@ npm run smoke:small-skip
 `smoke:real-corpus-integration` is an explicit representative integration check for a local real font corpus, and is not included in `npm run check`. It checks runtime status and agent guidance, scans the corpus root compactly, selects one real sample directory, then runs directory-organization dry-run, directory-organization copy-only write, single-font `split_font` write, batch dry-run, batch reviewed-write, and `inspect_split_output` output audits. It only clears and recreates a generated `.font-split-*` output root under the supplied corpus directory; it never moves, deletes, or rewrites source fonts. Optional arguments are `<font-corpus-dir> [sample-input-dir] [output-root] [maxFiles] [limit]`; the default output root is `font-split-mcp/.font-split-real-corpus-integration-output`.
 
 `smoke:real-corpus-write` is an explicit write/audit check for the same kind of local corpus, and is also not included in `npm run check`. It inspects the corpus root, selects a real sample directory, removes and recreates only a generated `.font-split-*` output root, runs `split_font_batch` with `workflowPreset: "reviewed-write"`, then calls `inspect_split_output` through the returned `audit-split-output` action and requires `structureSummary.conforms: true`. Optional arguments are `<font-corpus-dir> [sample-input-dir] [output-root] [maxFiles] [limit]`; the default output root is `font-split-mcp/.font-split-real-corpus-write-output`.
+
+`smoke:api-docs` starts the MCP server, reads the live tool schema, and checks that `API.md` / `API.zh-CN.md` cover every tool, input argument, `get_agent_guidance` section, `workflowPreset`, and key safety/audit field. It is included in `npm run check` to prevent implementation changes from silently drifting away from the API docs.
 
 `smoke:small-skip` currently exercises the `copy-original` small-font policy; the script name is kept for compatibility. `smoke:incremental` also prints a sample `splitDir` so you can verify the collision-safe batch naming stays stable across reruns.
 

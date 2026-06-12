@@ -2021,6 +2021,77 @@ if (scenario === 'single') {
   } finally {
     await client.close();
   }
+} else if (scenario === 'api-docs') {
+  const apiDocs = {
+    'API.md': await fs.readFile('API.md', 'utf8'),
+    'API.zh-CN.md': await fs.readFile('API.zh-CN.md', 'utf8'),
+  };
+  const assertDocsContainAny = (label, tokens) => {
+    for (const [fileName, content] of Object.entries(apiDocs)) {
+      if (!tokens.some((token) => content.includes(token))) {
+        throw new Error(`${fileName} is missing documented ${label}: ${tokens.join(' or ')}`);
+      }
+    }
+  };
+  const assertDocsContain = (label, token) => assertDocsContainAny(label, [token]);
+
+  const client = new Client({ name: 'api-docs-smoke', version: '0.0.0' });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ['src/server.js'],
+    cwd: process.cwd(),
+  });
+  await client.connect(transport);
+  try {
+    const result = await client.listTools();
+    const guidance = getAgentGuidance({ workflow: 'batch', detailLevel: 'full' });
+    for (const tool of result.tools) {
+      assertDocsContain(`${tool.name} heading`, `## \`${tool.name}\``);
+      for (const propertyName of Object.keys(tool.inputSchema?.properties || {})) {
+        assertDocsContain(`${tool.name}.${propertyName}`, `\`${propertyName}\``);
+      }
+    }
+
+    for (const sectionName of guidance.guidanceView?.availableSections || []) {
+      assertDocsContain(`get_agent_guidance section ${sectionName}`, `\`${sectionName}\``);
+    }
+    for (const preset of guidance.workflowPresets || []) {
+      assertDocsContain(`workflowPreset ${preset.id}`, `\`${preset.id}\``);
+    }
+    for (const fieldName of [
+      'guidanceView',
+      'directoryWorkflowDecisionMatrix',
+      'safeInvocationTemplates',
+      'warningCodeCatalog',
+      'toolResponseFieldCatalog',
+      'workflowPresets',
+      'recommendedBatchPreviewArgs',
+      'recommendedNextActions',
+      'safetySummary',
+      'sourceDestructive',
+      'writesSourceTree',
+      'writesOutputTree',
+      'outputTreeInsideInputTree',
+      'mayOverwriteOutputTree',
+      'structureSummary',
+      'maxFilesHit',
+      'unsupportedFileSummary',
+      'debugBatchDecisions',
+    ]) {
+      assertDocsContainAny(`important field ${fieldName}`, [`\`${fieldName}\``, `\`${fieldName}[]\``]);
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      docsChecked: Object.keys(apiDocs),
+      toolCount: result.tools.length,
+      documentedSchemaPropertyCount: result.tools.reduce((count, tool) => count + Object.keys(tool.inputSchema?.properties || {}).length, 0),
+      documentedGuidanceSectionCount: guidance.guidanceView?.availableSections?.length || 0,
+      documentedWorkflowPresetCount: guidance.workflowPresets?.length || 0,
+    }, null, 2));
+  } finally {
+    await client.close();
+  }
 } else if (scenario === 'batch-compact') {
   const inputDir = process.argv[3] || '0xA000';
   const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-batch-compact-output';

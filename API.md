@@ -26,6 +26,36 @@ Use `detailLevel: "full"` when the agent needs every catalog and example in one 
 
 `toolResponseFieldCatalog` is returned with `detailLevel: "full"` or `sections: ["field-catalog"]`. It maps important response field paths to the tools that emit them, their meaning, and the action an AI agent should take before reporting success. It is intended as a runtime companion to this API document, especially for fields whose meaning is easy to misread such as `ok`, `performedSplit`, `usedFallback`, `sourceDestructive`, `writesOutputTree`, `maxFilesHit`, and `recommendedNextActions`.
 
+Guidance section names:
+
+| Section | Contents |
+|---------|----------|
+| `workspace` | Workspace root and path-base information. |
+| `tools` | Tool inventory and when each tool should be called. |
+| `defaults` | Important default policies and supported extensions. |
+| `recommendations` | Recommended batch, inspect, and organization options. |
+| `directory-workflows` | Directory workflow decision matrix for flat, nested, mixed, noisy, and staging scenarios. |
+| `examples` | Concrete source-tree examples; returned in `full` detail or when explicitly requested. |
+| `verification` | Checklist items an agent should verify before reporting success. |
+| `warning-catalog` | Warning-code catalog for `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]`. |
+| `field-catalog` | Response-field catalog mapping fields to meanings and agent actions. |
+| `safe-templates` | Copyable safe invocation templates for common workflows. |
+| `response-fields` | Short list of response fields agents should inspect. |
+| `path-rules` | Path containment and relative-path rules. |
+| `workflow` | Recommended workflow for the requested guidance focus. |
+
+Workflow presets:
+
+| Preset | Write behavior | Batch defaults | Organization defaults | Use when |
+|--------|----------------|----------------|------------------------|----------|
+| `default` | Depends on explicit `dryRun` and tool defaults. | No preset overrides. | No preset overrides. | You want raw tool defaults. |
+| `safe-preview` | No batch or organization writes. | `dryRun: true`, `includeResults: true`, `skipMode: "manifest"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `batchErrorMode: "fail-after"`, `splitFailureAction: "single-woff2"`. | `dryRun: true`, `includePlan: true`, `parseFonts: true`, `batchGroupBy: "auto"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `copyInvalidFonts: false`, `overwriteExisting: false`. | First call on unfamiliar sources, before any write. |
+| `reviewed-write` | Batch writes output; organization copies into `outputDir`. | `dryRun: false`, `includeResults: false`, `skipMode: "manifest"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `batchErrorMode: "fail-after"`, `splitFailureAction: "single-woff2"`. | `dryRun: false`, `includePlan: true`, `parseFonts: true`, `batchGroupBy: "auto"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `copyInvalidFonts: false`, `overwriteExisting: false`. | After reviewing a no-write preview. |
+| `structure-first` | No batch or organization writes. | `dryRun: true`, `includeResults: false`, `skipMode: "manifest"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "same-path"`, `batchErrorMode: "fail-after"`. | `dryRun: true`, `includePlan: false`, `parseFonts: false`, `batchGroupBy: "auto"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `copyInvalidFonts: false`, `overwriteExisting: false`. | Very large or noisy first-pass scans where metadata parsing should be deferred. |
+| `source-layout` | Depends on explicit `dryRun`. | `batchGroupBy: "source-dir"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`. | Same grouping, naming, and dedupe defaults. | Archive-per-family or nested source folders already express grouping. |
+| `metadata-family` | Depends on explicit `dryRun`. | `batchGroupBy: "font-family"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`. | Same grouping, naming, and dedupe defaults. | Flat source folders where internal font metadata should decide family grouping. |
+| `preserve-all` | Depends on explicit `dryRun`. | `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "none"`. | `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "none"`. | Every supported font file must be kept, even apparent duplicates. |
+
 ## `get_runtime_status`
 
 Return a read-only runtime diagnostic summary.

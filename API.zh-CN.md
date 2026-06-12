@@ -26,6 +26,36 @@
 
 `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，会把重要响应字段路径映射到产生这些字段的工具、字段含义，以及 AI agent 在宣称成功前应该采取的动作。它是本文档的运行时补充，尤其用于避免误读 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit` 和 `recommendedNextActions` 这类容易违反直觉的字段。
 
+指南 section 名称：
+
+| Section | 内容 |
+|---------|------|
+| `workspace` | 工作区根目录和路径基准信息。 |
+| `tools` | 工具清单，以及每个工具适合在什么时候调用。 |
+| `defaults` | 重要默认策略和支持的字体扩展名。 |
+| `recommendations` | 推荐的批量、检查和目录整理参数。 |
+| `directory-workflows` | 面向扁平、嵌套、混合、嘈杂和暂存目录场景的目录工作流决策表。 |
+| `examples` | 具体源目录示例；在 `full` 详情或显式请求时返回。 |
+| `verification` | agent 在宣称成功前应该验证的检查清单。 |
+| `warning-catalog` | `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 的 warning code 目录。 |
+| `field-catalog` | 把响应字段映射到含义和 agent 动作的字段目录。 |
+| `safe-templates` | 常见工作流的可复制安全调用模板。 |
+| `response-fields` | agent 应检查的响应字段短清单。 |
+| `path-rules` | 路径限制和相对路径规则。 |
+| `workflow` | 针对当前指南重点推荐的工作流。 |
+
+工作流预设：
+
+| Preset | 写入行为 | 批量默认值 | 目录整理默认值 | 适用场景 |
+|--------|----------|------------|----------------|----------|
+| `default` | 取决于显式 `dryRun` 和工具默认值。 | 不增加预设覆盖项。 | 不增加预设覆盖项。 | 需要原始工具默认行为。 |
+| `safe-preview` | 批量和目录整理都不写文件。 | `dryRun: true`、`includeResults: true`、`skipMode: "manifest"`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"`、`batchErrorMode: "fail-after"`、`splitFailureAction: "single-woff2"`。 | `dryRun: true`、`includePlan: true`、`parseFonts: true`、`batchGroupBy: "auto"`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"`、`copyInvalidFonts: false`、`overwriteExisting: false`。 | 陌生源目录的第一次调用，先于任何写入。 |
+| `reviewed-write` | 批量会写输出；目录整理会复制到 `outputDir`。 | `dryRun: false`、`includeResults: false`、`skipMode: "manifest"`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"`、`batchErrorMode: "fail-after"`、`splitFailureAction: "single-woff2"`。 | `dryRun: false`、`includePlan: true`、`parseFonts: true`、`batchGroupBy: "auto"`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"`、`copyInvalidFonts: false`、`overwriteExisting: false`。 | 已经审查过无写入预览之后。 |
+| `structure-first` | 批量和目录整理都不写文件。 | `dryRun: true`、`includeResults: false`、`skipMode: "manifest"`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "same-path"`、`batchErrorMode: "fail-after"`。 | `dryRun: true`、`includePlan: false`、`parseFonts: false`、`batchGroupBy: "auto"`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"`、`copyInvalidFonts: false`、`overwriteExisting: false`。 | 超大或嘈杂目录的第一遍结构扫描，暂时推迟元数据解析。 |
+| `source-layout` | 取决于显式 `dryRun`。 | `batchGroupBy: "source-dir"`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"`。 | 使用相同的分组、命名和去重默认值。 | 每个压缩包或每个 family 已经有独立源目录。 |
+| `metadata-family` | 取决于显式 `dryRun`。 | `batchGroupBy: "font-family"`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"`。 | 使用相同的分组、命名和去重默认值。 | 扁平源目录，需要由字体内部 metadata 决定 family 分组。 |
+| `preserve-all` | 取决于显式 `dryRun`。 | `batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "none"`。 | `batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "none"`。 | 所有受支持字体文件都必须保留，即使看起来是重复字体。 |
+
 ## `get_runtime_status`
 
 返回只读运行时诊断摘要。
