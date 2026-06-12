@@ -956,6 +956,7 @@ if (scenario === 'single') {
     || mismatchTemplate?.sourceDestructive !== false
     || mismatchTemplate?.args?.workflowPreset !== 'safe-preview'
     || !mismatchTemplate.inspectFields?.includes('sourceDestructive')
+    || !mismatchTemplate.inspectFields?.includes('organizationDecision')
     || !mismatchTemplate.inspectFields?.includes('unsupportedFileSummary')
     || !mismatchTemplate.inspectFields?.includes('recommendedBatchPreviewArgs')
   ) {
@@ -967,6 +968,7 @@ if (scenario === 'single') {
     structureTemplate?.tool !== 'organize_font_directory'
     || structureTemplate?.args?.workflowPreset !== 'structure-first'
     || !structureTemplate.inspectFields?.includes('dedupeLimitedByParsing')
+    || !structureTemplate.inspectFields?.includes('organizationDecision')
     || !structureTemplate.inspectFields?.includes('recommendedBatchPreviewArgs')
   ) {
     throw new Error('Expected structure-first template to expose dedupe limitations and safe batch preview args.');
@@ -979,6 +981,7 @@ if (scenario === 'single') {
     || copyTemplate?.args?.workflowPreset !== 'reviewed-write'
     || copyTemplate?.args?.outputDir !== 'organized-fonts'
     || !copyTemplate.inspectFields?.includes('writesSourceTree')
+    || !copyTemplate.inspectFields?.includes('organizationDecision')
     || !copyTemplate.inspectFields?.includes('unsupportedFileSummary')
   ) {
     throw new Error('Expected copy staging template to disclose copy-only source safety.');
@@ -995,6 +998,7 @@ if (scenario === 'single') {
     || !batchPreviewTemplate.inspectFields?.includes('sourceDestructive')
     || !batchPreviewTemplate.inspectFields?.includes('writesOutputTree')
     || !batchPreviewTemplate.inspectFields?.includes('outputTreeInsideInputTree')
+    || !batchPreviewTemplate.inspectFields?.includes('batchDecision')
   ) {
     throw new Error('Expected batch preview template to rely on the safe-preview batch preset.');
   }
@@ -1007,6 +1011,7 @@ if (scenario === 'single') {
     || batchProcessTemplate?.args?.workflowPreset !== 'reviewed-write'
     || batchProcessTemplate?.args?.limit !== 50000
     || batchProcessTemplate?.args?.maxFiles !== 50000
+    || !batchProcessTemplate.inspectFields?.includes('batchDecision')
     || !batchProcessTemplate.nextStep?.includes('inspect_split_output')
   ) {
     throw new Error('Expected reviewed batch processing template to rely on the reviewed-write preset and require output inspection.');
@@ -1024,11 +1029,12 @@ if (scenario === 'single') {
   const workflowPlan = result.recommendedWorkflowPlan;
   if (
     workflowPlan?.id !== 'batch-workflow'
-    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-dry-run-preview' && step.writesFiles === false)
-    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true)
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-dry-run-preview' && step.writesFiles === false && step.inspectFields?.includes('batchDecision'))
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true && step.inspectFields?.includes('batchDecision'))
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'directory-mismatch-plan' && step.inspectFields?.includes('organizationDecision'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('auditStatus') && step.inspectFields?.includes('structureSummary'))
   ) {
-    throw new Error('Expected batch recommendedWorkflowPlan to order preview, reviewed write, and output audit steps.');
+    throw new Error('Expected batch recommendedWorkflowPlan to order preview, reviewed write, output audit, and route-decision checks.');
   }
   const referencedTemplateIds = new Set();
   for (const step of workflowPlan.orderedSteps || []) {
@@ -1114,14 +1120,20 @@ if (scenario === 'single') {
     || preserveRecipe?.writeArgsAfterReview?.workflowPreset !== 'reviewed-write'
     || preserveRecipe?.writesFilesBeforeReview !== false
     || preserveRecipe?.sourceDestructive !== false
+    || !preserveRecipe.inspectFields?.includes('batchDecision')
   ) {
     throw new Error('Expected preserve-every-source-font recipe to disable dedupe only inside preview/write presets.');
+  }
+  const sourceFolderRecipe = (result.configurationRecipes || []).find((item) => item.id === 'source-folder-families');
+  if (!sourceFolderRecipe?.inspectFields?.includes('batchDecision')) {
+    throw new Error('Expected source-folder-families recipe to require batchDecision inspection.');
   }
   const stagingRecipe = (result.configurationRecipes || []).find((item) => item.id === 'copy-clean-staging-directory');
   if (
     stagingRecipe?.firstTool !== 'organize_font_directory'
     || stagingRecipe?.writeBehavior !== 'copy-only-outputDir'
     || stagingRecipe?.sourceDestructive !== false
+    || !stagingRecipe.inspectFields?.includes('organizationDecision')
     || !stagingRecipe.inspectFields?.includes('writesSourceTree')
   ) {
     throw new Error('Expected copy-clean-staging-directory recipe to disclose copy-only source safety.');
@@ -1130,8 +1142,17 @@ if (scenario === 'single') {
   if (
     structureRecipe?.previewArgs?.workflowPreset !== 'structure-first'
     || !structureRecipe.inspectFields?.includes('dedupeLimitedByParsing')
+    || !structureRecipe.inspectFields?.includes('organizationDecision')
   ) {
     throw new Error('Expected fast structure recipe to use structure-first and require dedupe limitation inspection.');
+  }
+  const metadataRecipe = (result.configurationRecipes || []).find((item) => item.id === 'metadata-family-groups');
+  if (!metadataRecipe?.inspectFields?.includes('organizationDecision')) {
+    throw new Error('Expected metadata-family-groups recipe to require organizationDecision inspection.');
+  }
+  const reviewedWriteRecipe = (result.configurationRecipes || []).find((item) => item.id === 'large-reviewed-write');
+  if (!reviewedWriteRecipe?.inspectFields?.includes('batchDecision')) {
+    throw new Error('Expected large-reviewed-write recipe to require batchDecision inspection.');
   }
   const decisionIds = new Set((result.directoryWorkflowDecisionMatrix || []).map((item) => item.id));
   for (const requiredDecision of ['known-good-batch-layout', 'unknown-or-mixed-directory-layout', 'large-or-noisy-directory-first-pass', 'user-wants-clean-staging-directory']) {
@@ -1143,6 +1164,7 @@ if (scenario === 'single') {
   if (
     structureDecision?.recommendedOptions?.workflowPreset !== 'structure-first'
     || !structureDecision.mustInspectFields?.includes('dedupeLimitedByParsing')
+    || !structureDecision.mustInspectFields?.includes('organizationDecision')
     || !structureDecision.mustInspectFields?.includes('unsupportedFileSummary')
     || !structureDecision.mustInspectFields?.includes('planActionSummary')
     || !structureDecision.mustInspectFields?.includes('recommendedBatchPreviewArgs')
@@ -1156,6 +1178,7 @@ if (scenario === 'single') {
     || knownBatchDecision?.followUpOptions?.workflowPreset !== 'reviewed-write'
     || !knownBatchDecision?.mustInspectFields?.includes('unsupportedFileSummary')
     || !knownBatchDecision?.mustInspectFields?.includes('safetySummary')
+    || !knownBatchDecision?.mustInspectFields?.includes('batchDecision')
     || !knownBatchDecision?.mustInspectFields?.includes('outputTreeInsideInputTree')
   ) {
     throw new Error('Expected direct batch guidance to use workflow presets while requiring unsupportedFileSummary and full safety inspection.');
@@ -1166,6 +1189,7 @@ if (scenario === 'single') {
   if (
     mixedDecision?.recommendedOptions?.workflowPreset !== 'safe-preview'
     || mixedDecision?.followUpOptions?.workflowPreset !== 'safe-preview'
+    || !mixedDecision?.mustInspectFields?.includes('organizationDecision')
     || !mixedDecision?.mustInspectFields?.includes('planActionSummary')
     || !mixedDecision?.mustInspectFields?.includes('recommendedBatchPreviewArgs')
   ) {
@@ -1178,6 +1202,7 @@ if (scenario === 'single') {
     stagingDecision?.sourceDestructive !== false
     || stagingDecision?.recommendedOptions?.workflowPreset !== 'safe-preview'
     || stagingDecision?.followUpOptions?.workflowPreset !== 'reviewed-write'
+    || !stagingDecision.mustInspectFields?.includes('organizationDecision')
     || !stagingDecision.mustInspectFields?.includes('unsupportedFileSummary')
     || !stagingDecision.mustInspectFields?.includes('planActionSummary')
     || !stagingDecision.mustInspectFields?.includes('outputTreeInsideInputTree')
@@ -1196,6 +1221,7 @@ if (scenario === 'single') {
   if (
     noisyExample?.firstCall?.workflowPreset !== 'structure-first'
     || !noisyExample.mustInspectFields?.includes('dedupeLimitedByParsing')
+    || !noisyExample.mustInspectFields?.includes('organizationDecision')
     || !noisyExample.mustInspectFields?.includes('unsupportedFileSummary')
     || !noisyExample.mustInspectFields?.includes('planActionSummary')
     || !noisyExample.mustInspectFields?.includes('recommendedBatchPreviewArgs')
@@ -1207,6 +1233,7 @@ if (scenario === 'single') {
   if (
     archiveExample?.firstCall?.workflowPreset !== 'safe-preview'
     || archiveExample?.firstCall?.batchGroupBy !== 'source-dir'
+    || !archiveExample?.mustInspectFields?.includes('batchDecision')
     || !archiveExample?.mustInspectFields?.includes('unsupportedFileSummary')
   ) {
     throw new Error('Expected archive-per-family example to use safe-preview with source-dir grouping and require unsupportedFileSummary inspection.');
@@ -1216,6 +1243,7 @@ if (scenario === 'single') {
   if (
     mixedExample?.safety?.sourceDestructive !== false
     || mixedExample?.firstCall?.workflowPreset !== 'safe-preview'
+    || !mixedExample.mustInspectFields?.includes('organizationDecision')
     || !mixedExample.mustInspectFields?.includes('writesSourceTree')
     || !mixedExample.mustInspectFields?.includes('outputTreeInsideInputTree')
     || !mixedExample.mustInspectFields?.includes('planActionSummary')
@@ -1225,7 +1253,11 @@ if (scenario === 'single') {
   }
   assertObjectOmitsKeys(mixedExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'mixed-root-and-nested-fonts firstCall');
   const flatExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'flat-vendor-dump');
-  if (flatExample?.firstCall?.workflowPreset !== 'safe-preview' || !flatExample.mustInspectFields?.includes('recommendedBatchPreviewArgs')) {
+  if (
+    flatExample?.firstCall?.workflowPreset !== 'safe-preview'
+    || !flatExample.mustInspectFields?.includes('organizationDecision')
+    || !flatExample.mustInspectFields?.includes('recommendedBatchPreviewArgs')
+  ) {
     throw new Error('Expected flat vendor example to use the safe-preview organization preset.');
   }
   assertObjectOmitsKeys(flatExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'flat-vendor-dump firstCall');
@@ -1250,6 +1282,18 @@ if (scenario === 'single') {
   }
   if (!layoutChecklist?.responseFields?.includes('recommendedBatchPreviewArgs')) {
     throw new Error('Expected layout verification checklist to include recommendedBatchPreviewArgs.');
+  }
+  if (!layoutChecklist?.responseFields?.includes('organizationDecision')) {
+    throw new Error('Expected layout verification checklist to include organizationDecision.');
+  }
+  const processChecklist = (result.verificationChecklist || []).find((item) => item.id === 'process-outcome-checked');
+  if (
+    !processChecklist?.responseFields?.includes('batchDecision')
+    || !processChecklist?.responseFields?.includes('batchWarnings')
+    || !processChecklist?.responseFields?.includes('errorCount')
+    || !processChecklist?.responseFields?.includes('errors')
+  ) {
+    throw new Error('Expected process verification checklist to include batch route decisions and error fields.');
   }
   const outputChecklist = (result.verificationChecklist || []).find((item) => item.id === 'output-audited');
   if (
@@ -1840,16 +1884,18 @@ if (scenario === 'single') {
   if (
     rerunWithParsingAction?.suggestedArgs?.workflowPreset !== 'safe-preview'
     || rerunWithParsingAction?.suggestedArgs?.batchGroupBy !== 'font-family'
+    || !rerunWithParsingAction?.inspectFields?.includes('organizationDecision')
   ) {
-    throw new Error('Expected rerun-with-font-parsing to use safe-preview and preserve only the metadata-family grouping override.');
+    throw new Error('Expected rerun-with-font-parsing to use safe-preview, preserve only the metadata-family grouping override, and inspect organizationDecision.');
   }
   assertActionSuggestedArgsOmit(rerunWithParsingAction, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'], 'rerun-with-font-parsing suggestedArgs');
   const structurePreviewAction = (result.recommendedNextActions || []).find((action) => action.id === 'preview-batch-split-original-layout');
   if (
     structurePreviewAction?.suggestedArgs?.workflowPreset !== 'safe-preview'
     || structurePreviewAction?.suggestedArgs?.batchGroupBy !== 'source-dir'
+    || !structurePreviewAction?.inspectFields?.includes('batchDecision')
   ) {
-    throw new Error('Expected structure-only batch preview action to use safe-preview with source-dir grouping as the scene-specific override.');
+    throw new Error('Expected structure-only batch preview action to use safe-preview with source-dir grouping and inspect batchDecision.');
   }
   assertActionSuggestedArgsOmit(structurePreviewAction, ['dryRun', 'includeResults', 'skipMode', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode'], 'preview-batch-split-original-layout suggestedArgs');
   for (const expectedAction of ['rerun-with-font-parsing', 'review-plan-before-writing']) {
@@ -1915,8 +1961,8 @@ if (scenario === 'single') {
     throw new Error('Expected avoid-reprocessing next action to use safe-preview with source-dir grouping as the only batch policy override.');
   }
   assertActionSuggestedArgsOmit(avoidAction, ['dryRun', 'includeResults', 'skipMode', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode'], 'avoid-reprocessing-organized-copies suggestedArgs');
-  if (!avoidAction.inspectFields?.includes('batchWarnings')) {
-    throw new Error('Expected avoid-reprocessing next action to require batch warning inspection.');
+  if (!avoidAction.inspectFields?.includes('batchDecision') || !avoidAction.inspectFields?.includes('batchWarnings')) {
+    throw new Error('Expected avoid-reprocessing next action to require batch route decision and warning inspection.');
   }
   const insideBatchPreview = await splitFontBatch({
     inputDir,
@@ -2257,6 +2303,7 @@ if (scenario === 'single') {
     || rerunAction?.suggestedArgs?.batchGroupBy !== 'font-family'
     || rerunAction?.suggestedArgs?.batchDedupeMode !== 'none'
     || rerunAction?.suggestedArgs?.skipMode !== 'force'
+    || !rerunAction?.inspectFields?.includes('batchDecision')
     || truncatedPreview.batchDecision?.route !== 'rerun-batch-with-higher-maxFiles'
     || truncatedPreview.batchDecision?.preferredNextActionId !== 'rerun-batch-with-higher-maxFiles'
     || truncatedPreview.batchDecision?.rerunArgs?.maxFiles !== '<higher-than-current>'
@@ -2972,8 +3019,9 @@ if (scenario === 'single') {
     || batchWriteAction?.suggestedArgs?.inputDir !== inputDir
     || batchWriteAction?.suggestedArgs?.outputRoot !== outputRoot
     || !batchWriteAction.inspectFields?.includes('writesOutputTree')
+    || !batchWriteAction.inspectFields?.includes('batchDecision')
   ) {
-    throw new Error('Expected batch dry-run to recommend a reviewed-write follow-up with safety fields.');
+    throw new Error('Expected batch dry-run to recommend a reviewed-write follow-up with safety and route-decision fields.');
   }
   if (batchWriteAction.suggestedArgs?.skipMode !== 'force') {
     throw new Error('Expected reviewed-write follow-up to preserve the explicit skipMode override.');
