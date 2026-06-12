@@ -12,11 +12,13 @@ Return machine-readable usage guidance for AI coding assistants.
 | `detailLevel` | `compact`, `full` | `compact` | Response size. `compact` keeps the workflow-critical sections and omits bulky catalogs/examples; `full` returns every guidance section. |
 | `sections` | array of section names | unset | Focused section filter. When set, it overrides the default section set from `detailLevel`. |
 
-The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available. By default the response is compact: it includes workspace path rules, supported extensions, default policies, `configurationRecipes[]`, `unsupportedFileCategoryCatalog`, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `safeInvocationTemplates[]`, `recommendedWorkflowPlan`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available. By default the response is compact: it includes workspace path rules, supported extensions, default policies, `configurationRecipes[]`, `batchPolicyGuide`, `unsupportedFileCategoryCatalog`, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `safeInvocationTemplates[]`, `recommendedWorkflowPlan`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
 
 Use `detailLevel: "full"` when the agent needs every catalog and example in one response. Use `sections` when it only needs specific data, for example `["warning-catalog", "field-catalog"]`. Available sections are reported in `guidanceView.availableSections`.
 
 `configurationRecipes[]` maps common user intent to preset-first calls and tradeoffs. Recipes cover safe default batch work, preserving every source font, grouping by source folders, grouping by font metadata, fast structure-first scans, copy-only staging directories, and large reviewed writes. Each recipe includes `inspectFields` and `successCriteria`. A recipe is guidance, not proof of success: agents must still run the preview/write tools, inspect those fields, and satisfy the criteria.
+
+`batchPolicyGuide` is a machine-readable customization guide for batch policy options. It covers `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, and `batchErrorMode`; each policy value includes `useWhen`, `avoidWhen`, `inspectFields`, and `successCriteria`. Use it when the user asks for behavior different from the default presets, then preview before writing.
 
 `unsupportedFileCategoryCatalog` explains the categories used by `unsupportedFileSummary.byCategory[]`, including representative extensions, category meaning, and handling behavior. In particular, `archive` files are reported for awareness but are not extracted, copied, or split.
 
@@ -41,7 +43,7 @@ Guidance section names:
 | `workspace` | Workspace root and path-base information. |
 | `tools` | Tool inventory and when each tool should be called. |
 | `defaults` | Important default policies and supported extensions. |
-| `recommendations` | Recommended batch, inspect, and organization options, plus `configurationRecipes[]` and `unsupportedFileCategoryCatalog`. |
+| `recommendations` | Recommended batch, inspect, and organization options, plus `workflowPresets[]`, `batchPolicyGuide`, `configurationRecipes[]`, and `unsupportedFileCategoryCatalog`. |
 | `directory-workflows` | Directory workflow decision matrix for flat, nested, mixed, noisy, and staging scenarios. |
 | `examples` | Concrete source-tree examples; returned in `full` detail or when explicitly requested. |
 | `verification` | Checklist items an agent should verify before reporting success. |

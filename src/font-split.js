@@ -228,7 +228,7 @@ const GUIDANCE_SECTION_FIELDS = {
   workspace: ['workspace'],
   tools: ['tools', 'supportedExtensions'],
   defaults: ['defaultPolicies'],
-  recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets', 'configurationRecipes', 'unsupportedFileCategoryCatalog'],
+  recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets', 'batchPolicyGuide', 'configurationRecipes', 'unsupportedFileCategoryCatalog'],
   'directory-workflows': ['directoryWorkflowDecisionMatrix'],
   examples: ['directoryWorkflowExamples'],
   verification: ['verificationChecklist'],
@@ -907,6 +907,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Suggested split_font_batch option fragment from guidance or layout analysis. It is not a complete safe invocation by itself.',
     agentAction: 'Prefer recommendedBatchPreviewArgs for a copyable no-write preview call after organize_font_directory; use this field only as policy overrides after reviewing layout and warnings.',
   },
+  batchPolicyGuide: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Machine-readable customization guide for batchGroupBy, batchNamingMode, batchDedupeMode, and batchErrorMode choices.',
+    agentAction: 'Use it when the user wants behavior different from safe defaults; pick the smallest explicit override, preview first, inspect listed fields, and satisfy successCriteria.',
+  },
   configurationRecipes: {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Machine-readable mapping from common user intent to preset-first tool calls, explicit tradeoffs, inspectFields, and successCriteria.',
@@ -957,15 +962,25 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Named configuration preset applied before explicit arguments. Explicit tool arguments override preset values.',
     agentAction: 'Use this to explain why effective defaults such as dryRun, parseFonts, skip mode, or dedupe mode were selected.',
   },
+  batchGroupBy: {
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
+    meaning: 'Resolved first-level family/group directory policy: auto, source-dir, or font-family.',
+    agentAction: 'Confirm the grouping mode matches the source layout and user intent before writing or copying output.',
+  },
   batchNamingMode: {
-    sourceTools: ['split_font_batch'],
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Resolved batch output naming policy: plain, numeric-suffix, or source-suffix.',
     agentAction: 'Confirm numeric suffixes only appear when the selected naming mode and real output-name conflicts require them.',
   },
   batchDedupeMode: {
-    sourceTools: ['split_font_batch'],
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Resolved batch pre-processing dedupe policy: none, same-path, or font-identity.',
     agentAction: 'Confirm the mode matches user intent, especially when preserving every source font or deduping equivalent cross-format fonts matters.',
+  },
+  batchErrorMode: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Resolved per-font batch error handling mode: collect, fail-fast, or fail-after.',
+    agentAction: 'Use collect only when the caller will inspect errors[] and errorCount; require errorCount zero before treating a batch as successful.',
   },
   workflowPresets: {
     sourceTools: ['get_agent_guidance'],
@@ -1158,6 +1173,130 @@ const SAFE_INVOCATION_TEMPLATES = [
     successCriteria: 'Require auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as valid.',
   },
 ];
+
+const BATCH_POLICY_GUIDE = [
+  {
+    id: 'grouping-policy',
+    optionName: 'batchGroupBy',
+    appliesTo: ['split_font_batch', 'organize_font_directory'],
+    defaultValue: 'auto',
+    purpose: 'Choose the first-level family/group directory for batch output or organized copies.',
+    values: [
+      {
+        value: 'auto',
+        useWhen: 'The caller wants the tool to infer grouping from source shape: nested sources usually preserve source directories, flat sources lean on font metadata.',
+        avoidWhen: 'The user explicitly says source folders are authoritative, or explicitly wants internal font metadata to decide groups.',
+        inspectFields: ['layout', 'recommendedBatchPreviewArgs', 'batchGroupBy', 'planned', 'batchWarnings'],
+        successCriteria: 'Preview shows the intended family/group directories, with layout warnings reviewed before any write.',
+      },
+      {
+        value: 'source-dir',
+        useWhen: 'Each source folder already represents a family, vendor package, or archive-derived grouping that should be preserved.',
+        avoidWhen: 'The source is a flat dump or folder names are download artifacts rather than family names.',
+        inspectFields: ['layout', 'recommendedBatchPreviewArgs', 'batchGroupBy', 'planned', 'batchWarnings'],
+        successCriteria: 'Preview paths preserve the intended source folder grouping and do not mix unrelated root-level files unexpectedly.',
+      },
+      {
+        value: 'font-family',
+        useWhen: 'The source layout is flat or unreliable and internal font family metadata should decide grouping.',
+        avoidWhen: 'parseFonts is false, font metadata is missing/unreliable, or user wants original source folders preserved.',
+        inspectFields: ['parsedFontMetadata', 'missingIdentityCount', 'invalidFontCount', 'batchGroupBy', 'planned', 'batchWarnings'],
+        successCriteria: 'Metadata has been parsed, missing/invalid font counts are acceptable or disclosed, and preview paths use the intended font-family groups.',
+      },
+    ],
+  },
+  {
+    id: 'naming-policy',
+    optionName: 'batchNamingMode',
+    appliesTo: ['split_font_batch', 'organize_font_directory'],
+    defaultValue: 'numeric-suffix',
+    purpose: 'Choose how per-font output directories or organized copy filenames avoid collisions inside a group.',
+    values: [
+      {
+        value: 'numeric-suffix',
+        useWhen: 'Default agent-safe behavior: keep bare names unless a real same-group output name conflict exists.',
+        avoidWhen: 'The user demands exact bare names even if outputs collide, or wants source-derived suffixes for traceability.',
+        inspectFields: ['batchNamingMode', 'planned', 'batchWarnings', 'outputTreeInsideInputTree'],
+        successCriteria: 'Preview shows bare names when there is no real conflict and numeric suffixes only where collisions require them.',
+      },
+      {
+        value: 'plain',
+        useWhen: 'The user explicitly wants bare names and accepts that same-group collisions may overwrite/merge poorly or require manual handling.',
+        avoidWhen: 'The source contains multiple styles/files with the same stem inside one group or the run should be collision-safe by default.',
+        inspectFields: ['batchNamingMode', 'planned', 'batchWarnings', 'errorCount', 'errors'],
+        successCriteria: 'Plain naming is explicitly intentional, planned paths have been reviewed for collisions, and any collision/error risk is disclosed.',
+      },
+      {
+        value: 'source-suffix',
+        useWhen: 'The user explicitly wants source-derived suffixes to preserve traceability across folders or similarly named files.',
+        avoidWhen: 'Default behavior is desired, because source suffixes make names longer and should not appear implicitly.',
+        inspectFields: ['batchNamingMode', 'planned', 'batchWarnings'],
+        successCriteria: 'Source suffixes are intentionally requested and preview paths demonstrate the desired traceability without surprising extra suffixes.',
+      },
+    ],
+  },
+  {
+    id: 'dedupe-policy',
+    optionName: 'batchDedupeMode',
+    appliesTo: ['split_font_batch', 'organize_font_directory'],
+    defaultValue: 'font-identity',
+    purpose: 'Choose whether equivalent source fonts are collapsed before processing or copying.',
+    values: [
+      {
+        value: 'font-identity',
+        useWhen: 'Default behavior: dedupe equivalent fonts across formats when they represent the same effective font.',
+        avoidWhen: 'Every supported source font file must be preserved, even when only format/container differs.',
+        inspectFields: ['batchDedupeMode', 'skippedDuplicates', 'planned', 'batchWarnings', 'dedupeLimitedByParsing'],
+        successCriteria: 'Duplicate skips match user intent; if parsing was skipped, rerun with parseFonts true before trusting identity dedupe.',
+      },
+      {
+        value: 'same-path',
+        useWhen: 'A fast structure/path-level dedupe is enough, or parseFonts is intentionally disabled for a structure-first pass.',
+        avoidWhen: 'Equivalent fonts may appear across arbitrary folders/formats and should be deduped semantically.',
+        inspectFields: ['batchDedupeMode', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'skippedDuplicates', 'planned'],
+        successCriteria: 'The caller accepts path/stem-level dedupe limits and does not rely on it as semantic font identity.',
+      },
+      {
+        value: 'none',
+        useWhen: 'The user wants to preserve every supported source font file, including apparent duplicates or alternate containers.',
+        avoidWhen: 'The goal is one representative output per effective font.',
+        inspectFields: ['batchDedupeMode', 'skippedDuplicates', 'planned', 'batchWarnings', 'outputTreeInsideInputTree'],
+        successCriteria: 'Preview intentionally keeps every selected supported font, skippedDuplicates is zero, and naming collisions are handled or disclosed.',
+      },
+    ],
+  },
+  {
+    id: 'error-policy',
+    optionName: 'batchErrorMode',
+    appliesTo: ['split_font_batch'],
+    defaultValue: 'fail-after',
+    purpose: 'Choose how per-font processing errors affect the batch tool result.',
+    values: [
+      {
+        value: 'fail-after',
+        useWhen: 'Default behavior: process selected fonts, then fail the batch if any per-font errors occurred.',
+        avoidWhen: 'The caller wants a best-effort ok:true response with collected errors, or wants to stop immediately on the first error.',
+        inspectFields: ['batchErrorMode', 'errorCount', 'errors', 'batchDecision', 'recommendedNextActions'],
+        successCriteria: 'errorCount is zero before claiming success, or the thrown/returned batch failure is reported with errors[] details.',
+      },
+      {
+        value: 'fail-fast',
+        useWhen: 'The first per-font failure should stop the batch immediately to save time or avoid partial output.',
+        avoidWhen: 'The caller wants a complete list of all failing files in one run.',
+        inspectFields: ['batchErrorMode', 'errorCount', 'errors', 'batchDecision'],
+        successCriteria: 'The first failure is treated as blocking and partial output, if any, is audited or disclosed.',
+      },
+      {
+        value: 'collect',
+        useWhen: 'The caller intentionally wants ok:true best-effort output plus errors[] for later inspection.',
+        avoidWhen: 'An agent might forget to check errors[] and incorrectly report full success.',
+        inspectFields: ['batchErrorMode', 'errorCount', 'errors', 'batchDecision', 'recommendedNextActions'],
+        successCriteria: 'Every errors[] entry is inspected, resolved, or disclosed; errorCount must be zero before reporting full success.',
+      },
+    ],
+  },
+];
+
 function buildRecommendedWorkflowPlan(workflow) {
   const auditStep = {
     id: 'audit-output',
@@ -2085,6 +2224,7 @@ export function getAgentGuidance(args = {}) {
       overwriteExisting: false,
     },
     workflowPresets: buildWorkflowPresetCatalog(),
+    batchPolicyGuide: BATCH_POLICY_GUIDE,
     configurationRecipes,
     unsupportedFileCategoryCatalog: buildUnsupportedFileCategoryCatalog(),
     directoryWorkflowDecisionMatrix,
@@ -2105,8 +2245,11 @@ export function getAgentGuidance(args = {}) {
       'recommendedActions',
       'workflowPresets',
       'workflowPreset',
+      'batchPolicyGuide',
+      'batchGroupBy',
       'batchNamingMode',
       'batchDedupeMode',
+      'batchErrorMode',
       'configurationRecipes',
       'unsupportedFileCategoryCatalog',
       'supportedFontCount',

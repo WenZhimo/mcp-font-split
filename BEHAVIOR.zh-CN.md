@@ -62,6 +62,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 推荐工具调用顺序
 - 调用方应该检查的关键响应字段
 - `configurationRecipes[]`：把常见用户意图映射到 preset-first 参数和取舍说明
+- `batchPolicyGuide`：解释批量策略自定义项该如何选择
 - `unsupportedFileCategoryCatalog`：解释 `unsupportedFileSummary.byCategory[]` 中各分类的代表扩展名、含义和处理行为
 - `safeInvocationTemplates[]`：常见工作流的安全起步调用模板
 - `recommendedWorkflowPlan`：把安全模板编排成有序阶段的推荐路线图
@@ -73,6 +74,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 其中 `local-real-corpus-suite-passed` 是面向本包维护者的本地验证项：当改动会影响功能行为时，应在本机真实字体语料库上运行 `smoke:real-corpus-suite`，也就是 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`。它是代表性可靠性门禁，不是逐个字体目录人工验收，也不是运行时 MCP 工具调用。
 该 suite 的最终摘要会返回 `coverageSummary.functionalCoverage[]`，其中的 `functionalCoverage[]` 用于说明真实语料运行实际覆盖了哪些功能路径，例如全根输入扫描、非字体噪声分类、目录整理预览、copy-only 写入、单字体拆分、批量写入和输出结构审计。
 `configurationRecipes[]` 是给 agent 用的配置配方表；它把“保留每个源字体”“按源目录分组”“按字体 metadata 分组”“快速结构优先扫描”“copy-only 暂存整理”“大库审查后写入”等用户意图映射到最小 preset-first 参数，并列出写入行为、源目录安全性、取舍、必须检查的 `inspectFields` 和继续前必须满足的 `successCriteria`。配方不是成功证明，不能替代实际工具响应检查。
+`batchPolicyGuide` 是给 agent 用的批量策略自定义指南；它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个可选值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前必须满足的 `successCriteria`。当用户想偏离默认 preset 行为时，应优先参考它选择最小显式覆盖，并先运行 safe-preview。
 `unsupportedFileCategoryCatalog` 是给 agent 解释非字体噪声分类的机器可读目录；它会说明 `archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other` 的代表扩展名与处理行为。尤其要注意，`archive` 只表示“被报告的压缩包”，不会触发解压、复制或拆分。
 `directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段、继续前必须满足的 `successCriteria` 和非直觉行为。推荐参数会优先使用 `workflowPreset`，只保留路径、规模或目录形态造成的差异覆盖。它不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
 `directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。示例调用也采用 preset-first 风格，并带有 `mustInspectFields` 和 `successCriteria`。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs` 和 warning 字段为准。

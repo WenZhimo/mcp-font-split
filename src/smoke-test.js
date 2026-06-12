@@ -480,6 +480,53 @@ function assertRecommendedWorkflowPlanHasCompletionProof(plan, templateIds, cont
   }
 }
 
+function assertBatchPolicyGuide(policyGuide) {
+  assertNonEmptyArray(policyGuide, 'batchPolicyGuide', 'batchPolicyGuide');
+  const expectedPolicies = {
+    batchGroupBy: ['auto', 'source-dir', 'font-family'],
+    batchNamingMode: ['numeric-suffix', 'plain', 'source-suffix'],
+    batchDedupeMode: ['font-identity', 'same-path', 'none'],
+    batchErrorMode: ['fail-after', 'fail-fast', 'collect'],
+  };
+  const byOptionName = new Map((policyGuide || []).map((policy) => [policy.optionName, policy]));
+  for (const [optionName, values] of Object.entries(expectedPolicies)) {
+    const policy = byOptionName.get(optionName);
+    if (!policy) {
+      throw new Error(`Expected batchPolicyGuide to include ${optionName}.`);
+    }
+    assertNonEmptyString(policy.id, `batchPolicyGuide.${optionName}`, 'id');
+    assertNonEmptyString(policy.defaultValue, `batchPolicyGuide.${optionName}`, 'defaultValue');
+    assertNonEmptyString(policy.purpose, `batchPolicyGuide.${optionName}`, 'purpose');
+    assertNonEmptyStringArray(policy.appliesTo, `batchPolicyGuide.${optionName}`, 'appliesTo');
+    assertNonEmptyArray(policy.values, `batchPolicyGuide.${optionName}`, 'values');
+    const actualValues = new Set(policy.values.map((item) => item.value));
+    for (const value of values) {
+      if (!actualValues.has(value)) {
+        throw new Error(`Expected batchPolicyGuide.${optionName} to include value ${value}.`);
+      }
+    }
+    for (const value of policy.values) {
+      assertNonEmptyString(value.value, `batchPolicyGuide.${optionName}`, 'value');
+      assertNonEmptyString(value.useWhen, `batchPolicyGuide.${optionName}.${value.value}`, 'useWhen');
+      assertNonEmptyString(value.avoidWhen, `batchPolicyGuide.${optionName}.${value.value}`, 'avoidWhen');
+      assertNonEmptyStringArray(value.inspectFields, `batchPolicyGuide.${optionName}.${value.value}`, 'inspectFields');
+      assertNonEmptyString(value.successCriteria, `batchPolicyGuide.${optionName}.${value.value}`, 'successCriteria');
+    }
+  }
+  const dedupeNone = byOptionName.get('batchDedupeMode')?.values?.find((item) => item.value === 'none');
+  if (!dedupeNone?.successCriteria?.includes('skippedDuplicates is zero')) {
+    throw new Error('Expected batchPolicyGuide batchDedupeMode none to preserve every selected supported font.');
+  }
+  const namingNumeric = byOptionName.get('batchNamingMode')?.values?.find((item) => item.value === 'numeric-suffix');
+  if (!namingNumeric?.successCriteria?.includes('only where collisions require them')) {
+    throw new Error('Expected batchPolicyGuide numeric-suffix to explain suffixes only on real conflicts.');
+  }
+  const collect = byOptionName.get('batchErrorMode')?.values?.find((item) => item.value === 'collect');
+  if (!collect?.successCriteria?.includes('Every errors[] entry is inspected')) {
+    throw new Error('Expected batchPolicyGuide collect to require errors[] inspection.');
+  }
+}
+
 function assertTemplateOmitsArgs(template, omittedArgs, context) {
   const leaked = omittedArgs.filter((key) => Object.hasOwn(template?.args || {}, key));
   if (leaked.length > 0) {
@@ -1152,6 +1199,11 @@ if (scenario === 'single') {
   for (const item of result.safeInvocationTemplates || []) {
     for (const fieldName of item.inspectFields || []) referencedFieldNames.add(fieldName);
   }
+  for (const policy of result.batchPolicyGuide || []) {
+    for (const value of policy.values || []) {
+      for (const fieldName of value.inspectFields || []) referencedFieldNames.add(fieldName);
+    }
+  }
   for (const workflowGuidance of Object.values(workflowGuidances)) {
     for (const step of workflowGuidance.recommendedWorkflowPlan?.orderedSteps || []) {
       for (const fieldName of step.inspectFields || []) referencedFieldNames.add(fieldName);
@@ -1168,6 +1220,11 @@ if (scenario === 'single') {
   const expectedFieldCatalogEntries = {
     workflowPresets: 'get_agent_guidance',
     workflowPreset: 'split_font_batch',
+    batchPolicyGuide: 'get_agent_guidance',
+    batchGroupBy: 'split_font_batch',
+    batchNamingMode: 'split_font_batch',
+    batchDedupeMode: 'split_font_batch',
+    batchErrorMode: 'split_font_batch',
     configurationRecipes: 'get_agent_guidance',
     unsupportedFileCategoryCatalog: 'get_agent_guidance',
     recommendedBatchOptions: 'organize_font_directory',
@@ -1196,6 +1253,7 @@ if (scenario === 'single') {
       throw new Error(`Expected toolResponseFieldCatalog.${fieldName} to include ${toolName}.`);
     }
   }
+  assertBatchPolicyGuide(result.batchPolicyGuide || []);
   const recipeIds = new Set((result.configurationRecipes || []).map((item) => item.id));
   for (const requiredRecipe of ['safe-default-batch', 'preserve-every-source-font', 'source-folder-families', 'metadata-family-groups', 'fast-structure-first-scan', 'copy-clean-staging-directory', 'large-reviewed-write']) {
     if (!recipeIds.has(requiredRecipe)) {
@@ -2867,7 +2925,7 @@ if (scenario === 'single') {
     if (!Object.hasOwn(batchProps, 'workflowPreset') || !Object.hasOwn(organizeProps, 'workflowPreset')) {
       throw new Error('Expected batch and organization tools to expose workflowPreset.');
     }
-    expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'outputTreeInsideInputTree']);
@@ -2925,6 +2983,7 @@ if (scenario === 'single') {
       'guidanceView',
       'recommendedWorkflowPlan',
       'configurationRecipes',
+      'batchPolicyGuide',
       'unsupportedFileCategoryCatalog',
       'directoryWorkflowDecisionMatrix',
       'safeInvocationTemplates',
@@ -2935,6 +2994,10 @@ if (scenario === 'single') {
       'recommendedNextActions',
       'successCriteria',
       'safetySummary',
+      'batchGroupBy',
+      'batchNamingMode',
+      'batchDedupeMode',
+      'batchErrorMode',
       'batchDecision',
       'organizationDecision',
       'sourceDestructive',
@@ -2990,6 +3053,7 @@ if (scenario === 'single') {
     '`guidanceView`',
     '`recommendedWorkflowPlan`',
     '`configurationRecipes[]`',
+    '`batchPolicyGuide`',
     '`unsupportedFileCategoryCatalog`',
     '`verificationChecklist[]`',
     '`smoke:real-corpus-suite`',
