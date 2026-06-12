@@ -232,12 +232,12 @@ const GUIDANCE_SECTION_FIELDS = {
   'directory-workflows': ['directoryWorkflowDecisionMatrix'],
   examples: ['directoryWorkflowExamples'],
   verification: ['verificationChecklist'],
-  'warning-catalog': ['warningCodeCatalogVersion', 'warningCodeCatalog'],
-  'field-catalog': ['toolResponseFieldCatalogVersion', 'toolResponseFieldCatalog'],
-  'safe-templates': ['safeInvocationTemplatesVersion', 'safeInvocationTemplates'],
+  'warning-catalog': ['warningCodeCatalog'],
+  'field-catalog': ['toolResponseFieldCatalog'],
+  'safe-templates': ['safeInvocationTemplates'],
   'response-fields': ['responseFieldsToCheck'],
   'path-rules': ['pathRules'],
-  workflow: ['recommendedWorkflow', 'recommendedWorkflowPlanVersion', 'recommendedWorkflowPlan'],
+  workflow: ['recommendedWorkflow', 'recommendedWorkflowPlan'],
 };
 let wasmRuntimePromise;
 let wasmPath;
@@ -586,7 +586,6 @@ const ALL_TOOL_NAMES = [
   'inspect_split_output',
 ];
 
-const TOOL_RESPONSE_FIELD_CATALOG_VERSION = 1;
 const TOOL_RESPONSE_FIELD_CATALOG = {
   ok: {
     sourceTools: ALL_TOOL_NAMES,
@@ -723,11 +722,6 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Catalog of machine-readable warning codes emitted by batch, inspection, and organization tools.',
     agentAction: 'Use it to interpret warning severity and choose follow-up actions.',
   },
-  warningCodeCatalogVersion: {
-    sourceTools: ['get_agent_guidance'],
-    meaning: 'Version of warningCodeCatalog.',
-    agentAction: 'Use this for compatibility checks in automated agents.',
-  },
   safetySummary: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Compact source/output safety summary for batch or directory organization calls.',
@@ -738,30 +732,15 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Catalog of important response fields, their source tools, meanings, and suggested agent actions.',
     agentAction: 'Use it as the runtime API map before interpreting tool responses.',
   },
-  toolResponseFieldCatalogVersion: {
-    sourceTools: ['get_agent_guidance'],
-    meaning: 'Version of toolResponseFieldCatalog.',
-    agentAction: 'Use this for compatibility checks in automated agents.',
-  },
   safeInvocationTemplates: {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Machine-readable safe starting calls for common AI-agent workflows.',
     agentAction: 'Choose the closest template, customize placeholder paths and limits, then inspect the listed fields.',
   },
-  safeInvocationTemplatesVersion: {
-    sourceTools: ['get_agent_guidance'],
-    meaning: 'Version of safeInvocationTemplates.',
-    agentAction: 'Use this for compatibility checks in automated agents.',
-  },
   recommendedWorkflowPlan: {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Ordered workflow plan that composes safeInvocationTemplates into phases for the selected guidance workflow.',
     agentAction: 'Follow the ordered steps, inspect each listed field, and only advance from preview to write after the reviewed conditions are satisfied.',
-  },
-  recommendedWorkflowPlanVersion: {
-    sourceTools: ['get_agent_guidance'],
-    meaning: 'Version of recommendedWorkflowPlan.',
-    agentAction: 'Use this for compatibility checks in automated agents.',
   },
   batchWarnings: {
     sourceTools: ['split_font_batch'],
@@ -1030,7 +1009,6 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
 };
 
-const SAFE_INVOCATION_TEMPLATES_VERSION = 1;
 const SAFE_INVOCATION_TEMPLATES = [
   {
     id: 'runtime-diagnostic',
@@ -1152,8 +1130,6 @@ const SAFE_INVOCATION_TEMPLATES = [
     nextStep: 'Require auditStatus pass and structureSummary.conforms true; if maxFilesHit is true or legacy/structure issues are detected, disclose uncertainty or rerun with more detail.',
   },
 ];
-const RECOMMENDED_WORKFLOW_PLAN_VERSION = 1;
-
 function buildRecommendedWorkflowPlan(workflow) {
   const auditStep = {
     id: 'audit-output',
@@ -2063,11 +2039,8 @@ export function getAgentGuidance(args = {}) {
     directoryWorkflowDecisionMatrix,
     directoryWorkflowExamples,
     verificationChecklist,
-    warningCodeCatalogVersion: 1,
     warningCodeCatalog: WARNING_CODE_CATALOG,
-    toolResponseFieldCatalogVersion: TOOL_RESPONSE_FIELD_CATALOG_VERSION,
     toolResponseFieldCatalog: TOOL_RESPONSE_FIELD_CATALOG,
-    safeInvocationTemplatesVersion: SAFE_INVOCATION_TEMPLATES_VERSION,
     safeInvocationTemplates: SAFE_INVOCATION_TEMPLATES,
     responseFieldsToCheck: [
       'ok',
@@ -2105,7 +2078,6 @@ export function getAgentGuidance(args = {}) {
       'toolResponseFieldCatalog',
       'safeInvocationTemplates',
       'recommendedWorkflowPlan',
-      'recommendedWorkflowPlanVersion',
       'batchWarnings',
       'batchWarningCount',
       'errorCount',
@@ -2121,9 +2093,6 @@ export function getAgentGuidance(args = {}) {
       'organizationWarnings',
       'organizationWarningCount',
       'recommendedNextActions',
-      'warningCodeCatalogVersion',
-      'toolResponseFieldCatalogVersion',
-      'safeInvocationTemplatesVersion',
       'operationMode',
       'copiedCount',
       'organizationManifestPath',
@@ -2161,7 +2130,6 @@ export function getAgentGuidance(args = {}) {
     ],
     pathRules: commonPathRules,
     recommendedWorkflow: workflows[workflow],
-    recommendedWorkflowPlanVersion: RECOMMENDED_WORKFLOW_PLAN_VERSION,
     recommendedWorkflowPlan: buildRecommendedWorkflowPlan(workflow),
   };
   return selectGuidanceSections(guidance, guidanceView.sectionsIncluded);

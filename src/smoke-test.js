@@ -873,20 +873,11 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('warningCodeCatalog')) {
     throw new Error('Expected agent guidance to recommend checking the warning code catalog.');
   }
-  if (!result.responseFieldsToCheck?.includes('warningCodeCatalogVersion')) {
-    throw new Error('Expected agent guidance to recommend checking the warning code catalog version.');
-  }
   if (!result.responseFieldsToCheck?.includes('toolResponseFieldCatalog')) {
     throw new Error('Expected agent guidance to recommend checking the tool response field catalog.');
   }
-  if (!result.responseFieldsToCheck?.includes('toolResponseFieldCatalogVersion')) {
-    throw new Error('Expected agent guidance to recommend checking the tool response field catalog version.');
-  }
   if (!result.responseFieldsToCheck?.includes('safeInvocationTemplates')) {
     throw new Error('Expected agent guidance to recommend checking safe invocation templates.');
-  }
-  if (!result.responseFieldsToCheck?.includes('safeInvocationTemplatesVersion')) {
-    throw new Error('Expected agent guidance to recommend checking safe invocation template version.');
   }
   if (!result.responseFieldsToCheck?.includes('guidanceView')) {
     throw new Error('Expected agent guidance to recommend checking guidance view metadata.');
@@ -894,8 +885,19 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('recommendedWorkflowPlan')) {
     throw new Error('Expected agent guidance to recommend checking the ordered workflow plan.');
   }
-  if (!result.responseFieldsToCheck?.includes('recommendedWorkflowPlanVersion')) {
-    throw new Error('Expected agent guidance to recommend checking the ordered workflow plan version.');
+  for (const removedVersionField of [
+    'warningCodeCatalogVersion',
+    'toolResponseFieldCatalogVersion',
+    'safeInvocationTemplatesVersion',
+    'recommendedWorkflowPlanVersion',
+  ]) {
+    if (
+      Object.hasOwn(result, removedVersionField)
+      || result.responseFieldsToCheck?.includes(removedVersionField)
+      || result.toolResponseFieldCatalog?.[removedVersionField]
+    ) {
+      throw new Error(`Expected unreleased forward-compatibility field ${removedVersionField} to be removed from agent guidance.`);
+    }
   }
   const expectedWarningCodes = [
     'dry-run-no-write',
@@ -922,9 +924,6 @@ if (scenario === 'single') {
     'mixed-layout-detected',
     'output-inside-input',
   ];
-  if (result.warningCodeCatalogVersion !== 1) {
-    throw new Error('Expected agent guidance to version the warning code catalog.');
-  }
   for (const code of expectedWarningCodes) {
     const entry = result.warningCodeCatalog?.[code];
     if (!entry || !Array.isArray(entry.sources) || entry.sources.length === 0 || !entry.severity || !entry.suggestedAction) {
@@ -937,15 +936,6 @@ if (scenario === 'single') {
     if (!result.warningCodeCatalog?.[code]) {
       throw new Error(`Expected warningCodeCatalog to cover source warning code ${code}.`);
     }
-  }
-  if (result.toolResponseFieldCatalogVersion !== 1) {
-    throw new Error('Expected agent guidance to version the tool response field catalog.');
-  }
-  if (result.safeInvocationTemplatesVersion !== 1) {
-    throw new Error('Expected agent guidance to version safe invocation templates.');
-  }
-  if (result.recommendedWorkflowPlanVersion !== 1) {
-    throw new Error('Expected agent guidance to version recommended workflow plans.');
   }
   const templateIds = new Set((result.safeInvocationTemplates || []).map((item) => item.id));
   for (const requiredTemplate of ['runtime-diagnostic', 'directory-mismatch-plan', 'structure-first-large-directory', 'copy-organized-staging', 'batch-dry-run-preview', 'batch-process-reviewed-plan', 'output-audit-compact']) {
