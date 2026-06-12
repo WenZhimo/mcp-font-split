@@ -406,7 +406,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 4. 根据 `batchDedupeMode` 对等价字体去重，默认仍是 `font-identity`。
 5. 根据 `batchGroupBy` 计算整理后的分组目录。
 6. 根据 `batchNamingMode` 计算整理后的目标文件名。
-7. 返回 `layout`、`recommendedBatchOptions`、`organizationWarnings[]` 和可选 `plan[]`。
+7. 返回 `layout`、`recommendedBatchOptions`、`recommendedNextActions[]`、`organizationWarnings[]` 和可选 `plan[]`。
 
 `parseFonts` 控制是否读取字体元数据：
 
@@ -440,10 +440,11 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 推荐 agent 工作流：
 
 1. 先调用 `organize_font_directory`，保持默认 `dryRun: true`。
-2. 检查 `layout.layoutKind`、`recommendedBatchOptions`、`organizationWarnings[]`、`sourceDestructive`、`destructive`、`writesSourceTree`、`writesOutputTree` 和 `mayOverwriteOutputTree`。
+2. 检查 `layout.layoutKind`、`recommendedBatchOptions`、`recommendedNextActions[]`、`organizationWarnings[]`、`sourceDestructive`、`destructive`、`writesSourceTree`、`writesOutputTree` 和 `mayOverwriteOutputTree`。
 3. 如果用户只是想调整批量参数，不一定需要真的整理目录；可直接把 `recommendedBatchOptions` 应用到 `split_font_batch`。
 4. 如果用户明确希望得到更规整的暂存目录，再用 `dryRun: false` 执行 copy-only 整理。
 5. 整理完成后，对 `outputDir` 调用 `inspect_font_inputs` 或把它作为后续 `split_font_batch.inputDir`。
+6. `recommendedNextActions[]` 是给 agent 的下一步清单；它不会自动执行，也不能替代对每项 `inspectFields` 的检查。
 
 ---
 
@@ -615,6 +616,7 @@ split-meta.json
 | `dedupeLimitedByParsing` | 是否因跳过解析而无法执行真实 identity 去重 |
 | `layout.layoutKind` | `empty` / `flat` / `nested` / `mixed` |
 | `recommendedBatchOptions` | 根据目录结构建议的后续批量参数 |
+| `recommendedNextActions[]` | 面向 agent 的后续动作建议，包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields` |
 | `organizationWarnings[]` | 摘要级风险和状态提示 |
 | `plan[]` | 可选的逐字体复制/跳过计划 |
 | `organizationManifestPath` | 执行 copy-only 后的 manifest 路径 |

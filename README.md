@@ -302,8 +302,11 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `effectiveBatchDedupeMode`, `dedupeLimitedByParsing`: explain whether identity dedupe was available
 - `layout.layoutKind`: `empty`, `flat`, `nested`, or `mixed`
 - `recommendedBatchOptions`: a suggested follow-up `split_font_batch` configuration for the detected layout
+- `recommendedNextActionCount`, `recommendedNextActions[]`: machine-readable follow-up actions for agents, each with an `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, and `inspectFields`
 - `organizationWarningCount`, `organizationWarnings[]` with machine-readable `code` and `message`
 - optional `plan[]` entries with `source`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`
+
+Treat `recommendedNextActions[]` as a checklist, not automation. Agents should still inspect the action's `inspectFields`, especially when an action recommends writing files or rerunning with different parsing options.
 
 `inspect_split_output` keeps flat file stats and adds structured output inventory:
 

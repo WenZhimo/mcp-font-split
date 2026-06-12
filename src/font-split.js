@@ -350,7 +350,7 @@ export function getAgentGuidance(args = {}) {
       id: 'layout-plan-reviewed',
       appliesTo: ['overview', 'batch', 'organize'],
       check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect layout, recommendedBatchOptions, sourceDestructive, writesSourceTree, writesOutputTree, mayOverwriteOutputTree, and organizationWarnings before applying any copy plan.',
-      responseFields: ['layout', 'recommendedBatchOptions', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'plan'],
+      responseFields: ['layout', 'recommendedBatchOptions', 'recommendedNextActions', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'plan'],
     },
     {
       id: 'batch-plan-reviewed',
@@ -709,6 +709,7 @@ export function getAgentGuidance(args = {}) {
       'inspectionWarningCount',
       'organizationWarnings',
       'organizationWarningCount',
+      'recommendedNextActions',
       'destructive',
       'sourceDestructive',
       'writesSourceTree',
@@ -1053,6 +1054,191 @@ function buildOrganizationWarnings({
   }
 
   return warnings;
+}
+
+function buildOrganizationNextActions({
+  options,
+  inputDirRelative,
+  outputDirRelative,
+  maxFiles,
+  maxFilesHit,
+  layout,
+  warnings,
+  errorCount,
+  selectedFontCount,
+  copiedCount,
+}) {
+  const actions = [];
+  const warningCodes = new Set(warnings.map((warning) => warning.code));
+  const push = (action) => actions.push(action);
+
+  if (maxFilesHit) {
+    push({
+      id: 'rerun-with-higher-maxFiles',
+      priority: 'high',
+      tool: 'organize_font_directory',
+      reason: `The organization scan hit maxFiles (${maxFiles}); the plan may be incomplete.`,
+      suggestedArgs: {
+        inputDir: inputDirRelative,
+        outputDir: outputDirRelative,
+        dryRun: true,
+        parseFonts: options.parseFonts,
+        includePlan: options.includePlan,
+        maxFiles: '<higher-than-current>',
+      },
+      inspectFields: ['maxFilesHit', 'layout', 'organizationWarnings', 'plan'],
+    });
+  }
+
+  if (!options.parseFonts) {
+    push({
+      id: 'rerun-with-font-parsing',
+      priority: 'high',
+      tool: 'organize_font_directory',
+      reason: 'parseFonts:false is structure-only; rerun with parsing before relying on invalid-font counts, glyph counts, identity dedupe, or metadata family grouping.',
+      suggestedArgs: {
+        inputDir: inputDirRelative,
+        outputDir: outputDirRelative,
+        dryRun: true,
+        parseFonts: true,
+        includePlan: options.includePlan,
+        batchGroupBy: options.batchGroupBy,
+        batchNamingMode: options.batchNamingMode,
+        batchDedupeMode: options.batchDedupeMode,
+      },
+      inspectFields: ['parsedFontMetadata', 'validFontCount', 'invalidFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings'],
+    });
+  }
+
+  if (warningCodes.has('invalid-fonts-skipped')) {
+    push({
+      id: 'decide-on-invalid-fonts',
+      priority: 'medium',
+      tool: 'organize_font_directory',
+      reason: 'Some supported-extension files looked like fonts but could not be parsed and were skipped.',
+      suggestedArgs: {
+        inputDir: inputDirRelative,
+        outputDir: outputDirRelative,
+        dryRun: true,
+        copyInvalidFonts: true,
+      },
+      inspectFields: ['invalidFontCount', 'organizationWarnings', 'plan'],
+      note: 'Use copyInvalidFonts:true only when preserving broken font-like files is intentional.',
+    });
+  }
+
+  if (layout.layoutKind === 'mixed') {
+    push({
+      id: 'review-mixed-layout-grouping',
+      priority: 'medium',
+      tool: 'split_font_batch',
+      reason: 'Fonts were found both at the input root and in nested folders; direct batch grouping can surprise users.',
+      suggestedArgs: {
+        inputDir: inputDirRelative,
+        dryRun: true,
+        includeResults: true,
+        ...layout.recommendedBatchOptions,
+      },
+      inspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errors'],
+    });
+  }
+
+  if (warningCodes.has('output-inside-input')) {
+    push({
+      id: 'avoid-reprocessing-organized-copies',
+      priority: 'medium',
+      tool: 'split_font_batch',
+      reason: 'outputDir is inside inputDir, so future broad scans can accidentally process organized copies as source fonts.',
+      suggestedArgs: {
+        inputDir: outputDirRelative,
+        dryRun: true,
+        includeResults: true,
+        ...layout.recommendedBatchOptions,
+      },
+      inspectFields: ['inputDir', 'maxFilesHit', 'batchWarnings', 'planned'],
+      note: 'Use the organized outputDir intentionally as the next inputDir, or keep future scans scoped so they do not reprocess organized copies.',
+    });
+  }
+
+  if (errorCount > 0) {
+    push({
+      id: 'inspect-organization-errors',
+      priority: 'high',
+      tool: 'organize_font_directory',
+      reason: 'The organization run reported per-file errors.',
+      inspectFields: ['errorCount', 'errors', 'plan'],
+    });
+  }
+
+  if (options.dryRun) {
+    push({
+      id: 'review-plan-before-writing',
+      priority: 'high',
+      tool: 'organize_font_directory',
+      reason: 'dryRun:true wrote no files; review the plan and warnings before choosing a write step.',
+      inspectFields: ['plan', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree'],
+    });
+
+    if (selectedFontCount > 0) {
+      push({
+        id: 'preview-batch-split-original-layout',
+        priority: 'medium',
+        tool: 'split_font_batch',
+        reason: 'If the user only needs split output, preview splitting the original inputDir with the recommended batch options.',
+        suggestedArgs: {
+          inputDir: inputDirRelative,
+          dryRun: true,
+          includeResults: true,
+          ...layout.recommendedBatchOptions,
+        },
+        inspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errors'],
+      });
+      push({
+        id: 'copy-organized-staging-directory',
+        priority: 'medium',
+        tool: 'organize_font_directory',
+        reason: 'If the user wants a cleaner staging directory, rerun the reviewed plan in copy-only mode.',
+        suggestedArgs: {
+          inputDir: inputDirRelative,
+          outputDir: outputDirRelative,
+          dryRun: false,
+          parseFonts: options.parseFonts,
+          batchGroupBy: options.batchGroupBy,
+          batchNamingMode: options.batchNamingMode,
+          batchDedupeMode: options.batchDedupeMode,
+          overwriteExisting: false,
+        },
+        inspectFields: ['operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'mayOverwriteOutputTree', 'organizationWarnings'],
+      });
+    }
+  } else if (copiedCount > 0) {
+    push({
+      id: 'inspect-organized-output',
+      priority: 'medium',
+      tool: 'inspect_font_inputs',
+      reason: 'The organizer copied fonts into outputDir; inspect that staging directory before splitting it.',
+      suggestedArgs: {
+        inputDir: outputDirRelative,
+        includeFiles: false,
+      },
+      inspectFields: ['supportedFontCount', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
+    });
+    push({
+      id: 'preview-batch-split-organized-output',
+      priority: 'medium',
+      tool: 'split_font_batch',
+      reason: 'Preview splitting the organized staging directory before writing split output.',
+      suggestedArgs: {
+        inputDir: outputDirRelative,
+        dryRun: true,
+        includeResults: true,
+        ...layout.recommendedBatchOptions,
+      },
+      inspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errors'],
+    });
+  }
+
+  return actions;
 }
 
 function logBatchDecision(enabled, event, details) {
@@ -2859,6 +3045,18 @@ export async function organizeFontDirectory(args) {
     layoutKind: layout.layoutKind,
     outputDirInsideInput,
   });
+  const recommendedNextActions = buildOrganizationNextActions({
+    options,
+    inputDirRelative,
+    outputDirRelative,
+    maxFiles,
+    maxFilesHit: scan.truncated,
+    layout,
+    warnings,
+    errorCount: errors.length,
+    selectedFontCount: selectedEntries.length,
+    copiedCount,
+  });
 
   const result = {
     ok: errors.length === 0,
@@ -2900,6 +3098,8 @@ export async function organizeFontDirectory(args) {
     overwriteExisting: options.overwriteExisting,
     layout,
     recommendedBatchOptions: layout.recommendedBatchOptions,
+    recommendedNextActionCount: recommendedNextActions.length,
+    recommendedNextActions,
     organizationWarningCount: warnings.length,
     organizationWarnings: warnings,
     planIncluded: options.includePlan,

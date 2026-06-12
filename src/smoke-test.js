@@ -103,6 +103,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('organizationWarnings')) {
     throw new Error('Expected agent guidance to recommend checking organization warnings.');
   }
+  if (!result.responseFieldsToCheck?.includes('recommendedNextActions')) {
+    throw new Error('Expected agent guidance to recommend checking organization next actions.');
+  }
   const decisionIds = new Set((result.directoryWorkflowDecisionMatrix || []).map((item) => item.id));
   for (const requiredDecision of ['known-good-batch-layout', 'unknown-or-mixed-directory-layout', 'large-or-noisy-directory-first-pass', 'user-wants-clean-staging-directory']) {
     if (!decisionIds.has(requiredDecision)) {
@@ -136,6 +139,10 @@ if (scenario === 'single') {
     if (!checklistIds.has(requiredId)) {
       throw new Error(`Expected agent guidance verification checklist to include ${requiredId}.`);
     }
+  }
+  const layoutChecklist = (result.verificationChecklist || []).find((item) => item.id === 'layout-plan-reviewed');
+  if (!layoutChecklist?.responseFields?.includes('recommendedNextActions')) {
+    throw new Error('Expected layout verification checklist to include recommendedNextActions.');
   }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'runtime-status') {
@@ -270,6 +277,12 @@ if (scenario === 'single') {
   if (!result.organizationWarnings?.some((warning) => warning.code === 'invalid-fonts-skipped')) {
     throw new Error('Expected organization warning about skipped invalid fonts.');
   }
+  const dryRunNextActionIds = new Set((result.recommendedNextActions || []).map((action) => action.id));
+  for (const expectedAction of ['review-plan-before-writing', 'decide-on-invalid-fonts']) {
+    if (!dryRunNextActionIds.has(expectedAction)) {
+      throw new Error(`Expected organization dry-run next actions to include ${expectedAction}.`);
+    }
+  }
   if (await fsExists(outputDir)) {
     throw new Error('Expected organization dry-run not to create outputDir.');
   }
@@ -303,6 +316,12 @@ if (scenario === 'single') {
   }
   if (!copied.organizationWarnings?.some((warning) => warning.code === 'organization-writes-output')) {
     throw new Error('Expected organization copy warning.');
+  }
+  const copyNextActionIds = new Set((copied.recommendedNextActions || []).map((action) => action.id));
+  for (const expectedAction of ['inspect-organized-output', 'preview-batch-split-organized-output']) {
+    if (!copyNextActionIds.has(expectedAction)) {
+      throw new Error(`Expected organization copy next actions to include ${expectedAction}.`);
+    }
   }
   if (await fs.readFile(sourcePath, 'utf8') !== 'not a real font') {
     throw new Error('Expected source file content to be preserved after organization copy.');
@@ -367,6 +386,10 @@ if (scenario === 'single') {
   }
   if (!result.organizationWarnings?.some((warning) => warning.code === 'font-parsing-skipped')) {
     throw new Error('Expected structure-only organization warning about skipped font parsing.');
+  }
+  const structureNextActionIds = new Set((result.recommendedNextActions || []).map((action) => action.id));
+  if (!structureNextActionIds.has('rerun-with-font-parsing')) {
+    throw new Error('Expected structure-only organization next actions to recommend rerunning with font parsing.');
   }
   if (result.plan?.[0]?.status !== 'not-parsed' || result.plan?.[0]?.groupName !== 'not-a-font') {
     throw new Error('Expected structure-only organization plan to use path-based fallback details.');

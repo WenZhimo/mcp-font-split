@@ -300,8 +300,11 @@ fonts/
 - `effectiveBatchDedupeMode`、`dedupeLimitedByParsing`：说明 identity 去重是否真正可用
 - `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`
 - `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 建议配置
+- `recommendedNextActionCount`、`recommendedNextActions[]`：面向 agent 的机器可读后续动作，每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields`
 - `organizationWarningCount`、`organizationWarnings[]`，每项包含机器可读的 `code` 和 `message`
 - 可选 `plan[]` 条目，包含 `source`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`
+
+应把 `recommendedNextActions[]` 当作检查清单，而不是自动执行结果。Agent 仍然要检查每项里的 `inspectFields`，尤其是当某个动作建议写文件或用不同解析参数重跑时。
 
 `inspect_split_output` 保留基础文件统计，并增加结构化输出清单：
 
