@@ -406,6 +406,14 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 6. 根据 `batchNamingMode` 计算整理后的目标文件名。
 7. 返回 `layout`、`recommendedBatchOptions`、`organizationWarnings[]` 和可选 `plan[]`。
 
+`parseFonts` 控制是否读取字体元数据：
+
+- 默认 `parseFonts: true`，会读取 identity、glyph count，并能检测坏字体。
+- `parseFonts: false` 是结构优先模式，只根据路径和扩展名生成计划，不读取字体内容。
+- 在结构优先模式下，`validFontCount` 和 `invalidFontCount` 返回 `null`，表示“未检查”，不是 0。
+- 在结构优先模式下，请求 `batchDedupeMode: "font-identity"` 会回退为 `effectiveBatchDedupeMode: "same-path"`，并返回 `dedupeLimitedByParsing: true`。
+- 在结构优先模式下，`batchGroupBy: "font-family"` 无法读取真实 metadata，会使用文件 basename 作为 fallback。
+
 真正执行时：
 
 - 只有显式设置 `dryRun: false` 才会写入文件。
@@ -421,6 +429,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 需要特别注意：
 
 - `dryRun` 默认值与 `split_font_batch` 不同。`organize_font_directory` 默认 `true`，`split_font_batch` 默认 `false`。
+- `parseFonts: false` 会跳过坏字体检测和真实 identity 去重；不要把 `invalidFontCount: null` 解读为没有坏字体。
 - 非字体文件会被忽略。
 - 扩展名像字体但解析失败的文件默认跳过；只有 `copyInvalidFonts: true` 时才会纳入复制计划。
 - 如果 `outputDir` 位于 `inputDir` 里面，响应会给出 `output-inside-input` 警告；后续扫描应排除该目录，避免把整理后的副本再次当作源字体。
@@ -598,6 +607,10 @@ split-meta.json
 | `writesSourceTree` | 恒为 `false` |
 | `writesOutputTree` | `dryRun: false` 时为 `true` |
 | `mayOverwriteOutputTree` | 当前非 dry-run 调用是否可能覆盖目标目录文件 |
+| `parsedFontMetadata` | 是否读取了字体元数据 |
+| `unparsedFontCount` | 被有意跳过元数据解析的受支持扩展名文件数 |
+| `effectiveBatchDedupeMode` | 实际执行的整理去重策略 |
+| `dedupeLimitedByParsing` | 是否因跳过解析而无法执行真实 identity 去重 |
 | `layout.layoutKind` | `empty` / `flat` / `nested` / `mixed` |
 | `recommendedBatchOptions` | 根据目录结构建议的后续批量参数 |
 | `organizationWarnings[]` | 摘要级风险和状态提示 |
@@ -614,6 +627,7 @@ split-meta.json
 - `duplicate-fonts-skipped`：等价字体被去重。
 - `mixed-layout-detected`：根目录和子目录中都发现了字体。
 - `output-inside-input`：整理输出目录位于输入目录内，后续扫描需要排除它。
+- `font-parsing-skipped`：`parseFonts: false`，本次只做结构优先计划，没有读取字体元数据。
 
 ### 9.4 `inspect_split_output`
 

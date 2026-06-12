@@ -232,6 +232,8 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `writesSourceTree`: always `false`
 - `writesOutputTree`: true only when `dryRun: false`
 - `mayOverwriteOutputTree`: true only when `dryRun: false` and `overwriteExisting: true`
+- `parsedFontMetadata`: false when `parseFonts: false`; then `validFontCount` / `invalidFontCount` are `null`
+- `effectiveBatchDedupeMode`, `dedupeLimitedByParsing`: explain whether identity dedupe was available
 - `layout.layoutKind`: `empty`, `flat`, `nested`, or `mixed`
 - `recommendedBatchOptions`: a suggested follow-up `split_font_batch` configuration for the detected layout
 - `organizationWarningCount`, `organizationWarnings[]` with machine-readable `code` and `message`
@@ -344,6 +346,18 @@ Preview a non-destructive directory organization plan:
 }
 ```
 
+Preview a fast structure-only organization plan without reading font metadata:
+
+```json
+{
+  "inputDir": ".",
+  "outputDir": "organized-fonts",
+  "dryRun": true,
+  "parseFonts": false,
+  "includePlan": true
+}
+```
+
 Apply the reviewed copy-only organization plan:
 
 ```json
@@ -442,6 +456,7 @@ npm run smoke:font-inputs
 npm run smoke:scan-limits
 npm run smoke:organize
 npm run smoke:organize-copy
+npm run smoke:organize-structure
 npm run smoke:batch-run
 npm run smoke:inspect-compact
 npm run smoke:mcp-error

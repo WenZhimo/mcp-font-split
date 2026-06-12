@@ -160,6 +160,7 @@ server.registerTool(
       maxFiles: z.number().int().positive().max(50000).optional().describe('Maximum source files to scan. Defaults to 50000.'),
       dryRun: z.boolean().optional().describe('Plan only without writing directories or files. Default: true. Set false only after reviewing plan[] and organizationWarnings[].'),
       includePlan: z.boolean().optional().describe('Include per-font plan[] entries. Default: true. Set false for compact summaries.'),
+      parseFonts: z.boolean().optional().describe('Read font metadata for identity dedupe, glyph counts, invalid-font detection, and font-family grouping. Default: true. Set false for a faster structure-only plan when metadata parsing is expensive or noisy.'),
       batchGroupBy: z.enum(['auto', 'source-dir', 'font-family']).optional().describe('How organized copy folders are grouped. Default: auto. Uses the same meanings as split_font_batch.'),
       batchNamingMode: z.enum(['plain', 'numeric-suffix', 'source-suffix']).optional().describe('How copied font filenames avoid collisions. Default: numeric-suffix.'),
       batchDedupeMode: z.enum(['none', 'same-path', 'font-identity']).optional().describe('How equivalent fonts are deduped before copy planning. Default: font-identity.'),

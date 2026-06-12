@@ -312,6 +312,41 @@ if (scenario === 'single') {
   }
 
   console.log(JSON.stringify({ copied, overwritten }, null, 2));
+} else if (scenario === 'organize-structure-only') {
+  const inputDir = process.argv[3] || '.font-split-organize-structure-input';
+  const outputDir = process.argv[4] || '.font-split-organize-structure-output';
+  console.log('Directory organization structure-only smoke:', inputDir, '->', outputDir);
+  await fs.rm(inputDir, { recursive: true, force: true });
+  await fs.rm(outputDir, { recursive: true, force: true });
+  await fs.mkdir(path.join(inputDir, 'FamilyA'), { recursive: true });
+  await fs.writeFile(path.join(inputDir, 'FamilyA', 'not-a-font.ttf'), 'not a real font');
+
+  const result = await organizeFontDirectory({
+    inputDir,
+    outputDir,
+    dryRun: true,
+    includePlan: true,
+    parseFonts: false,
+    batchGroupBy: 'font-family',
+    batchDedupeMode: 'font-identity',
+    maxFiles: 10,
+  });
+  if (result.parsedFontMetadata !== false || result.unparsedFontCount !== 1 || result.validFontCount !== null || result.invalidFontCount !== null) {
+    throw new Error('Expected structure-only organization to mark font metadata as unparsed.');
+  }
+  if (result.effectiveBatchDedupeMode !== 'same-path' || result.dedupeLimitedByParsing !== true) {
+    throw new Error('Expected structure-only organization to downgrade identity dedupe.');
+  }
+  if (!result.organizationWarnings?.some((warning) => warning.code === 'font-parsing-skipped')) {
+    throw new Error('Expected structure-only organization warning about skipped font parsing.');
+  }
+  if (result.plan?.[0]?.status !== 'not-parsed' || result.plan?.[0]?.groupName !== 'not-a-font') {
+    throw new Error('Expected structure-only organization plan to use path-based fallback details.');
+  }
+  if (await fsExists(outputDir)) {
+    throw new Error('Expected structure-only dry-run not to create outputDir.');
+  }
+  console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'batch-run-cli') {
   const inputDir = process.argv[3] || '.font-split-batch-run-cli';
   const outputRoot = process.argv[4] || '.font-split-batch-run-cli-output';

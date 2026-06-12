@@ -167,6 +167,7 @@ Plan or copy-organize a source font directory into a cleaner staging layout.
 | `maxFiles` | positive integer, MCP max `50000` | `50000` | Maximum source files to scan. |
 | `dryRun` | boolean | `true` | Plan only without writing files. Set `false` only after reviewing `plan[]` and `organizationWarnings[]`. |
 | `includePlan` | boolean | `true` | Include per-font `plan[]` entries. Set `false` for compact summaries. |
+| `parseFonts` | boolean | `true` | Read font metadata for identity dedupe, glyph counts, invalid-font detection, and font-family grouping. Set `false` for a faster structure-only plan. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | Folder grouping strategy for organized copies, using the same meanings as `split_font_batch`. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Copied filename collision strategy. |
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Equivalent-font dedupe strategy before copy planning. |
@@ -183,6 +184,10 @@ Important result fields:
 | `writesSourceTree` | Always `false`; source files are preserved. |
 | `writesOutputTree` | `true` only when `dryRun` is false. |
 | `mayOverwriteOutputTree` | `true` only when the current non-dry-run call may replace files in `outputDir`. |
+| `parsedFontMetadata` | `false` when `parseFonts: false`; in that mode `validFontCount` and `invalidFontCount` are `null`, not zero. |
+| `unparsedFontCount` | Number of supported-extension files intentionally not parsed because `parseFonts` was false. |
+| `effectiveBatchDedupeMode` | Actual dedupe mode used. When `parseFonts: false` and `batchDedupeMode: "font-identity"`, this falls back to `same-path`. |
+| `dedupeLimitedByParsing` | `true` when requested identity dedupe could not run because font parsing was skipped. |
 | `layout.layoutKind` | `empty`, `flat`, `nested`, or `mixed`. Mixed means fonts exist both at the input root and below subdirectories. |
 | `recommendedBatchOptions` | Suggested `split_font_batch` options for the detected layout. Nested or mixed inputs usually recommend `batchGroupBy: "source-dir"`; flat inputs usually recommend `font-family`. |
 | `organizationWarningCount` / `organizationWarnings[]` | Machine-readable notices such as `organization-dry-run`, `organization-writes-output`, `output-overwrite-enabled`, `mixed-layout-detected`, `invalid-fonts-skipped`, and `output-inside-input`. |
@@ -193,6 +198,7 @@ Non-intuitive behavior to watch:
 
 - `dryRun` defaults to `true`, unlike `split_font_batch`, where `dryRun` defaults to `false`.
 - The tool copies fonts into a staging directory; it does not split fonts and does not generate CSS.
+- `parseFonts: false` is structure-only. It avoids metadata parsing, but cannot detect invalid fonts, cannot provide glyph counts, and cannot do true identity dedupe or metadata-driven family grouping.
 - Non-font files are ignored. Invalid font-like files are skipped unless `copyInvalidFonts: true`.
 - If `outputDir` is inside `inputDir`, the response includes `output-inside-input`; future scans should exclude that output directory to avoid processing organized copies as new source fonts.
 

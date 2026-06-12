@@ -230,6 +230,8 @@ organized-fonts/
 - `writesSourceTree`：恒为 `false`
 - `writesOutputTree`：只有 `dryRun: false` 时为 true
 - `mayOverwriteOutputTree`：只有 `dryRun: false` 且 `overwriteExisting: true` 时为 true
+- `parsedFontMetadata`：`parseFonts: false` 时为 false；此时 `validFontCount` / `invalidFontCount` 是 `null`
+- `effectiveBatchDedupeMode`、`dedupeLimitedByParsing`：说明 identity 去重是否真正可用
 - `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`
 - `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 建议配置
 - `organizationWarningCount`、`organizationWarnings[]`，每项包含机器可读的 `code` 和 `message`
@@ -342,6 +344,18 @@ organized-fonts/
 }
 ```
 
+预览一次不读取字体元数据的结构优先整理计划：
+
+```json
+{
+  "inputDir": ".",
+  "outputDir": "organized-fonts",
+  "dryRun": true,
+  "parseFonts": false,
+  "includePlan": true
+}
+```
+
 执行已经审阅过的 copy-only 整理计划：
 
 ```json
@@ -440,6 +454,7 @@ npm run smoke:font-inputs
 npm run smoke:scan-limits
 npm run smoke:organize
 npm run smoke:organize-copy
+npm run smoke:organize-structure
 npm run smoke:batch-run
 npm run smoke:inspect-compact
 npm run smoke:mcp-error

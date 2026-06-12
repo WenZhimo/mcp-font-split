@@ -410,6 +410,7 @@ export function getAgentGuidance(args = {}) {
     organize: [
       'Call organize_font_directory with dryRun true first; review layout, recommendedBatchOptions, organizationWarnings, and plan before writing copies.',
       'If the plan is acceptable, call organize_font_directory again with dryRun false to copy selected fonts into outputDir. This never moves or deletes source files.',
+      'Use parseFonts false only when the user needs a fast structure-first plan; inspect parsedFontMetadata and dedupeLimitedByParsing before relying on identity dedupe or font-family grouping.',
       'After organizing, run inspect_font_inputs on outputDir or split_font_batch with inputDir set to outputDir.',
       'If organizationWarnings contains output-overwrite-enabled or output-inside-input, disclose the risk before proceeding.',
     ],
@@ -464,6 +465,7 @@ export function getAgentGuidance(args = {}) {
     recommendedOrganizationOptions: {
       dryRun: true,
       includePlan: true,
+      parseFonts: true,
       batchGroupBy: 'auto',
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'font-identity',
@@ -500,6 +502,10 @@ export function getAgentGuidance(args = {}) {
       'writesSourceTree',
       'writesOutputTree',
       'mayOverwriteOutputTree',
+      'parsedFontMetadata',
+      'unparsedFontCount',
+      'effectiveBatchDedupeMode',
+      'dedupeLimitedByParsing',
       'recommendedBatchOptions',
       'resultsIncluded',
       'planIncluded',
@@ -621,6 +627,7 @@ function normalizeOrganizationOptions(args) {
   return {
     dryRun: args.dryRun !== false,
     includePlan: args.includePlan !== false,
+    parseFonts: args.parseFonts !== false,
     batchGroupBy: ['auto', 'source-dir', 'font-family'].includes(args.batchGroupBy) ? args.batchGroupBy : 'auto',
     batchNamingMode: ['plain', 'numeric-suffix', 'source-suffix'].includes(args.batchNamingMode) ? args.batchNamingMode : 'numeric-suffix',
     batchDedupeMode: ['none', 'same-path', 'font-identity'].includes(args.batchDedupeMode) ? args.batchDedupeMode : 'font-identity',
@@ -787,6 +794,7 @@ function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, in
 
 function buildOrganizationWarnings({
   dryRun,
+  parseFonts,
   overwriteExisting,
   inputScanTruncated,
   maxFiles,
@@ -804,6 +812,9 @@ function buildOrganizationWarnings({
     push('organization-dry-run', 'dryRun is true; no directories or files were written.');
   } else {
     push('organization-writes-output', 'dryRun is false; this tool may create directories and copy files into outputDir, but it never moves or deletes source files.');
+  }
+  if (!parseFonts) {
+    push('font-parsing-skipped', 'parseFonts is false; the organizer did not read font metadata, so identity dedupe, glyph counts, invalid-font detection, and font-family grouping are limited.');
   }
   if (overwriteExisting) {
     push('output-overwrite-enabled', 'overwriteExisting is true; matching files in outputDir may be replaced, but source files are still not modified.');
@@ -1530,6 +1541,12 @@ function dedupeOrganizationEntries(entries, dedupeMode) {
 }
 
 async function resolveOrganizationGroupName({ entry, inputDir, groupingMode }) {
+  if (entry.metadataParsed === false) {
+    const relativeToInput = path.relative(inputDir, entry.file);
+    const segments = relativeToInput.split(path.sep).filter(Boolean);
+    if (groupingMode === 'font-family') return path.basename(entry.file, path.extname(entry.file));
+    return segments.length > 1 ? segments[0] : path.basename(entry.file, path.extname(entry.file));
+  }
   if (entry.status === 'invalid') {
     const relativeToInput = path.relative(inputDir, entry.file);
     const segments = relativeToInput.split(path.sep).filter(Boolean);
@@ -2495,15 +2512,34 @@ export async function organizeFontDirectory(args) {
   const entries = [];
 
   for (const file of fontFiles) {
-    entries.push({
-      ...(await inspectInputFontFile(file)),
-      file,
-    });
+    if (options.parseFonts) {
+      entries.push({
+        ...(await inspectInputFontFile(file)),
+        file,
+        metadataParsed: true,
+      });
+    } else {
+      const stat = await fs.stat(file);
+      entries.push({
+        path: toRelativeWorkspacePath(file),
+        extension: path.extname(file).toLowerCase(),
+        sizeBytes: stat.size,
+        status: 'not-parsed',
+        container: null,
+        glyphCount: null,
+        identity: null,
+        identityBasis: null,
+        identityKey: null,
+        metadataParsed: false,
+        file,
+      });
+    }
   }
 
   const validEntries = entries.filter((entry) => entry.status !== 'invalid');
   const invalidEntries = entries.filter((entry) => entry.status === 'invalid');
-  const dedupe = dedupeOrganizationEntries(validEntries, options.batchDedupeMode);
+  const effectiveDedupeMode = options.parseFonts ? options.batchDedupeMode : options.batchDedupeMode === 'none' ? 'none' : 'same-path';
+  const dedupe = dedupeOrganizationEntries(validEntries, effectiveDedupeMode);
   const selectedEntries = [
     ...dedupe.selected,
     ...(options.copyInvalidFonts ? invalidEntries : []),
@@ -2517,12 +2553,12 @@ export async function organizeFontDirectory(args) {
 
   for (const duplicate of dedupe.duplicates) {
     plan.push({
-      source: duplicate.path,
-      action: 'skipped-duplicate',
-      reason: 'deduped by selected batchDedupeMode',
-      duplicateOf: duplicate.duplicateOf,
-      identityKey: duplicate.identityKey,
-    });
+    source: duplicate.path,
+    action: 'skipped-duplicate',
+    reason: 'deduped by effective batchDedupeMode',
+    duplicateOf: duplicate.duplicateOf,
+    identityKey: duplicate.identityKey,
+  });
   }
 
   if (!options.copyInvalidFonts) {
@@ -2601,6 +2637,7 @@ export async function organizeFontDirectory(args) {
     overwriteExisting: options.overwriteExisting,
     inputScanTruncated: scan.truncated,
     maxFiles,
+    parseFonts: options.parseFonts,
     unsupportedFileCount: layout.unsupportedFileCount,
     invalidFontCount: invalidEntries.length,
     copyInvalidFonts: options.copyInvalidFonts,
@@ -2618,8 +2655,10 @@ export async function organizeFontDirectory(args) {
     maxFilesHit: scan.truncated,
     scannedFileCount: allFiles.length,
     supportedFontCount: fontFiles.length,
-    validFontCount: validEntries.length,
-    invalidFontCount: invalidEntries.length,
+    parsedFontMetadata: options.parseFonts,
+    unparsedFontCount: options.parseFonts ? 0 : entries.length,
+    validFontCount: options.parseFonts ? validEntries.length : null,
+    invalidFontCount: options.parseFonts ? invalidEntries.length : null,
     unsupportedFileCount: layout.unsupportedFileCount,
     deduplicatedCount: dedupe.selected.length,
     skippedDuplicates: dedupe.duplicates.length,
@@ -2636,6 +2675,10 @@ export async function organizeFontDirectory(args) {
     mayOverwriteOutputTree,
     sourceFilesPreserved: true,
     operationMode: options.dryRun ? 'plan-only' : 'copy-only',
+    parseFonts: options.parseFonts,
+    requestedBatchDedupeMode: options.batchDedupeMode,
+    effectiveBatchDedupeMode: effectiveDedupeMode,
+    dedupeLimitedByParsing: !options.parseFonts && options.batchDedupeMode === 'font-identity',
     batchGroupBy: options.batchGroupBy,
     batchNamingMode: options.batchNamingMode,
     batchDedupeMode: options.batchDedupeMode,

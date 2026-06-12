@@ -167,6 +167,7 @@
 | `maxFiles` | 正整数，MCP 最大 `50000` | `50000` | 最多扫描多少个源文件。 |
 | `dryRun` | boolean | `true` | 只生成计划，不写文件；只有检查过 `plan[]` 和 `organizationWarnings[]` 后才建议设为 `false`。 |
 | `includePlan` | boolean | `true` | 是否返回逐字体 `plan[]`；大目录只看摘要时可设为 `false`。 |
+| `parseFonts` | boolean | `true` | 是否读取字体元数据，用于 identity 去重、glyph count、坏字体检测和 font-family 分组。设为 `false` 时只做更快的结构优先计划。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 整理副本的目录分组策略，含义与 `split_font_batch` 相同。 |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 复制字体文件名的冲突处理策略。 |
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 复制计划前如何对等价字体去重。 |
@@ -183,6 +184,10 @@
 | `writesSourceTree` | 恒为 `false`；源文件会被保留。 |
 | `writesOutputTree` | 只有 `dryRun: false` 时才为 `true`。 |
 | `mayOverwriteOutputTree` | 只有当前非 dry-run 调用可能替换 `outputDir` 中的文件时才为 `true`。 |
+| `parsedFontMetadata` | `parseFonts: false` 时为 `false`；此时 `validFontCount` 和 `invalidFontCount` 是 `null`，不是 0。 |
+| `unparsedFontCount` | 因 `parseFonts: false` 而被有意跳过元数据解析的受支持扩展名文件数。 |
+| `effectiveBatchDedupeMode` | 实际使用的去重策略。当 `parseFonts: false` 且请求 `batchDedupeMode: "font-identity"` 时，会回退到 `same-path`。 |
+| `dedupeLimitedByParsing` | 请求 identity 去重但因为跳过字体解析而无法执行时为 `true`。 |
 | `layout.layoutKind` | `empty`、`flat`、`nested` 或 `mixed`。`mixed` 表示输入根目录和子目录里都发现了字体。 |
 | `recommendedBatchOptions` | 根据目录形态建议的 `split_font_batch` 参数；嵌套或混合目录通常建议 `batchGroupBy: "source-dir"`，扁平目录通常建议 `font-family`。 |
 | `organizationWarningCount` / `organizationWarnings[]` | 摘要级提示，例如 `organization-dry-run`、`organization-writes-output`、`output-overwrite-enabled`、`mixed-layout-detected`、`invalid-fonts-skipped`、`output-inside-input`。 |
@@ -193,6 +198,7 @@
 
 - `dryRun` 默认是 `true`，这与 `split_font_batch` 的默认 `dryRun: false` 不同。
 - 该工具只整理/复制字体，不会拆分字体，也不会生成 CSS。
+- `parseFonts: false` 是结构优先模式：它会跳过字体元数据解析，因此不能检测坏字体、不能提供 glyph count，也不能做真正的 identity 去重或完全基于 metadata 的 family 分组。
 - 非字体文件会被忽略；扩展名像字体但解析失败的文件默认跳过，除非 `copyInvalidFonts: true`。
 - 如果 `outputDir` 位于 `inputDir` 内，响应会包含 `output-inside-input`；后续扫描应排除该输出目录，避免把整理后的副本再次当作源字体处理。
 
