@@ -145,6 +145,13 @@ function assertRecommendedNextActionInspectFields(actions, responsesByTool, cont
   }
 }
 
+function assertTemplateOmitsArgs(template, omittedArgs, context) {
+  const leaked = omittedArgs.filter((key) => Object.hasOwn(template?.args || {}, key));
+  if (leaked.length > 0) {
+    throw new Error(`${context}: expected template args to omit preset-provided defaults: ${leaked.join(', ')}`);
+  }
+}
+
 if (scenario === 'single') {
   console.log('Splitting:', fontPath, '->', outDir);
   const result = await splitFont({
@@ -375,38 +382,56 @@ if (scenario === 'single') {
     || mismatchTemplate?.writesFiles !== false
     || mismatchTemplate?.sourceDestructive !== false
     || mismatchTemplate?.args?.workflowPreset !== 'safe-preview'
-    || mismatchTemplate?.args?.dryRun !== true
     || !mismatchTemplate.inspectFields?.includes('sourceDestructive')
     || !mismatchTemplate.inspectFields?.includes('unsupportedFileSummary')
   ) {
-    throw new Error('Expected directory mismatch template to be a source-safe dry-run organization plan.');
+    throw new Error('Expected directory mismatch template to rely on the safe-preview organization preset.');
   }
+  assertTemplateOmitsArgs(mismatchTemplate, ['dryRun', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'], 'directory-mismatch-plan');
   const copyTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'copy-organized-staging');
   if (
     copyTemplate?.tool !== 'organize_font_directory'
     || copyTemplate?.writesFiles !== true
     || copyTemplate?.sourceDestructive !== false
     || copyTemplate?.args?.workflowPreset !== 'reviewed-write'
-    || copyTemplate?.args?.dryRun !== false
-    || copyTemplate?.args?.overwriteExisting !== false
+    || copyTemplate?.args?.outputDir !== 'organized-fonts'
     || !copyTemplate.inspectFields?.includes('writesSourceTree')
     || !copyTemplate.inspectFields?.includes('unsupportedFileSummary')
   ) {
     throw new Error('Expected copy staging template to disclose copy-only source safety.');
   }
+  assertTemplateOmitsArgs(copyTemplate, ['dryRun', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'], 'copy-organized-staging');
   const batchPreviewTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'batch-dry-run-preview');
   if (
     batchPreviewTemplate?.tool !== 'split_font_batch'
     || batchPreviewTemplate?.writesFiles !== false
     || batchPreviewTemplate?.args?.workflowPreset !== 'safe-preview'
-    || batchPreviewTemplate?.args?.dryRun !== true
-    || batchPreviewTemplate?.args?.includeResults !== true
+    || batchPreviewTemplate?.args?.limit !== 50000
+    || batchPreviewTemplate?.args?.maxFiles !== 50000
     || !batchPreviewTemplate.inspectFields?.includes('safetySummary')
     || !batchPreviewTemplate.inspectFields?.includes('sourceDestructive')
     || !batchPreviewTemplate.inspectFields?.includes('writesOutputTree')
     || !batchPreviewTemplate.inspectFields?.includes('outputTreeInsideInputTree')
   ) {
-    throw new Error('Expected batch preview template to be a no-write dry run with included results.');
+    throw new Error('Expected batch preview template to rely on the safe-preview batch preset.');
+  }
+  assertTemplateOmitsArgs(batchPreviewTemplate, ['dryRun', 'includeResults', 'skipMode', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'], 'batch-dry-run-preview');
+  const batchProcessTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'batch-process-reviewed-plan');
+  if (
+    batchProcessTemplate?.tool !== 'split_font_batch'
+    || batchProcessTemplate?.writesFiles !== true
+    || batchProcessTemplate?.sourceDestructive !== false
+    || batchProcessTemplate?.args?.workflowPreset !== 'reviewed-write'
+    || batchProcessTemplate?.args?.limit !== 50000
+    || batchProcessTemplate?.args?.maxFiles !== 50000
+    || !batchProcessTemplate.nextStep?.includes('inspect_split_output')
+  ) {
+    throw new Error('Expected reviewed batch processing template to rely on the reviewed-write preset and require output inspection.');
+  }
+  assertTemplateOmitsArgs(batchProcessTemplate, ['dryRun', 'includeResults', 'skipMode', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'], 'batch-process-reviewed-plan');
+  const outputAuditTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'output-audit-compact');
+  if (!outputAuditTemplate?.inspectFields?.includes('structureSummary')) {
+    throw new Error('Expected output audit template to require structureSummary inspection.');
   }
   for (const fieldName of result.responseFieldsToCheck || []) {
     const entry = result.toolResponseFieldCatalog?.[fieldName];
