@@ -227,11 +227,23 @@ if (scenario === 'single') {
     }
   }
   const structureDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'large-or-noisy-directory-first-pass');
-  if (structureDecision?.recommendedOptions?.parseFonts !== false || !structureDecision.mustInspectFields?.includes('dedupeLimitedByParsing')) {
+  if (
+    structureDecision?.recommendedOptions?.parseFonts !== false
+    || !structureDecision.mustInspectFields?.includes('dedupeLimitedByParsing')
+    || !structureDecision.mustInspectFields?.includes('planActionSummary')
+  ) {
     throw new Error('Expected structure-first guidance to recommend parseFonts:false and dedupe checks.');
   }
+  const mixedDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'unknown-or-mixed-directory-layout');
+  if (!mixedDecision?.mustInspectFields?.includes('planActionSummary')) {
+    throw new Error('Expected mixed-layout guidance to require planActionSummary inspection.');
+  }
   const stagingDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'user-wants-clean-staging-directory');
-  if (stagingDecision?.sourceDestructive !== false || stagingDecision?.followUpOptions?.dryRun !== false) {
+  if (
+    stagingDecision?.sourceDestructive !== false
+    || stagingDecision?.followUpOptions?.dryRun !== false
+    || !stagingDecision.mustInspectFields?.includes('planActionSummary')
+  ) {
     throw new Error('Expected staging guidance to disclose source safety and copy-only follow-up.');
   }
   const exampleIds = new Set((result.directoryWorkflowExamples || []).map((item) => item.id));
@@ -241,11 +253,19 @@ if (scenario === 'single') {
     }
   }
   const noisyExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'large-noisy-first-pass');
-  if (noisyExample?.firstCall?.parseFonts !== false || !noisyExample.mustInspectFields?.includes('dedupeLimitedByParsing')) {
+  if (
+    noisyExample?.firstCall?.parseFonts !== false
+    || !noisyExample.mustInspectFields?.includes('dedupeLimitedByParsing')
+    || !noisyExample.mustInspectFields?.includes('planActionSummary')
+  ) {
     throw new Error('Expected noisy-directory example to use parseFonts:false and require dedupe limitation checks.');
   }
   const mixedExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'mixed-root-and-nested-fonts');
-  if (mixedExample?.safety?.sourceDestructive !== false || !mixedExample.mustInspectFields?.includes('writesSourceTree')) {
+  if (
+    mixedExample?.safety?.sourceDestructive !== false
+    || !mixedExample.mustInspectFields?.includes('writesSourceTree')
+    || !mixedExample.mustInspectFields?.includes('planActionSummary')
+  ) {
     throw new Error('Expected mixed-layout example to disclose source safety fields.');
   }
   const checklistIds = new Set((result.verificationChecklist || []).map((item) => item.id));
@@ -401,6 +421,12 @@ if (scenario === 'single') {
   for (const expectedAction of ['review-plan-before-writing', 'decide-on-invalid-fonts']) {
     if (!dryRunNextActionIds.has(expectedAction)) {
       throw new Error(`Expected organization dry-run next actions to include ${expectedAction}.`);
+    }
+  }
+  for (const expectedAction of ['review-plan-before-writing', 'decide-on-invalid-fonts']) {
+    const action = (result.recommendedNextActions || []).find((item) => item.id === expectedAction);
+    if (!action?.inspectFields?.includes('planActionSummary')) {
+      throw new Error(`Expected ${expectedAction} to require planActionSummary inspection.`);
     }
   }
   if (await fsExists(outputDir)) {

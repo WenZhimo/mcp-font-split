@@ -469,7 +469,7 @@ export function getAgentGuidance(args = {}) {
         dryRun: true,
         strictMode: true,
       },
-      mustInspectFields: ['layout', 'recommendedBatchOptions', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'plan'],
+      mustInspectFields: ['layout', 'recommendedBatchOptions', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
       nonIntuitiveBehavior: 'organize_font_directory defaults to dryRun:true and never moves or deletes source files; dryRun:false copies into outputDir only.',
     },
     {
@@ -483,7 +483,7 @@ export function getAgentGuidance(args = {}) {
         includePlan: false,
         parseFonts: false,
       },
-      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings', 'layout', 'recommendedBatchOptions'],
+      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings', 'planActionSummary', 'layout', 'recommendedBatchOptions'],
       nonIntuitiveBehavior: 'parseFonts:false means validFontCount and invalidFontCount are null, not zero; identity dedupe and metadata family grouping are limited.',
     },
     {
@@ -503,7 +503,7 @@ export function getAgentGuidance(args = {}) {
         dryRun: false,
         overwriteExisting: false,
       },
-      mustInspectFields: ['operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings'],
+      mustInspectFields: ['operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
       nonIntuitiveBehavior: 'A real organize run is copy-only. overwriteExisting:true can replace files in outputDir but still does not modify source files.',
     },
   ];
@@ -534,7 +534,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['layout.layoutKind', 'recommendedBatchOptions', 'organizationWarnings', 'plan'],
+      mustInspectFields: ['layout.layoutKind', 'recommendedBatchOptions', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'archive-per-family-folders',
@@ -595,7 +595,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['layout.layoutKind', 'organizationWarnings', 'recommendedBatchOptions', 'sourceDestructive', 'writesSourceTree'],
+      mustInspectFields: ['layout.layoutKind', 'organizationWarnings', 'recommendedBatchOptions', 'sourceDestructive', 'writesSourceTree', 'planActionSummary'],
     },
     {
       id: 'large-noisy-first-pass',
@@ -622,7 +622,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only-when-dryRun-false',
       },
-      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings'],
+      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings', 'planActionSummary'],
     },
   ];
 
@@ -1087,7 +1087,7 @@ function buildOrganizationNextActions({
         includePlan: options.includePlan,
         maxFiles: '<higher-than-current>',
       },
-      inspectFields: ['maxFilesHit', 'layout', 'organizationWarnings', 'plan'],
+      inspectFields: ['maxFilesHit', 'layout', 'organizationWarnings', 'planActionSummary', 'plan'],
     });
   }
 
@@ -1107,7 +1107,7 @@ function buildOrganizationNextActions({
         batchNamingMode: options.batchNamingMode,
         batchDedupeMode: options.batchDedupeMode,
       },
-      inspectFields: ['parsedFontMetadata', 'validFontCount', 'invalidFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings'],
+      inspectFields: ['parsedFontMetadata', 'validFontCount', 'invalidFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings', 'planActionSummary'],
     });
   }
 
@@ -1123,7 +1123,7 @@ function buildOrganizationNextActions({
         dryRun: true,
         copyInvalidFonts: true,
       },
-      inspectFields: ['invalidFontCount', 'organizationWarnings', 'plan'],
+      inspectFields: ['invalidFontCount', 'organizationWarnings', 'planActionSummary', 'plan'],
       note: 'Use copyInvalidFonts:true only when preserving broken font-like files is intentional.',
     });
   }
@@ -1167,7 +1167,7 @@ function buildOrganizationNextActions({
       priority: 'high',
       tool: 'organize_font_directory',
       reason: 'The organization run reported per-file errors.',
-      inspectFields: ['errorCount', 'errors', 'plan'],
+      inspectFields: ['errorCount', 'errors', 'planActionSummary', 'plan'],
     });
   }
 
@@ -1177,7 +1177,7 @@ function buildOrganizationNextActions({
       priority: 'high',
       tool: 'organize_font_directory',
       reason: 'dryRun:true wrote no files; review the plan and warnings before choosing a write step.',
-      inspectFields: ['plan', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree'],
+      inspectFields: ['planActionSummary', 'plan', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree'],
     });
 
     if (selectedFontCount > 0) {
@@ -1209,7 +1209,7 @@ function buildOrganizationNextActions({
           batchDedupeMode: options.batchDedupeMode,
           overwriteExisting: false,
         },
-        inspectFields: ['operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'mayOverwriteOutputTree', 'organizationWarnings'],
+        inspectFields: ['operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
       });
     }
   } else if (copiedCount > 0) {

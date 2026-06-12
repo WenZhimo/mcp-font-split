@@ -212,7 +212,7 @@
 
 常见 `recommendedNextActions[].id` 包括 `review-plan-before-writing`、`preview-batch-split-original-layout`、`copy-organized-staging-directory`、`inspect-organized-output`、`preview-batch-split-organized-output`、`rerun-with-font-parsing`、`rerun-with-higher-maxFiles`、`decide-on-invalid-fonts`、`review-mixed-layout-grouping` 和 `avoid-reprocessing-organized-copies`。这些是后续行动建议，不是成功证明；agent 仍必须检查每项列出的 `inspectFields`。
 
-`planActionSummary` 是压缩概览，不替代写文件前审查详细 `plan[]`。它主要服务自动化和大响应场景，尤其是使用 `includePlan: false` 时。
+`planActionSummary` 是压缩概览，不替代写文件前审查详细 `plan[]`。它主要服务自动化和大响应场景，尤其是使用 `includePlan: false` 时。当后续动作依赖理解复制/跳过计划形态时，organizer 的 `recommendedNextActions[].inspectFields` 会包含 `planActionSummary`。
 
 ## `inspect_split_output`
 

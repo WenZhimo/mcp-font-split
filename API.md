@@ -212,7 +212,7 @@ Use `parseFonts: true` when you need trustworthy invalid-font counts, glyph coun
 
 Common `recommendedNextActions[].id` values include `review-plan-before-writing`, `preview-batch-split-original-layout`, `copy-organized-staging-directory`, `inspect-organized-output`, `preview-batch-split-organized-output`, `rerun-with-font-parsing`, `rerun-with-higher-maxFiles`, `decide-on-invalid-fonts`, `review-mixed-layout-grouping`, and `avoid-reprocessing-organized-copies`. These are guidance, not proof of success; agents must still inspect the listed `inspectFields`.
 
-`planActionSummary` is a compact overview, not a substitute for reviewing detailed `plan[]` entries before copying files. It is mainly for automation and large responses where `includePlan: false` is used.
+`planActionSummary` is a compact overview, not a substitute for reviewing detailed `plan[]` entries before copying files. It is mainly for automation and large responses where `includePlan: false` is used. Organizer `recommendedNextActions[].inspectFields` includes `planActionSummary` whenever the action depends on understanding the copy/skip plan shape.
 
 ## `inspect_split_output`
 
