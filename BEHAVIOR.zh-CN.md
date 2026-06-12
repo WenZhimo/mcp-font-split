@@ -218,13 +218,13 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 - `single-woff2` 会把失败恢复成 `ok: true`，调用方必须检查 `resultType`、`usedFallback` 和 `warnings`
 
-### 4.5 `strictMode`
+### 4.5 批量安全默认值
 
-`strictMode: true` 是自说明严格开关：
+批量模式默认已经采用适合自动化的安全策略：
 
 - 批量模式默认已经使用 `skipMode: "manifest"`
 - 批量模式默认已经使用 `batchErrorMode: "fail-after"`
-- 显式参数优先级高于 `strictMode`，所以仍可手动覆盖
+- 如果需要旧版跳过或收集错误，必须显式传 `skipMode: "legacy-css"` 或 `batchErrorMode: "collect"`
 - 单文件模式下，当前默认已经偏严格：`splitFailureAction` 默认 `error`，`smallGlyphAction` 默认 `subset`
 
 ### 4.6 `skipMode`（批量专用）
@@ -327,7 +327,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 可选值：
 
 - `default`：不改变工具默认行为。
-- `safe-preview`：第一次查看陌生目录时使用的无写入预览。批量模式会启用 `dryRun: true`、`includeResults: true`、`strictMode: true`、`skipMode: "manifest"`、`batchDedupeMode: "font-identity"` 等安全默认值；目录整理会保持 `dryRun: true`、解析字体并返回完整计划。
+- `safe-preview`：第一次查看陌生目录时使用的无写入预览。批量模式会启用 `dryRun: true`、`includeResults: true`、`skipMode: "manifest"`、`batchErrorMode: "fail-after"`、`batchDedupeMode: "font-identity"` 等安全默认值；目录整理会保持 `dryRun: true`、解析字体并返回完整计划。
 - `reviewed-write`：已经审查过预览后使用的写入配置。批量模式会真实写拆分输出；目录整理只会 copy-only 写入 `outputDir`，仍不会移动或删除源文件。
 - `structure-first`：面向超大或嘈杂目录的快速无写入第一遍扫描。批量模式使用 `batchDedupeMode: "same-path"`，只做路径/stem 级去重；目录整理会使用 `parseFonts: false` 和 `includePlan: false`，此时 identity 去重会受限并回退到结构/路径级判断。
 - `source-layout`：优先按源目录分组，适合“每个压缩包/家族一个目录”的来源结构。

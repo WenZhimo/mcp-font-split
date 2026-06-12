@@ -38,7 +38,6 @@ const WORKFLOW_PRESETS = {
     batch: {
       dryRun: true,
       includeResults: true,
-      strictMode: true,
       skipMode: 'manifest',
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'font-identity',
@@ -63,7 +62,6 @@ const WORKFLOW_PRESETS = {
     batch: {
       dryRun: false,
       includeResults: false,
-      strictMode: true,
       skipMode: 'manifest',
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'font-identity',
@@ -88,7 +86,6 @@ const WORKFLOW_PRESETS = {
     batch: {
       dryRun: true,
       includeResults: false,
-      strictMode: true,
       skipMode: 'manifest',
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'same-path',
@@ -875,7 +872,7 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   workflowPreset: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Named configuration preset applied before explicit arguments. Explicit tool arguments override preset values.',
-    agentAction: 'Use this to explain why effective defaults such as dryRun, strictMode, parseFonts, or dedupe mode were selected.',
+    agentAction: 'Use this to explain why effective defaults such as dryRun, parseFonts, skip mode, or dedupe mode were selected.',
   },
   workflowPresets: {
     sourceTools: ['get_agent_guidance'],
@@ -1024,7 +1021,6 @@ const SAFE_INVOCATION_TEMPLATES = [
       workflowPreset: 'safe-preview',
       dryRun: true,
       includeResults: true,
-      strictMode: true,
       skipMode: 'manifest',
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'font-identity',
@@ -1047,7 +1043,6 @@ const SAFE_INVOCATION_TEMPLATES = [
       includeResults: false,
       limit: 50000,
       maxFiles: 50000,
-      strictMode: true,
       skipMode: 'manifest',
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'font-identity',
@@ -1325,7 +1320,8 @@ export function getAgentGuidance(args = {}) {
       recommendedOptions: {
         dryRun: true,
         includeResults: true,
-        strictMode: true,
+        skipMode: 'manifest',
+        batchErrorMode: 'fail-after',
         batchNamingMode: 'numeric-suffix',
         batchDedupeMode: 'font-identity',
       },
@@ -1355,7 +1351,8 @@ export function getAgentGuidance(args = {}) {
       followUpOptions: {
         inputDir: '<original-inputDir-or-organized-outputDir>',
         dryRun: true,
-        strictMode: true,
+        skipMode: 'manifest',
+        batchErrorMode: 'fail-after',
       },
       mustInspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
       nonIntuitiveBehavior: 'organize_font_directory defaults to dryRun:true and never moves or deletes source files; dryRun:false copies into outputDir only.',
@@ -1442,7 +1439,8 @@ export function getAgentGuidance(args = {}) {
         dryRun: true,
         includeResults: true,
         batchGroupBy: 'source-dir',
-        strictMode: true,
+        skipMode: 'manifest',
+        batchErrorMode: 'fail-after',
       },
       ifPlanLooksGood: [
         'Run split_font_batch again with dryRun:false, usually includeResults:false for large libraries.',
@@ -1541,7 +1539,6 @@ export function getAgentGuidance(args = {}) {
       batchDedupeMode: 'font-identity',
       batchErrorMode: 'fail-after',
       skipMode: 'manifest',
-      strictMode: false,
       inspectInputMaxFiles: 50000,
       batchMaxFiles: 5000,
       outputInspectMaxFiles: 200000,
@@ -1816,10 +1813,8 @@ function normalizeProcessingOptions(args) {
 }
 
 function normalizeBatchOptions(args) {
-  const strictMode = args.strictMode === true;
   return {
     workflowPreset: getWorkflowPresetName(args.workflowPreset),
-    strictMode,
     skipMode: ['legacy-css', 'manifest', 'force'].includes(args.skipMode) ? args.skipMode : 'manifest',
     batchGroupBy: ['auto', 'source-dir', 'font-family'].includes(args.batchGroupBy) ? args.batchGroupBy : 'auto',
     batchNamingMode: ['plain', 'numeric-suffix', 'source-suffix'].includes(args.batchNamingMode) ? args.batchNamingMode : 'numeric-suffix',
@@ -1886,7 +1881,7 @@ function buildEffectiveConfigSnapshot(args, processingOptions) {
 
   const optionalBooleans = [
     'languageAreas', 'testHtml', 'reporter', 'multiThreads', 'fontFeature',
-    'reduceMins', 'autoSubset', 'subsetRemainChars', 'strictMode',
+    'reduceMins', 'autoSubset', 'subsetRemainChars',
   ];
   for (const key of optionalBooleans) {
     const value = normalizeOptionalBoolean(args[key]);
@@ -3096,7 +3091,6 @@ function buildDirectoryLayoutSummary({ inputDir, allFiles, fontFiles }) {
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'font-identity',
       skipMode: 'manifest',
-      strictMode: true,
     },
   };
 }
@@ -4030,7 +4024,6 @@ export async function splitFontBatch(args = {}) {
     outputTreeInsideInputTree: safetySummary.outputTreeInsideInputTree,
     mayOverwriteOutputTree: safetySummary.mayOverwriteOutputTree,
     dryRun,
-    strictMode: batchOptions.strictMode,
     skipMode: batchOptions.skipMode,
     batchGroupBy: batchOptions.batchGroupBy,
     batchNamingMode: batchOptions.batchNamingMode,

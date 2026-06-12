@@ -127,7 +127,6 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 | `includeResults` | boolean | `true` | Include per-font `results[]`; set `false` for compact large-batch responses. |
 | `dryRun` | boolean | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
 | `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | Named preset applied before explicit options. Explicit options override preset values. |
-| `strictMode` | boolean | `false` | Self-documenting strict flag. Batch defaults already use `manifest` skip checks and `fail-after` errors; explicit options still override it. |
 | `skipMode` | `legacy-css`, `manifest`, `force` | `manifest` | Existing-output skip policy. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | First-level family directory strategy. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Per-font output directory naming strategy. |
@@ -139,7 +138,7 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 
 `workflowPreset` is a shorthand for common configurations:
 
-- `safe-preview`: no-write strict preview.
+- `safe-preview`: no-write safety preview.
 - `reviewed-write`: write settings for after a reviewed preview.
 - `structure-first`: no-write compact first pass for large/noisy directories; batch mode uses `same-path` dedupe, and organization mode skips font metadata parsing.
 - `source-layout`: prefer source-directory grouping.
@@ -156,7 +155,6 @@ Batch dedupe priority is `.otf`, `.ttf`, `.woff2`, `.ttc`, `.otc`, `.woff`.
 If identity extraction fails for a file, batch dedupe falls back to that file's path stem so scanning can continue and the processing phase can report the actual per-font error.
 
 `batchErrorMode` defaults to `fail-after`, which finishes selected fonts and then throws if any per-font errors occurred. Use `collect` only when the caller will inspect `errors[]` and `errorCount` itself, or `fail-fast` to throw on the first per-font error.
-`strictMode: true` is now mostly self-documenting because batch defaults already use `manifest` and `fail-after`; it still does not prevent explicit overrides.
 When `fail-fast` or `fail-after` throws through the MCP server, the error response text is JSON with `ok: false`, `name`, `error`, and `details` so agents can still read `details.errors[]` and `details.summary`.
 
 Compact full-library example:
@@ -168,7 +166,6 @@ Compact full-library example:
   "limit": 50000,
   "maxFiles": 50000,
   "includeResults": false,
-  "strictMode": true,
   "batchNamingMode": "numeric-suffix",
   "batchDedupeMode": "font-identity",
   "skipMode": "manifest",

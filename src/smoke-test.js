@@ -1291,7 +1291,6 @@ if (scenario === 'single') {
     || safePreview.outputTreeInsideInputTree !== false
     || safePreview.mayOverwriteOutputTree !== false
     || safePreview.resultsIncluded !== true
-    || safePreview.strictMode !== true
     || safePreview.skipMode !== 'manifest'
     || safePreview.batchErrorMode !== 'fail-after'
     || safePreview.batchNamingMode !== 'numeric-suffix'
@@ -1300,7 +1299,7 @@ if (scenario === 'single') {
     || safePreview.skippedDuplicates !== 1
     || safePreview.unsupportedFileSummary?.total !== 1
   ) {
-    throw new Error('Expected safe-preview preset to apply no-write strict batch defaults.');
+    throw new Error('Expected safe-preview preset to apply no-write safe batch defaults.');
   }
   if (await fsExists(outputRoot)) {
     throw new Error('Expected safe-preview preset not to create outputRoot.');
@@ -1632,7 +1631,7 @@ if (scenario === 'single') {
         }
       }
     };
-    const batchOnly = ['strictMode', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'debugBatchDecisions'];
+    const batchOnly = ['skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'debugBatchDecisions'];
     const leaked = batchOnly.filter((key) => Object.hasOwn(splitFontProps, key));
     const missing = batchOnly.filter((key) => !Object.hasOwn(batchProps, key));
     if (leaked.length > 0) {
@@ -1770,10 +1769,10 @@ if (scenario === 'single') {
     },
     failAfterThrew: threw,
   }, null, 2));
-} else if (scenario === 'batch-strict') {
-  const inputDir = process.argv[3] || 'font-split-mcp/.font-split-strict-input';
-  const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-strict-output';
-  console.log('Batch strict mode smoke:', inputDir, '->', outputRoot);
+} else if (scenario === 'batch-defaults') {
+  const inputDir = process.argv[3] || 'font-split-mcp/.font-split-defaults-input';
+  const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-defaults-output';
+  console.log('Batch defaults smoke:', inputDir, '->', outputRoot);
   await fs.rm(inputDir, { recursive: true, force: true });
   await fs.rm(outputRoot, { recursive: true, force: true });
   await fs.mkdir(inputDir, { recursive: true });
@@ -1803,19 +1802,17 @@ if (scenario === 'single') {
     outputRoot,
     limit: 2,
     maxFiles: 10,
-    strictMode: true,
     skipMode: 'force',
     batchErrorMode: 'collect',
     silent: true,
   });
-  if (overridden.strictMode !== true || overridden.skipMode !== 'force' || overridden.batchErrorMode !== 'collect' || overridden.errorCount !== 1) {
-    throw new Error('Expected explicit batch options to override the strictMode self-documenting flag.');
+  if (Object.hasOwn(overridden, 'strictMode') || overridden.skipMode !== 'force' || overridden.batchErrorMode !== 'collect' || overridden.errorCount !== 1) {
+    throw new Error('Expected batch defaults to omit strictMode and allow explicit batch options.');
   }
 
   console.log(JSON.stringify({
     defaultThrew,
     overridden: {
-      strictMode: overridden.strictMode,
       skipMode: overridden.skipMode,
       batchErrorMode: overridden.batchErrorMode,
       errorCount: overridden.errorCount,

@@ -26,7 +26,6 @@ const outputRoot = process.env.FONT_SPLIT_OUTPUT_ROOT || process.argv[3] || 'spl
 const limit = numberOption(process.env.FONT_SPLIT_LIMIT || process.argv[4], 50000);
 const maxFiles = numberOption(process.env.FONT_SPLIT_MAX_FILES || process.argv[5], 50000);
 const dryRun = process.argv.includes('--dry-run') || booleanEnv(process.env.FONT_SPLIT_DRY_RUN);
-const strictMode = booleanOption(process.env.FONT_SPLIT_STRICT_MODE, true);
 const includeResults = booleanOption(process.env.FONT_SPLIT_INCLUDE_RESULTS, false);
 const chunkSize = numberOption(process.env.FONT_SPLIT_CHUNK_SIZE, 70 * 1024);
 const skipMode = enumOption(process.env.FONT_SPLIT_SKIP_MODE, ['legacy-css', 'manifest', 'force'], undefined);
@@ -43,7 +42,6 @@ const batchOptions = {
   maxFiles,
   dryRun,
   includeResults,
-  strictMode,
   batchNamingMode,
   batchDedupeMode,
   splitFailureAction,

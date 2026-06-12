@@ -67,7 +67,6 @@
 - 批量增量跳过默认是 `skipMode: "manifest"`，会用 `split-meta.json` 比较源文件和有效配置。
 - 旧版只看 `result.css` 的跳过行为需要显式选择 `skipMode: "legacy-css"`；需要强制重跑时使用 `skipMode: "force"`。
 - 批量错误处理默认是 `batchErrorMode: "fail-after"`，会处理完选中的字体后把任何单字体错误升级为批量错误。
-- `strictMode: true` 现在主要是自说明开关；默认已经采用 `manifest` 跳过和 `fail-after` 错误策略，显式参数仍优先生效。
 - 删除超大 `kern` 表必须显式设置 `oversizedKernAction: "strip"`。
 - 分割失败后回退为单 WOFF2 必须显式设置 `splitFailureAction: "single-woff2"`。
 - 小字形字体由 `smallGlyphAction` 控制：`subset`、`single-woff2` 或 `copy-original`。
@@ -223,7 +222,6 @@ fonts/
 | `maxFiles` | 正整数，MCP 最大 `50000` | `5000` | 扫描阶段最多读取多少个源文件，再过滤字体扩展名。 |
 | `includeResults` | `true`, `false` | `true` | 是否返回每个字体的详细 `results[]`。大批量只需要摘要和错误时可设为 `false`。 |
 | `dryRun` | `true`, `false` | `false` | 只预览扫描、去重、命名和 skip 决策，不写任何输出文件。 |
-| `strictMode` | `true`, `false` | `false` | 自说明严格开关。批量默认已经使用 `manifest` 和 `fail-after`；显式参数仍优先生效。 |
 
 `skipMode` 说明：
 
@@ -233,7 +231,7 @@ fonts/
 
 `workflowPreset` 说明：
 
-- `safe-preview`：无写入预览。批量时等价于 `dryRun: true`、`includeResults: true`、`strictMode: true`、`skipMode: "manifest"` 等安全默认值；整理时等价于解析字体并返回完整计划。
+- `safe-preview`：无写入预览。批量时等价于 `dryRun: true`、`includeResults: true`、`skipMode: "manifest"`、`batchErrorMode: "fail-after"` 等安全默认值；整理时等价于解析字体并返回完整计划。
 - `reviewed-write`：用于已经审查过预览后的真实写入。批量会写拆分输出；整理会 copy-only 写入 `outputDir`，仍不会改动源文件。
 - `structure-first`：无写入、偏结构/路径的快速第一遍扫描，适合超大或嘈杂目录；批量侧使用 `same-path` 去重，目录整理侧跳过字体元数据解析。
 - `source-layout`：优先按源目录分组，适合每个压缩包/家族一个目录的来源结构。
@@ -411,7 +409,6 @@ fonts/
   "limit": 50000,
   "maxFiles": 50000,
   "includeResults": false,
-  "strictMode": true,
   "batchNamingMode": "numeric-suffix",
   "batchDedupeMode": "font-identity",
   "skipMode": "manifest",
@@ -543,7 +540,7 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。它默认使用 `strictMode: true`（自说明；核心批量默认已经是 `skipMode: "manifest"` 和 `batchErrorMode: "fail-after"`）、`includeResults: false`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"` 和 `splitFailureAction: "single-woff2"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_DRY_RUN` 提供相同配置。它会在控制台摘要里打印 `batchWarnings[]` 的 code/message。高级覆盖项可使用 `FONT_SPLIT_STRICT_MODE`、`FONT_SPLIT_INCLUDE_RESULTS`、`FONT_SPLIT_SKIP_MODE`、`FONT_SPLIT_BATCH_GROUP_BY`、`FONT_SPLIT_BATCH_NAMING_MODE`、`FONT_SPLIT_BATCH_DEDUPE_MODE`、`FONT_SPLIT_BATCH_ERROR_MODE`、`FONT_SPLIT_SPLIT_FAILURE_ACTION` 和 `FONT_SPLIT_CHUNK_SIZE`。
+`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。它默认使用 `includeResults: false`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"`、`skipMode: "manifest"`、`batchErrorMode: "fail-after"` 和 `splitFailureAction: "single-woff2"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_DRY_RUN` 提供相同配置。它会在控制台摘要里打印 `batchWarnings[]` 的 code/message。高级覆盖项可使用 `FONT_SPLIT_INCLUDE_RESULTS`、`FONT_SPLIT_SKIP_MODE`、`FONT_SPLIT_BATCH_GROUP_BY`、`FONT_SPLIT_BATCH_NAMING_MODE`、`FONT_SPLIT_BATCH_DEDUPE_MODE`、`FONT_SPLIT_BATCH_ERROR_MODE`、`FONT_SPLIT_SPLIT_FAILURE_ACTION` 和 `FONT_SPLIT_CHUNK_SIZE`。
 
 ### Smoke 检查
 
@@ -563,6 +560,7 @@ npm run smoke:organize-valid
 npm run smoke:organize-structure
 npm run smoke:organize-output-inside
 npm run smoke:batch-run
+npm run smoke:batch-defaults
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
 npm run smoke:inspect

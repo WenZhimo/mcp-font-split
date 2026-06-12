@@ -67,7 +67,6 @@ Key defaults and policy choices:
 - Batch incremental skipping defaults to `skipMode: "manifest"`, which compares source files and effective options through `split-meta.json`.
 - The old `result.css` marker behavior requires explicit `skipMode: "legacy-css"`; use `skipMode: "force"` when reprocessing is intentional.
 - Batch error handling defaults to `batchErrorMode: "fail-after"`, which finishes selected fonts and then upgrades any per-font error to a batch error.
-- `strictMode: true` is now mostly self-documenting; batch defaults are already `manifest` skipping and `fail-after` errors, and explicit options still win.
 - Oversized `kern` stripping is opt-in via `oversizedKernAction: "strip"`.
 - Split-failure single-WOFF2 fallback is opt-in via `splitFailureAction: "single-woff2"`.
 - Small glyph fonts are controlled by `smallGlyphAction`: `subset`, `single-woff2`, or `copy-original`.
@@ -223,7 +222,6 @@ Use this only to learn the directory shape quickly. Because font parsing is skip
 | `maxFiles` | positive integer, MCP max `50000` | `5000` | Maximum source files to scan before filtering fonts. |
 | `includeResults` | `true`, `false` | `true` | Include per-font result objects. Set `false` for large runs that only need summary counters and errors. |
 | `dryRun` | `true`, `false` | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
-| `strictMode` | `true`, `false` | `false` | Self-documenting strict flag. Batch defaults already use `manifest` and `fail-after`; explicit options still win. |
 
 `skipMode` details:
 
@@ -233,7 +231,7 @@ Use this only to learn the directory shape quickly. Because font parsing is skip
 
 `workflowPreset` details:
 
-- `safe-preview`: no-write preview. In batch mode this applies safe defaults such as `dryRun: true`, `includeResults: true`, `strictMode: true`, and `skipMode: "manifest"`; in organization mode it parses fonts and returns the full plan.
+- `safe-preview`: no-write preview. In batch mode this applies safe defaults such as `dryRun: true`, `includeResults: true`, `skipMode: "manifest"`, and `batchErrorMode: "fail-after"`; in organization mode it parses fonts and returns the full plan.
 - `reviewed-write`: real write settings after a preview has been reviewed. Batch mode writes split output; organization mode performs copy-only writes into `outputDir` and still does not modify source files.
 - `structure-first`: no-write structure/path-oriented first pass for very large or noisy directories; batch mode uses `same-path` dedupe, and organization mode skips font metadata parsing.
 - `source-layout`: prefer source directories as family/group names, useful for archive-per-family folder layouts.
@@ -411,7 +409,6 @@ Full-library batch run with compact response:
   "limit": 50000,
   "maxFiles": 50000,
   "includeResults": false,
-  "strictMode": true,
   "batchNamingMode": "numeric-suffix",
   "batchDedupeMode": "font-identity",
   "skipMode": "manifest",
@@ -543,7 +540,7 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` is a safe standalone batch helper for agents and maintainers. It defaults to `strictMode: true` (self-documenting; core batch defaults are already `skipMode: "manifest"` and `batchErrorMode: "fail-after"`), `includeResults: false`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, and `splitFailureAction: "single-woff2"`. Positional arguments are `inputDir`, `outputRoot`, `limit`, and `maxFiles`; the same values can be supplied with `FONT_SPLIT_INPUT_DIR`, `FONT_SPLIT_OUTPUT_ROOT`, `FONT_SPLIT_LIMIT`, `FONT_SPLIT_MAX_FILES`, and `FONT_SPLIT_DRY_RUN`. It prints `batchWarnings[]` codes/messages in the console summary. Advanced overrides are available through `FONT_SPLIT_STRICT_MODE`, `FONT_SPLIT_INCLUDE_RESULTS`, `FONT_SPLIT_SKIP_MODE`, `FONT_SPLIT_BATCH_GROUP_BY`, `FONT_SPLIT_BATCH_NAMING_MODE`, `FONT_SPLIT_BATCH_DEDUPE_MODE`, `FONT_SPLIT_BATCH_ERROR_MODE`, `FONT_SPLIT_SPLIT_FAILURE_ACTION`, and `FONT_SPLIT_CHUNK_SIZE`.
+`batch:run` is a safe standalone batch helper for agents and maintainers. It defaults to `includeResults: false`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `skipMode: "manifest"`, `batchErrorMode: "fail-after"`, and `splitFailureAction: "single-woff2"`. Positional arguments are `inputDir`, `outputRoot`, `limit`, and `maxFiles`; the same values can be supplied with `FONT_SPLIT_INPUT_DIR`, `FONT_SPLIT_OUTPUT_ROOT`, `FONT_SPLIT_LIMIT`, `FONT_SPLIT_MAX_FILES`, and `FONT_SPLIT_DRY_RUN`. It prints `batchWarnings[]` codes/messages in the console summary. Advanced overrides are available through `FONT_SPLIT_INCLUDE_RESULTS`, `FONT_SPLIT_SKIP_MODE`, `FONT_SPLIT_BATCH_GROUP_BY`, `FONT_SPLIT_BATCH_NAMING_MODE`, `FONT_SPLIT_BATCH_DEDUPE_MODE`, `FONT_SPLIT_BATCH_ERROR_MODE`, `FONT_SPLIT_SPLIT_FAILURE_ACTION`, and `FONT_SPLIT_CHUNK_SIZE`.
 
 ### Smoke checks
 
@@ -563,6 +560,7 @@ npm run smoke:organize-valid
 npm run smoke:organize-structure
 npm run smoke:organize-output-inside
 npm run smoke:batch-run
+npm run smoke:batch-defaults
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
 npm run smoke:inspect
