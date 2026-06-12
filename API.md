@@ -16,7 +16,7 @@ The response always includes `guidanceView`, which tells the caller which sectio
 
 Use `detailLevel: "full"` when the agent needs every catalog and example in one response. Use `sections` when it only needs specific data, for example `["warning-catalog", "field-catalog"]`. Available sections are reported in `guidanceView.availableSections`.
 
-`configurationRecipes[]` maps common user intent to preset-first calls and tradeoffs. Recipes cover safe default batch work, preserving every source font, grouping by source folders, grouping by font metadata, fast structure-first scans, copy-only staging directories, and large reviewed writes. A recipe is guidance, not proof of success: agents must still run the preview/write tools and inspect the listed response fields.
+`configurationRecipes[]` maps common user intent to preset-first calls and tradeoffs. Recipes cover safe default batch work, preserving every source font, grouping by source folders, grouping by font metadata, fast structure-first scans, copy-only staging directories, and large reviewed writes. Each recipe includes `inspectFields` and `successCriteria`. A recipe is guidance, not proof of success: agents must still run the preview/write tools, inspect those fields, and satisfy the criteria.
 
 `unsupportedFileCategoryCatalog` explains the categories used by `unsupportedFileSummary.byCategory[]`, including representative extensions, category meaning, and handling behavior. In particular, `archive` files are reported for awareness but are not extracted, copied, or split.
 

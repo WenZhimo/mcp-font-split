@@ -1122,6 +1122,15 @@ if (scenario === 'single') {
       throw new Error(`Expected configurationRecipes to include ${requiredRecipe}.`);
     }
   }
+  for (const recipe of result.configurationRecipes || []) {
+    if (typeof recipe.successCriteria !== 'string' || recipe.successCriteria.trim() === '') {
+      throw new Error(`Expected configurationRecipes.${recipe.id} to include successCriteria.`);
+    }
+  }
+  const safeDefaultRecipe = (result.configurationRecipes || []).find((item) => item.id === 'safe-default-batch');
+  if (!safeDefaultRecipe?.inspectFields?.includes('batchDecision') || !safeDefaultRecipe?.successCriteria?.includes('audit')) {
+    throw new Error('Expected safe-default-batch recipe to include route-decision inspection and output audit success criteria.');
+  }
   const preserveRecipe = (result.configurationRecipes || []).find((item) => item.id === 'preserve-every-source-font');
   if (
     preserveRecipe?.previewArgs?.workflowPreset !== 'safe-preview'
@@ -1130,6 +1139,7 @@ if (scenario === 'single') {
     || preserveRecipe?.writesFilesBeforeReview !== false
     || preserveRecipe?.sourceDestructive !== false
     || !preserveRecipe.inspectFields?.includes('batchDecision')
+    || !preserveRecipe.successCriteria?.includes('batchDedupeMode none')
   ) {
     throw new Error('Expected preserve-every-source-font recipe to disable dedupe only inside preview/write presets.');
   }
@@ -1144,6 +1154,7 @@ if (scenario === 'single') {
     || stagingRecipe?.sourceDestructive !== false
     || !stagingRecipe.inspectFields?.includes('organizationDecision')
     || !stagingRecipe.inspectFields?.includes('writesSourceTree')
+    || !stagingRecipe.successCriteria?.includes('copy-only')
   ) {
     throw new Error('Expected copy-clean-staging-directory recipe to disclose copy-only source safety.');
   }
@@ -1152,6 +1163,7 @@ if (scenario === 'single') {
     structureRecipe?.previewArgs?.workflowPreset !== 'structure-first'
     || !structureRecipe.inspectFields?.includes('dedupeLimitedByParsing')
     || !structureRecipe.inspectFields?.includes('organizationDecision')
+    || !structureRecipe.successCriteria?.includes('parseFonts true')
   ) {
     throw new Error('Expected fast structure recipe to use structure-first and require dedupe limitation inspection.');
   }

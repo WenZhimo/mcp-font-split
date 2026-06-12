@@ -909,8 +909,8 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   configurationRecipes: {
     sourceTools: ['get_agent_guidance'],
-    meaning: 'Machine-readable mapping from common user intent to preset-first tool calls and explicit tradeoffs.',
-    agentAction: 'Use these recipes to choose workflowPreset and the smallest necessary overrides before previewing or writing output.',
+    meaning: 'Machine-readable mapping from common user intent to preset-first tool calls, explicit tradeoffs, inspectFields, and successCriteria.',
+    agentAction: 'Use these recipes to choose workflowPreset and the smallest necessary overrides, then inspect the listed fields and satisfy successCriteria before treating the intent as complete.',
   },
   unsupportedFileCategoryCatalog: {
     sourceTools: ['get_agent_guidance'],
@@ -1857,6 +1857,8 @@ export function getAgentGuidance(args = {}) {
         'Uses font-identity dedupe, numeric-suffix naming, manifest skip checks, and fail-after error handling.',
         'Preview before writing; inspect batchDecision, batchWarnings, maxFilesHit, skippedDuplicates, errors, and safetySummary.',
       ],
+      inspectFields: ['safetySummary', 'batchDecision', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors', 'recommendedNextActions'],
+      successCriteria: 'Preview must be no-write and acceptable; reviewed write must have sourceDestructive false and errorCount zero; final inspect_split_output audit must pass before reporting completion.',
       auditAfterWrite: {
         tool: 'inspect_split_output',
         requiredFields: ['auditStatus', 'auditPassed', 'structureSummary', 'maxFilesHit', 'inspectionWarnings'],
@@ -1886,6 +1888,7 @@ export function getAgentGuidance(args = {}) {
         'Keep batchNamingMode numeric-suffix unless the user explicitly wants another collision policy.',
       ],
       inspectFields: ['batchDecision', 'planned', 'plannedCount', 'skippedDuplicates', 'batchWarnings', 'outputTreeInsideInputTree'],
+      successCriteria: 'Preview and reviewed write must intentionally use batchDedupeMode none, preserve every supported selected source font, and still pass the normal output audit after writing.',
     },
     {
       id: 'source-folder-families',
@@ -1910,6 +1913,7 @@ export function getAgentGuidance(args = {}) {
         'If root-level and nested fonts are mixed, dry-run organize_font_directory first to avoid surprising grouping.',
       ],
       inspectFields: ['batchDecision', 'layout', 'recommendedBatchPreviewArgs', 'planned', 'batchWarnings', 'unsupportedFileSummary'],
+      successCriteria: 'Preview must show the intended source-dir grouping with acceptable planned paths and warnings; reviewed write should only follow after that preview and must be audited afterward.',
     },
     {
       id: 'metadata-family-groups',
@@ -1933,6 +1937,7 @@ export function getAgentGuidance(args = {}) {
         'Use organize_font_directory first when source layout is flat or mixed so recommendedBatchPreviewArgs can be reviewed.',
       ],
       inspectFields: ['parsedFontMetadata', 'invalidFontCount', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'organizationWarnings'],
+      successCriteria: 'Organization preview must parse font metadata and produce reviewed grouping guidance; follow-up batch preview must remain dryRun true and use the intended font-family grouping before any write.',
     },
     {
       id: 'fast-structure-first-scan',
@@ -1949,6 +1954,7 @@ export function getAgentGuidance(args = {}) {
         'Identity dedupe and font-family grouping are limited until rerun with parseFonts:true or safe-preview.',
       ],
       inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'dedupeLimitedByParsing', 'organizationDecision', 'unsupportedFileSummary', 'recommendedBatchPreviewArgs'],
+      successCriteria: 'Use this only as a no-write structural scan; do not rely on invalid-font counts, glyph counts, metadata grouping, or identity dedupe until rerun with parseFonts true.',
     },
     {
       id: 'copy-clean-staging-directory',
@@ -1972,6 +1978,7 @@ export function getAgentGuidance(args = {}) {
         'overwriteExisting only affects files in outputDir and should be enabled explicitly.',
       ],
       inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationDecision', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'organizationWarnings', 'planActionSummary'],
+      successCriteria: 'Dry-run plan must be reviewed first; real organization must remain sourceDestructive false and copy-only, and the staged output should be inspected or batch-previewed before splitting.',
     },
     {
       id: 'large-reviewed-write',
@@ -1991,6 +1998,7 @@ export function getAgentGuidance(args = {}) {
         'Always follow the audit-split-output next action and require auditStatus pass before reporting completion.',
       ],
       inspectFields: ['safetySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions', 'resultsIncluded'],
+      successCriteria: 'Run only after a reviewed preview; require maxFilesHit false, errorCount zero, audit-split-output next action, and a passing inspect_split_output audit before reporting completion.',
     },
   ];
 
