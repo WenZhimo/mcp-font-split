@@ -567,7 +567,6 @@ npm run smoke:batch-defaults
 npm run smoke:real-corpus -- <字体语料目录>
 npm run smoke:real-corpus-targets -- <字体语料目录>
 npm run smoke:real-corpus-integration -- <字体语料目录>
-npm run smoke:real-corpus-write -- <字体语料目录>
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
 npm run smoke:api-docs
@@ -582,9 +581,7 @@ npm run smoke:small-copy-original
 
 `smoke:real-corpus-targets` 是显式的真实语料定向回归检查，也不包含在 `npm run check` 中。它默认会依次审计 `aexpective`、`tiny5`、`agu_display` 和 `architectural` 这些代表性问题家族，验证目录结构建议、`font-identity` 去重数量、是否出现意外数字/源后缀，以及 `run-reviewed-batch-write` 后续动作，同时不创建任何输出目录。它用于覆盖已知复杂形态，不表示工具会逐目录检查整个语料库。可选参数为 `<字体语料目录> [逗号分隔的目标目录] [maxFiles] [limit]`。
 
-`smoke:real-corpus-integration` 是显式的真实语料代表性集成检查，也不包含在 `npm run check` 中。它会检查运行时和 agent 指南，对语料根目录做 compact 输入扫描，选择一个真实样本目录，依次运行目录整理 dry-run、目录整理 copy-only 写入、单字体 `split_font` 写入、批量 dry-run、批量 reviewed-write 和 `inspect_split_output` 输出审计。它只会删除并重建传入语料目录下生成用的 `.font-split-*` 输出根，不会移动、删除或重写源字体。可选参数为 `<字体语料目录> [样本输入目录] [输出根目录] [maxFiles] [limit]`；默认输出根是 `font-split-mcp/.font-split-real-corpus-integration-output`。
-
-`smoke:real-corpus-write` 是显式的本机真实语料写入/审计检查，也不包含在 `npm run check` 中。它会先检查语料根目录，再选择一个真实样本目录，只删除并重建生成用的 `.font-split-*` 输出根，使用 `workflowPreset: "reviewed-write"` 运行 `split_font_batch`，随后通过返回的 `audit-split-output` 动作调用 `inspect_split_output`，并要求 `structureSummary.conforms: true`。可选参数为 `<字体语料目录> [样本输入目录] [输出根目录] [maxFiles] [limit]`；默认输出根是 `font-split-mcp/.font-split-real-corpus-write-output`。
+`smoke:real-corpus-integration` 是显式的真实语料代表性写入/审计集成检查，也不包含在 `npm run check` 中。它会检查运行时和 agent 指南，对语料根目录做 compact 输入扫描，选择一个真实样本目录，依次运行目录整理 dry-run、目录整理 copy-only 写入、单字体 `split_font` 写入、批量 dry-run、批量 reviewed-write 和 `inspect_split_output` 输出审计。它只会删除并重建传入语料目录下生成用的 `.font-split-*` 输出根，不会移动、删除或重写源字体。可选参数为 `<字体语料目录> [样本输入目录] [输出根目录] [maxFiles] [limit]`；默认输出根是 `font-split-mcp/.font-split-real-corpus-integration-output`。
 
 `smoke:api-docs` 会启动 MCP server 读取真实工具 schema，并检查 `API.md` / `API.zh-CN.md` 是否覆盖所有工具、输入参数、`get_agent_guidance` section、`workflowPreset` 和关键安全/审计字段。它包含在 `npm run check` 中，用来防止实现变化后 API 文档静默漂移。
 
