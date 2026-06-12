@@ -633,6 +633,8 @@ split-meta.json
 - `mayOverwriteOutputTree`：当前非 dry-run 调用是否可能覆盖 `outputRoot` 中的文件
 - `batchWarningCount`
 - `batchWarnings[]`：批量摘要级提示，每项包含 `code` 和 `message`
+- `recommendedNextActionCount`
+- `recommendedNextActions[]`：面向 agent 的批量后续动作建议；dry-run 可能给出 `run-reviewed-batch-write`，真实写入可能给出 `audit-split-output`，要求继续用 `inspect_split_output` 审计输出结构
 - `errorCount`
 - `processingSummary`
 
@@ -647,6 +649,8 @@ split-meta.json
 - `decompressedInputs`
 - `oversizedKernDetected`
 - `oversizedKernStripped`
+
+`recommendedNextActions[]` 是检查清单，不会自动执行。真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
 
 ### 9.3 `organize_font_directory`
 

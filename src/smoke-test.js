@@ -604,6 +604,7 @@ if (scenario === 'single') {
     workflowPreset: 'split_font_batch',
     recommendedBatchOptions: 'organize_font_directory',
     recommendedBatchPreviewArgs: 'organize_font_directory',
+    recommendedNextActions: 'split_font_batch',
     safetySummary: 'split_font_batch',
     unsupportedFileSummary: 'organize_font_directory',
     structureSummary: 'inspect_split_output',
@@ -1508,10 +1509,36 @@ if (scenario === 'single') {
   if (!pathDedupeSplitDirNames.has('FixtureSans-Regular') || !pathDedupeSplitDirNames.has('FixtureSans-Regular-1')) {
     throw new Error('Expected numeric-suffix batch naming to avoid same-run splitDirName collisions.');
   }
+  const truncatedPreview = await splitFontBatch({
+    inputDir,
+    outputRoot,
+    workflowPreset: 'safe-preview',
+    limit: 10,
+    maxFiles: 1,
+    batchGroupBy: 'font-family',
+    batchDedupeMode: 'none',
+    skipMode: 'force',
+    silent: true,
+  });
+  const rerunAction = (truncatedPreview.recommendedNextActions || []).find((action) => action.id === 'rerun-batch-with-higher-maxFiles');
+  if (
+    truncatedPreview.maxFilesHit !== true
+    || rerunAction?.tool !== 'split_font_batch'
+    || rerunAction?.suggestedArgs?.workflowPreset !== 'safe-preview'
+    || rerunAction?.suggestedArgs?.maxFiles !== '<higher-than-current>'
+    || rerunAction?.suggestedArgs?.batchGroupBy !== 'font-family'
+    || rerunAction?.suggestedArgs?.batchDedupeMode !== 'none'
+    || rerunAction?.suggestedArgs?.skipMode !== 'force'
+  ) {
+    throw new Error('Expected truncated batch preview to recommend rerun args that preserve explicit batch policy overrides.');
+  }
+  assertInspectFieldsExist(rerunAction, {
+    split_font_batch: truncatedPreview,
+  }, 'batch-identity truncated rerun action');
   if (await fsExists(outputRoot)) {
     throw new Error('Expected batch identity dry-runs not to create outputRoot.');
   }
-  console.log(JSON.stringify({ inspection, identityDedupe, pathDedupe }, null, 2));
+  console.log(JSON.stringify({ inspection, identityDedupe, pathDedupe, truncatedPreview }, null, 2));
 } else if (scenario === 'workflow-presets') {
   const inputDir = process.argv[3] || 'font-split-mcp/.font-split-preset-input';
   const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-preset-output';
@@ -1818,6 +1845,7 @@ if (scenario === 'single') {
     includeFamilies: true,
   });
   const batchManifest = batchInspectDetailed.families?.[0]?.fontEntries?.[0]?.manifest;
+  const auditAction = (batchWrite.recommendedNextActions || []).find((action) => action.id === 'audit-split-output');
   if (
     batchWrite.workflowPreset !== 'reviewed-write'
     || batchWrite.dryRun !== false
@@ -1834,9 +1862,18 @@ if (scenario === 'single') {
     || batchInspect.structureSummary?.manifestCoverageOk !== true
     || batchInspect.copyOriginalOutputCount !== 1
     || batchInspect.structureSummary?.outputModeCounts?.['copy-original'] !== 1
+    || batchWrite.recommendedNextActionCount !== (batchWrite.recommendedNextActions || []).length
+    || auditAction?.tool !== 'inspect_split_output'
+    || auditAction?.suggestedArgs?.outDir !== batchOutputRoot
+    || auditAction?.suggestedArgs?.includeFiles !== false
+    || auditAction?.suggestedArgs?.includeFamilies !== false
+    || !auditAction.inspectFields?.includes('structureSummary')
   ) {
     throw new Error('Expected real batch copy-original output to match the documented output directory structure.');
   }
+  assertInspectFieldsExist(auditAction, {
+    inspect_split_output: batchInspect,
+  }, 'inspect-structure batch audit action');
   if (Object.hasOwn(batchManifest?.effectiveConfig || {}, 'workflowPreset')) {
     throw new Error('Expected workflowPreset shorthand not to be stored as an output-affecting manifest config.');
   }
@@ -1944,9 +1981,21 @@ if (scenario === 'single') {
   }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'batch-dry-run') {
-  const inputDir = process.argv[3] || '0xA000';
+  const ownsFixtureInput = process.argv[3] === undefined;
+  const inputDir = process.argv[3] || '.font-split-batch-dry-run-input';
   const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-batch-dry-run-output';
   console.log('Batch dry-run smoke:', inputDir, '->', outputRoot);
+  if (ownsFixtureInput) {
+    await fs.rm(inputDir, { recursive: true, force: true });
+    await fs.rm(outputRoot, { recursive: true, force: true });
+    await fs.mkdir(inputDir, { recursive: true });
+    await fs.writeFile(path.join(inputDir, 'FixtureSans-Regular.ttf'), buildMinimalTtf({
+      familyName: 'Fixture Sans',
+      subfamilyName: 'Regular',
+      glyphCount: 5,
+    }));
+  }
+  const outputRootExistedBefore = await fsExists(outputRoot);
   const result = await splitFontBatch({
     inputDir,
     outputRoot,
@@ -1966,8 +2015,26 @@ if (scenario === 'single') {
   if (Object.hasOwn(result, 'results')) {
     throw new Error('Expected dry-run batch response to omit results.');
   }
-  if (await fsExists(outputRoot)) {
-    throw new Error('Expected dry-run not to create outputRoot.');
+  const batchWriteAction = (result.recommendedNextActions || []).find((action) => action.id === 'run-reviewed-batch-write');
+  if (
+    result.recommendedNextActionCount !== (result.recommendedNextActions || []).length
+    || batchWriteAction?.tool !== 'split_font_batch'
+    || batchWriteAction?.suggestedArgs?.workflowPreset !== 'reviewed-write'
+    || batchWriteAction?.suggestedArgs?.inputDir !== inputDir
+    || batchWriteAction?.suggestedArgs?.outputRoot !== outputRoot
+    || !batchWriteAction.inspectFields?.includes('writesOutputTree')
+  ) {
+    throw new Error('Expected batch dry-run to recommend a reviewed-write follow-up with safety fields.');
+  }
+  if (batchWriteAction.suggestedArgs?.skipMode !== 'force') {
+    throw new Error('Expected reviewed-write follow-up to preserve the explicit skipMode override.');
+  }
+  assertActionSuggestedArgsOmit(batchWriteAction, ['dryRun', 'includeResults', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'], 'run-reviewed-batch-write suggestedArgs');
+  assertInspectFieldsExist(batchWriteAction, {
+    split_font_batch: result,
+  }, 'batch-dry-run');
+  if ((await fsExists(outputRoot)) !== outputRootExistedBefore) {
+    throw new Error('Expected dry-run not to create or remove outputRoot.');
   }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'batch-error-mode') {
@@ -2074,21 +2141,43 @@ if (scenario === 'single') {
 } else if (scenario === 'real-corpus-readonly') {
   const corpusRoot = path.resolve(process.argv[3] || process.env.FONT_SPLIT_REAL_CORPUS_DIR || path.join(process.cwd(), '..'));
   const requestedInputDir = process.argv[4] || null;
-  const maxFiles = Number.parseInt(process.argv[5] || process.env.FONT_SPLIT_REAL_CORPUS_MAX_FILES || '200', 10);
+  const maxFiles = Number.parseInt(process.argv[5] || process.env.FONT_SPLIT_REAL_CORPUS_MAX_FILES || '50000', 10);
   if (!Number.isFinite(maxFiles) || maxFiles < 1) {
     throw new Error('Expected maxFiles to be a positive integer for real-corpus-readonly smoke.');
   }
   process.env.FONT_SPLIT_ROOT = corpusRoot;
 
+  const corpusProbeFiles = await collectProbeFiles(corpusRoot, { maxFiles });
+  const corpusSummary = summarizeProbeFiles(corpusProbeFiles);
+  if (corpusSummary.supportedCount < 1) {
+    throw new Error(`Expected real corpus root to contain supported font files within ${maxFiles} files.`);
+  }
+
   const sample = await findRealCorpusSample({ corpusRoot, requestedInputDir, maxFiles });
   const outputDir = '.font-split-real-corpus-readonly-output';
+  const batchPreviewRoot = '.font-split-real-corpus-batch-preview';
   const resolvedOutputDir = path.resolve(corpusRoot, outputDir);
+  const resolvedBatchPreviewRoot = path.resolve(corpusRoot, batchPreviewRoot);
   const outputDirExistedBefore = await fsExists(resolvedOutputDir);
-  console.log('Real corpus read-only smoke:', corpusRoot, 'sample:', sample.inputDir, 'maxFiles:', maxFiles);
+  const batchPreviewRootExistedBefore = await fsExists(resolvedBatchPreviewRoot);
+  console.log('Real corpus read-only smoke:', corpusRoot, 'corpus fonts:', corpusSummary.supportedCount, 'sample:', sample.inputDir, 'maxFiles:', maxFiles);
 
   const runtime = await getRuntimeStatus();
   if (runtime.ok !== true || path.resolve(runtime.workspace?.root || '') !== corpusRoot) {
     throw new Error('Expected runtime status to use the real corpus as FONT_SPLIT_ROOT.');
+  }
+
+  const corpusInspection = await inspectFontInputs({
+    inputDir: '.',
+    maxFiles,
+    includeFiles: false,
+  });
+  if (
+    corpusInspection.supportedFontCount !== corpusSummary.supportedCount
+    || corpusInspection.unsupportedFileSummary?.total !== corpusSummary.unsupportedCount
+    || corpusInspection.filesIncluded !== false
+  ) {
+    throw new Error('Expected real corpus root inspection to summarize the full bounded corpus without file details.');
   }
 
   const inspection = await inspectFontInputs({
@@ -2142,12 +2231,47 @@ if (scenario === 'single') {
     'batchErrorMode',
     'splitFailureAction',
   ], 'real-corpus-readonly recommendedBatchPreviewArgs');
+
+  const batchPreview = await splitFontBatch({
+    inputDir: sample.inputDir,
+    outputRoot: batchPreviewRoot,
+    workflowPreset: 'safe-preview',
+    batchGroupBy: organization.recommendedBatchPreviewArgs?.batchGroupBy,
+    limit: Math.min(20, maxFiles),
+    maxFiles,
+    silent: true,
+  });
+  const batchWriteAction = (batchPreview.recommendedNextActions || []).find((action) => action.id === 'run-reviewed-batch-write');
+  if (
+    batchPreview.dryRun !== true
+    || batchPreview.resultsIncluded !== true
+    || batchPreview.selectedFontCount < 1
+    || batchWriteAction?.tool !== 'split_font_batch'
+    || batchWriteAction?.suggestedArgs?.workflowPreset !== 'reviewed-write'
+    || batchWriteAction?.suggestedArgs?.inputDir !== sample.inputDir
+    || batchWriteAction?.suggestedArgs?.outputRoot !== batchPreviewRoot
+  ) {
+    throw new Error('Expected real corpus batch preview to stay read-only and recommend a reviewed-write follow-up.');
+  }
+  assertInspectFieldsExist(batchWriteAction, {
+    split_font_batch: batchPreview,
+  }, 'real-corpus-readonly batch preview action');
+
   if ((await fsExists(resolvedOutputDir)) !== outputDirExistedBefore) {
     throw new Error('Expected real-corpus-readonly smoke not to create or remove the output directory.');
+  }
+  if ((await fsExists(resolvedBatchPreviewRoot)) !== batchPreviewRootExistedBefore) {
+    throw new Error('Expected real-corpus-readonly batch preview not to create or remove the output directory.');
   }
 
   console.log(JSON.stringify({
     corpusRoot,
+    corpus: {
+      supportedFontCount: corpusInspection.supportedFontCount,
+      unsupportedFileSummary: corpusInspection.unsupportedFileSummary,
+      maxFilesHit: corpusInspection.maxFilesHit,
+      filesIncluded: corpusInspection.filesIncluded,
+    },
     sample,
     inspection: {
       supportedFontCount: inspection.supportedFontCount,
@@ -2162,6 +2286,14 @@ if (scenario === 'single') {
       parsedFontMetadata: organization.parsedFontMetadata,
       dedupeLimitedByParsing: organization.dedupeLimitedByParsing,
       organizationWarnings: organization.organizationWarnings,
+    },
+    batchPreview: {
+      dryRun: batchPreview.dryRun,
+      discoveredFontCount: batchPreview.discoveredFontCount,
+      deduplicatedCount: batchPreview.deduplicatedCount,
+      selectedFontCount: batchPreview.selectedFontCount,
+      skippedDuplicates: batchPreview.skippedDuplicates,
+      recommendedNextActions: batchPreview.recommendedNextActions,
     },
   }, null, 2));
 } else if (scenario === 'small-skip') {

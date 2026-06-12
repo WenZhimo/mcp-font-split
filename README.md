@@ -337,7 +337,7 @@ fonts/
 - `planActionSummary`：始终返回；按动作统计 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists` 和 `error` 等数量，即使 `includePlan: false` 省略明细也会保留
 - 可选 `plan[]` 条目，包含 `source`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`
 
-应把 `recommendedNextActions[]` 当作检查清单，而不是自动执行结果。Agent 仍然要检查每项里的 `inspectFields`，尤其是当某个动作建议写文件或用不同解析参数重跑时。`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对 preset 的差异覆盖。
+应把 `recommendedNextActions[]` 当作检查清单，而不是自动执行结果。Agent 仍然要检查每项里的 `inspectFields`，尤其是当某个动作建议写文件、审计输出或用不同扫描/解析上限重跑时。`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对 preset 的差异覆盖。批量 dry-run 可能返回 `run-reviewed-batch-write`；真实批量写入可能返回 `audit-split-output`，其建议的下一步工具是 `inspect_split_output`。
 应把 `planActionSummary` 当作压缩概览，而不是无需审查详细计划就可以写文件的许可。
 
 `inspect_split_output` 保留基础文件统计，并增加结构化输出清单：
@@ -561,6 +561,7 @@ npm run smoke:organize-valid
 npm run smoke:organize-structure
 npm run smoke:organize-output-inside
 npm run smoke:batch-run
+npm run smoke:batch-dry-run
 npm run smoke:batch-defaults
 npm run smoke:real-corpus -- <字体语料目录>
 npm run smoke:inspect-compact
@@ -571,7 +572,7 @@ npm run smoke:small-skip
 
 `npm run check` 是推荐给 AI agent / CI 的入口。它会运行语法检查和一组能自造最小输入的 smoke 场景，不依赖真实字体库。
 
-`smoke:real-corpus` 是显式的本机真实语料只读检查，不包含在 `npm run check` 中。它会把传入目录作为 `FONT_SPLIT_ROOT`，自动选择一个含字体的样本目录，运行 `inspect_font_inputs` 和 `organize_font_directory` 的 `structure-first` dry-run，验证 `unsupportedFileSummary`、`recommendedBatchPreviewArgs` 和安全字段，不会创建输出目录。
+`smoke:real-corpus` 是显式的本机真实语料只读检查，不包含在 `npm run check` 中。它会把传入目录作为 `FONT_SPLIT_ROOT`，先对语料根目录运行 `includeFiles:false` 的 `inspect_font_inputs`，再自动选择一个含字体的样本目录执行 `structure-first` 的 `organize_font_directory` 和无写入 `split_font_batch` 预览检查。它会验证全库范围的 `unsupportedFileSummary`、`recommendedBatchPreviewArgs`、批量 `recommendedNextActions` 和安全字段，不会创建输出目录。可选第二个参数指定样本目录；可选第三个参数覆盖 `maxFiles`（默认 `50000`）。
 
 `smoke:small-skip` 当前验证的是 `copy-original` 小字体策略；脚本名保留是为了兼容。`smoke:incremental` 也会额外打印一个示例 `splitDir`，用于确认新的批量命名在重复运行时仍然稳定。
 

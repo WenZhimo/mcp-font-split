@@ -750,8 +750,8 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     agentAction: 'Use as a compact signal that organizationWarnings needs attention.',
   },
   recommendedNextActions: {
-    sourceTools: ['organize_font_directory'],
-    meaning: 'Machine-readable follow-up checklist for directory organization workflows.',
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
+    meaning: 'Machine-readable follow-up checklist for batch and directory organization workflows.',
     agentAction: 'Treat as guidance and inspect each action inspectFields before proceeding.',
   },
   operationMode: {
@@ -2083,6 +2083,138 @@ function buildSuggestedBatchPreviewArgs({ inputDir, recommendedBatchOptions = {}
     ...omitPresetDefaults(recommendedBatchOptions, presetDefaults),
     ...extraArgs,
   };
+}
+
+function buildSuggestedBatchWriteArgs({ inputDir, outputRoot, effectiveArgs, batchOptions }) {
+  const presetDefaults = {
+    batchGroupBy: 'auto',
+    ...WORKFLOW_PRESETS['reviewed-write'].batch,
+  };
+  const overrides = omitPresetDefaults({
+    skipMode: batchOptions.skipMode,
+    batchGroupBy: batchOptions.batchGroupBy,
+    batchNamingMode: batchOptions.batchNamingMode,
+    batchDedupeMode: batchOptions.batchDedupeMode,
+    batchErrorMode: batchOptions.batchErrorMode,
+    splitFailureAction: effectiveArgs.splitFailureAction,
+  }, presetDefaults);
+  return {
+    inputDir,
+    outputRoot,
+    workflowPreset: 'reviewed-write',
+    ...(effectiveArgs.limit !== undefined ? { limit: effectiveArgs.limit } : {}),
+    ...(effectiveArgs.maxFiles !== undefined ? { maxFiles: effectiveArgs.maxFiles } : {}),
+    ...overrides,
+  };
+}
+
+function buildSuggestedBatchRerunArgs({ inputDir, outputRoot, workflowPreset, effectiveArgs, batchOptions }) {
+  const presetDefaults = {
+    batchGroupBy: 'auto',
+    ...(WORKFLOW_PRESETS[workflowPreset]?.batch || {}),
+  };
+  const overrides = omitPresetDefaults({
+    skipMode: batchOptions.skipMode,
+    batchGroupBy: batchOptions.batchGroupBy,
+    batchNamingMode: batchOptions.batchNamingMode,
+    batchDedupeMode: batchOptions.batchDedupeMode,
+    batchErrorMode: batchOptions.batchErrorMode,
+    splitFailureAction: effectiveArgs.splitFailureAction,
+  }, presetDefaults);
+  return {
+    inputDir,
+    outputRoot,
+    workflowPreset,
+    ...(effectiveArgs.limit !== undefined ? { limit: effectiveArgs.limit } : {}),
+    maxFiles: '<higher-than-current>',
+    ...overrides,
+  };
+}
+
+function buildBatchAuditArgs({ outputRoot }) {
+  return {
+    outDir: outputRoot,
+    includeFiles: false,
+    includeFamilies: false,
+    maxFiles: 200000,
+  };
+}
+
+function buildBatchNextActions({
+  dryRun,
+  inputDirRelative,
+  outputRoot,
+  effectiveArgs,
+  batchOptions,
+  maxFiles,
+  maxFilesHit,
+  selectedFontCount,
+  errorCount,
+  writesOutputTree,
+}) {
+  const actions = [];
+  const push = (action) => actions.push(action);
+
+  if (maxFilesHit) {
+    const rerunWorkflowPreset = dryRun ? 'safe-preview' : 'reviewed-write';
+    push({
+      id: 'rerun-batch-with-higher-maxFiles',
+      priority: 'high',
+      tool: 'split_font_batch',
+      reason: `The batch scan hit maxFiles (${maxFiles}); the planned or processed set may be incomplete.`,
+      suggestedArgs: buildSuggestedBatchRerunArgs({
+        inputDir: inputDirRelative,
+        outputRoot,
+        workflowPreset: rerunWorkflowPreset,
+        effectiveArgs,
+        batchOptions,
+      }),
+      inspectFields: ['maxFilesHit', 'unsupportedFileSummary', 'batchWarnings', 'discoveredFontCount', 'deduplicatedCount', 'selectedFontCount'],
+    });
+  }
+
+  if (errorCount > 0) {
+    push({
+      id: 'inspect-batch-errors',
+      priority: 'high',
+      tool: 'split_font_batch',
+      reason: 'The batch response contains per-font errors; inspect errors[] before reporting the batch as successful.',
+      inspectFields: ['errorCount', 'errors', 'batchWarnings', 'processedFontCount'],
+    });
+  }
+
+  if (dryRun) {
+    if (selectedFontCount > 0) {
+      push({
+        id: 'run-reviewed-batch-write',
+        priority: maxFilesHit || errorCount > 0 ? 'medium' : 'high',
+        tool: 'split_font_batch',
+        reason: 'The dry-run wrote no files; after reviewing planned paths and warnings, rerun with reviewed-write to create output.',
+        suggestedArgs: buildSuggestedBatchWriteArgs({
+          inputDir: inputDirRelative,
+          outputRoot,
+          effectiveArgs,
+          batchOptions,
+        }),
+        inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchWarnings', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileSummary'],
+      });
+    }
+    return actions;
+  }
+
+  if (writesOutputTree) {
+    push({
+      id: 'audit-split-output',
+      priority: errorCount > 0 ? 'medium' : 'high',
+      tool: 'inspect_split_output',
+      reason: 'A real batch write can create or update output files; inspect the output directory before reporting completion.',
+      suggestedArgs: buildBatchAuditArgs({ outputRoot }),
+      inspectFields: ['maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
+      successCriteria: 'Require structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
+    });
+  }
+
+  return actions;
 }
 
 function buildOrganizationNextActions({
@@ -3991,10 +4123,23 @@ export async function splitFontBatch(args = {}) {
     selectedCount: selected.length,
     outputTreeInsideInputTree,
   });
+  const inputDirRelative = toRelativeWorkspacePath(inputDir);
+  const recommendedNextActions = buildBatchNextActions({
+    dryRun,
+    inputDirRelative,
+    outputRoot,
+    effectiveArgs,
+    batchOptions,
+    maxFiles,
+    maxFilesHit: inputScan.truncated,
+    selectedFontCount: selected.length,
+    errorCount: errors.length,
+    writesOutputTree: safetySummary.writesOutputTree,
+  });
 
   const response = {
     ok: true,
-    inputDir: toRelativeWorkspacePath(inputDir),
+    inputDir: inputDirRelative,
     outputRoot,
     workflowPreset: batchOptions.workflowPreset,
     safetySummary,
@@ -4028,6 +4173,8 @@ export async function splitFontBatch(args = {}) {
     errors,
     batchWarningCount: batchWarnings.length,
     batchWarnings,
+    recommendedNextActionCount: recommendedNextActions.length,
+    recommendedNextActions,
     resultsIncluded: includeResults,
     processingSummary,
     ...(dryRun ? {

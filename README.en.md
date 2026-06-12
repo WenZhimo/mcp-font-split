@@ -337,7 +337,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `planActionSummary`: always returned; counts plan actions such as `would-copy`, `copied`, `skipped-duplicate`, `skipped-invalid`, `skipped-target-exists`, and `error`, even when `includePlan: false`
 - optional `plan[]` entries with `source`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`
 
-Treat `recommendedNextActions[]` as a checklist, not automation. Agents should still inspect the action's `inspectFields`, especially when an action recommends writing files or rerunning with different parsing options. `suggestedArgs` prefer `workflowPreset` and only keep overrides that differ from that preset.
+Treat `recommendedNextActions[]` as a checklist, not automation. Agents should still inspect the action's `inspectFields`, especially when an action recommends writing files, auditing output, or rerunning with different scan/parsing limits. `suggestedArgs` prefer `workflowPreset` and only keep overrides that differ from that preset. Batch dry-runs can return `run-reviewed-batch-write`; real batch writes can return `audit-split-output`, whose suggested next tool is `inspect_split_output`.
 Treat `planActionSummary` as a compact overview, not approval to write files without reviewing the detailed plan when it is included.
 
 `inspect_split_output` keeps flat file stats and adds structured output inventory:
@@ -561,6 +561,7 @@ npm run smoke:organize-valid
 npm run smoke:organize-structure
 npm run smoke:organize-output-inside
 npm run smoke:batch-run
+npm run smoke:batch-dry-run
 npm run smoke:batch-defaults
 npm run smoke:real-corpus -- <font-corpus-dir>
 npm run smoke:inspect-compact
@@ -571,7 +572,7 @@ npm run smoke:small-skip
 
 `npm run check` is the recommended agent/CI entry point. It runs syntax checks plus smoke scenarios that create their own tiny inputs and do not require a real font library.
 
-`smoke:real-corpus` is an explicit read-only check for a local real font corpus, and is not included in `npm run check`. It treats the supplied directory as `FONT_SPLIT_ROOT`, auto-selects a sample directory containing fonts, runs `inspect_font_inputs` plus a `structure-first` dry-run `organize_font_directory`, and verifies `unsupportedFileSummary`, `recommendedBatchPreviewArgs`, and safety fields without creating an output directory.
+`smoke:real-corpus` is an explicit read-only check for a local real font corpus, and is not included in `npm run check`. It treats the supplied directory as `FONT_SPLIT_ROOT`, first runs `inspect_font_inputs` against the corpus root with `includeFiles:false`, then auto-selects a sample directory containing fonts for `structure-first` `organize_font_directory` and no-write `split_font_batch` preview checks. It verifies broad `unsupportedFileSummary`, `recommendedBatchPreviewArgs`, batch `recommendedNextActions`, and safety fields without creating an output directory. The optional second argument selects the sample directory; the optional third argument overrides `maxFiles` (default `50000`).
 
 `smoke:small-skip` currently exercises the `copy-original` small-font policy; the script name is kept for compatibility. `smoke:incremental` also prints a sample `splitDir` so you can verify the collision-safe batch naming stays stable across reruns.
 
