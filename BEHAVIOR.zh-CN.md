@@ -49,7 +49,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 本项目是给 AI 编程助理调用的 MCP Server，因此除了普通参数 schema，还提供了 `get_agent_guidance` 和 `get_runtime_status`。
 
-`get_agent_guidance` 不读写字体文件，只返回：
+`get_agent_guidance` 不读写字体文件。默认 `detailLevel: "compact"`，只返回工作流决策所需的核心 section：
 
 - 当前 `FONT_SPLIT_ROOT` 解析结果
 - 路径使用规则
@@ -59,14 +59,16 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 完成验证清单
 - 推荐工具调用顺序
 - 调用方应该检查的关键响应字段
-- `toolResponseFieldCatalog`：关键响应字段的来源工具、字段含义和建议 agent 动作
 - `safeInvocationTemplates[]`：常见工作流的安全起步调用模板
+- `guidanceView`：说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称
+
+当 agent 需要完整 warning code 目录、响应字段目录或示例时，应设置 `detailLevel: "full"`，或用 `sections` 精确请求，例如 `["warning-catalog", "field-catalog"]`。
 
 当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。响应里的 `verificationChecklist[]` 是给 agent 用的防误判清单；在向用户宣称完成前，应检查其中适用于当前工作流的项目。
 `directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段和非直觉行为。它不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
-`directoryWorkflowExamples[]` 是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions` 和 warning 字段为准。
+`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions` 和 warning 字段为准。
 `safeInvocationTemplates[]` 是可复制的安全起步调用模板；其中包括运行时诊断、输入预检、源目录结构不匹配时的 dry-run 整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和输出审计。每个模板都会声明 `writesFiles`、`sourceDestructive`、可自定义参数和必须检查的响应字段。
-`toolResponseFieldCatalog` 是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
+`toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
 
 `get_runtime_status` 也是只读工具。它会检查：
 

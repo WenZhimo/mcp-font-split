@@ -23,6 +23,49 @@ const MANIFEST_VERSION = 1;
 const ORGANIZATION_MANIFEST_FILE_NAME = 'font-organization-manifest.json';
 const ORGANIZATION_MANIFEST_VERSION = 1;
 const PACKAGE_VERSION = packageJson.version;
+const GUIDANCE_DETAIL_LEVELS = ['compact', 'full'];
+const GUIDANCE_SECTION_NAMES = [
+  'workspace',
+  'tools',
+  'defaults',
+  'recommendations',
+  'directory-workflows',
+  'examples',
+  'verification',
+  'warning-catalog',
+  'field-catalog',
+  'safe-templates',
+  'response-fields',
+  'path-rules',
+  'workflow',
+];
+const GUIDANCE_COMPACT_SECTION_NAMES = [
+  'workspace',
+  'tools',
+  'defaults',
+  'recommendations',
+  'directory-workflows',
+  'safe-templates',
+  'verification',
+  'response-fields',
+  'path-rules',
+  'workflow',
+];
+const GUIDANCE_SECTION_FIELDS = {
+  workspace: ['workspace'],
+  tools: ['tools', 'supportedExtensions'],
+  defaults: ['defaultPolicies'],
+  recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions'],
+  'directory-workflows': ['directoryWorkflowDecisionMatrix'],
+  examples: ['directoryWorkflowExamples'],
+  verification: ['verificationChecklist'],
+  'warning-catalog': ['warningCodeCatalogVersion', 'warningCodeCatalog'],
+  'field-catalog': ['toolResponseFieldCatalogVersion', 'toolResponseFieldCatalog'],
+  'safe-templates': ['safeInvocationTemplatesVersion', 'safeInvocationTemplates'],
+  'response-fields': ['responseFieldsToCheck'],
+  'path-rules': ['pathRules'],
+  workflow: ['recommendedWorkflow'],
+};
 let wasmRuntimePromise;
 let wasmPath;
 
@@ -380,6 +423,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['get_agent_guidance', 'get_runtime_status'],
     meaning: 'Resolved FONT_SPLIT_ROOT workspace and configuration status.',
     agentAction: 'Confirm paths are inside the intended workspace before reading or writing local fonts.',
+  },
+  guidanceView: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Summary of get_agent_guidance response shaping, including detailLevel, included sections, omitted sections, and available sections.',
+    agentAction: 'Use this to decide whether to request full guidance or additional sections before relying on omitted catalogs or examples.',
   },
   wasm: {
     sourceTools: ['get_runtime_status'],
@@ -949,8 +997,56 @@ export async function getRuntimeStatus() {
   };
 }
 
+function uniqueAllowedValues(values, allowed) {
+  const allowedSet = new Set(allowed);
+  const seen = new Set();
+  const result = [];
+  for (const value of values) {
+    if (!allowedSet.has(value) || seen.has(value)) continue;
+    seen.add(value);
+    result.push(value);
+  }
+  return result;
+}
+
+function buildGuidanceView(args) {
+  const detailLevel = GUIDANCE_DETAIL_LEVELS.includes(args.detailLevel) ? args.detailLevel : 'compact';
+  const rawSections = Array.isArray(args.sections) ? args.sections : null;
+  const requestedSections = rawSections ? uniqueAllowedValues(rawSections, GUIDANCE_SECTION_NAMES) : null;
+  const ignoredSections = rawSections ? rawSections.filter((section) => !GUIDANCE_SECTION_NAMES.includes(section)) : [];
+  const defaultSections = detailLevel === 'compact' ? GUIDANCE_COMPACT_SECTION_NAMES : GUIDANCE_SECTION_NAMES;
+  const sectionsIncluded = requestedSections?.length ? requestedSections : defaultSections;
+  return {
+    detailLevel,
+    availableDetailLevels: GUIDANCE_DETAIL_LEVELS,
+    availableSections: GUIDANCE_SECTION_NAMES,
+    compactDefaultSections: GUIDANCE_COMPACT_SECTION_NAMES,
+    sectionsRequested: rawSections,
+    sectionsIncluded,
+    omittedSections: GUIDANCE_SECTION_NAMES.filter((section) => !sectionsIncluded.includes(section)),
+    ignoredSections,
+  };
+}
+
+function selectGuidanceSections(guidance, sectionsIncluded) {
+  const selected = {
+    ok: guidance.ok,
+    purpose: guidance.purpose,
+    workflow: guidance.workflow,
+    agentOptimized: guidance.agentOptimized,
+    guidanceView: guidance.guidanceView,
+  };
+  for (const section of sectionsIncluded) {
+    for (const fieldName of GUIDANCE_SECTION_FIELDS[section] || []) {
+      selected[fieldName] = guidance[fieldName];
+    }
+  }
+  return selected;
+}
+
 export function getAgentGuidance(args = {}) {
   const workflow = ['overview', 'single', 'batch', 'inspect', 'organize'].includes(args.workflow) ? args.workflow : 'overview';
+  const guidanceView = buildGuidanceView(args);
   const configuredRoot = process.env.FONT_SPLIT_ROOT || null;
   const root = workspaceRoot();
   const commonPathRules = [
@@ -1254,11 +1350,12 @@ export function getAgentGuidance(args = {}) {
     },
   ];
 
-  return {
+  const guidance = {
     ok: true,
     purpose: 'AI-agent guidance for using mcp-font-split safely and predictably.',
     workflow,
     agentOptimized: true,
+    guidanceView,
     workspace: {
       root,
       fontSplitRootConfigured: configuredRoot !== null,
@@ -1339,6 +1436,7 @@ export function getAgentGuidance(args = {}) {
       'usedFallback',
       'warnings',
       'manifestPath',
+      'guidanceView',
       'warningCodeCatalog',
       'safetySummary',
       'toolResponseFieldCatalog',
@@ -1394,6 +1492,7 @@ export function getAgentGuidance(args = {}) {
     pathRules: commonPathRules,
     recommendedWorkflow: workflows[workflow],
   };
+  return selectGuidanceSections(guidance, guidanceView.sectionsIncluded);
 }
 
 async function listFilesRecursive(root, { maxFiles = 5000, excludeDirs = [] } = {}) {

@@ -58,9 +58,11 @@ server.registerTool(
   'get_agent_guidance',
   {
     title: 'Get AI agent usage guidance',
-    description: 'Call this first when an AI coding assistant needs to choose a safe font-splitting workflow. It returns workspace path rules, directoryWorkflowDecisionMatrix, directoryWorkflowExamples, safeInvocationTemplates, warningCodeCatalog, toolResponseFieldCatalog, recommended tool order, defaults, and response fields to inspect.',
+    description: 'Call this first when an AI coding assistant needs to choose a safe font-splitting workflow. It returns workspace path rules, directoryWorkflowDecisionMatrix, directoryWorkflowExamples, safeInvocationTemplates, warningCodeCatalog, toolResponseFieldCatalog, recommended tool order, defaults, and response fields to inspect. Use detailLevel or sections for a compact or focused response.',
     inputSchema: {
       workflow: z.enum(['overview', 'single', 'batch', 'inspect', 'organize']).optional().describe('Guidance focus. Default: overview.'),
+      detailLevel: z.enum(['compact', 'full']).optional().describe('Response detail. compact keeps workflow essentials and omits bulky catalogs/examples unless requested; full returns all guidance sections. Default: compact.'),
+      sections: z.array(z.enum(['workspace', 'tools', 'defaults', 'recommendations', 'directory-workflows', 'examples', 'verification', 'warning-catalog', 'field-catalog', 'safe-templates', 'response-fields', 'path-rules', 'workflow'])).optional().describe('Optional focused guidance sections to return. When set, this overrides the detailLevel default section set.'),
     },
   },
   async (args) => {

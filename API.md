@@ -9,18 +9,22 @@ Return machine-readable usage guidance for AI coding assistants.
 | Field | Type / values | Default | Description |
 |-------|---------------|---------|-------------|
 | `workflow` | `overview`, `single`, `batch`, `inspect`, `organize` | `overview` | Guidance focus. |
+| `detailLevel` | `compact`, `full` | `compact` | Response size. `compact` keeps the workflow-critical sections and omits bulky catalogs/examples; `full` returns every guidance section. |
+| `sections` | array of section names | unset | Focused section filter. When set, it overrides the default section set from `detailLevel`. |
 
-The response includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `directoryWorkflowExamples[]`, `safeInvocationTemplates[]`, `warningCodeCatalog`, `toolResponseFieldCatalog`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available. By default the response is compact: it includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `safeInvocationTemplates[]`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+
+Use `detailLevel: "full"` when the agent needs every catalog and example in one response. Use `sections` when it only needs specific data, for example `["warning-catalog", "field-catalog"]`. Available sections are reported in `guidanceView.availableSections`.
 
 `directoryWorkflowDecisionMatrix[]` is a machine-readable decision table for common directory scenarios. Each entry includes `id`, `useWhen`, `firstTool`, default write/source-safety flags, `recommendedOptions`, optional follow-up tool/options, `mustInspectFields`, and `nonIntuitiveBehavior`.
 
-`directoryWorkflowExamples[]` gives concrete source-tree patterns such as flat vendor dumps, archive-per-family folders, mixed root+nested libraries, and large/noisy first-pass scans. Each example includes `sourceShape`, the likely layout kind, the recommended first tool and first call, follow-up guidance, safety flags, and response fields the agent must inspect.
+`directoryWorkflowExamples[]` is returned with `detailLevel: "full"` or `sections: ["examples"]`. It gives concrete source-tree patterns such as flat vendor dumps, archive-per-family folders, mixed root+nested libraries, and large/noisy first-pass scans.
 
 `safeInvocationTemplates[]` gives copyable starting calls for common agent workflows, including runtime diagnostics, compact source preflight, source-layout mismatch planning, structure-first scans for large directories, copy-only staging, batch dry-run preview, reviewed batch processing, and compact output audit. Each template declares whether it writes files, whether it can modify source files, which arguments are meant to be customized, and which response fields must be inspected.
 
-`warningCodeCatalog` maps machine-readable warning codes from `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]` to their response sources, severity, and suggested agent action.
+`warningCodeCatalog` is returned with `detailLevel: "full"` or `sections: ["warning-catalog"]`. It maps machine-readable warning codes from `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]` to their response sources, severity, and suggested agent action.
 
-`toolResponseFieldCatalog` maps important response field paths to the tools that emit them, their meaning, and the action an AI agent should take before reporting success. It is intended as a runtime companion to this API document, especially for fields whose meaning is easy to misread such as `ok`, `performedSplit`, `usedFallback`, `sourceDestructive`, `writesOutputTree`, `maxFilesHit`, and `recommendedNextActions`.
+`toolResponseFieldCatalog` is returned with `detailLevel: "full"` or `sections: ["field-catalog"]`. It maps important response field paths to the tools that emit them, their meaning, and the action an AI agent should take before reporting success. It is intended as a runtime companion to this API document, especially for fields whose meaning is easy to misread such as `ok`, `performedSplit`, `usedFallback`, `sourceDestructive`, `writesOutputTree`, `maxFilesHit`, and `recommendedNextActions`.
 
 ## `get_runtime_status`
 

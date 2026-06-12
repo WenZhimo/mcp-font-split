@@ -202,9 +202,53 @@ if (scenario === 'single') {
 } else if (scenario === 'inspect') {
   console.log(JSON.stringify(await inspectSplitOutput({ outDir: fontPath }), null, 2));
 } else if (scenario === 'agent-guidance') {
-  const result = getAgentGuidance({ workflow: 'batch' });
+  const defaultGuidance = getAgentGuidance({ workflow: 'batch' });
+  if (
+    defaultGuidance.guidanceView?.detailLevel !== 'compact'
+    || !defaultGuidance.guidanceView?.omittedSections?.includes('warning-catalog')
+    || !defaultGuidance.guidanceView?.omittedSections?.includes('field-catalog')
+    || Object.hasOwn(defaultGuidance, 'warningCodeCatalog')
+    || Object.hasOwn(defaultGuidance, 'toolResponseFieldCatalog')
+    || Object.hasOwn(defaultGuidance, 'directoryWorkflowExamples')
+    || !defaultGuidance.safeInvocationTemplates?.length
+    || !defaultGuidance.directoryWorkflowDecisionMatrix?.length
+  ) {
+    throw new Error('Expected default agent guidance to be compact and omit bulky catalogs/examples.');
+  }
+  const result = getAgentGuidance({ workflow: 'batch', detailLevel: 'full' });
   if (result.agentOptimized !== true || result.workflow !== 'batch' || !result.tools.some((tool) => tool.name === 'inspect_font_inputs')) {
     throw new Error('Expected agent guidance to describe the batch workflow and preflight tool.');
+  }
+  if (
+    result.guidanceView?.detailLevel !== 'full'
+    || !result.guidanceView?.sectionsIncluded?.includes('warning-catalog')
+    || !result.guidanceView?.availableSections?.includes('field-catalog')
+  ) {
+    throw new Error('Expected explicit full guidance to expose the full guidance view.');
+  }
+  const compactGuidance = getAgentGuidance({ workflow: 'organize', detailLevel: 'compact' });
+  if (
+    compactGuidance.guidanceView?.detailLevel !== 'compact'
+    || compactGuidance.workflow !== 'organize'
+    || !compactGuidance.guidanceView?.omittedSections?.includes('warning-catalog')
+    || !compactGuidance.guidanceView?.omittedSections?.includes('field-catalog')
+    || Object.hasOwn(compactGuidance, 'warningCodeCatalog')
+    || Object.hasOwn(compactGuidance, 'toolResponseFieldCatalog')
+    || Object.hasOwn(compactGuidance, 'directoryWorkflowExamples')
+    || !compactGuidance.safeInvocationTemplates?.length
+    || !compactGuidance.directoryWorkflowDecisionMatrix?.length
+  ) {
+    throw new Error('Expected compact agent guidance to keep workflow essentials and omit bulky catalogs/examples.');
+  }
+  const catalogGuidance = getAgentGuidance({ sections: ['warning-catalog', 'field-catalog'] });
+  if (
+    catalogGuidance.guidanceView?.sectionsIncluded?.length !== 2
+    || !catalogGuidance.warningCodeCatalog
+    || !catalogGuidance.toolResponseFieldCatalog
+    || Object.hasOwn(catalogGuidance, 'safeInvocationTemplates')
+    || Object.hasOwn(catalogGuidance, 'directoryWorkflowDecisionMatrix')
+  ) {
+    throw new Error('Expected focused agent guidance sections to return only requested catalogs.');
   }
   if (!result.tools.some((tool) => tool.name === 'organize_font_directory')) {
     throw new Error('Expected agent guidance to describe the directory organization tool.');
@@ -259,6 +303,9 @@ if (scenario === 'single') {
   }
   if (!result.responseFieldsToCheck?.includes('safeInvocationTemplatesVersion')) {
     throw new Error('Expected agent guidance to recommend checking safe invocation template version.');
+  }
+  if (!result.responseFieldsToCheck?.includes('guidanceView')) {
+    throw new Error('Expected agent guidance to recommend checking guidance view metadata.');
   }
   const expectedWarningCodes = [
     'dry-run-no-write',
@@ -1092,6 +1139,7 @@ if (scenario === 'single') {
   try {
     const result = await client.listTools();
     const tools = Object.fromEntries(result.tools.map((tool) => [tool.name, tool]));
+    const guidanceProps = tools.get_agent_guidance?.inputSchema?.properties || {};
     const splitFontProps = tools.split_font?.inputSchema?.properties || {};
     const batchProps = tools.split_font_batch?.inputSchema?.properties || {};
     const organizeProps = tools.organize_font_directory?.inputSchema?.properties || {};
@@ -1112,18 +1160,24 @@ if (scenario === 'single') {
     if (missing.length > 0) {
       throw new Error(`split_font_batch is missing batch-only properties: ${missing.join(', ')}`);
     }
+    for (const requiredGuidanceProp of ['workflow', 'detailLevel', 'sections']) {
+      if (!Object.hasOwn(guidanceProps, requiredGuidanceProp)) {
+        throw new Error(`get_agent_guidance is missing ${requiredGuidanceProp}`);
+      }
+    }
     for (const requiredOrganizeProp of ['dryRun', 'outputDir', 'overwriteExisting', 'copyInvalidFonts']) {
       if (!Object.hasOwn(organizeProps, requiredOrganizeProp)) {
         throw new Error(`organize_font_directory is missing ${requiredOrganizeProp}`);
       }
     }
-    expectDescriptionIncludes('get_agent_guidance', ['directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect']);
+    expectDescriptionIncludes('get_agent_guidance', ['directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'batchWarnings']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files']);
     expectDescriptionIncludes('inspect_split_output', ['maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
+      guidancePropertyCount: Object.keys(guidanceProps).length,
       splitFontPropertyCount: Object.keys(splitFontProps).length,
       splitFontBatchPropertyCount: Object.keys(batchProps).length,
       organizeFontDirectoryPropertyCount: Object.keys(organizeProps).length,
