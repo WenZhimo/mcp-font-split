@@ -952,6 +952,11 @@ if (scenario === 'single') {
       throw new Error(`Expected safeInvocationTemplates to include ${requiredTemplate}.`);
     }
   }
+  for (const template of result.safeInvocationTemplates || []) {
+    if (typeof template.successCriteria !== 'string' || template.successCriteria.trim() === '') {
+      throw new Error(`Expected safeInvocationTemplates.${template.id} to include successCriteria.`);
+    }
+  }
   const mismatchTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'directory-mismatch-plan');
   if (
     mismatchTemplate?.tool !== 'organize_font_directory'
@@ -1026,6 +1031,7 @@ if (scenario === 'single') {
     || !outputAuditTemplate?.inspectFields?.includes('auditPassed')
     || !outputAuditTemplate?.inspectFields?.includes('auditBlockingReasons')
     || !outputAuditTemplate?.inspectFields?.includes('structureSummary')
+    || !outputAuditTemplate?.successCriteria?.includes('auditStatus pass')
   ) {
     throw new Error('Expected output audit template to require compact audit status and structureSummary inspection.');
   }

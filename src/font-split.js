@@ -734,8 +734,8 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   safeInvocationTemplates: {
     sourceTools: ['get_agent_guidance'],
-    meaning: 'Machine-readable safe starting calls for common AI-agent workflows.',
-    agentAction: 'Choose the closest template, customize placeholder paths and limits, then inspect the listed fields.',
+    meaning: 'Machine-readable safe starting calls for common AI-agent workflows. Each template includes inspectFields and successCriteria.',
+    agentAction: 'Choose the closest template, customize placeholder paths and limits, inspect the listed fields, and satisfy successCriteria before proceeding.',
   },
   recommendedWorkflowPlan: {
     sourceTools: ['get_agent_guidance'],
@@ -1030,6 +1030,7 @@ const SAFE_INVOCATION_TEMPLATES = [
     customizableFields: [],
     inspectFields: ['ok', 'recommendedActions', 'node', 'workspace', 'wasm', 'cnFontSplit'],
     nextStep: 'Handle recommendedActions before calling tools that write output.',
+    successCriteria: 'Proceed to write-capable tools only when ok is true, or every recommendedActions item has been handled or disclosed.',
   },
   {
     id: 'source-preflight-compact',
@@ -1045,6 +1046,7 @@ const SAFE_INVOCATION_TEMPLATES = [
     customizableFields: ['inputDir', 'maxFiles', 'includeFiles'],
     inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
     nextStep: 'If maxFilesHit is true or invalid fonts are found, resolve that before relying on batch counts.',
+    successCriteria: 'Require maxFilesHit false before trusting counts, and resolve or disclose invalid fonts, missing identities, and relevant inspectionWarnings.',
   },
   {
     id: 'directory-mismatch-plan',
@@ -1057,8 +1059,9 @@ const SAFE_INVOCATION_TEMPLATES = [
       workflowPreset: 'safe-preview',
     },
     customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
-    inspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+    inspectFields: ['safetySummary', 'dryRun', 'operationMode', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
     nextStep: 'Use recommendedBatchPreviewArgs for a batch dry-run, or copy to a staging directory only after reviewing the plan.',
+    successCriteria: 'The organization preview must remain no-write and sourceDestructive false, with layout, route decision, plan summary, warnings, and recommendedBatchPreviewArgs reviewed before any write.',
   },
   {
     id: 'structure-first-large-directory',
@@ -1073,6 +1076,7 @@ const SAFE_INVOCATION_TEMPLATES = [
     customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'includePlan'],
     inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationDecision', 'unsupportedFileSummary', 'organizationWarnings', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'planActionSummary'],
     nextStep: 'Rerun with parseFonts:true before trusting invalid-font counts, glyph counts, identity dedupe, or font-family grouping.',
+    successCriteria: 'Use this result only for structure-level decisions; rerun with parseFonts true before relying on invalid-font counts, glyph counts, identity dedupe, or metadata grouping.',
   },
   {
     id: 'copy-organized-staging',
@@ -1086,8 +1090,9 @@ const SAFE_INVOCATION_TEMPLATES = [
       workflowPreset: 'reviewed-write',
     },
     customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'],
-    inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
+    inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'errorCount', 'errors'],
     nextStep: 'Use outputDir as the next split_font_batch input only after checking organizationWarnings.',
+    successCriteria: 'The copy run must be sourceDestructive false, operationMode copy-only, errorCount zero, and copiedCount or planActionSummary must match the reviewed plan.',
   },
   {
     id: 'batch-dry-run-preview',
@@ -1105,6 +1110,7 @@ const SAFE_INVOCATION_TEMPLATES = [
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'includeResults', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'splitFailureAction'],
     inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
     nextStep: 'If the plan is acceptable, rerun with dryRun:false; use includeResults:false for large real runs.',
+    successCriteria: 'The preview must have dryRun true, sourceDestructive false, maxFilesHit false, errorCount zero, and acceptable planned paths, warnings, naming, and dedupe decisions before writing.',
   },
   {
     id: 'batch-process-reviewed-plan',
@@ -1120,8 +1126,9 @@ const SAFE_INVOCATION_TEMPLATES = [
       maxFiles: 50000,
     },
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'],
-    inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileSummary'],
+    inspectFields: ['safetySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileSummary'],
     nextStep: 'Run inspect_split_output on outputRoot before reporting completion.',
+    successCriteria: 'The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up output audit before reporting completion.',
   },
   {
     id: 'output-audit-compact',
@@ -1138,6 +1145,7 @@ const SAFE_INVOCATION_TEMPLATES = [
     customizableFields: ['outDir', 'maxFiles', 'includeFiles', 'includeFamilies'],
     inspectFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
     nextStep: 'Require auditStatus pass and structureSummary.conforms true; if maxFilesHit is true or legacy/structure issues are detected, disclose uncertainty or rerun with more detail.',
+    successCriteria: 'Require auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as valid.',
   },
 ];
 function buildRecommendedWorkflowPlan(workflow) {
