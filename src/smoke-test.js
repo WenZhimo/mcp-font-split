@@ -632,6 +632,7 @@ if (scenario === 'single') {
     || Object.hasOwn(defaultGuidance, 'directoryWorkflowExamples')
     || !defaultGuidance.safeInvocationTemplates?.length
     || !defaultGuidance.directoryWorkflowDecisionMatrix?.length
+    || !defaultGuidance.configurationRecipes?.length
     || !defaultGuidance.recommendedWorkflowPlan?.orderedSteps?.length
   ) {
     throw new Error('Expected default agent guidance to be compact and omit bulky catalogs/examples.');
@@ -658,6 +659,7 @@ if (scenario === 'single') {
     || Object.hasOwn(compactGuidance, 'directoryWorkflowExamples')
     || !compactGuidance.safeInvocationTemplates?.length
     || !compactGuidance.directoryWorkflowDecisionMatrix?.length
+    || !compactGuidance.configurationRecipes?.length
   ) {
     throw new Error('Expected compact agent guidance to keep workflow essentials and omit bulky catalogs/examples.');
   }
@@ -691,6 +693,9 @@ if (scenario === 'single') {
   }
   if (!result.responseFieldsToCheck?.includes('workflowPresets') || !result.responseFieldsToCheck?.includes('workflowPreset')) {
     throw new Error('Expected agent guidance to recommend checking workflow preset fields.');
+  }
+  if (!result.responseFieldsToCheck?.includes('configurationRecipes')) {
+    throw new Error('Expected agent guidance to recommend checking configuration recipes.');
   }
   if (!result.responseFieldsToCheck?.includes('recommendedBatchPreviewArgs')) {
     throw new Error('Expected agent guidance to recommend checking safe batch preview args.');
@@ -918,6 +923,10 @@ if (scenario === 'single') {
   for (const item of result.directoryWorkflowExamples || []) {
     for (const fieldName of item.mustInspectFields || []) referencedFieldNames.add(fieldName);
   }
+  for (const item of result.configurationRecipes || []) {
+    for (const fieldName of item.inspectFields || []) referencedFieldNames.add(fieldName);
+    for (const fieldName of item.auditAfterWrite?.requiredFields || []) referencedFieldNames.add(fieldName);
+  }
   for (const item of result.safeInvocationTemplates || []) {
     for (const fieldName of item.inspectFields || []) referencedFieldNames.add(fieldName);
   }
@@ -929,6 +938,7 @@ if (scenario === 'single') {
   const expectedFieldCatalogEntries = {
     workflowPresets: 'get_agent_guidance',
     workflowPreset: 'split_font_batch',
+    configurationRecipes: 'get_agent_guidance',
     recommendedBatchOptions: 'organize_font_directory',
     recommendedBatchPreviewArgs: 'organize_font_directory',
     recommendedNextActions: 'split_font_batch',
@@ -949,6 +959,38 @@ if (scenario === 'single') {
     if (!result.toolResponseFieldCatalog?.[fieldName]?.sourceTools?.includes(toolName)) {
       throw new Error(`Expected toolResponseFieldCatalog.${fieldName} to include ${toolName}.`);
     }
+  }
+  const recipeIds = new Set((result.configurationRecipes || []).map((item) => item.id));
+  for (const requiredRecipe of ['safe-default-batch', 'preserve-every-source-font', 'source-folder-families', 'metadata-family-groups', 'fast-structure-first-scan', 'copy-clean-staging-directory', 'large-reviewed-write']) {
+    if (!recipeIds.has(requiredRecipe)) {
+      throw new Error(`Expected configurationRecipes to include ${requiredRecipe}.`);
+    }
+  }
+  const preserveRecipe = (result.configurationRecipes || []).find((item) => item.id === 'preserve-every-source-font');
+  if (
+    preserveRecipe?.previewArgs?.workflowPreset !== 'safe-preview'
+    || preserveRecipe?.previewArgs?.batchDedupeMode !== 'none'
+    || preserveRecipe?.writeArgsAfterReview?.workflowPreset !== 'reviewed-write'
+    || preserveRecipe?.writesFilesBeforeReview !== false
+    || preserveRecipe?.sourceDestructive !== false
+  ) {
+    throw new Error('Expected preserve-every-source-font recipe to disable dedupe only inside preview/write presets.');
+  }
+  const stagingRecipe = (result.configurationRecipes || []).find((item) => item.id === 'copy-clean-staging-directory');
+  if (
+    stagingRecipe?.firstTool !== 'organize_font_directory'
+    || stagingRecipe?.writeBehavior !== 'copy-only-outputDir'
+    || stagingRecipe?.sourceDestructive !== false
+    || !stagingRecipe.inspectFields?.includes('writesSourceTree')
+  ) {
+    throw new Error('Expected copy-clean-staging-directory recipe to disclose copy-only source safety.');
+  }
+  const structureRecipe = (result.configurationRecipes || []).find((item) => item.id === 'fast-structure-first-scan');
+  if (
+    structureRecipe?.previewArgs?.workflowPreset !== 'structure-first'
+    || !structureRecipe.inspectFields?.includes('dedupeLimitedByParsing')
+  ) {
+    throw new Error('Expected fast structure recipe to use structure-first and require dedupe limitation inspection.');
   }
   const decisionIds = new Set((result.directoryWorkflowDecisionMatrix || []).map((item) => item.id));
   for (const requiredDecision of ['known-good-batch-layout', 'unknown-or-mixed-directory-layout', 'large-or-noisy-directory-first-pass', 'user-wants-clean-staging-directory']) {
@@ -2455,7 +2497,7 @@ if (scenario === 'single') {
     if (!Object.hasOwn(batchProps, 'workflowPreset') || !Object.hasOwn(organizeProps, 'workflowPreset')) {
       throw new Error('Expected batch and organization tools to expose workflowPreset.');
     }
-    expectDescriptionIncludes('get_agent_guidance', ['directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'outputTreeInsideInputTree', 'batchWarnings']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'outputTreeInsideInputTree']);
@@ -2512,6 +2554,7 @@ if (scenario === 'single') {
     for (const fieldName of [
       'guidanceView',
       'recommendedWorkflowPlan',
+      'configurationRecipes',
       'directoryWorkflowDecisionMatrix',
       'safeInvocationTemplates',
       'warningCodeCatalog',
@@ -2568,6 +2611,7 @@ if (scenario === 'single') {
     '`FONT_SPLIT_ROOT`',
     '`guidanceView`',
     '`recommendedWorkflowPlan`',
+    '`configurationRecipes[]`',
     '`verificationChecklist[]`',
     '`smoke:real-corpus-suite`',
     '`directoryWorkflowDecisionMatrix[]`',
