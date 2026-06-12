@@ -23,7 +23,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 - Batch-process font directories under the configured workspace.
 - Preflight input directories to find invalid font-like files before large batch runs.
 - Plan or copy-organize source font directories into a cleaner staging layout when the source structure does not match the desired batch grouping.
-- Provide `get_agent_guidance` so AI coding assistants can choose a safe workflow from machine-readable guidance, warning-code meanings, and response-field meanings.
+- Provide `get_agent_guidance` so AI coding assistants can choose a safe workflow from machine-readable guidance, safe invocation templates, warning-code meanings, and response-field meanings.
 - Provide `get_runtime_status` so agents can verify workspace, Node engine compatibility, package versions, and WASM availability before processing.
 - Preserve original font files in the output family directory.
 - Write `split-meta.json` manifests for processed fonts.
@@ -52,6 +52,7 @@ Key defaults and policy choices:
 - Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server.
 - For AI coding assistants, call `get_agent_guidance` first when the workflow is unclear. It returns recommended tool order, default policies, path rules, response fields, and a verification checklist that should be inspected before claiming success.
 - `get_agent_guidance` also returns `directoryWorkflowDecisionMatrix[]`, a machine-readable decision table for choosing direct batch splitting, dry-run organization, copy-only organization, or structure-only planning.
+- `get_agent_guidance` includes `safeInvocationTemplates[]`, copyable starting calls for runtime checks, source preflight, directory-mismatch planning, copy-only staging, batch dry-run preview, reviewed batch processing, and compact output audits. Each template declares whether it writes files and whether it can modify source files.
 - `get_agent_guidance` includes `warningCodeCatalog`, mapping `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]` codes to severity and suggested agent actions.
 - `get_agent_guidance` includes `toolResponseFieldCatalog`, mapping important response fields to source tools, meanings, and suggested agent actions. Use it to avoid misreading fields such as `ok`, `performedSplit`, `usedFallback`, `sourceDestructive`, `writesOutputTree`, `maxFilesHit`, and `recommendedNextActions`.
 - Use `get_runtime_status` when setup is uncertain; it checks the resolved workspace, Node engine compatibility, package versions, cn-font-split runtime version, and WASM file without writing anything, then returns `recommendedActions[]` for agent-friendly remediation.
@@ -596,7 +597,7 @@ limitations under the License.
 - 批量扫描并处理字体目录。
 - 在大批量处理前预检输入目录，先发现坏字体或身份解析问题。
 - 当源字体目录结构与预期批量分组不一致时，生成整理计划，或把字体非破坏性复制到更规整的暂存目录。
-- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南、warning code 含义和响应字段含义选择安全工作流。
+- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南、安全调用模板、warning code 含义和响应字段含义选择安全工作流。
 - 提供 `get_runtime_status`，让 agent 在处理前确认工作区、Node engine 兼容性、包版本和 WASM 是否可用。
 - 在输出目录中保留原字体副本。
 - 为每个处理过的字体写入 `split-meta.json`。
@@ -625,6 +626,7 @@ limitations under the License.
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。
 - 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它会返回推荐工具顺序、默认策略、路径规则、必须检查的响应字段和完成验证清单。
 - `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。
+- `get_agent_guidance` 包含 `safeInvocationTemplates[]`，提供运行时检查、输入预检、目录不匹配整理计划、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和紧凑输出审计等可复制起步调用。每个模板都会声明是否写文件、是否可能修改源文件。
 - `get_agent_guidance` 包含 `warningCodeCatalog`，把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的 code 映射到严重度和建议 agent 动作。
 - `get_agent_guidance` 包含 `toolResponseFieldCatalog`，把重要响应字段映射到来源工具、字段含义和建议 agent 动作。用它避免误读 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit` 和 `recommendedNextActions` 等容易违反直觉的字段。
 - 当安装或运行环境不确定时，使用 `get_runtime_status`；它会只读检查解析后的工作区、Node engine 兼容性、包版本、cn-font-split 运行时版本和 WASM 文件，并返回便于 agent 执行/提示的 `recommendedActions[]`。

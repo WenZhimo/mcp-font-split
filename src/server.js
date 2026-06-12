@@ -58,7 +58,7 @@ server.registerTool(
   'get_agent_guidance',
   {
     title: 'Get AI agent usage guidance',
-    description: 'Call this first when an AI coding assistant needs to choose a safe font-splitting workflow. It returns workspace path rules, directoryWorkflowDecisionMatrix, directoryWorkflowExamples, warningCodeCatalog, toolResponseFieldCatalog, recommended tool order, defaults, and response fields to inspect.',
+    description: 'Call this first when an AI coding assistant needs to choose a safe font-splitting workflow. It returns workspace path rules, directoryWorkflowDecisionMatrix, directoryWorkflowExamples, safeInvocationTemplates, warningCodeCatalog, toolResponseFieldCatalog, recommended tool order, defaults, and response fields to inspect.',
     inputSchema: {
       workflow: z.enum(['overview', 'single', 'batch', 'inspect', 'organize']).optional().describe('Guidance focus. Default: overview.'),
     },

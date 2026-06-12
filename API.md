@@ -10,11 +10,13 @@ Return machine-readable usage guidance for AI coding assistants.
 |-------|---------------|---------|-------------|
 | `workflow` | `overview`, `single`, `batch`, `inspect`, `organize` | `overview` | Guidance focus. |
 
-The response includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `directoryWorkflowExamples[]`, `warningCodeCatalog`, `toolResponseFieldCatalog`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `directoryWorkflowExamples[]`, `safeInvocationTemplates[]`, `warningCodeCatalog`, `toolResponseFieldCatalog`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
 
 `directoryWorkflowDecisionMatrix[]` is a machine-readable decision table for common directory scenarios. Each entry includes `id`, `useWhen`, `firstTool`, default write/source-safety flags, `recommendedOptions`, optional follow-up tool/options, `mustInspectFields`, and `nonIntuitiveBehavior`.
 
 `directoryWorkflowExamples[]` gives concrete source-tree patterns such as flat vendor dumps, archive-per-family folders, mixed root+nested libraries, and large/noisy first-pass scans. Each example includes `sourceShape`, the likely layout kind, the recommended first tool and first call, follow-up guidance, safety flags, and response fields the agent must inspect.
+
+`safeInvocationTemplates[]` gives copyable starting calls for common agent workflows, including runtime diagnostics, compact source preflight, source-layout mismatch planning, structure-first scans for large directories, copy-only staging, batch dry-run preview, reviewed batch processing, and compact output audit. Each template declares whether it writes files, whether it can modify source files, which arguments are meant to be customized, and which response fields must be inspected.
 
 `warningCodeCatalog` maps machine-readable warning codes from `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]` to their response sources, severity, and suggested agent action.
 

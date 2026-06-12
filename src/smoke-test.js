@@ -254,6 +254,12 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('toolResponseFieldCatalogVersion')) {
     throw new Error('Expected agent guidance to recommend checking the tool response field catalog version.');
   }
+  if (!result.responseFieldsToCheck?.includes('safeInvocationTemplates')) {
+    throw new Error('Expected agent guidance to recommend checking safe invocation templates.');
+  }
+  if (!result.responseFieldsToCheck?.includes('safeInvocationTemplatesVersion')) {
+    throw new Error('Expected agent guidance to recommend checking safe invocation template version.');
+  }
   const expectedWarningCodes = [
     'dry-run-no-write',
     'input-scan-truncated',
@@ -298,6 +304,45 @@ if (scenario === 'single') {
   if (result.toolResponseFieldCatalogVersion !== 1) {
     throw new Error('Expected agent guidance to version the tool response field catalog.');
   }
+  if (result.safeInvocationTemplatesVersion !== 1) {
+    throw new Error('Expected agent guidance to version safe invocation templates.');
+  }
+  const templateIds = new Set((result.safeInvocationTemplates || []).map((item) => item.id));
+  for (const requiredTemplate of ['runtime-diagnostic', 'directory-mismatch-plan', 'structure-first-large-directory', 'copy-organized-staging', 'batch-dry-run-preview', 'batch-process-reviewed-plan', 'output-audit-compact']) {
+    if (!templateIds.has(requiredTemplate)) {
+      throw new Error(`Expected safeInvocationTemplates to include ${requiredTemplate}.`);
+    }
+  }
+  const mismatchTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'directory-mismatch-plan');
+  if (
+    mismatchTemplate?.tool !== 'organize_font_directory'
+    || mismatchTemplate?.writesFiles !== false
+    || mismatchTemplate?.sourceDestructive !== false
+    || mismatchTemplate?.args?.dryRun !== true
+    || !mismatchTemplate.inspectFields?.includes('sourceDestructive')
+  ) {
+    throw new Error('Expected directory mismatch template to be a source-safe dry-run organization plan.');
+  }
+  const copyTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'copy-organized-staging');
+  if (
+    copyTemplate?.tool !== 'organize_font_directory'
+    || copyTemplate?.writesFiles !== true
+    || copyTemplate?.sourceDestructive !== false
+    || copyTemplate?.args?.dryRun !== false
+    || copyTemplate?.args?.overwriteExisting !== false
+    || !copyTemplate.inspectFields?.includes('writesSourceTree')
+  ) {
+    throw new Error('Expected copy staging template to disclose copy-only source safety.');
+  }
+  const batchPreviewTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'batch-dry-run-preview');
+  if (
+    batchPreviewTemplate?.tool !== 'split_font_batch'
+    || batchPreviewTemplate?.writesFiles !== false
+    || batchPreviewTemplate?.args?.dryRun !== true
+    || batchPreviewTemplate?.args?.includeResults !== true
+  ) {
+    throw new Error('Expected batch preview template to be a no-write dry run with included results.');
+  }
   for (const fieldName of result.responseFieldsToCheck || []) {
     const entry = result.toolResponseFieldCatalog?.[fieldName];
     if (!entry || !Array.isArray(entry.sourceTools) || entry.sourceTools.length === 0 || !entry.meaning || !entry.agentAction) {
@@ -313,6 +358,9 @@ if (scenario === 'single') {
   }
   for (const item of result.directoryWorkflowExamples || []) {
     for (const fieldName of item.mustInspectFields || []) referencedFieldNames.add(fieldName);
+  }
+  for (const item of result.safeInvocationTemplates || []) {
+    for (const fieldName of item.inspectFields || []) referencedFieldNames.add(fieldName);
   }
   for (const fieldName of referencedFieldNames) {
     if (!result.toolResponseFieldCatalog?.[fieldName]) {
@@ -1029,7 +1077,7 @@ if (scenario === 'single') {
         throw new Error(`organize_font_directory is missing ${requiredOrganizeProp}`);
       }
     }
-    expectDescriptionIncludes('get_agent_guidance', ['directoryWorkflowDecisionMatrix', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect']);
+    expectDescriptionIncludes('get_agent_guidance', ['directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'batchWarnings']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files']);
