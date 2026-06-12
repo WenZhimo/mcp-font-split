@@ -564,6 +564,7 @@ npm run smoke:batch-run
 npm run smoke:batch-dry-run
 npm run smoke:batch-defaults
 npm run smoke:real-corpus -- <font-corpus-dir>
+npm run smoke:real-corpus-write -- <font-corpus-dir>
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
 npm run smoke:inspect
@@ -573,6 +574,8 @@ npm run smoke:small-skip
 `npm run check` is the recommended agent/CI entry point. It runs syntax checks plus smoke scenarios that create their own tiny inputs and do not require a real font library.
 
 `smoke:real-corpus` is an explicit read-only check for a local real font corpus, and is not included in `npm run check`. It treats the supplied directory as `FONT_SPLIT_ROOT`, first runs `inspect_font_inputs` against the corpus root with `includeFiles:false`, then auto-selects a sample directory containing fonts for `structure-first` `organize_font_directory` and no-write `split_font_batch` preview checks. It verifies broad `unsupportedFileSummary`, `recommendedBatchPreviewArgs`, batch `recommendedNextActions`, and safety fields without creating an output directory. The optional second argument selects the sample directory; the optional third argument overrides `maxFiles` (default `50000`).
+
+`smoke:real-corpus-write` is an explicit write/audit check for the same kind of local corpus, and is also not included in `npm run check`. It inspects the corpus root, selects a real sample directory, removes and recreates only a generated `.font-split-*` output root, runs `split_font_batch` with `workflowPreset: "reviewed-write"`, then calls `inspect_split_output` through the returned `audit-split-output` action and requires `structureSummary.conforms: true`. Optional arguments are `<font-corpus-dir> [sample-input-dir] [output-root] [maxFiles] [limit]`; the default output root is `font-split-mcp/.font-split-real-corpus-write-output`.
 
 `smoke:small-skip` currently exercises the `copy-original` small-font policy; the script name is kept for compatibility. `smoke:incremental` also prints a sample `splitDir` so you can verify the collision-safe batch naming stays stable across reruns.
 
