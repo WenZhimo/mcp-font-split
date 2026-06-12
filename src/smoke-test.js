@@ -628,6 +628,14 @@ function assertDirectoryWorkflowSummary(summary, {
   if (!summary.policySnapshot?.batchGroupBy || !summary.policySnapshot?.effectiveBatchDedupeMode) {
     throw new Error(`${context}: expected directoryWorkflowSummary.policySnapshot.`);
   }
+  if (
+    typeof summary.planVisibility?.planIncluded !== 'boolean'
+    || !Array.isArray(summary.planVisibility?.detailsOmitted)
+    || !summary.planVisibility?.availableSummaryFields?.includes('planActionSummary')
+    || !summary.planVisibility?.successCriteria
+  ) {
+    throw new Error(`${context}: expected directoryWorkflowSummary.planVisibility to describe compact plan visibility.`);
+  }
   if (!summary.directBatchPreviewArgs?.workflowPreset || summary.directBatchPreviewArgs.workflowPreset !== 'safe-preview') {
     throw new Error(`${context}: expected directoryWorkflowSummary.directBatchPreviewArgs to be a safe-preview call.`);
   }
@@ -1904,6 +1912,18 @@ if (scenario === 'single') {
   }
   if (compact.organizationDecision?.route !== 'decide-on-invalid-fonts') {
     throw new Error('Expected compact organization dry-run to keep organizationDecision.');
+  }
+  if (
+    compact.directoryWorkflowSummary?.planVisibility?.planIncluded !== false
+    || !compact.directoryWorkflowSummary?.planVisibility?.detailsOmitted?.includes('plan')
+    || !compact.directoryWorkflowSummary?.planVisibility?.availableSummaryFields?.includes('planActionSummary')
+    || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanBeforeWrite !== true
+    || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanArgs?.workflowPreset !== 'safe-preview'
+    || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanArgs?.includePlan !== true
+    || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanArgs?.inputDir !== inputDir
+    || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanArgs?.outputDir !== outputDir
+  ) {
+    throw new Error('Expected compact organization dry-run to explain omitted plan[] details and provide rerun guidance.');
   }
   console.log(JSON.stringify(result, null, 2));
   console.log(JSON.stringify({ compact }, null, 2));
@@ -3202,6 +3222,8 @@ if (scenario === 'single') {
       'batchPolicyGuide',
       'batchPolicySummary',
       'directoryWorkflowSummary',
+      'planVisibility',
+      'directoryWorkflowSummary.planVisibility',
       'unsupportedFileCategoryCatalog',
       'directoryWorkflowDecisionMatrix',
       'safeInvocationTemplates',
@@ -3275,6 +3297,8 @@ if (scenario === 'single') {
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
     '`directoryWorkflowSummary`',
+    '`planVisibility`',
+    '`directoryWorkflowSummary.planVisibility`',
     '`unsupportedFileCategoryCatalog`',
     '`verificationChecklist[]`',
     '`smoke:real-corpus-suite`',

@@ -852,6 +852,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Response-local navigation summary for source-layout mismatch handling, safe staging, batch preview, reviewed write, and output audit.',
     agentAction: 'Use it to explain the current layout workflow in one pass, then verify the referenced safety, warning, plan, batch preview, and audit fields.',
   },
+  planVisibility: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Explains whether the organizer response includes detailed plan[] entries or only compact summary fields.',
+    agentAction: 'When planIncluded is false, use the listed summary fields for triage and rerun with includePlan:true before copying if exact per-file targets matter.',
+  },
   plan: {
     sourceTools: ['organize_font_directory'],
     meaning: 'Per-font copy or skip plan entries for directory organization.',
@@ -2371,6 +2376,7 @@ export function getAgentGuidance(args = {}) {
       'planActionSummary',
       'organizationDecision',
       'directoryWorkflowSummary',
+      'planVisibility',
       'plan',
       'sourceDestructive',
       'sourceFilesPreserved',
@@ -3211,6 +3217,7 @@ function buildOrganizationNextActions({
         outputDir: outputDirRelative,
         workflowPreset: options.parseFonts ? 'safe-preview' : 'structure-first',
         options,
+        optionOverrides: { includePlan: true },
         extraArgs: { maxFiles: '<higher-than-current>' },
       }),
       inspectFields: ['organizationDecision', 'directoryWorkflowSummary', 'maxFilesHit', 'layout', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
@@ -3247,7 +3254,7 @@ function buildOrganizationNextActions({
         outputDir: outputDirRelative,
         workflowPreset: 'safe-preview',
         options,
-        optionOverrides: { dryRun: true, copyInvalidFonts: true },
+        optionOverrides: { dryRun: true, includePlan: true, copyInvalidFonts: true },
       }),
       inspectFields: ['organizationDecision', 'directoryWorkflowSummary', 'invalidFontCount', 'organizationWarnings', 'planActionSummary', 'plan'],
       note: 'Use copyInvalidFonts:true only when preserving broken font-like files is intentional.',
@@ -3481,6 +3488,7 @@ function buildOrganizationDecision({
 
 function buildDirectoryWorkflowSummary({
   options,
+  inputDirRelative,
   layout,
   safetySummary,
   organizationDecision,
@@ -3626,10 +3634,43 @@ function buildDirectoryWorkflowSummary({
     nonIntuitiveBehavior.push('writesSourceTree true means the output tree is inside the input tree, not that source font files are modified.');
   }
 
+  const planVisibility = {
+    planIncluded: options.includePlan,
+    detailsOmitted: options.includePlan ? [] : ['plan'],
+    availableSummaryFields: [
+      'planActionSummary',
+      'organizationDecision',
+      'directoryWorkflowSummary',
+      'recommendedNextActions',
+      'organizationWarnings',
+      'layout',
+      'safetySummary',
+      'batchPolicySummary',
+    ],
+    summaryUse: options.includePlan
+      ? 'plan[] is available for exact per-file copy, skip, dedupe, and target review.'
+      : 'plan[] is omitted; planActionSummary and routing fields are suitable for triage but not exact per-file target review.',
+    rerunWithPlanBeforeWrite: options.dryRun && !options.includePlan,
+    rerunWithPlanArgs: options.dryRun && !options.includePlan
+      ? buildSuggestedOrganizationArgs({
+        inputDir: inputDirRelative,
+        outputDir: outputDirRelative,
+        workflowPreset: 'safe-preview',
+        options,
+        optionOverrides: { dryRun: true, includePlan: true },
+        extraArgs: { includePlan: true },
+      })
+      : null,
+    successCriteria: options.includePlan
+      ? 'Detailed plan[] is visible; review it with organizationWarnings before any copy-only write.'
+      : 'For large/noisy triage, inspect availableSummaryFields; before copy-only writes that depend on exact targets, rerun the dry-run with includePlan:true.',
+  };
+
   return {
     summaryType: 'directory-layout-workflow',
     appliesToTool: 'organize_font_directory',
     currentStep: options.dryRun ? 'layout-plan' : 'copy-only-staging',
+    planVisibility,
     sourceLayout: {
       layoutKind: layout.layoutKind,
       recommendedBatchGroupBy: layout.recommendedBatchOptions?.batchGroupBy,
@@ -5820,6 +5861,7 @@ export async function organizeFontDirectory(args = {}) {
   });
   const directoryWorkflowSummary = buildDirectoryWorkflowSummary({
     options,
+    inputDirRelative,
     layout,
     safetySummary,
     organizationDecision,
