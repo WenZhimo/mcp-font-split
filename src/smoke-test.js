@@ -13,6 +13,7 @@ const fontPath = process.argv[3] || '0xA000/0xA000-Regular.ttf';
 const outDir = process.argv[4] || 'font-split-mcp/.font-split-smoke-output';
 const REAL_CORPUS_FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.ttc', '.otc', '.woff', '.woff2']);
 const DEFAULT_REAL_CORPUS_TARGETS = ['aexpective', 'tiny5', 'agu_display', 'architectural'];
+const DEFAULT_REAL_CORPUS_TARGET_SAMPLE_COUNT = 10;
 const REAL_CORPUS_TARGET_EXPECTATIONS = {
   aexpective: {
     supportedFontCount: 4,
@@ -280,11 +281,99 @@ function isRealCorpusSupportedFont(file) {
 }
 
 function parseRealCorpusTargetList(value) {
-  if (!value) return DEFAULT_REAL_CORPUS_TARGETS;
-  return value
+  if (!value || String(value).trim().toLowerCase() === 'auto') return null;
+  return String(value)
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function buildRealCorpusTargetProfiles({ corpusRoot, files }) {
+  const byTopLevelDir = new Map();
+  for (const file of files) {
+    const relative = path.relative(corpusRoot, file);
+    const parts = relative.split(path.sep).filter(Boolean);
+    if (parts.length < 2) continue;
+    const inputDir = parts[0];
+    const profile = byTopLevelDir.get(inputDir) || {
+      inputDir,
+      scannedFileCount: 0,
+      supportedFontCount: 0,
+      unsupportedFileCount: 0,
+      fontExtensions: new Set(),
+      unsupportedExtensions: new Set(),
+    };
+    const extension = path.extname(file).toLowerCase() || '<none>';
+    profile.scannedFileCount++;
+    if (isRealCorpusSupportedFont(file)) {
+      profile.supportedFontCount++;
+      profile.fontExtensions.add(extension);
+    } else {
+      profile.unsupportedFileCount++;
+      profile.unsupportedExtensions.add(extension);
+    }
+    byTopLevelDir.set(inputDir, profile);
+  }
+
+  return [...byTopLevelDir.values()]
+    .filter((profile) => profile.supportedFontCount > 0)
+    .map((profile) => ({
+      ...profile,
+      fontExtensions: [...profile.fontExtensions].sort(),
+      unsupportedExtensions: [...profile.unsupportedExtensions].sort(),
+    }))
+    .sort((a, b) => a.inputDir.localeCompare(b.inputDir, undefined, { numeric: true }));
+}
+
+function scoreRealCorpusTargetProfile(profile) {
+  return profile.supportedFontCount * 8
+    + profile.unsupportedFileCount * 2
+    + profile.fontExtensions.length * 20
+    + profile.unsupportedExtensions.length * 12
+    + (profile.fontExtensions.some((extension) => extension === '.woff' || extension === '.woff2') ? 25 : 0)
+    + (profile.unsupportedFileCount > 0 ? 15 : 0);
+}
+
+function selectRealCorpusTargets({ requestedTargets, targetProfiles, sampleCount }) {
+  if (requestedTargets) {
+    return {
+      mode: 'explicit',
+      targets: requestedTargets,
+      availableTargetCount: targetProfiles.length,
+      selectedProfiles: targetProfiles.filter((profile) => requestedTargets.includes(profile.inputDir)),
+    };
+  }
+
+  const profileByInputDir = new Map(targetProfiles.map((profile) => [profile.inputDir, profile]));
+  const selected = [];
+  const selectedSet = new Set();
+  const addTarget = (inputDir) => {
+    if (!inputDir || selectedSet.has(inputDir) || !profileByInputDir.has(inputDir)) return;
+    selected.push(inputDir);
+    selectedSet.add(inputDir);
+  };
+
+  for (const inputDir of DEFAULT_REAL_CORPUS_TARGETS) {
+    addTarget(inputDir);
+  }
+
+  const ranked = [...targetProfiles]
+    .filter((profile) => !selectedSet.has(profile.inputDir))
+    .sort((a, b) => {
+      const scoreDelta = scoreRealCorpusTargetProfile(b) - scoreRealCorpusTargetProfile(a);
+      return scoreDelta || a.inputDir.localeCompare(b.inputDir, undefined, { numeric: true });
+    });
+  for (const profile of ranked) {
+    if (selected.length >= sampleCount) break;
+    addTarget(profile.inputDir);
+  }
+
+  return {
+    mode: 'auto',
+    targets: selected,
+    availableTargetCount: targetProfiles.length,
+    selectedProfiles: selected.map((inputDir) => profileByInputDir.get(inputDir)).filter(Boolean),
+  };
 }
 
 async function findRealCorpusSample({ corpusRoot, requestedInputDir, maxFiles }) {
@@ -1519,12 +1608,8 @@ if (scenario === 'single') {
 
   const { stdout } = await execFileAsync(process.execPath, ['batch-run.js', inputDir, outputRoot, '1', '1', '--dry-run'], {
     cwd: process.cwd(),
-    env: {
-      ...process.env,
-      FONT_SPLIT_INCLUDE_RESULTS: 'false',
-    },
   });
-  for (const expectedText of ['Batch warnings:', 'dry-run-no-write', 'input-scan-truncated', 'batch-plan-omitted']) {
+  for (const expectedText of ['"workflowPreset": "safe-preview"', 'Batch warnings:', 'dry-run-no-write', 'input-scan-truncated', 'Results included: true']) {
     if (!stdout.includes(expectedText)) {
       throw new Error(`Expected batch-run CLI output to include ${expectedText}.`);
     }
@@ -2553,11 +2638,20 @@ if (scenario === 'single') {
   }, null, 2));
 } else if (scenario === 'real-corpus-targets') {
   const corpusRoot = path.resolve(process.argv[3] || process.env.FONT_SPLIT_REAL_CORPUS_DIR || path.join(process.cwd(), '..'));
-  const targets = parseRealCorpusTargetList(process.argv[4] || process.env.FONT_SPLIT_REAL_CORPUS_TARGETS);
+  const requestedTargets = parseRealCorpusTargetList(process.argv[4] || process.env.FONT_SPLIT_REAL_CORPUS_TARGETS);
   const maxFiles = Number.parseInt(process.argv[5] || process.env.FONT_SPLIT_REAL_CORPUS_MAX_FILES || '50000', 10);
   const limit = Number.parseInt(process.argv[6] || process.env.FONT_SPLIT_REAL_CORPUS_TARGET_LIMIT || '100', 10);
-  if (targets.length === 0 || !Number.isFinite(maxFiles) || maxFiles < 1 || !Number.isFinite(limit) || limit < 1) {
-    throw new Error('Expected targets plus positive maxFiles and limit for real-corpus-targets smoke.');
+  const sampleCount = Number.parseInt(process.argv[7] || process.env.FONT_SPLIT_REAL_CORPUS_TARGET_SAMPLE_COUNT || String(DEFAULT_REAL_CORPUS_TARGET_SAMPLE_COUNT), 10);
+  if (
+    (requestedTargets && requestedTargets.length === 0)
+    || !Number.isFinite(maxFiles)
+    || maxFiles < 1
+    || !Number.isFinite(limit)
+    || limit < 1
+    || !Number.isFinite(sampleCount)
+    || sampleCount < 1
+  ) {
+    throw new Error('Expected targets plus positive maxFiles, limit, and sampleCount for real-corpus-targets smoke.');
   }
   process.env.FONT_SPLIT_ROOT = corpusRoot;
 
@@ -2568,6 +2662,14 @@ if (scenario === 'single') {
   const outputDirExistedBefore = await fsExists(resolvedOutputDir);
   const outputRootExistedBefore = await fsExists(resolvedOutputRoot);
 
+  const corpusProbeFiles = await collectProbeFiles(corpusRoot, { maxFiles });
+  const targetProfiles = buildRealCorpusTargetProfiles({ corpusRoot, files: corpusProbeFiles });
+  const targetSelection = selectRealCorpusTargets({ requestedTargets, targetProfiles, sampleCount });
+  const targets = targetSelection.targets;
+  if (targets.length === 0) {
+    throw new Error(`Expected real corpus root to contain at least one supported top-level sample directory within ${maxFiles} files.`);
+  }
+
   const corpusInspection = await inspectFontInputs({
     inputDir: '.',
     maxFiles,
@@ -2577,7 +2679,7 @@ if (scenario === 'single') {
     throw new Error('Expected targeted real corpus smoke to inspect the full bounded corpus root without truncation.');
   }
 
-  console.log('Real corpus targeted dry-run smoke:', corpusRoot, 'targets:', targets.join(','), 'limit:', limit, 'maxFiles:', maxFiles);
+  console.log('Real corpus targeted dry-run smoke:', corpusRoot, 'selection:', targetSelection.mode, 'targets:', targets.join(','), 'limit:', limit, 'maxFiles:', maxFiles);
   const targetSummaries = [];
   for (const target of targets) {
     const sample = await findRealCorpusSample({ corpusRoot, requestedInputDir: target, maxFiles });
@@ -2605,6 +2707,7 @@ if (scenario === 'single') {
     const planned = batchPreview.planned || [];
     const numericSuffixCount = planned.filter((item) => /-\d+$/.test(item.splitDirName || '')).length;
     const sourceSuffixCount = planned.filter((item) => (item.splitDirName || '').includes('--')).length;
+    const expected = REAL_CORPUS_TARGET_EXPECTATIONS[sample.inputDir];
     if (
       inspection.supportedFontCount < 1
       || organization.dryRun !== true
@@ -2620,7 +2723,7 @@ if (scenario === 'single') {
       || batchWriteAction?.tool !== 'split_font_batch'
       || batchWriteAction?.suggestedArgs?.workflowPreset !== 'reviewed-write'
       || batchWriteAction?.suggestedArgs?.batchGroupBy !== organization.recommendedBatchPreviewArgs?.batchGroupBy
-      || numericSuffixCount !== 0
+      || (expected && numericSuffixCount !== 0)
       || sourceSuffixCount !== 0
     ) {
       throw new Error(`Expected targeted real corpus dry-run to stay safe and stable for ${target}.`);
@@ -2629,7 +2732,6 @@ if (scenario === 'single') {
       split_font_batch: batchPreview,
     }, `real-corpus-targets ${target} batch action`);
 
-    const expected = REAL_CORPUS_TARGET_EXPECTATIONS[sample.inputDir];
     if (
       expected
       && (
@@ -2673,6 +2775,14 @@ if (scenario === 'single') {
 
   console.log(JSON.stringify({
     corpusRoot,
+    selection: {
+      mode: targetSelection.mode,
+      requestedTargets,
+      sampleCount,
+      availableTargetCount: targetSelection.availableTargetCount,
+      selectedTargetCount: targets.length,
+      selectedProfiles: targetSelection.selectedProfiles,
+    },
     corpus: {
       supportedFontCount: corpusInspection.supportedFontCount,
       unsupportedFileSummary: corpusInspection.unsupportedFileSummary,

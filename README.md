@@ -542,7 +542,7 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。它默认使用 `includeResults: false`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"`、`skipMode: "manifest"`、`batchErrorMode: "fail-after"` 和 `splitFailureAction: "single-woff2"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_DRY_RUN` 提供相同配置。它会在控制台摘要里打印 `batchWarnings[]` 的 code/message。高级覆盖项可使用 `FONT_SPLIT_INCLUDE_RESULTS`、`FONT_SPLIT_SKIP_MODE`、`FONT_SPLIT_BATCH_GROUP_BY`、`FONT_SPLIT_BATCH_NAMING_MODE`、`FONT_SPLIT_BATCH_DEDUPE_MODE`、`FONT_SPLIT_BATCH_ERROR_MODE`、`FONT_SPLIT_SPLIT_FAILURE_ACTION` 和 `FONT_SPLIT_CHUNK_SIZE`。
+`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。默认真实运行使用 `workflowPreset: "reviewed-write"`；带 `--dry-run` 或 `FONT_SPLIT_DRY_RUN=true` 时使用 `workflowPreset: "safe-preview"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_WORKFLOW_PRESET` 提供相同配置。环境变量覆盖项只有显式设置时才会覆盖 preset 默认值，包括 `FONT_SPLIT_DRY_RUN`、`FONT_SPLIT_INCLUDE_RESULTS`、`FONT_SPLIT_SKIP_MODE`、`FONT_SPLIT_BATCH_GROUP_BY`、`FONT_SPLIT_BATCH_NAMING_MODE`、`FONT_SPLIT_BATCH_DEDUPE_MODE`、`FONT_SPLIT_BATCH_ERROR_MODE`、`FONT_SPLIT_SPLIT_FAILURE_ACTION` 和 `FONT_SPLIT_CHUNK_SIZE`。它会在控制台摘要里打印 `batchWarnings[]` 的 code/message。
 
 ### Smoke 检查
 
@@ -579,7 +579,7 @@ npm run smoke:small-copy-original
 
 `smoke:real-corpus` 是显式的本机真实语料只读检查，不包含在 `npm run check` 中。它会把传入目录作为 `FONT_SPLIT_ROOT`，先对语料根目录运行 `includeFiles:false` 的 `inspect_font_inputs`，再自动选择一个含字体的样本目录执行 `structure-first` 的 `organize_font_directory` 和无写入 `split_font_batch` 预览检查。它会验证全库范围的 `unsupportedFileSummary`、`recommendedBatchPreviewArgs`、批量 `recommendedNextActions` 和安全字段，不会创建输出目录。可选第二个参数指定样本目录；可选第三个参数覆盖 `maxFiles`（默认 `50000`）。这个检查的目标是用复杂真实语料覆盖发现、统计和预览路径，不是逐个字体目录做验收。
 
-`smoke:real-corpus-targets` 是显式的真实语料定向回归检查，也不包含在 `npm run check` 中。它默认会依次审计 `aexpective`、`tiny5`、`agu_display` 和 `architectural` 这些代表性问题家族，验证目录结构建议、`font-identity` 去重数量、是否出现意外数字/源后缀，以及 `run-reviewed-batch-write` 后续动作，同时不创建任何输出目录。它用于覆盖已知复杂形态，不表示工具会逐目录检查整个语料库。可选参数为 `<字体语料目录> [逗号分隔的目标目录] [maxFiles] [limit]`。
+`smoke:real-corpus-targets` 是显式的真实语料定向回归和自动抽样检查，也不包含在 `npm run check` 中。默认会先保留 `aexpective`、`tiny5`、`agu_display` 和 `architectural` 这些已知问题家族作为固定回归点，再从语料根目录自动选择若干有代表性的顶层字体目录，覆盖字体数量较多、格式组合较多、非字体噪声较多或 WOFF/WOFF2 较多的场景。它验证目录结构建议、`font-identity` 去重、默认命名不混入 `source-suffix`、固定回归样本不出现意外数字后缀，以及 `run-reviewed-batch-write` 后续动作，同时不创建任何输出目录。它的目标是用真实复杂语料扩大功能链覆盖面，不是逐目录检查整个语料库。可选参数为 `<字体语料目录> [逗号分隔的目标目录|auto] [maxFiles] [limit] [sampleCount]`；默认 `sampleCount` 为 `10`，也可用 `FONT_SPLIT_REAL_CORPUS_TARGET_SAMPLE_COUNT` 设置。
 
 `smoke:real-corpus-integration` 是显式的真实语料代表性写入/审计集成检查，也不包含在 `npm run check` 中。它会检查运行时和 agent 指南，对语料根目录做 compact 输入扫描，选择一个真实样本目录，依次运行目录整理 dry-run、目录整理 copy-only 写入、单字体 `split_font` 写入、批量 dry-run、批量 reviewed-write 和 `inspect_split_output` 输出审计。它只会删除并重建传入语料目录下生成用的 `.font-split-*` 输出根，不会移动、删除或重写源字体。可选参数为 `<字体语料目录> [样本输入目录] [输出根目录] [maxFiles] [limit]`；默认输出根是 `font-split-mcp/.font-split-real-corpus-integration-output`。
 

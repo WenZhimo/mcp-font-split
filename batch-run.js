@@ -1,8 +1,14 @@
 import { splitFontBatch } from './src/font-split.js';
 
+const WORKFLOW_PRESETS = ['default', 'safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all'];
+
 function numberOption(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function hasEnv(name) {
+  return process.env[name] !== undefined && process.env[name] !== '';
 }
 
 function booleanEnv(value) {
@@ -25,31 +31,35 @@ const inputDir = process.env.FONT_SPLIT_INPUT_DIR || process.argv[2] || '.';
 const outputRoot = process.env.FONT_SPLIT_OUTPUT_ROOT || process.argv[3] || 'split-output';
 const limit = numberOption(process.env.FONT_SPLIT_LIMIT || process.argv[4], 50000);
 const maxFiles = numberOption(process.env.FONT_SPLIT_MAX_FILES || process.argv[5], 50000);
-const dryRun = process.argv.includes('--dry-run') || booleanEnv(process.env.FONT_SPLIT_DRY_RUN);
-const includeResults = booleanOption(process.env.FONT_SPLIT_INCLUDE_RESULTS, false);
+const dryRunFlag = process.argv.includes('--dry-run');
+const dryRunEnvProvided = hasEnv('FONT_SPLIT_DRY_RUN');
+const dryRun = dryRunFlag || booleanEnv(process.env.FONT_SPLIT_DRY_RUN);
+const includeResults = booleanOption(process.env.FONT_SPLIT_INCLUDE_RESULTS, undefined);
 const chunkSize = numberOption(process.env.FONT_SPLIT_CHUNK_SIZE, 70 * 1024);
+const workflowPreset = enumOption(process.env.FONT_SPLIT_WORKFLOW_PRESET, WORKFLOW_PRESETS, dryRun ? 'safe-preview' : 'reviewed-write');
 const skipMode = enumOption(process.env.FONT_SPLIT_SKIP_MODE, ['legacy-css', 'manifest', 'force'], undefined);
 const batchGroupBy = enumOption(process.env.FONT_SPLIT_BATCH_GROUP_BY, ['auto', 'source-dir', 'font-family'], undefined);
-const batchNamingMode = enumOption(process.env.FONT_SPLIT_BATCH_NAMING_MODE, ['plain', 'numeric-suffix', 'source-suffix'], 'numeric-suffix');
-const batchDedupeMode = enumOption(process.env.FONT_SPLIT_BATCH_DEDUPE_MODE, ['none', 'same-path', 'font-identity'], 'font-identity');
+const batchNamingMode = enumOption(process.env.FONT_SPLIT_BATCH_NAMING_MODE, ['plain', 'numeric-suffix', 'source-suffix'], undefined);
+const batchDedupeMode = enumOption(process.env.FONT_SPLIT_BATCH_DEDUPE_MODE, ['none', 'same-path', 'font-identity'], undefined);
 const batchErrorMode = enumOption(process.env.FONT_SPLIT_BATCH_ERROR_MODE, ['collect', 'fail-fast', 'fail-after'], undefined);
-const splitFailureAction = enumOption(process.env.FONT_SPLIT_SPLIT_FAILURE_ACTION, ['error', 'single-woff2'], 'single-woff2');
+const splitFailureAction = enumOption(process.env.FONT_SPLIT_SPLIT_FAILURE_ACTION, ['error', 'single-woff2'], undefined);
 const startedAt = Date.now();
 const batchOptions = {
   inputDir,
   outputRoot,
   limit,
   maxFiles,
-  dryRun,
-  includeResults,
-  batchNamingMode,
-  batchDedupeMode,
-  splitFailureAction,
+  workflowPreset,
   silent: true,
   chunkSize,
+  ...(dryRunFlag || dryRunEnvProvided ? { dryRun } : {}),
+  ...(includeResults !== undefined ? { includeResults } : {}),
   ...(skipMode ? { skipMode } : {}),
   ...(batchGroupBy ? { batchGroupBy } : {}),
+  ...(batchNamingMode ? { batchNamingMode } : {}),
+  ...(batchDedupeMode ? { batchDedupeMode } : {}),
   ...(batchErrorMode ? { batchErrorMode } : {}),
+  ...(splitFailureAction ? { splitFailureAction } : {}),
 };
 
 console.log('Starting batch font split...');
