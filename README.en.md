@@ -303,6 +303,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `unsupportedFileSummary`: summary of all scanned ignored non-font files, including exact `unsupportedFileSummary.byExtension[]`, overview `unsupportedFileSummary.byCategory[]`, `<none>` counts for extensionless files, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`; archives are categorized as `archive` and still ignored
 - `dryRun`, `plannedCount`, `wouldProcessCount`, `planIncluded`
 - `batchWarningCount`, `batchWarnings[]` with machine-readable `code` and `message`
+- `batchPolicySummary`: compact summary of the grouping, naming, dedupe, and error policies selected for this call, including the relevant `batchPolicyGuide` success criteria
 - `batchDecision`: compact main-route recommendation for the batch response, distinguishing dry-run review, maxFiles rerun, error inspection, output audit, existing-output skips, and empty-batch branches
 - `batchErrorMode`, `errorCount`, `errors[]`
 - `safetySummary`: source/output safety summary for the batch call. Prefer it when deciding whether the call writes files or affects the source tree; source font files are preserved, and writes are limited to `outputRoot`.
@@ -334,6 +335,7 @@ Treat `batchDecision` as a route hint, not proof of success. It helps agents cho
 - `sourceFilesPreserved`: always `true`
 - `parsedFontMetadata`: false when `parseFonts: false`; then `validFontCount` / `invalidFontCount` are `null`
 - `effectiveBatchDedupeMode`, `dedupeLimitedByParsing`: explain whether identity dedupe was available
+- `batchPolicySummary`: compact summary of the grouping, naming, and dedupe policies selected for this organization call; when `parseFonts: false` limits identity dedupe, `effectiveValues.batchDedupeMode` shows the actual fallback
 - `unsupportedFileSummary`: summary of all ignored non-font files, including exact `unsupportedFileSummary.byExtension[]`, overview `unsupportedFileSummary.byCategory[]`, `<none>` counts for extensionless files, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`; inspect it first when the source tree mixes fonts with archives, images, docs, or generated assets
 - `layout.layoutKind`: `empty`, `flat`, `nested`, or `mixed`
 - `recommendedBatchOptions`: a suggested follow-up `split_font_batch` policy fragment for the detected layout; not a complete safe invocation

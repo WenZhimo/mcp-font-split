@@ -110,7 +110,7 @@ server.registerTool(
   'split_font_batch',
   {
     title: 'Batch split fonts under a directory',
-    description: 'Call this when the user wants to split many local font files under a directory. dryRun defaults to false and can write output files; agents should set dryRun:true with includeResults:true to preview scan, dedupe, naming, skip decisions, safetySummary, outputTreeInsideInputTree, batchDecision, and batchWarnings before writing. Source font files are never moved or deleted, but writesSourceTree can be true when outputRoot is inside or equal to inputDir.',
+    description: 'Call this when the user wants to split many local font files under a directory. dryRun defaults to false and can write output files; agents should set dryRun:true with includeResults:true to preview scan, dedupe, naming, skip decisions, safetySummary, batchPolicySummary, outputTreeInsideInputTree, batchDecision, and batchWarnings before writing. Source font files are never moved or deleted, but writesSourceTree can be true when outputRoot is inside or equal to inputDir.',
     inputSchema: {
       inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
       outputRoot: z.string().optional().describe('Directory to place per-font output folders. Defaults to split-output.'),
@@ -155,7 +155,7 @@ server.registerTool(
   'organize_font_directory',
   {
     title: 'Plan or copy-organize a font directory',
-    description: 'Call this when the source font directory layout does not match the desired batch grouping. It defaults to dryRun true and is source-non-destructive: it never moves or deletes source files, and when dryRun is false it only copies selected fonts into outputDir. Inspect safetySummary and outputTreeInsideInputTree because writesSourceTree can be true when outputDir is inside or equal to inputDir.',
+    description: 'Call this when the source font directory layout does not match the desired batch grouping. It defaults to dryRun true and is source-non-destructive: it never moves or deletes source files, and when dryRun is false it only copies selected fonts into outputDir. Inspect safetySummary, batchPolicySummary, and outputTreeInsideInputTree because writesSourceTree can be true when outputDir is inside or equal to inputDir.',
     inputSchema: {
       inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
       outputDir: z.string().optional().describe('Directory for organized copies, relative to the font workspace. Defaults to organized-fonts. Must differ from inputDir.'),

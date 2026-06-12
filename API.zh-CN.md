@@ -189,7 +189,7 @@
 
 预设会先展开；同一次调用里显式传入的参数会覆盖预设值。
 
-批量响应会包含 `safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree`、`mayOverwriteOutputTree`、`scannedFileCount`、`maxFiles`、`maxFilesHit`、`unsupportedFileSummary` 和 `batchDecision`。`sourceDestructive` 应始终为 `false`：批量处理不会移动、删除或重写源字体。`dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。只有当真实输出树位于 `inputDir` 内时，`writesSourceTree` 才为 `true`；此时源字体文件仍会保留，但输入目录树会新增生成输出。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileSummary` 会按扩展名汇总所有已扫描但被忽略的非字体文件。
+批量响应会包含 `safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree`、`mayOverwriteOutputTree`、`batchPolicySummary`、`scannedFileCount`、`maxFiles`、`maxFilesHit`、`unsupportedFileSummary` 和 `batchDecision`。`sourceDestructive` 应始终为 `false`：批量处理不会移动、删除或重写源字体。`dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。只有当真实输出树位于 `inputDir` 内时，`writesSourceTree` 才为 `true`；此时源字体文件仍会保留，但输入目录树会新增生成输出。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileSummary` 会按扩展名汇总所有已扫描但被忽略的非字体文件。
 
 批量格式代表优先级为：`.otf`、`.ttf`、`.woff2`、`.ttc`、`.otc`、`.woff`。
 
@@ -220,6 +220,8 @@
 批量响应包含 `batchWarningCount` 和 `batchWarnings[]`，用于提示 dry-run 未写文件、扫描被 `maxFiles` 截断、`limit` 截断、每字体详情被省略、已有输出被跳过、错误被收集等摘要级状态。每个 warning 都包含机器可读的 `code` 和人类可读的 `message`。
 
 `batchDecision` 是批量响应的压缩主线路由。它可能建议 `review-dry-run-plan`、`rerun-batch-with-higher-maxFiles`、`inspect-batch-errors`、`audit-written-output`、`review-existing-output-skips`、`no-supported-fonts` 或 `no-selected-fonts`，并可能附带 `reviewedWriteArgs`、`rerunArgs` 或 `auditArgs`。它只是路由提示，不是成功证明；仍要检查 `batchWarnings[]`、`errors[]`、`recommendedNextActions[]` 和输出审计字段。
+
+`batchPolicySummary` 会回显本次批量调用实际采用的分组、命名、去重和错误策略，并把它们关联回 `get_agent_guidance.batchPolicyGuide`。它包含 `values`、可选的 `effectiveValues`、`selectedPolicies[]`、当前响应可直接检查的 `inspectFields`、完整来源字段 `policyGuideInspectFields` 和 `policySuccessCriteria[]`。用它先解释本次调用的策略，再解释计数或计划路径。
 
 ## `organize_font_directory`
 
@@ -259,6 +261,7 @@
 | `unparsedFontCount` | 因 `parseFonts: false` 而被有意跳过元数据解析的受支持扩展名文件数。 |
 | `effectiveBatchDedupeMode` | 实际使用的去重策略。当 `parseFonts: false` 且请求 `batchDedupeMode: "font-identity"` 时，会回退到 `same-path`。 |
 | `dedupeLimitedByParsing` | 请求 identity 去重但因为跳过字体解析而无法执行时为 `true`。 |
+| `batchPolicySummary` | 本次整理调用所采用的分组、命名和去重策略摘要，以及对应的 `batchPolicyGuide` 成功标准。若 `parseFonts: false` 导致 identity 去重降级，`effectiveValues.batchDedupeMode` 会显示真实回退值。 |
 | `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、无扩展文件的 `<none>` 计数，以及少量示例路径。它用于解释为什么嘈杂源目录里有很多压缩包、文档、图片、生成产物或无扩展文件，但不会被复制或拆分。 |
 | `layout.layoutKind` | `empty`、`flat`、`nested` 或 `mixed`。`mixed` 表示输入根目录和子目录里都发现了字体。 |
 | `recommendedBatchOptions` | 根据目录形态建议的 `split_font_batch` 策略片段；嵌套或混合目录通常建议 `batchGroupBy: "source-dir"`，扁平目录通常建议 `font-family`。它本身不是完整安全调用。 |

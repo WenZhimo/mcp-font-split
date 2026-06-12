@@ -303,6 +303,7 @@ fonts/
 - `unsupportedFileSummary`：所有已扫描但被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；压缩包会归入 `archive` 并保持忽略
 - `dryRun`、`plannedCount`、`wouldProcessCount`、`planIncluded`
 - `batchWarningCount`、`batchWarnings[]`，每项包含机器可读的 `code` 和 `message`
+- `batchPolicySummary`：本次实际采用的批量分组、命名、去重和错误策略摘要，并附带对应 `batchPolicyGuide` 成功标准
 - `batchDecision`：批量响应的紧凑主线路由建议，用于区分 dry-run 计划审查、提高 `maxFiles` 重跑、错误检查、输出审计、已有输出跳过和空批量等分支
 - `batchErrorMode`、`errorCount`、`errors[]`
 - `safetySummary`：批量源目录/输出目录安全摘要。判断批量调用是否写文件、是否影响源目录树时优先看它；源字体文件应始终保留，写入范围只限 `outputRoot`。
@@ -334,6 +335,7 @@ fonts/
 - `sourceFilesPreserved`：恒为 `true`
 - `parsedFontMetadata`：`parseFonts: false` 时为 false；此时 `validFontCount` / `invalidFontCount` 是 `null`
 - `effectiveBatchDedupeMode`、`dedupeLimitedByParsing`：说明 identity 去重是否真正可用
+- `batchPolicySummary`：本次整理调用采用的分组、命名和去重策略摘要；当 `parseFonts: false` 限制 identity 去重时，`effectiveValues.batchDedupeMode` 会显示实际回退值
 - `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；源目录混有压缩包、图片、文档或生成产物时优先看它
 - `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`
 - `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 策略片段，不是完整安全调用

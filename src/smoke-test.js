@@ -527,6 +527,41 @@ function assertBatchPolicyGuide(policyGuide) {
   }
 }
 
+function assertBatchPolicySummary(summary, { context, appliesToTool, expectedValues, expectedEffectiveValues = {} }) {
+  if (!summary || summary.policySource !== 'get_agent_guidance.batchPolicyGuide' || summary.appliesToTool !== appliesToTool) {
+    throw new Error(`${context}: expected batchPolicySummary to point at batchPolicyGuide for ${appliesToTool}.`);
+  }
+  if (!Array.isArray(summary.selectedPolicies) || summary.selectedPolicies.length === 0) {
+    throw new Error(`${context}: expected batchPolicySummary.selectedPolicies.`);
+  }
+  if (!Array.isArray(summary.policySuccessCriteria) || summary.policySuccessCriteria.length !== summary.selectedPolicies.length) {
+    throw new Error(`${context}: expected batchPolicySummary.policySuccessCriteria for every selected policy.`);
+  }
+  if (!Array.isArray(summary.inspectFields) || summary.inspectFields.length === 0) {
+    throw new Error(`${context}: expected batchPolicySummary.inspectFields.`);
+  }
+  if (!Array.isArray(summary.policyGuideInspectFields) || summary.policyGuideInspectFields.length < summary.inspectFields.length) {
+    throw new Error(`${context}: expected batchPolicySummary.policyGuideInspectFields to retain the source policy fields.`);
+  }
+  for (const [optionName, value] of Object.entries(expectedValues)) {
+    const selected = summary.selectedPolicies.find((policy) => policy.optionName === optionName);
+    const success = summary.policySuccessCriteria.find((policy) => policy.optionName === optionName);
+    if (summary.values?.[optionName] !== value || selected?.value !== value || success?.value !== value) {
+      throw new Error(`${context}: expected batchPolicySummary ${optionName} to be ${value}.`);
+    }
+    if (!selected.inspectFields?.length || !selected.successCriteria || !success.successCriteria) {
+      throw new Error(`${context}: expected batchPolicySummary ${optionName} to include inspectFields and successCriteria.`);
+    }
+  }
+  for (const [optionName, value] of Object.entries(expectedEffectiveValues)) {
+    const selected = summary.selectedPolicies.find((policy) => policy.optionName === optionName);
+    const success = summary.policySuccessCriteria.find((policy) => policy.optionName === optionName);
+    if (summary.effectiveValues?.[optionName] !== value || selected?.effectiveValue !== value || success?.effectiveValue !== value) {
+      throw new Error(`${context}: expected batchPolicySummary effective ${optionName} to be ${value}.`);
+    }
+  }
+}
+
 function assertTemplateOmitsArgs(template, omittedArgs, context) {
   const leaked = omittedArgs.filter((key) => Object.hasOwn(template?.args || {}, key));
   if (leaked.length > 0) {
@@ -1225,6 +1260,7 @@ if (scenario === 'single') {
     workflowPresets: 'get_agent_guidance',
     workflowPreset: 'split_font_batch',
     batchPolicyGuide: 'get_agent_guidance',
+    batchPolicySummary: 'split_font_batch',
     batchGroupBy: 'split_font_batch',
     batchNamingMode: 'split_font_batch',
     batchDedupeMode: 'split_font_batch',
@@ -1956,6 +1992,18 @@ if (scenario === 'single') {
   if (result.operationMode !== 'copy-only' || result.validFontCount !== 2 || result.invalidFontCount !== 0 || result.deduplicatedCount !== 1 || result.skippedDuplicates !== 1 || result.copiedCount !== 1) {
     throw new Error('Expected valid-font organization to parse, identity-dedupe, and copy one representative.');
   }
+  assertBatchPolicySummary(result.batchPolicySummary, {
+    context: 'organize-valid-font',
+    appliesToTool: 'organize_font_directory',
+    expectedValues: {
+      batchGroupBy: 'font-family',
+      batchNamingMode: 'plain',
+      batchDedupeMode: 'font-identity',
+    },
+    expectedEffectiveValues: {
+      batchDedupeMode: 'font-identity',
+    },
+  });
   if (result.planActionSummary?.total !== 2 || result.planActionSummary?.byAction?.copied !== 1 || result.planActionSummary?.byAction?.['skipped-duplicate'] !== 1) {
     throw new Error('Expected valid-font organization to summarize copied and skipped-duplicate actions.');
   }
@@ -2033,6 +2081,18 @@ if (scenario === 'single') {
   if (result.effectiveBatchDedupeMode !== 'same-path' || result.dedupeLimitedByParsing !== true) {
     throw new Error('Expected structure-only organization to downgrade identity dedupe.');
   }
+  assertBatchPolicySummary(result.batchPolicySummary, {
+    context: 'organize-structure-only',
+    appliesToTool: 'organize_font_directory',
+    expectedValues: {
+      batchGroupBy: 'font-family',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+    },
+    expectedEffectiveValues: {
+      batchDedupeMode: 'same-path',
+    },
+  });
   if (!result.organizationWarnings?.some((warning) => warning.code === 'font-parsing-skipped')) {
     throw new Error('Expected structure-only organization warning about skipped font parsing.');
   }
@@ -2426,6 +2486,16 @@ if (scenario === 'single') {
   if (identityDedupe.discoveredFontCount !== 2 || identityDedupe.deduplicatedCount !== 1 || identityDedupe.skippedDuplicates !== 1 || identityDedupe.planned?.length !== 1) {
     throw new Error('Expected font-identity batch dedupe to collapse same-identity fonts despite glyph count differences.');
   }
+  assertBatchPolicySummary(identityDedupe.batchPolicySummary, {
+    context: 'batch-identity font-identity dry-run',
+    appliesToTool: 'split_font_batch',
+    expectedValues: {
+      batchGroupBy: 'font-family',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+      batchErrorMode: 'fail-after',
+    },
+  });
   if (
     identityDedupe.batchDecision?.route !== 'review-dry-run-plan'
     || identityDedupe.batchDecision?.preferredNextActionId !== 'run-reviewed-batch-write'
@@ -2931,8 +3001,8 @@ if (scenario === 'single') {
     }
     expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
-    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings']);
-    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'outputTreeInsideInputTree']);
+    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings']);
+    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree']);
     expectDescriptionIncludes('inspect_split_output', ['auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
@@ -2988,6 +3058,7 @@ if (scenario === 'single') {
       'recommendedWorkflowPlan',
       'configurationRecipes',
       'batchPolicyGuide',
+      'batchPolicySummary',
       'unsupportedFileCategoryCatalog',
       'directoryWorkflowDecisionMatrix',
       'safeInvocationTemplates',
@@ -3058,6 +3129,7 @@ if (scenario === 'single') {
     '`recommendedWorkflowPlan`',
     '`configurationRecipes[]`',
     '`batchPolicyGuide`',
+    '`batchPolicySummary`',
     '`unsupportedFileCategoryCatalog`',
     '`verificationChecklist[]`',
     '`smoke:real-corpus-suite`',

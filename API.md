@@ -189,7 +189,7 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 
 Presets are expanded first; any explicit argument in the same call overrides the preset value.
 
-Batch responses include `safetySummary`, `sourceDestructive`, `writesSourceTree`, `writesOutputTree`, `outputTreeInsideInputTree`, `mayOverwriteOutputTree`, `scannedFileCount`, `maxFiles`, `maxFilesHit`, `unsupportedFileSummary`, and `batchDecision`. `sourceDestructive` should always be `false`: batch processing does not move, delete, or rewrite source fonts. With `dryRun: false`, `writesOutputTree: true` means the tool writes generated files, original-font copies, and manifests under `outputRoot`, and may replace existing output files. `writesSourceTree` is true only when that real output tree is inside `inputDir`; in that case source font files are still preserved, but the input tree receives generated output. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileSummary` summarizes all scanned non-font files that were ignored by extension.
+Batch responses include `safetySummary`, `sourceDestructive`, `writesSourceTree`, `writesOutputTree`, `outputTreeInsideInputTree`, `mayOverwriteOutputTree`, `batchPolicySummary`, `scannedFileCount`, `maxFiles`, `maxFilesHit`, `unsupportedFileSummary`, and `batchDecision`. `sourceDestructive` should always be `false`: batch processing does not move, delete, or rewrite source fonts. With `dryRun: false`, `writesOutputTree: true` means the tool writes generated files, original-font copies, and manifests under `outputRoot`, and may replace existing output files. `writesSourceTree` is true only when that real output tree is inside `inputDir`; in that case source font files are still preserved, but the input tree receives generated output. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileSummary` summarizes all scanned non-font files that were ignored by extension.
 
 Batch dedupe priority is `.otf`, `.ttf`, `.woff2`, `.ttc`, `.otc`, `.woff`.
 
@@ -220,6 +220,8 @@ Dry-run responses use `planned[]` instead of `results[]` when `includeResults` i
 Batch responses include `batchWarningCount` and `batchWarnings[]` for summary-level notices such as dry-run no-write mode, scan truncation, limit truncation, omitted per-font details, existing-output skips, and collected per-font errors. Each warning has a machine-readable `code` and a human-readable `message`.
 
 `batchDecision` is the compact main route for a batch response. It can recommend `review-dry-run-plan`, `rerun-batch-with-higher-maxFiles`, `inspect-batch-errors`, `audit-written-output`, `review-existing-output-skips`, `no-supported-fonts`, or `no-selected-fonts`, and may include `reviewedWriteArgs`, `rerunArgs`, or `auditArgs`. Treat it as a route hint, not proof of success; still inspect `batchWarnings[]`, `errors[]`, `recommendedNextActions[]`, and output audit fields.
+
+`batchPolicySummary` echoes the batch policies selected for this call and links them back to `get_agent_guidance.batchPolicyGuide`. It includes `values`, optional `effectiveValues`, `selectedPolicies[]`, response-local `inspectFields`, complete `policyGuideInspectFields`, and `policySuccessCriteria[]`. Use it to explain the effective grouping, naming, dedupe, and error policy before interpreting counts or planned paths.
 
 ## `organize_font_directory`
 
@@ -259,6 +261,7 @@ Important result fields:
 | `unparsedFontCount` | Number of supported-extension files intentionally not parsed because `parseFonts` was false. |
 | `effectiveBatchDedupeMode` | Actual dedupe mode used. When `parseFonts: false` and `batchDedupeMode: "font-identity"`, this falls back to `same-path`. |
 | `dedupeLimitedByParsing` | `true` when requested identity dedupe could not run because font parsing was skipped. |
+| `batchPolicySummary` | Echo of the selected batch grouping, naming, and dedupe policies for this organization call, plus the relevant `batchPolicyGuide` success criteria. When `parseFonts: false` limits identity dedupe, `effectiveValues.batchDedupeMode` shows the actual fallback. |
 | `unsupportedFileSummary` | Compact summary of all ignored non-font files, including exact `byExtension`, overview `byCategory`, `<none>` for extensionless files, and a small set of example paths. It explains noisy source trees where archives, documents, images, generated assets, or extensionless files are present but will not be copied or split. |
 | `layout.layoutKind` | `empty`, `flat`, `nested`, or `mixed`. Mixed means fonts exist both at the input root and below subdirectories. |
 | `recommendedBatchOptions` | Suggested `split_font_batch` policy fragment for the detected layout. Nested or mixed inputs usually recommend `batchGroupBy: "source-dir"`; flat inputs usually recommend `font-family`. This is not a complete safe invocation by itself. |

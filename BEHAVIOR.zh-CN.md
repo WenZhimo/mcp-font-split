@@ -658,6 +658,7 @@ split-meta.json
 - `mayOverwriteOutputTree`：当前非 dry-run 调用是否可能覆盖 `outputRoot` 中的文件
 - `batchWarningCount`
 - `batchWarnings[]`：批量摘要级提示，每项包含 `code` 和 `message`
+- `batchPolicySummary`：本次实际采用的批量分组、命名、去重和错误策略摘要，并附带对应 `batchPolicyGuide` 成功标准
 - `batchDecision`：当前批量响应的紧凑主线路由建议
 - `recommendedNextActionCount`
 - `recommendedNextActions[]`：面向 agent 的批量后续动作建议；dry-run 可能给出 `run-reviewed-batch-write`，真实写入可能给出 `audit-split-output`，要求继续用 `inspect_split_output` 审计输出结构
@@ -675,6 +676,8 @@ split-meta.json
 - `decompressedInputs`
 - `oversizedKernDetected`
 - `oversizedKernStripped`
+
+`batchPolicySummary` 是本次调用的策略回显，不是成功证明。它会列出 `values`、可选 `effectiveValues`、`selectedPolicies[]`、当前响应可直接检查的 `inspectFields`、完整来源字段 `policyGuideInspectFields` 和 `policySuccessCriteria[]`；agent 应用它解释当前策略，然后继续检查 `batchWarnings[]`、`errors[]`、`batchDecision` 和后续审计字段。
 
 `batchDecision` 会把复杂的批量响应压缩成主线路由，例如 `review-dry-run-plan`、`rerun-batch-with-higher-maxFiles`、`inspect-batch-errors`、`audit-written-output`、`review-existing-output-skips`、`no-supported-fonts` 或 `no-selected-fonts`。它只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `batchWarnings[]`、`errors[]`、`recommendedNextActions[]`，以及真实写入后的输出审计字段。
 
@@ -708,6 +711,7 @@ split-meta.json
 | `unparsedFontCount` | 被有意跳过元数据解析的受支持扩展名文件数 |
 | `effectiveBatchDedupeMode` | 实际执行的整理去重策略 |
 | `dedupeLimitedByParsing` | 是否因跳过解析而无法执行真实 identity 去重 |
+| `batchPolicySummary` | 本次整理调用采用的分组、命名和去重策略摘要；若 `parseFonts: false` 导致 identity 去重降级，`effectiveValues.batchDedupeMode` 会显示实际回退值 |
 | `layout.layoutKind` | `empty` / `flat` / `nested` / `mixed` |
 | `recommendedBatchOptions` | 根据目录结构建议的后续批量策略片段，不是完整安全调用 |
 | `recommendedBatchPreviewArgs` | 可直接复制的后续 `split_font_batch` 无写入预览参数 |
