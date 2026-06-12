@@ -401,6 +401,9 @@ if (scenario === 'single') {
     || batchPreviewTemplate?.args?.workflowPreset !== 'safe-preview'
     || batchPreviewTemplate?.args?.dryRun !== true
     || batchPreviewTemplate?.args?.includeResults !== true
+    || !batchPreviewTemplate.inspectFields?.includes('safetySummary')
+    || !batchPreviewTemplate.inspectFields?.includes('sourceDestructive')
+    || !batchPreviewTemplate.inspectFields?.includes('writesOutputTree')
   ) {
     throw new Error('Expected batch preview template to be a no-write dry run with included results.');
   }
@@ -432,10 +435,10 @@ if (scenario === 'single') {
     workflowPresets: 'get_agent_guidance',
     workflowPreset: 'split_font_batch',
     recommendedBatchOptions: 'organize_font_directory',
-    safetySummary: 'organize_font_directory',
+    safetySummary: 'split_font_batch',
     unsupportedFileSummary: 'organize_font_directory',
     structureSummary: 'inspect_split_output',
-    sourceDestructive: 'organize_font_directory',
+    sourceDestructive: 'split_font_batch',
     batchWarnings: 'split_font_batch',
     inspectionWarnings: 'inspect_split_output',
     warningCodeCatalog: 'get_agent_guidance',
@@ -461,8 +464,8 @@ if (scenario === 'single') {
     throw new Error('Expected structure-first guidance to recommend parseFonts:false and dedupe checks.');
   }
   const knownBatchDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'known-good-batch-layout');
-  if (!knownBatchDecision?.mustInspectFields?.includes('unsupportedFileSummary')) {
-    throw new Error('Expected direct batch guidance to require unsupportedFileSummary inspection.');
+  if (!knownBatchDecision?.mustInspectFields?.includes('unsupportedFileSummary') || !knownBatchDecision?.mustInspectFields?.includes('safetySummary')) {
+    throw new Error('Expected direct batch guidance to require unsupportedFileSummary and safetySummary inspection.');
   }
   const mixedDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'unknown-or-mixed-directory-layout');
   if (!mixedDecision?.mustInspectFields?.includes('planActionSummary')) {
@@ -627,6 +630,16 @@ if (scenario === 'single') {
   });
   if (batchPlan.scannedFileCount !== 1 || batchPlan.maxFilesHit !== true || batchPlan.processedFontCount !== 0) {
     throw new Error('Expected splitFontBatch dry-run to report accurate scan truncation without processing.');
+  }
+  if (
+    batchPlan.safetySummary?.operationMode !== 'preview-only'
+    || batchPlan.sourceDestructive !== false
+    || batchPlan.sourceFilesPreserved !== true
+    || batchPlan.writesSourceTree !== false
+    || batchPlan.writesOutputTree !== false
+    || batchPlan.mayOverwriteOutputTree !== false
+  ) {
+    throw new Error('Expected splitFontBatch dry-run safety summary to be source-safe and no-write.');
   }
   if (batchPlan.unsupportedFileSummary?.total !== 1 || batchPlan.unsupportedFileSummary?.byExtension?.[0]?.extension !== '.txt') {
     throw new Error('Expected splitFontBatch dry-run to summarize scanned unsupported files.');
@@ -1189,6 +1202,11 @@ if (scenario === 'single') {
   if (
     safePreview.workflowPreset !== 'safe-preview'
     || safePreview.dryRun !== true
+    || safePreview.safetySummary?.operationMode !== 'preview-only'
+    || safePreview.sourceDestructive !== false
+    || safePreview.writesSourceTree !== false
+    || safePreview.writesOutputTree !== false
+    || safePreview.mayOverwriteOutputTree !== false
     || safePreview.resultsIncluded !== true
     || safePreview.strictMode !== true
     || safePreview.skipMode !== 'manifest'
@@ -1236,6 +1254,8 @@ if (scenario === 'single') {
   if (
     structureFirstBatch.workflowPreset !== 'structure-first'
     || structureFirstBatch.dryRun !== true
+    || structureFirstBatch.safetySummary?.operationMode !== 'preview-only'
+    || structureFirstBatch.writesOutputTree !== false
     || structureFirstBatch.resultsIncluded !== false
     || structureFirstBatch.batchDedupeMode !== 'same-path'
     || structureFirstBatch.deduplicatedCount !== 2
@@ -1465,6 +1485,12 @@ if (scenario === 'single') {
   if (
     batchWrite.workflowPreset !== 'reviewed-write'
     || batchWrite.dryRun !== false
+    || batchWrite.safetySummary?.operationMode !== 'batch-output'
+    || batchWrite.sourceDestructive !== false
+    || batchWrite.sourceFilesPreserved !== true
+    || batchWrite.writesSourceTree !== false
+    || batchWrite.writesOutputTree !== true
+    || batchWrite.mayOverwriteOutputTree !== true
     || batchWrite.processedFontCount !== 1
     || batchInspect.structureSummary?.conforms !== true
     || batchInspect.structureSummary?.layoutKind !== 'family-tree'

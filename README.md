@@ -63,6 +63,7 @@
 - 批量分组默认是 `batchGroupBy: "auto"`，会保留之前的目录优先行为。
 - 批量命名默认是 `batchNamingMode: "numeric-suffix"`：先用裸 `fontBaseName`，只有真实冲突时才分配稳定的 `-1`、`-2`、`-3`。
 - 当 OTF / TTF 仅容器不同但字体身份相同时，批量模式会去重并只保留一个代表。
+- 批量处理不会修改源目录：`sourceDestructive` 和 `writesSourceTree` 应始终为 `false`。真实写入只发生在 `outputRoot`，可能创建或替换生成输出、原字体副本和 manifest。
 - 批量增量跳过默认是 `skipMode: "legacy-css"`，会保留旧版只看 `result.css` 的行为。
 - 更安全的批量重跑建议使用 `skipMode: "manifest"` 或 `skipMode: "force"`。
 - `strictMode: true` 是更安全批量默认值的快捷入口：未显式设置时使用 `skipMode: "manifest"` 和 `batchErrorMode: "fail-after"`。
@@ -300,6 +301,10 @@ fonts/
 - `dryRun`、`plannedCount`、`wouldProcessCount`、`planIncluded`
 - `batchWarningCount`、`batchWarnings[]`，每项包含机器可读的 `code` 和 `message`
 - `batchErrorMode`、`errorCount`、`errors[]`
+- `safetySummary`：批量源目录/输出目录安全摘要。判断批量调用是否写文件、是否影响源目录时优先看它；源目录应始终保留，写入范围只限 `outputRoot`。
+- `sourceDestructive`、`writesSourceTree`：批量工具应始终返回 `false`
+- `writesOutputTree`：`dryRun: false` 时为 `true`
+- `mayOverwriteOutputTree`：非 dry-run 且有选中字体时为 `true`，表示可能替换 `outputRoot` 中已有输出
 - `skippedExisting`、`skippedLegacy`、`skippedByManifest`
 - `reprocessedBecauseSourceChanged`、`reprocessedBecauseOptionsChanged`
 - `processingSummary.subsetOutputs`

@@ -379,6 +379,17 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 11. 如果 `dryRun: true`，第 8 步不会真正执行，而是返回 `planned[]`、`plannedCount` 和 `wouldProcessCount`
 12. 如果 `batchErrorMode` 是 `fail-fast` 或 `fail-after`，按对应策略把单字体错误升级为批量工具错误
 
+批量处理的源目录安全语义：
+
+- 批量工具不会移动、删除或重写源字体文件。
+- `sourceDestructive` 恒为 `false`。
+- `sourceFilesPreserved` 恒为 `true`。
+- `writesSourceTree` 恒为 `false`。
+- `dryRun: true` 时 `writesOutputTree: false`，不会写 `outputRoot`。
+- `dryRun: false` 时 `writesOutputTree: true`，只会在 `outputRoot` 下写生成文件、原字体副本和 `split-meta.json`。
+- 非 dry-run 且有选中字体时 `mayOverwriteOutputTree: true`，表示已有输出文件可能被替换；这个风险只限输出目录，不影响源目录。
+- `safetySummary` 会集中重复这些字段，agent 判断批量工具是否破坏源目录时应优先看它。
+
 ### 6.1 批量去重策略
 
 格式优先级仍然是：
@@ -611,6 +622,12 @@ split-meta.json
 - `reprocessedBecauseSourceChanged`
 - `reprocessedBecauseOptionsChanged`
 - `processedFontCount`
+- `safetySummary`：集中的源目录/输出目录安全摘要；优先用于判断批量工具是否会写文件、是否影响源目录、覆盖风险是否只限输出目录
+- `sourceDestructive`：恒为 `false`
+- `sourceFilesPreserved`：恒为 `true`
+- `writesSourceTree`：恒为 `false`
+- `writesOutputTree`：`dryRun: false` 时为 `true`
+- `mayOverwriteOutputTree`：当前非 dry-run 调用是否可能覆盖 `outputRoot` 中的文件
 - `batchWarningCount`
 - `batchWarnings[]`：批量摘要级提示，每项包含 `code` 和 `message`
 - `errorCount`

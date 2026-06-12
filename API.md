@@ -148,7 +148,7 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 
 Presets are expanded first; any explicit argument in the same call overrides the preset value.
 
-Batch responses include `scannedFileCount`, `maxFiles`, `maxFilesHit`, and `unsupportedFileSummary`. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileSummary` summarizes all scanned non-font files that were ignored by extension.
+Batch responses include `safetySummary`, `sourceDestructive`, `writesSourceTree`, `writesOutputTree`, `mayOverwriteOutputTree`, `scannedFileCount`, `maxFiles`, `maxFilesHit`, and `unsupportedFileSummary`. `sourceDestructive` and `writesSourceTree` should always be `false`: batch processing does not move, delete, or rewrite source fonts. With `dryRun: false`, `writesOutputTree: true` means the tool writes generated files, original-font copies, and manifests under `outputRoot`, and may replace existing output files. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileSummary` summarizes all scanned non-font files that were ignored by extension.
 
 Batch dedupe priority is `.otf`, `.ttf`, `.woff2`, `.ttc`, `.otc`, `.woff`.
 

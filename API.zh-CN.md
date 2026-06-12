@@ -148,7 +148,7 @@
 
 预设会先展开；同一次调用里显式传入的参数会覆盖预设值。
 
-批量响应会包含 `scannedFileCount`、`maxFiles`、`maxFilesHit` 和 `unsupportedFileSummary`。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileSummary` 会按扩展名汇总所有已扫描但被忽略的非字体文件。
+批量响应会包含 `safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`mayOverwriteOutputTree`、`scannedFileCount`、`maxFiles`、`maxFilesHit` 和 `unsupportedFileSummary`。`sourceDestructive` 和 `writesSourceTree` 应始终为 `false`：批量处理不会移动、删除或重写源字体。`dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileSummary` 会按扩展名汇总所有已扫描但被忽略的非字体文件。
 
 批量格式代表优先级为：`.otf`、`.ttf`、`.woff2`、`.ttc`、`.otc`、`.woff`。
 
