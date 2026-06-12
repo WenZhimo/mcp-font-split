@@ -163,6 +163,25 @@ function assertActionSuggestedArgsOmit(action, omittedKeys, context) {
   assertObjectOmitsKeys(action?.suggestedArgs, omittedKeys, context);
 }
 
+function assertSafeRecommendedBatchPreviewArgs(previewArgs, expected, context) {
+  if (
+    previewArgs?.inputDir !== expected.inputDir
+    || previewArgs?.workflowPreset !== 'safe-preview'
+    || (expected.batchGroupBy !== undefined && previewArgs?.batchGroupBy !== expected.batchGroupBy)
+  ) {
+    throw new Error(`${context}: expected recommendedBatchPreviewArgs to be a copyable safe-preview batch call for the detected layout.`);
+  }
+  assertObjectOmitsKeys(previewArgs, [
+    'dryRun',
+    'includeResults',
+    'skipMode',
+    'batchNamingMode',
+    'batchDedupeMode',
+    'batchErrorMode',
+    'splitFailureAction',
+  ], `${context} recommendedBatchPreviewArgs`);
+}
+
 if (scenario === 'single') {
   console.log('Splitting:', fontPath, '->', outDir);
   const result = await splitFont({
@@ -289,6 +308,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('workflowPresets') || !result.responseFieldsToCheck?.includes('workflowPreset')) {
     throw new Error('Expected agent guidance to recommend checking workflow preset fields.');
   }
+  if (!result.responseFieldsToCheck?.includes('recommendedBatchPreviewArgs')) {
+    throw new Error('Expected agent guidance to recommend checking safe batch preview args.');
+  }
   if (!result.responseFieldsToCheck?.includes('recommendedActions')) {
     throw new Error('Expected agent guidance to recommend checking remediation actions.');
   }
@@ -395,10 +417,20 @@ if (scenario === 'single') {
     || mismatchTemplate?.args?.workflowPreset !== 'safe-preview'
     || !mismatchTemplate.inspectFields?.includes('sourceDestructive')
     || !mismatchTemplate.inspectFields?.includes('unsupportedFileSummary')
+    || !mismatchTemplate.inspectFields?.includes('recommendedBatchPreviewArgs')
   ) {
     throw new Error('Expected directory mismatch template to rely on the safe-preview organization preset.');
   }
   assertTemplateOmitsArgs(mismatchTemplate, ['dryRun', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'], 'directory-mismatch-plan');
+  const structureTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'structure-first-large-directory');
+  if (
+    structureTemplate?.tool !== 'organize_font_directory'
+    || structureTemplate?.args?.workflowPreset !== 'structure-first'
+    || !structureTemplate.inspectFields?.includes('dedupeLimitedByParsing')
+    || !structureTemplate.inspectFields?.includes('recommendedBatchPreviewArgs')
+  ) {
+    throw new Error('Expected structure-first template to expose dedupe limitations and safe batch preview args.');
+  }
   const copyTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'copy-organized-staging');
   if (
     copyTemplate?.tool !== 'organize_font_directory'
@@ -472,6 +504,7 @@ if (scenario === 'single') {
     workflowPresets: 'get_agent_guidance',
     workflowPreset: 'split_font_batch',
     recommendedBatchOptions: 'organize_font_directory',
+    recommendedBatchPreviewArgs: 'organize_font_directory',
     safetySummary: 'split_font_batch',
     unsupportedFileSummary: 'organize_font_directory',
     structureSummary: 'inspect_split_output',
@@ -498,6 +531,7 @@ if (scenario === 'single') {
     || !structureDecision.mustInspectFields?.includes('dedupeLimitedByParsing')
     || !structureDecision.mustInspectFields?.includes('unsupportedFileSummary')
     || !structureDecision.mustInspectFields?.includes('planActionSummary')
+    || !structureDecision.mustInspectFields?.includes('recommendedBatchPreviewArgs')
   ) {
     throw new Error('Expected structure-first guidance to use the structure-first preset and require dedupe checks.');
   }
@@ -519,6 +553,7 @@ if (scenario === 'single') {
     mixedDecision?.recommendedOptions?.workflowPreset !== 'safe-preview'
     || mixedDecision?.followUpOptions?.workflowPreset !== 'safe-preview'
     || !mixedDecision?.mustInspectFields?.includes('planActionSummary')
+    || !mixedDecision?.mustInspectFields?.includes('recommendedBatchPreviewArgs')
   ) {
     throw new Error('Expected mixed-layout guidance to use safe-preview and require planActionSummary inspection.');
   }
@@ -549,6 +584,7 @@ if (scenario === 'single') {
     || !noisyExample.mustInspectFields?.includes('dedupeLimitedByParsing')
     || !noisyExample.mustInspectFields?.includes('unsupportedFileSummary')
     || !noisyExample.mustInspectFields?.includes('planActionSummary')
+    || !noisyExample.mustInspectFields?.includes('recommendedBatchPreviewArgs')
   ) {
     throw new Error('Expected noisy-directory example to use structure-first and require dedupe limitation checks.');
   }
@@ -569,12 +605,13 @@ if (scenario === 'single') {
     || !mixedExample.mustInspectFields?.includes('writesSourceTree')
     || !mixedExample.mustInspectFields?.includes('outputTreeInsideInputTree')
     || !mixedExample.mustInspectFields?.includes('planActionSummary')
+    || !mixedExample.mustInspectFields?.includes('recommendedBatchPreviewArgs')
   ) {
     throw new Error('Expected mixed-layout example to disclose source safety fields.');
   }
   assertObjectOmitsKeys(mixedExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'mixed-root-and-nested-fonts firstCall');
   const flatExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'flat-vendor-dump');
-  if (flatExample?.firstCall?.workflowPreset !== 'safe-preview') {
+  if (flatExample?.firstCall?.workflowPreset !== 'safe-preview' || !flatExample.mustInspectFields?.includes('recommendedBatchPreviewArgs')) {
     throw new Error('Expected flat vendor example to use the safe-preview organization preset.');
   }
   assertObjectOmitsKeys(flatExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'flat-vendor-dump firstCall');
@@ -596,6 +633,9 @@ if (scenario === 'single') {
   }
   if (!layoutChecklist?.responseFields?.includes('planActionSummary')) {
     throw new Error('Expected layout verification checklist to include planActionSummary.');
+  }
+  if (!layoutChecklist?.responseFields?.includes('recommendedBatchPreviewArgs')) {
+    throw new Error('Expected layout verification checklist to include recommendedBatchPreviewArgs.');
   }
   const outputChecklist = (result.verificationChecklist || []).find((item) => item.id === 'output-audited');
   if (!outputChecklist?.responseFields?.includes('structureSummary')) {
@@ -789,6 +829,10 @@ if (scenario === 'single') {
   if (result.layout?.layoutKind !== 'nested' || result.recommendedBatchOptions?.batchGroupBy !== 'source-dir') {
     throw new Error('Expected organization layout analysis to recommend source-dir grouping for nested input.');
   }
+  assertSafeRecommendedBatchPreviewArgs(result.recommendedBatchPreviewArgs, {
+    inputDir,
+    batchGroupBy: 'source-dir',
+  }, 'organize-dry-run');
   if (!result.organizationWarnings?.some((warning) => warning.code === 'organization-dry-run')) {
     throw new Error('Expected organization dry-run warning.');
   }
@@ -1031,6 +1075,10 @@ if (scenario === 'single') {
   if (result.layout?.layoutKind !== 'nested' || result.recommendedBatchOptions?.batchGroupBy !== 'source-dir') {
     throw new Error('Expected valid-font organization to still summarize the source directory layout.');
   }
+  assertSafeRecommendedBatchPreviewArgs(result.recommendedBatchPreviewArgs, {
+    inputDir,
+    batchGroupBy: 'source-dir',
+  }, 'organize-valid-font');
   if (result.plan?.filter((item) => item.action === 'skipped-duplicate').length !== 1) {
     throw new Error('Expected valid-font organization plan to disclose the duplicate skipped by identity.');
   }
@@ -1104,6 +1152,10 @@ if (scenario === 'single') {
   if (result.plan?.[0]?.status !== 'not-parsed' || result.plan?.[0]?.groupName !== 'not-a-font') {
     throw new Error('Expected structure-only organization plan to use path-based fallback details.');
   }
+  assertSafeRecommendedBatchPreviewArgs(result.recommendedBatchPreviewArgs, {
+    inputDir,
+    batchGroupBy: 'source-dir',
+  }, 'organize-structure-only');
   const rerunWithParsingAction = (result.recommendedNextActions || []).find((action) => action.id === 'rerun-with-font-parsing');
   if (
     rerunWithParsingAction?.suggestedArgs?.workflowPreset !== 'safe-preview'

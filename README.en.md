@@ -150,7 +150,7 @@ Recommended first call:
 }
 ```
 
-This lets the tool read font metadata and recommend `batchGroupBy`. If the plan is good, either split the original directory with `recommendedBatchOptions`, or run copy-only organization into `organized-fonts` when the user wants a cleaner staging source.
+This lets the tool read font metadata and recommend `batchGroupBy`. If the plan is good, prefer copying `recommendedBatchPreviewArgs` into `split_font_batch` for a safe-preview run on the original directory. `recommendedBatchOptions` is only a policy fragment, not a complete safe invocation by itself. Run copy-only organization into `organized-fonts` only when the user wants a cleaner staging source.
 
 Archive-per-family folders:
 
@@ -176,7 +176,7 @@ fonts/
     Regular.otf
 ```
 
-This is the easiest layout to misread. Call `organize_font_directory` with `dryRun: true` first and inspect `safetySummary`, `layout.layoutKind`, `recommendedBatchOptions`, `organizationWarnings`, `sourceDestructive`, `writesSourceTree`, and `outputTreeInsideInputTree`.
+This is the easiest layout to misread. Call `organize_font_directory` with `dryRun: true` first and inspect `safetySummary`, `layout.layoutKind`, `recommendedBatchOptions`, `recommendedBatchPreviewArgs`, `organizationWarnings`, `sourceDestructive`, `writesSourceTree`, and `outputTreeInsideInputTree`.
 
 Large or noisy library first pass:
 
@@ -330,7 +330,8 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `effectiveBatchDedupeMode`, `dedupeLimitedByParsing`: explain whether identity dedupe was available
 - `unsupportedFileSummary`: extension counts for all ignored non-font files, `<none>` counts for extensionless files, and a small set of example paths; inspect it first when the source tree mixes fonts with archives, images, docs, or generated assets
 - `layout.layoutKind`: `empty`, `flat`, `nested`, or `mixed`
-- `recommendedBatchOptions`: a suggested follow-up `split_font_batch` configuration for the detected layout
+- `recommendedBatchOptions`: a suggested follow-up `split_font_batch` policy fragment for the detected layout; not a complete safe invocation
+- `recommendedBatchPreviewArgs`: copyable no-write `split_font_batch` preview args containing `inputDir`, `workflowPreset: "safe-preview"`, and the necessary layout overrides
 - `recommendedNextActionCount`, `recommendedNextActions[]`: machine-readable follow-up actions for agents, each with an `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, and `inspectFields`
 - `organizationWarningCount`, `organizationWarnings[]` with machine-readable `code` and `message`
 - `planActionSummary`: always returned; counts plan actions such as `would-copy`, `copied`, `skipped-duplicate`, `skipped-invalid`, `skipped-target-exists`, and `error`, even when `includePlan: false`
@@ -346,7 +347,7 @@ Treat `planActionSummary` as a compact overview, not approval to write files wit
 - `includeFiles: false` omits flat `files[]` while keeping summary counters.
 - `includeFamilies: false` omits structured `families[]` while keeping family and output-mode counters.
 - `inspectionWarningCount` and `inspectionWarnings[]` summarize truncation, omitted detail arrays, legacy output inference, and structure issues with machine-readable `code` values.
-- `structureSummary` checks whether the output directory matches the documented structure; require `structureSummary.conforms: true` before treating an output tree as free of stray files, missing manifests, or missing files required by the declared output mode.
+- `structureSummary` checks whether the output directory matches the documented structure; after real batch writes, call `inspect_split_output` and require `structureSummary.conforms: true` before treating an output tree as free of stray files, missing manifests, or missing files required by the declared output mode.
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`

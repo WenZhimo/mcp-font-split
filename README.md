@@ -150,7 +150,7 @@ fonts/
 }
 ```
 
-这会读取字体元数据并给出 `batchGroupBy` 建议。如果计划合理，可以直接把 `recommendedBatchOptions` 用到原目录的 `split_font_batch`；如果用户希望得到更干净的暂存源目录，再执行 copy-only 整理到 `organized-fonts`。
+这会读取字体元数据并给出 `batchGroupBy` 建议。如果计划合理，优先复制返回的 `recommendedBatchPreviewArgs` 先对原目录做 `split_font_batch` safe-preview；`recommendedBatchOptions` 只是策略片段，不应单独当作完整安全调用。如果用户希望得到更干净的暂存源目录，再执行 copy-only 整理到 `organized-fonts`。
 
 每个压缩包/家族一个目录：
 
@@ -176,7 +176,7 @@ fonts/
     Regular.otf
 ```
 
-这是最容易误判的结构。先调用 `organize_font_directory` 并保持 `dryRun: true`，重点检查 `safetySummary`、`layout.layoutKind`、`recommendedBatchOptions`、`organizationWarnings`、`sourceDestructive`、`writesSourceTree` 和 `outputTreeInsideInputTree`。
+这是最容易误判的结构。先调用 `organize_font_directory` 并保持 `dryRun: true`，重点检查 `safetySummary`、`layout.layoutKind`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`organizationWarnings`、`sourceDestructive`、`writesSourceTree` 和 `outputTreeInsideInputTree`。
 
 超大或嘈杂字体库的第一遍扫描：
 
@@ -330,7 +330,8 @@ fonts/
 - `effectiveBatchDedupeMode`、`dedupeLimitedByParsing`：说明 identity 去重是否真正可用
 - `unsupportedFileSummary`：所有被忽略的非字体文件扩展名统计、无扩展 `<none>` 计数和少量示例路径；源目录混有压缩包、图片、文档或生成产物时优先看它
 - `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`
-- `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 建议配置
+- `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 策略片段，不是完整安全调用
+- `recommendedBatchPreviewArgs`：可直接复制的 `split_font_batch` 无写入预览参数，包含 `inputDir`、`workflowPreset: "safe-preview"` 和必要的目录形态覆盖项
 - `recommendedNextActionCount`、`recommendedNextActions[]`：面向 agent 的机器可读后续动作，每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields`
 - `organizationWarningCount`、`organizationWarnings[]`，每项包含机器可读的 `code` 和 `message`
 - `planActionSummary`：始终返回；按动作统计 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists` 和 `error` 等数量，即使 `includePlan: false` 省略明细也会保留
@@ -346,7 +347,7 @@ fonts/
 - `includeFiles: false` 会省略扁平 `files[]`，但保留摘要计数。
 - `includeFamilies: false` 会省略结构化 `families[]`，但保留 family 和输出模式计数。
 - `inspectionWarningCount` 和 `inspectionWarnings[]` 会用机器可读 `code` 汇总截断、详情数组省略、legacy 输出推断和结构问题等状态。
-- `structureSummary` 检查输出目录是否符合文档化结构；只有 `structureSummary.conforms: true` 时，才表示没有发现杂项文件、manifest 缺失或输出模式文件缺失等结构问题。
+- `structureSummary` 检查输出目录是否符合文档化结构；真实批量写入后应调用 `inspect_split_output`，只有 `structureSummary.conforms: true` 时，才表示没有发现杂项文件、manifest 缺失或输出模式文件缺失等结构问题。
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`

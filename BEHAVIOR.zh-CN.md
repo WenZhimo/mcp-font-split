@@ -68,7 +68,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。响应里的 `verificationChecklist[]` 是给 agent 用的防误判清单；在向用户宣称完成前，应检查其中适用于当前工作流的项目。
 `directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段和非直觉行为。推荐参数会优先使用 `workflowPreset`，只保留路径、规模或目录形态造成的差异覆盖。它不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
-`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。示例调用也采用 preset-first 风格。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions` 和 warning 字段为准。
+`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。示例调用也采用 preset-first 风格。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs` 和 warning 字段为准。
 `safeInvocationTemplates[]` 是可复制的安全起步调用模板；其中包括运行时诊断、输入预检、源目录结构不匹配时的 dry-run 整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和输出审计。每个模板都会声明 `writesFiles`、`sourceDestructive`、可自定义参数和必须检查的响应字段。模板里的 `args` 会尽量保持最小；`workflowPreset` 已提供的默认项不会重复写入模板，需要完整展开时查看同一响应中的 `workflowPresets[]`。
 `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
 
@@ -447,7 +447,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 4. 根据 `batchDedupeMode` 对等价字体去重，默认仍是 `font-identity`。
 5. 根据 `batchGroupBy` 计算整理后的分组目录。
 6. 根据 `batchNamingMode` 计算整理后的目标文件名。
-7. 返回 `layout`、`recommendedBatchOptions`、`recommendedNextActions[]`、`organizationWarnings[]` 和可选 `plan[]`。
+7. 返回 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`recommendedNextActions[]`、`organizationWarnings[]` 和可选 `plan[]`。
 
 `parseFonts` 控制是否读取字体元数据：
 
@@ -483,8 +483,8 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 推荐 agent 工作流：
 
 1. 先调用 `organize_font_directory`，保持默认 `dryRun: true`。
-2. 检查 `safetySummary`、`layout.layoutKind`、`recommendedBatchOptions`、`recommendedNextActions[]`、`organizationWarnings[]`、`sourceDestructive`、`destructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree` 和 `mayOverwriteOutputTree`。
-3. 如果用户只是想调整批量参数，不一定需要真的整理目录；可直接把 `recommendedBatchOptions` 应用到 `split_font_batch`。
+2. 检查 `safetySummary`、`layout.layoutKind`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`recommendedNextActions[]`、`organizationWarnings[]`、`sourceDestructive`、`destructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree` 和 `mayOverwriteOutputTree`。
+3. 如果用户只是想调整批量参数，不一定需要真的整理目录；优先把 `recommendedBatchPreviewArgs` 用于 `split_font_batch` 无写入预览。`recommendedBatchOptions` 只是策略片段，不能单独当作完整安全调用。
 4. 如果用户明确希望得到更规整的暂存目录，再用 `dryRun: false` 执行 copy-only 整理。
 5. 整理完成后，对 `outputDir` 调用 `inspect_font_inputs` 或把它作为后续 `split_font_batch.inputDir`。
 6. `recommendedNextActions[]` 是给 agent 的下一步清单；它不会自动执行，也不能替代对每项 `inspectFields` 的检查。
@@ -668,7 +668,8 @@ split-meta.json
 | `effectiveBatchDedupeMode` | 实际执行的整理去重策略 |
 | `dedupeLimitedByParsing` | 是否因跳过解析而无法执行真实 identity 去重 |
 | `layout.layoutKind` | `empty` / `flat` / `nested` / `mixed` |
-| `recommendedBatchOptions` | 根据目录结构建议的后续批量参数 |
+| `recommendedBatchOptions` | 根据目录结构建议的后续批量策略片段，不是完整安全调用 |
+| `recommendedBatchPreviewArgs` | 可直接复制的后续 `split_font_batch` 无写入预览参数 |
 | `recommendedNextActions[]` | 面向 agent 的后续动作建议，包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields`；`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对该 preset 的差异覆盖 |
 | `organizationWarnings[]` | 摘要级风险和状态提示 |
 | `planActionSummary` | 计划动作汇总；即使 `includePlan: false` 也会返回 |
@@ -697,7 +698,7 @@ split-meta.json
 
 `includeFiles: false` 会省略扁平 `files[]` 清单；`includeFamilies: false` 会省略结构化 `families[]` 清单。它们只影响响应体大小，不影响 `fileCount`、`familyCount`、`fontEntryCount`、manifest 数量、输出模式计数或 `structureSummary`。
 
-`structureSummary` 是输出目录结构验收摘要。它会检查输出是否是文档化的 `single-family` 或 `family-tree` 结构，是否有无法归类到 family/font entry 的杂项文件，每个字体条目是否都有 `split-meta.json`，以及 manifest 声明为 `subset` / `single-woff2` / `copy-original` 时是否具备对应文件。只有 `structureSummary.conforms: true` 时，才应把输出目录视为结构合格。若为 false，优先查看 `structureSummary.issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 会出现 `output-structure-issues`。
+`structureSummary` 是输出目录结构验收摘要。它会检查输出是否是文档化的 `single-family` 或 `family-tree` 结构，是否有无法归类到 family/font entry 的杂项文件，每个字体条目是否都有 `split-meta.json`，以及 manifest 声明为 `subset` / `single-woff2` / `copy-original` 时是否具备对应文件。真实批量写入后，只有 `structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为结构合格。若为 false，优先查看 `structureSummary.issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 会出现 `output-structure-issues`。
 
 保留基础统计：
 

@@ -218,7 +218,8 @@ Important result fields:
 | `dedupeLimitedByParsing` | `true` when requested identity dedupe could not run because font parsing was skipped. |
 | `unsupportedFileSummary` | Compact summary of all ignored non-font files, including extension counts, `<none>` for extensionless files, and a small set of example paths. It explains noisy source trees where archives, documents, images, generated assets, or extensionless files are present but will not be copied or split. |
 | `layout.layoutKind` | `empty`, `flat`, `nested`, or `mixed`. Mixed means fonts exist both at the input root and below subdirectories. |
-| `recommendedBatchOptions` | Suggested `split_font_batch` options for the detected layout. Nested or mixed inputs usually recommend `batchGroupBy: "source-dir"`; flat inputs usually recommend `font-family`. |
+| `recommendedBatchOptions` | Suggested `split_font_batch` policy fragment for the detected layout. Nested or mixed inputs usually recommend `batchGroupBy: "source-dir"`; flat inputs usually recommend `font-family`. This is not a complete safe invocation by itself. |
+| `recommendedBatchPreviewArgs` | Copyable no-write `split_font_batch` preview arguments for the detected layout. It includes `inputDir`, `workflowPreset: "safe-preview"`, and only layout-specific overrides such as `batchGroupBy`. Prefer this before any real batch write. |
 | `recommendedNextActionCount` / `recommendedNextActions[]` | Machine-readable follow-up actions for agents. Entries include `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, and `inspectFields`. `suggestedArgs` prefer `workflowPreset` and only keep overrides that differ from that preset. |
 | `organizationWarningCount` / `organizationWarnings[]` | Machine-readable notices such as `organization-dry-run`, `organization-writes-output`, `output-overwrite-enabled`, `mixed-layout-detected`, `invalid-fonts-skipped`, and `output-inside-input`. |
 | `planActionSummary` | Always returned. Counts planned actions by `action`, including `would-copy`, `copied`, `skipped-duplicate`, `skipped-invalid`, `skipped-target-exists`, `would-skip-target-exists`, and `error`. Use this when `includePlan: false` omits detailed entries. |
@@ -258,7 +259,7 @@ Important result fields:
 | `maxFilesHit` | `true` only when more output files existed beyond `maxFiles`. |
 | `filesIncluded` / `familiesIncluded` | Whether `files[]` and `families[]` are present. |
 | `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, legacy output inference, and output structure issues. |
-| `structureSummary` | Machine-readable output-structure audit. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
+| `structureSummary` | Machine-readable output-structure audit. After real batch writes, treat the output directory as complete only when `structureSummary.conforms: true` and `maxFilesHit: false`. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
 | `fontEntryCount` | Number of detected per-font output entries. |
 | `manifestCount` | Number of entries with `split-meta.json`. |
 | `legacyOutputCount` | Number of entries inferred without manifest. |

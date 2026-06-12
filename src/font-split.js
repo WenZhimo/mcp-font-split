@@ -518,7 +518,7 @@ const WARNING_CODE_CATALOG = {
   'mixed-layout-detected': {
     sources: ['organizationWarnings'],
     severity: 'warning',
-    suggestedAction: 'Review layout and recommendedBatchOptions before direct batch splitting.',
+    suggestedAction: 'Review layout and recommendedBatchPreviewArgs before direct batch splitting.',
   },
   'output-inside-input': {
     sources: ['batchWarnings', 'organizationWarnings'],
@@ -742,7 +742,7 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   organizationWarnings: {
     sourceTools: ['organize_font_directory'],
     meaning: 'Summary-level organization notices with machine-readable codes.',
-    agentAction: 'Review before using recommendedBatchOptions or running a real copy.',
+    agentAction: 'Review before using recommendedBatchPreviewArgs or running a real copy.',
   },
   organizationWarningCount: {
     sourceTools: ['organize_font_directory'],
@@ -836,8 +836,13 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   recommendedBatchOptions: {
     sourceTools: ['organize_font_directory', 'get_agent_guidance'],
-    meaning: 'Suggested split_font_batch options based on detected or recommended workflow.',
-    agentAction: 'Apply only after reviewing layout and warning fields.',
+    meaning: 'Suggested split_font_batch option fragment from guidance or layout analysis. It is not a complete safe invocation by itself.',
+    agentAction: 'Prefer recommendedBatchPreviewArgs for a copyable no-write preview call after organize_font_directory; use this field only as policy overrides after reviewing layout and warnings.',
+  },
+  recommendedBatchPreviewArgs: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Copyable no-write split_font_batch preview arguments for the detected layout. It includes inputDir, workflowPreset safe-preview, and only layout-specific overrides.',
+    agentAction: 'Use this before writing batch output, then inspect safetySummary, batchWarnings, maxFilesHit, unsupportedFileSummary, skippedDuplicates, and errors.',
   },
   layout: {
     sourceTools: ['organize_font_directory'],
@@ -960,8 +965,8 @@ const SAFE_INVOCATION_TEMPLATES = [
       workflowPreset: 'safe-preview',
     },
     customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
-    inspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
-    nextStep: 'Use recommendedBatchOptions for a batch dry-run, or copy to a staging directory only after reviewing the plan.',
+    inspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+    nextStep: 'Use recommendedBatchPreviewArgs for a batch dry-run, or copy to a staging directory only after reviewing the plan.',
   },
   {
     id: 'structure-first-large-directory',
@@ -974,7 +979,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       workflowPreset: 'structure-first',
     },
     customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'includePlan'],
-    inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'layout', 'recommendedBatchOptions', 'planActionSummary'],
+    inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'planActionSummary'],
     nextStep: 'Rerun with parseFonts:true before trusting invalid-font counts, glyph counts, identity dedupe, or font-family grouping.',
   },
   {
@@ -1205,8 +1210,8 @@ export function getAgentGuidance(args = {}) {
     {
       id: 'layout-plan-reviewed',
       appliesTo: ['overview', 'batch', 'organize'],
-      check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect safetySummary, layout, recommendedBatchOptions, sourceDestructive, writesSourceTree, writesOutputTree, outputTreeInsideInputTree, mayOverwriteOutputTree, organizationWarnings, and planActionSummary before applying any copy plan.',
-      responseFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedNextActions', 'unsupportedFileSummary', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
+      check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect safetySummary, layout, recommendedBatchOptions, recommendedBatchPreviewArgs, sourceDestructive, writesSourceTree, writesOutputTree, outputTreeInsideInputTree, mayOverwriteOutputTree, organizationWarnings, and planActionSummary before applying any copy plan.',
+      responseFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'recommendedNextActions', 'unsupportedFileSummary', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'batch-plan-reviewed',
@@ -1265,7 +1270,7 @@ export function getAgentGuidance(args = {}) {
       'If maxFilesHit is true, rerun with a higher maxFiles before treating the summary as complete.',
     ],
     organize: [
-      'Call organize_font_directory with workflowPreset safe-preview first; review layout, recommendedBatchOptions, organizationWarnings, and plan before writing copies.',
+      'Call organize_font_directory with workflowPreset safe-preview first; review layout, recommendedBatchPreviewArgs, organizationWarnings, and plan before writing copies.',
       'If the plan is acceptable, call organize_font_directory again with workflowPreset reviewed-write to copy selected fonts into outputDir. This never moves or deletes source files.',
       'Use parseFonts false only when the user needs a fast structure-first plan; inspect parsedFontMetadata and dedupeLimitedByParsing before relying on identity dedupe or font-family grouping.',
       'After organizing, run inspect_font_inputs on outputDir or split_font_batch with inputDir set to outputDir.',
@@ -1315,7 +1320,7 @@ export function getAgentGuidance(args = {}) {
         inputDir: '<original-inputDir-or-organized-outputDir>',
         workflowPreset: 'safe-preview',
       },
-      mustInspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+      mustInspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
       nonIntuitiveBehavior: 'organize_font_directory defaults to dryRun:true and never moves or deletes source files; dryRun:false copies into outputDir only.',
     },
     {
@@ -1327,7 +1332,7 @@ export function getAgentGuidance(args = {}) {
       recommendedOptions: {
         workflowPreset: 'structure-first',
       },
-      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'layout', 'recommendedBatchOptions'],
+      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs'],
       nonIntuitiveBehavior: 'parseFonts:false means validFontCount and invalidFontCount are null, not zero; identity dedupe and metadata family grouping are limited.',
     },
     {
@@ -1364,7 +1369,7 @@ export function getAgentGuidance(args = {}) {
         workflowPreset: 'safe-preview',
       },
       ifPlanLooksGood: [
-        'If the user only wants split output, call split_font_batch on the original inputDir using recommendedBatchOptions.',
+        'If the user only wants split output, call split_font_batch on the original inputDir using recommendedBatchPreviewArgs.',
         'If the user wants a cleaner source staging directory, call organize_font_directory again with dryRun:false, then split_font_batch with inputDir set to outputDir.',
       ],
       safety: {
@@ -1372,7 +1377,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
+      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'archive-per-family-folders',
@@ -1421,7 +1426,7 @@ export function getAgentGuidance(args = {}) {
         workflowPreset: 'safe-preview',
       },
       ifPlanLooksGood: [
-        'Prefer reviewing or applying recommendedBatchOptions before splitting.',
+        'Prefer reviewing recommendedBatchPreviewArgs before splitting.',
         'Use copy-only organization when the user wants a stable staging source that separates loose and nested inputs.',
       ],
       safety: {
@@ -1429,7 +1434,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'organizationWarnings', 'recommendedBatchOptions', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
+      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'organizationWarnings', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
     },
     {
       id: 'large-noisy-first-pass',
@@ -1454,7 +1459,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only-when-dryRun-false',
       },
-      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
+      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'recommendedBatchPreviewArgs'],
     },
   ];
 
@@ -1588,6 +1593,7 @@ export function getAgentGuidance(args = {}) {
       'effectiveBatchDedupeMode',
       'dedupeLimitedByParsing',
       'recommendedBatchOptions',
+      'recommendedBatchPreviewArgs',
       'layout',
       'layout.layoutKind',
       'directoryWorkflowDecisionMatrix',
@@ -2019,7 +2025,7 @@ function buildOrganizationWarnings({
     push('duplicate-fonts-skipped', `${skippedDuplicateCount} equivalent fonts were skipped by the selected batchDedupeMode.`);
   }
   if (layoutKind === 'mixed') {
-    push('mixed-layout-detected', 'Fonts were found both at the input root and inside nested folders. Review recommendedBatchOptions before splitting.');
+    push('mixed-layout-detected', 'Fonts were found both at the input root and inside nested folders. Review recommendedBatchPreviewArgs before splitting.');
   }
   if (outputDirInsideInput) {
     push('output-inside-input', 'outputDir is inside or equal to inputDir. Future scans should exclude that output directory to avoid reprocessing organized copies.');
@@ -4297,6 +4303,10 @@ export async function organizeFontDirectory(args = {}) {
     layoutKind: layout.layoutKind,
     outputDirInsideInput,
   });
+  const recommendedBatchPreviewArgs = buildSuggestedBatchPreviewArgs({
+    inputDir: inputDirRelative,
+    recommendedBatchOptions: layout.recommendedBatchOptions,
+  });
   const recommendedNextActions = buildOrganizationNextActions({
     options,
     inputDirRelative,
@@ -4354,6 +4364,7 @@ export async function organizeFontDirectory(args = {}) {
     overwriteExisting: options.overwriteExisting,
     layout,
     recommendedBatchOptions: layout.recommendedBatchOptions,
+    recommendedBatchPreviewArgs,
     recommendedNextActionCount: recommendedNextActions.length,
     recommendedNextActions,
     organizationWarningCount: warnings.length,
