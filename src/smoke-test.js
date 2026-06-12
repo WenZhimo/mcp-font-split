@@ -120,13 +120,117 @@ function getUnsupportedCategoryCount(summary, category) {
 }
 
 function buildRealCorpusSuiteCoverageSummary(runs) {
+  const runByScenario = Object.fromEntries((runs || []).map((run) => [run.scenario, run || {}]));
   const byScenario = Object.fromEntries((runs || []).map((run) => [run.scenario, run.summary || {}]));
+  const readonlyRun = runByScenario['real-corpus-readonly'] || {};
+  const targetsRun = runByScenario['real-corpus-targets'] || {};
+  const integrationRun = runByScenario['real-corpus-integration'] || {};
   const readonly = byScenario['real-corpus-readonly'] || {};
   const targets = byScenario['real-corpus-targets'] || {};
   const integration = byScenario['real-corpus-integration'] || {};
+  const selectedTargetSet = new Set(targets.selectedTargets || []);
+  const fixedRegressionTargetsCovered = DEFAULT_REAL_CORPUS_TARGETS.every((target) => selectedTargetSet.has(target));
+  const functionalCoverage = [
+    {
+      id: 'full-root-input-scan',
+      covered: Boolean(readonlyRun.ok && readonly.corpusSupportedFontCount > 0 && readonly.corpusMaxFilesHit === false),
+      toolPaths: ['inspect_font_inputs'],
+      evidence: {
+        supportedFontCount: readonly.corpusSupportedFontCount,
+        unsupportedFileCount: readonly.corpusUnsupportedFileCount,
+        maxFilesHit: readonly.corpusMaxFilesHit,
+      },
+    },
+    {
+      id: 'unsupported-noise-classification',
+      covered: Boolean(readonlyRun.ok && Array.isArray(readonly.corpusUnsupportedByCategory) && readonly.corpusUnsupportedByCategory.length > 0),
+      toolPaths: ['inspect_font_inputs', 'organize_font_directory', 'split_font_batch'],
+      evidence: {
+        byCategory: readonly.corpusUnsupportedByCategory,
+        archiveCount: readonly.corpusUnsupportedArchiveCount,
+      },
+    },
+    {
+      id: 'source-safe-organization-preview',
+      covered: readonlyRun.ok === true,
+      toolPaths: ['organize_font_directory'],
+      evidence: {
+        sampleInputDir: readonly.sampleInputDir,
+        writesFiles: false,
+      },
+    },
+    {
+      id: 'batch-preview-and-next-action',
+      covered: Boolean(readonlyRun.ok && readonly.sampleSupportedFontCount > 0),
+      toolPaths: ['split_font_batch'],
+      evidence: {
+        sampleInputDir: readonly.sampleInputDir,
+        sampleSupportedFontCount: readonly.sampleSupportedFontCount,
+      },
+    },
+    {
+      id: 'targeted-naming-and-dedupe-regressions',
+      covered: Boolean(targetsRun.ok && fixedRegressionTargetsCovered && targets.selectedTargetCount >= DEFAULT_REAL_CORPUS_TARGETS.length),
+      toolPaths: ['inspect_font_inputs', 'organize_font_directory', 'split_font_batch'],
+      evidence: {
+        fixedRegressionTargets: DEFAULT_REAL_CORPUS_TARGETS,
+        selectedTargets: targets.selectedTargets,
+        availableTargetCount: targets.availableTargetCount,
+        selectedTargetCount: targets.selectedTargetCount,
+      },
+    },
+    {
+      id: 'adaptive-real-corpus-sampling',
+      covered: Boolean(targetsRun.ok && targets.selectionMode === 'auto' && targets.selectedTargetCount > DEFAULT_REAL_CORPUS_TARGETS.length),
+      toolPaths: ['inspect_font_inputs', 'organize_font_directory', 'split_font_batch'],
+      evidence: {
+        selectionMode: targets.selectionMode,
+        selectedTargetCount: targets.selectedTargetCount,
+        targetSampleCount: targets.sampleCount,
+      },
+    },
+    {
+      id: 'runtime-and-agent-guidance',
+      covered: integrationRun.ok === true,
+      toolPaths: ['get_runtime_status', 'get_agent_guidance'],
+      evidence: {
+        sampleInputDir: integration.sampleInputDir,
+      },
+    },
+    {
+      id: 'copy-only-organization-write',
+      covered: integrationRun.ok === true,
+      toolPaths: ['organize_font_directory'],
+      evidence: {
+        outputRoot: integration.outputRoot,
+        sourceDestructive: false,
+      },
+    },
+    {
+      id: 'single-font-write-and-audit',
+      covered: Boolean(integrationRun.ok && integration.singleAuditStatus === 'pass' && integration.singleStructureConforms === true),
+      toolPaths: ['split_font', 'inspect_split_output'],
+      evidence: {
+        sampleFontPath: integration.sampleFontPath,
+        auditStatus: integration.singleAuditStatus,
+        structureConforms: integration.singleStructureConforms,
+      },
+    },
+    {
+      id: 'batch-reviewed-write-and-audit',
+      covered: Boolean(integrationRun.ok && integration.batchAuditStatus === 'pass' && integration.batchStructureConforms === true),
+      toolPaths: ['split_font_batch', 'inspect_split_output'],
+      evidence: {
+        outputRoot: integration.outputRoot,
+        auditStatus: integration.batchAuditStatus,
+        structureConforms: integration.batchStructureConforms,
+      },
+    },
+  ];
   return {
     testStrategy: 'full-root compact scan plus representative target sampling plus one bounded write/audit path',
     perDirectoryAcceptanceAudit: false,
+    functionalCoverage,
     corpusSupportedFontCount: readonly.corpusSupportedFontCount ?? targets.corpusSupportedFontCount ?? integration.corpusSupportedFontCount,
     corpusUnsupportedFileCount: readonly.corpusUnsupportedFileCount ?? targets.corpusUnsupportedFileCount ?? integration.corpusUnsupportedFileCount,
     corpusUnsupportedByCategory: readonly.corpusUnsupportedByCategory ?? targets.corpusUnsupportedByCategory ?? integration.corpusUnsupportedByCategory,
@@ -2671,6 +2775,7 @@ if (scenario === 'single') {
     '`unsupportedFileCategoryCatalog`',
     '`verificationChecklist[]`',
     '`smoke:real-corpus-suite`',
+    '`functionalCoverage[]`',
     '`directoryWorkflowDecisionMatrix[]`',
     '`directoryWorkflowExamples[]`',
     '`safeInvocationTemplates[]`',
@@ -2975,12 +3080,14 @@ if (scenario === 'single') {
   const coverageSummary = buildRealCorpusSuiteCoverageSummary(runs);
   if (
     coverageSummary.perDirectoryAcceptanceAudit !== false
+    || !Array.isArray(coverageSummary.functionalCoverage)
+    || coverageSummary.functionalCoverage.some((item) => item.covered !== true)
     || coverageSummary.corpusSupportedFontCount < 1
     || !Array.isArray(coverageSummary.corpusUnsupportedByCategory)
     || coverageSummary.selectedTargetCount < 1
     || coverageSummary.batchAuditStatus !== 'pass'
   ) {
-    throw new Error('Expected real-corpus-suite compact coverage summary to expose root counts, unsupported categories, selected targets, and passing output audits.');
+    throw new Error('Expected real-corpus-suite compact coverage summary to expose covered function paths, root counts, unsupported categories, selected targets, and passing output audits.');
   }
 
   console.log(JSON.stringify({
