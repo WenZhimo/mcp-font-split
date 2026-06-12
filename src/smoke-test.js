@@ -965,6 +965,14 @@ if (scenario === 'single') {
     const splitFontProps = tools.split_font?.inputSchema?.properties || {};
     const batchProps = tools.split_font_batch?.inputSchema?.properties || {};
     const organizeProps = tools.organize_font_directory?.inputSchema?.properties || {};
+    const expectDescriptionIncludes = (toolName, phrases) => {
+      const description = tools[toolName]?.description || '';
+      for (const phrase of phrases) {
+        if (!description.includes(phrase)) {
+          throw new Error(`${toolName} description is missing ${phrase}`);
+        }
+      }
+    };
     const batchOnly = ['strictMode', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'debugBatchDecisions'];
     const leaked = batchOnly.filter((key) => Object.hasOwn(splitFontProps, key));
     const missing = batchOnly.filter((key) => !Object.hasOwn(batchProps, key));
@@ -979,6 +987,11 @@ if (scenario === 'single') {
         throw new Error(`organize_font_directory is missing ${requiredOrganizeProp}`);
       }
     }
+    expectDescriptionIncludes('get_agent_guidance', ['directoryWorkflowDecisionMatrix', 'warningCodeCatalog', 'response fields to inspect']);
+    expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
+    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'batchWarnings']);
+    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files']);
+    expectDescriptionIncludes('inspect_split_output', ['maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
       splitFontPropertyCount: Object.keys(splitFontProps).length,

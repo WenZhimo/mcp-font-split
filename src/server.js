@@ -58,7 +58,7 @@ server.registerTool(
   'get_agent_guidance',
   {
     title: 'Get AI agent usage guidance',
-    description: 'Call this first when an AI coding assistant needs to choose a safe font-splitting workflow. It returns workspace path rules, recommended tool order, defaults, and response fields to inspect.',
+    description: 'Call this first when an AI coding assistant needs to choose a safe font-splitting workflow. It returns workspace path rules, directoryWorkflowDecisionMatrix, directoryWorkflowExamples, warningCodeCatalog, recommended tool order, defaults, and response fields to inspect.',
     inputSchema: {
       workflow: z.enum(['overview', 'single', 'batch', 'inspect', 'organize']).optional().describe('Guidance focus. Default: overview.'),
     },
@@ -92,7 +92,7 @@ server.registerTool(
   'split_font',
   {
     title: 'Split a font into web-font chunks',
-    description: 'Call this when the user wants to split one local TTF/OTF/TTC/OTC/WOFF/WOFF2 font into cn-font-split web font output files. All paths must stay inside the configured font workspace.',
+    description: 'Call this when the user wants to split one local TTF/OTF/TTC/OTC/WOFF/WOFF2 font into cn-font-split web font output files. This writes output files; inspect resultType, outputMode, performedSplit, usedFallback, warnings, and manifestPath before claiming success. All paths must stay inside the configured font workspace.',
     inputSchema: SplitFontOptions,
   },
   async (args) => {
@@ -108,7 +108,7 @@ server.registerTool(
   'split_font_batch',
   {
     title: 'Batch split fonts under a directory',
-    description: 'Call this when the user wants to split many local font files under a directory. It scans and processes a bounded number of fonts, and can return per-font results, dry-run plans, or compact summary-only output depending on includeResults and dryRun.',
+    description: 'Call this when the user wants to split many local font files under a directory. dryRun defaults to false and can write output files; agents should set dryRun:true with includeResults:true to preview scan, dedupe, naming, skip decisions, and batchWarnings before writing.',
     inputSchema: {
       inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
       outputRoot: z.string().optional().describe('Directory to place per-font output folders. Defaults to split-output.'),
@@ -181,7 +181,7 @@ server.registerTool(
   'inspect_split_output',
   {
     title: 'Inspect split font output',
-    description: 'Call this to summarize and structurally inspect generated cn-font-split output files in an output directory.',
+    description: 'Call this to summarize and structurally inspect generated cn-font-split output files in an output directory. Inspect maxFilesHit and inspectionWarnings before treating an audit as complete; use includeFiles:false and includeFamilies:false for compact large-output summaries.',
     inputSchema: {
       outDir: z.string().optional().describe('Output directory to inspect, relative to the font workspace. Defaults to split-output.'),
       maxFiles: z.number().int().positive().max(200000).optional().describe('Maximum output files to inspect. Defaults to 200000.'),
