@@ -246,6 +246,72 @@ if (scenario === 'single') {
     throw new Error('Expected organization dry-run not to create outputDir.');
   }
   console.log(JSON.stringify(result, null, 2));
+} else if (scenario === 'organize-copy') {
+  const inputDir = process.argv[3] || '.font-split-organize-copy-input';
+  const outputDir = process.argv[4] || '.font-split-organize-copy-output';
+  const sourcePath = path.join(inputDir, 'FamilyA', 'not-a-font.ttf');
+  const targetPath = path.join(outputDir, 'FamilyA', 'not-a-font.ttf');
+  const manifestPath = path.join(outputDir, 'font-organization-manifest.json');
+  console.log('Directory organization copy smoke:', inputDir, '->', outputDir);
+  await fs.rm(inputDir, { recursive: true, force: true });
+  await fs.rm(outputDir, { recursive: true, force: true });
+  await fs.mkdir(path.dirname(sourcePath), { recursive: true });
+  await fs.writeFile(sourcePath, 'not a real font');
+
+  const copied = await organizeFontDirectory({
+    inputDir,
+    outputDir,
+    dryRun: false,
+    includePlan: true,
+    copyInvalidFonts: true,
+    batchNamingMode: 'plain',
+    maxFiles: 10,
+  });
+  if (copied.operationMode !== 'copy-only' || copied.sourceDestructive !== false || copied.writesSourceTree !== false || copied.writesOutputTree !== true || copied.mayOverwriteOutputTree !== false || copied.destructive !== false) {
+    throw new Error('Expected organizeFontDirectory copy mode to write only the output tree without overwrite risk.');
+  }
+  if (copied.copiedCount !== 1 || copied.organizationManifestWritten !== true || copied.organizationManifestPath !== `${outputDir}/font-organization-manifest.json`) {
+    throw new Error('Expected organizeFontDirectory copy mode to copy one file and write a manifest.');
+  }
+  if (!copied.organizationWarnings?.some((warning) => warning.code === 'organization-writes-output')) {
+    throw new Error('Expected organization copy warning.');
+  }
+  if (await fs.readFile(sourcePath, 'utf8') !== 'not a real font') {
+    throw new Error('Expected source file content to be preserved after organization copy.');
+  }
+  if (await fs.readFile(targetPath, 'utf8') !== 'not a real font') {
+    throw new Error('Expected organized target copy to match source content.');
+  }
+  const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+  if (manifest.summary?.copiedCount !== 1 || manifest.entries?.[0]?.source !== `${inputDir}/FamilyA/not-a-font.ttf`) {
+    throw new Error('Expected organization manifest to record the copied source.');
+  }
+
+  await fs.writeFile(sourcePath, 'replacement font-like file');
+  const overwritten = await organizeFontDirectory({
+    inputDir,
+    outputDir,
+    dryRun: false,
+    includePlan: true,
+    copyInvalidFonts: true,
+    batchNamingMode: 'plain',
+    overwriteExisting: true,
+    maxFiles: 10,
+  });
+  if (overwritten.sourceDestructive !== false || overwritten.writesSourceTree !== false || overwritten.writesOutputTree !== true || overwritten.mayOverwriteOutputTree !== true || overwritten.destructive !== true) {
+    throw new Error('Expected overwrite mode to flag output-tree overwrite risk while preserving source safety.');
+  }
+  if (!overwritten.organizationWarnings?.some((warning) => warning.code === 'output-overwrite-enabled')) {
+    throw new Error('Expected organization overwrite warning.');
+  }
+  if (await fs.readFile(sourcePath, 'utf8') !== 'replacement font-like file') {
+    throw new Error('Expected source file content to remain after overwrite-enabled organization copy.');
+  }
+  if (await fs.readFile(targetPath, 'utf8') !== 'replacement font-like file') {
+    throw new Error('Expected overwrite-enabled organization copy to update the target file.');
+  }
+
+  console.log(JSON.stringify({ copied, overwritten }, null, 2));
 } else if (scenario === 'batch-run-cli') {
   const inputDir = process.argv[3] || '.font-split-batch-run-cli';
   const outputRoot = process.argv[4] || '.font-split-batch-run-cli-output';

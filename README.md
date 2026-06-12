@@ -441,6 +441,7 @@ npm run smoke:incremental
 npm run smoke:font-inputs
 npm run smoke:scan-limits
 npm run smoke:organize
+npm run smoke:organize-copy
 npm run smoke:batch-run
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
