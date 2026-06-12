@@ -49,6 +49,7 @@ Key defaults and policy choices:
 
 - Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server.
 - For AI coding assistants, call `get_agent_guidance` first when the workflow is unclear. It returns recommended tool order, default policies, path rules, response fields, and a verification checklist that should be inspected before claiming success.
+- `get_agent_guidance` also returns `directoryWorkflowDecisionMatrix[]`, a machine-readable decision table for choosing direct batch splitting, dry-run organization, copy-only organization, or structure-only planning.
 - Use `get_runtime_status` when setup is uncertain; it checks the resolved workspace, Node engine compatibility, package versions, cn-font-split runtime version, and WASM file without writing anything, then returns `recommendedActions[]` for agent-friendly remediation.
 - Use `organize_font_directory` with `dryRun: true` when the source directory is flat, mixed, or otherwise does not match the intended batch grouping. This tool is source-non-destructive: it never moves or deletes source files, and real runs only copy selected fonts into `outputDir`.
 - Batch scanning skips dependencies, generated output directories, `__MACOSX`, and AppleDouble `._*` resource-fork files.

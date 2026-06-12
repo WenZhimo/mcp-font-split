@@ -103,6 +103,20 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('organizationWarnings')) {
     throw new Error('Expected agent guidance to recommend checking organization warnings.');
   }
+  const decisionIds = new Set((result.directoryWorkflowDecisionMatrix || []).map((item) => item.id));
+  for (const requiredDecision of ['known-good-batch-layout', 'unknown-or-mixed-directory-layout', 'large-or-noisy-directory-first-pass', 'user-wants-clean-staging-directory']) {
+    if (!decisionIds.has(requiredDecision)) {
+      throw new Error(`Expected agent guidance decision matrix to include ${requiredDecision}.`);
+    }
+  }
+  const structureDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'large-or-noisy-directory-first-pass');
+  if (structureDecision?.recommendedOptions?.parseFonts !== false || !structureDecision.mustInspectFields?.includes('dedupeLimitedByParsing')) {
+    throw new Error('Expected structure-first guidance to recommend parseFonts:false and dedupe checks.');
+  }
+  const stagingDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'user-wants-clean-staging-directory');
+  if (stagingDecision?.sourceDestructive !== false || stagingDecision?.followUpOptions?.dryRun !== false) {
+    throw new Error('Expected staging guidance to disclose source safety and copy-only follow-up.');
+  }
   const checklistIds = new Set((result.verificationChecklist || []).map((item) => item.id));
   for (const requiredId of ['runtime-ready', 'layout-plan-reviewed', 'process-outcome-checked', 'fallback-disclosed', 'output-audited']) {
     if (!checklistIds.has(requiredId)) {

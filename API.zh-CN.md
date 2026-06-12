@@ -10,7 +10,9 @@
 |------|---------------|--------|------|
 | `workflow` | `overview`, `single`, `batch`, `inspect`, `organize` | `overview` | 指南侧重点。 |
 
-响应会包含工作区路径规则、支持扩展名、默认策略、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应会包含工作区路径规则、支持扩展名、默认策略、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`directoryWorkflowDecisionMatrix[]`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+
+`directoryWorkflowDecisionMatrix[]` 是面向常见目录场景的机器可读决策表。每个条目包含 `id`、`useWhen`、`firstTool`、默认写入/源目录安全标记、`recommendedOptions`、可选后续工具/参数、`mustInspectFields` 和 `nonIntuitiveBehavior`。
 
 ## `get_runtime_status`
 

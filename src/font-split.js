@@ -415,6 +415,98 @@ export function getAgentGuidance(args = {}) {
       'If organizationWarnings contains output-overwrite-enabled or output-inside-input, disclose the risk before proceeding.',
     ],
   };
+  const directoryWorkflowDecisionMatrix = [
+    {
+      id: 'known-single-font',
+      useWhen: 'The user named one known font file and does not need directory scanning.',
+      firstTool: 'split_font',
+      writesFilesByDefault: true,
+      sourceDestructive: false,
+      recommendedOptions: {
+        fontPath: '<path-to-font>',
+      },
+      mustInspectFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'manifestPath'],
+      nonIntuitiveBehavior: 'ok:true may still mean single-woff2 fallback or copy-original instead of normal multi-subset output.',
+    },
+    {
+      id: 'known-good-batch-layout',
+      useWhen: 'The source directory layout already matches the intended family grouping.',
+      firstTool: 'split_font_batch',
+      writesFilesByDefault: false,
+      sourceDestructive: false,
+      recommendedOptions: {
+        dryRun: true,
+        includeResults: true,
+        strictMode: true,
+        batchNamingMode: 'numeric-suffix',
+        batchDedupeMode: 'font-identity',
+      },
+      followUpTool: 'split_font_batch',
+      followUpOptions: {
+        dryRun: false,
+        includeResults: false,
+      },
+      mustInspectFields: ['dryRun', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
+      nonIntuitiveBehavior: 'split_font_batch dryRun defaults to false, so agents should set dryRun:true explicitly for planning.',
+    },
+    {
+      id: 'unknown-or-mixed-directory-layout',
+      useWhen: 'The source directory is flat, mixed, unfamiliar, or may not match the desired output grouping.',
+      firstTool: 'organize_font_directory',
+      writesFilesByDefault: false,
+      sourceDestructive: false,
+      recommendedOptions: {
+        dryRun: true,
+        includePlan: true,
+        parseFonts: true,
+        batchGroupBy: 'auto',
+        batchNamingMode: 'numeric-suffix',
+        batchDedupeMode: 'font-identity',
+      },
+      followUpTool: 'split_font_batch',
+      followUpOptions: {
+        inputDir: '<original-inputDir-or-organized-outputDir>',
+        dryRun: true,
+        strictMode: true,
+      },
+      mustInspectFields: ['layout', 'recommendedBatchOptions', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'plan'],
+      nonIntuitiveBehavior: 'organize_font_directory defaults to dryRun:true and never moves or deletes source files; dryRun:false copies into outputDir only.',
+    },
+    {
+      id: 'large-or-noisy-directory-first-pass',
+      useWhen: 'The library is very large or metadata parsing is expected to be slow/noisy, and the agent only needs a structure-first recommendation.',
+      firstTool: 'organize_font_directory',
+      writesFilesByDefault: false,
+      sourceDestructive: false,
+      recommendedOptions: {
+        dryRun: true,
+        includePlan: false,
+        parseFonts: false,
+      },
+      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings', 'layout', 'recommendedBatchOptions'],
+      nonIntuitiveBehavior: 'parseFonts:false means validFontCount and invalidFontCount are null, not zero; identity dedupe and metadata family grouping are limited.',
+    },
+    {
+      id: 'user-wants-clean-staging-directory',
+      useWhen: 'The user explicitly wants an organized copy of the source fonts before splitting.',
+      firstTool: 'organize_font_directory',
+      writesFilesByDefault: false,
+      sourceDestructive: false,
+      recommendedOptions: {
+        dryRun: true,
+        includePlan: true,
+        parseFonts: true,
+        overwriteExisting: false,
+      },
+      followUpTool: 'organize_font_directory',
+      followUpOptions: {
+        dryRun: false,
+        overwriteExisting: false,
+      },
+      mustInspectFields: ['operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings'],
+      nonIntuitiveBehavior: 'A real organize run is copy-only. overwriteExisting:true can replace files in outputDir but still does not modify source files.',
+    },
+  ];
 
   return {
     ok: true,
@@ -472,6 +564,7 @@ export function getAgentGuidance(args = {}) {
       copyInvalidFonts: false,
       overwriteExisting: false,
     },
+    directoryWorkflowDecisionMatrix,
     verificationChecklist,
     responseFieldsToCheck: [
       'ok',
