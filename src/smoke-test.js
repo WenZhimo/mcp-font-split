@@ -119,7 +119,7 @@ function getUnsupportedCategoryCount(summary, category) {
   return (summary?.byCategory || []).find((item) => item.category === category)?.count ?? 0;
 }
 
-function buildRealCorpusSuiteCoverageSummary(runs) {
+function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
   const runByScenario = Object.fromEntries((runs || []).map((run) => [run.scenario, run || {}]));
   const byScenario = Object.fromEntries((runs || []).map((run) => [run.scenario, run.summary || {}]));
   const readonlyRun = runByScenario['real-corpus-readonly'] || {};
@@ -130,6 +130,44 @@ function buildRealCorpusSuiteCoverageSummary(runs) {
   const integration = byScenario['real-corpus-integration'] || {};
   const selectedTargetSet = new Set(targets.selectedTargets || []);
   const fixedRegressionTargetsCovered = DEFAULT_REAL_CORPUS_TARGETS.every((target) => selectedTargetSet.has(target));
+  const corpusSupportedFontCount = readonly.corpusSupportedFontCount ?? targets.corpusSupportedFontCount ?? integration.corpusSupportedFontCount;
+  const corpusUnsupportedFileCount = readonly.corpusUnsupportedFileCount ?? targets.corpusUnsupportedFileCount ?? integration.corpusUnsupportedFileCount;
+  const corpusUnsupportedByCategory = readonly.corpusUnsupportedByCategory ?? targets.corpusUnsupportedByCategory ?? integration.corpusUnsupportedByCategory;
+  const corpusUnsupportedArchiveCount = readonly.corpusUnsupportedArchiveCount ?? targets.corpusUnsupportedArchiveCount ?? integration.corpusUnsupportedArchiveCount;
+  const corpusMaxFilesHit = readonly.corpusMaxFilesHit ?? targets.corpusMaxFilesHit ?? integration.corpusMaxFilesHit;
+  const selectedTargets = targets.selectedTargets || [];
+  const testScope = {
+    corpusScan: {
+      scopeKind: 'full-root-bounded-scan',
+      meaning: 'Full corpus root is scanned up to maxFiles; corpusSupportedFontCount and corpusUnsupportedFileCount come from this root-level scan.',
+      maxFiles: suiteOptions.maxFiles,
+      maxFilesHit: corpusMaxFilesHit,
+      supportedFontCount: corpusSupportedFontCount,
+      unsupportedFileCount: corpusUnsupportedFileCount,
+    },
+    targetSampling: {
+      scopeKind: 'fixed-regression-plus-adaptive-sampling',
+      meaning: 'Selected target directories exercise dry-run naming, dedupe, layout, and next-action behavior; this is representative sampling, not every available target.',
+      targetLimit: suiteOptions.targetLimit,
+      requestedSampleCount: suiteOptions.sampleCount,
+      fixedRegressionTargetCount: DEFAULT_REAL_CORPUS_TARGETS.length,
+      fixedRegressionTargets: DEFAULT_REAL_CORPUS_TARGETS,
+      availableTargetCount: targets.availableTargetCount,
+      selectedTargetCount: targets.selectedTargetCount,
+      selectedTargets,
+      perDirectoryAcceptanceAudit: false,
+    },
+    representativeWriteAudit: {
+      scopeKind: 'single-representative-write-and-audit',
+      meaning: 'One selected sample directory runs real organization, single-font, batch write, and output-structure audits.',
+      integrationLimit: suiteOptions.integrationLimit,
+      sampleInputDir: integration.sampleInputDir,
+      sampleFontPath: integration.sampleFontPath,
+      outputRoot: integration.outputRoot,
+      singleAuditStatus: integration.singleAuditStatus,
+      batchAuditStatus: integration.batchAuditStatus,
+    },
+  };
   const functionalCoverage = [
     {
       id: 'full-root-input-scan',
@@ -230,18 +268,19 @@ function buildRealCorpusSuiteCoverageSummary(runs) {
   return {
     testStrategy: 'full-root compact scan plus representative target sampling plus one bounded write/audit path',
     perDirectoryAcceptanceAudit: false,
+    testScope,
     functionalCoverage,
-    corpusSupportedFontCount: readonly.corpusSupportedFontCount ?? targets.corpusSupportedFontCount ?? integration.corpusSupportedFontCount,
-    corpusUnsupportedFileCount: readonly.corpusUnsupportedFileCount ?? targets.corpusUnsupportedFileCount ?? integration.corpusUnsupportedFileCount,
-    corpusUnsupportedByCategory: readonly.corpusUnsupportedByCategory ?? targets.corpusUnsupportedByCategory ?? integration.corpusUnsupportedByCategory,
-    corpusUnsupportedArchiveCount: readonly.corpusUnsupportedArchiveCount ?? targets.corpusUnsupportedArchiveCount ?? integration.corpusUnsupportedArchiveCount,
-    corpusMaxFilesHit: readonly.corpusMaxFilesHit ?? targets.corpusMaxFilesHit ?? integration.corpusMaxFilesHit,
+    corpusSupportedFontCount,
+    corpusUnsupportedFileCount,
+    corpusUnsupportedByCategory,
+    corpusUnsupportedArchiveCount,
+    corpusMaxFilesHit,
     fixedRegressionTargets: DEFAULT_REAL_CORPUS_TARGETS,
     targetSelectionMode: targets.selectionMode,
     availableTargetCount: targets.availableTargetCount,
     selectedTargetCount: targets.selectedTargetCount,
     targetSampleCount: targets.sampleCount,
-    selectedTargets: targets.selectedTargets,
+    selectedTargets,
     representativeReadonlySample: readonly.sampleInputDir,
     representativeWriteSample: integration.sampleInputDir,
     singleAuditStatus: integration.singleAuditStatus,
@@ -3096,6 +3135,7 @@ if (scenario === 'single') {
     }
     assertDocsContain('real corpus suite checklist id', '`local-real-corpus-suite-passed`');
     assertDocsContain('real corpus suite command', '`npm run smoke:real-corpus-suite -- <font-corpus-dir>`');
+    assertDocsContain('real corpus suite test scope', '`testScope`');
 
     console.log(JSON.stringify({
       ok: true,
@@ -3133,6 +3173,7 @@ if (scenario === 'single') {
     '`unsupportedFileCategoryCatalog`',
     '`verificationChecklist[]`',
     '`smoke:real-corpus-suite`',
+    '`testScope`',
     '`functionalCoverage[]`',
     '`directoryWorkflowDecisionMatrix[]`',
     '`directoryWorkflowExamples[]`',
@@ -3458,9 +3499,23 @@ if (scenario === 'single') {
     String(integrationLimit),
   ], 'real-corpus representative write and output audit', { verbose }));
 
-  const coverageSummary = buildRealCorpusSuiteCoverageSummary(runs);
+  const coverageSummary = buildRealCorpusSuiteCoverageSummary(runs, {
+    maxFiles,
+    targetLimit,
+    integrationLimit,
+    sampleCount,
+  });
   if (
     coverageSummary.perDirectoryAcceptanceAudit !== false
+    || coverageSummary.testScope?.corpusScan?.scopeKind !== 'full-root-bounded-scan'
+    || coverageSummary.testScope?.corpusScan?.supportedFontCount !== coverageSummary.corpusSupportedFontCount
+    || coverageSummary.testScope?.targetSampling?.scopeKind !== 'fixed-regression-plus-adaptive-sampling'
+    || coverageSummary.testScope?.targetSampling?.fixedRegressionTargetCount !== DEFAULT_REAL_CORPUS_TARGETS.length
+    || coverageSummary.testScope?.targetSampling?.selectedTargetCount !== coverageSummary.selectedTargetCount
+    || coverageSummary.testScope?.targetSampling?.availableTargetCount !== coverageSummary.availableTargetCount
+    || coverageSummary.testScope?.targetSampling?.perDirectoryAcceptanceAudit !== false
+    || coverageSummary.testScope?.representativeWriteAudit?.scopeKind !== 'single-representative-write-and-audit'
+    || coverageSummary.testScope?.representativeWriteAudit?.batchAuditStatus !== coverageSummary.batchAuditStatus
     || !Array.isArray(coverageSummary.functionalCoverage)
     || coverageSummary.functionalCoverage.some((item) => item.covered !== true)
     || coverageSummary.corpusSupportedFontCount < 1
@@ -3468,7 +3523,7 @@ if (scenario === 'single') {
     || coverageSummary.selectedTargetCount < 1
     || coverageSummary.batchAuditStatus !== 'pass'
   ) {
-    throw new Error('Expected real-corpus-suite compact coverage summary to expose covered function paths, root counts, unsupported categories, selected targets, and passing output audits.');
+    throw new Error('Expected real-corpus-suite compact coverage summary to expose explicit testScope, covered function paths, root counts, unsupported categories, selected targets, and passing output audits.');
   }
 
   console.log(JSON.stringify({
@@ -3480,6 +3535,7 @@ if (scenario === 'single') {
     targetLimit,
     integrationLimit,
     sampleCount,
+    testScope: coverageSummary.testScope,
     coverageSummary,
     runs,
   }, null, 2));
