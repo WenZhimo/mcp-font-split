@@ -126,6 +126,7 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 | `maxFiles` | positive integer, MCP max `50000` | `5000` | Maximum source files to scan. |
 | `includeResults` | boolean | `true` | Include per-font `results[]`; set `false` for compact large-batch responses. |
 | `dryRun` | boolean | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
+| `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | Named preset applied before explicit options. Explicit options override preset values. |
 | `strictMode` | boolean | `false` | Convenience strict defaults. Unset `skipMode` becomes `manifest` and unset `batchErrorMode` becomes `fail-after`; explicit options still override it. |
 | `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | Existing-output skip policy. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | First-level family directory strategy. |
@@ -135,6 +136,17 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 | `debugBatchDecisions` | boolean | `false` | Emit structured decision logs for dedupe, naming, skip, and errors. |
 
 `split_font_batch` also accepts the split options from `split_font`, except `fontPath` and `outDir`. Batch mode applies those processing options to every selected font and uses `inputDir` / `outputRoot` for paths.
+
+`workflowPreset` is a shorthand for common configurations:
+
+- `safe-preview`: no-write strict preview.
+- `reviewed-write`: write settings for after a reviewed preview.
+- `structure-first`: no-write compact first pass for large/noisy directories; batch mode uses `same-path` dedupe, and organization mode skips font metadata parsing.
+- `source-layout`: prefer source-directory grouping.
+- `metadata-family`: prefer internal font-family metadata grouping.
+- `preserve-all`: disable dedupe while keeping collision-safe names.
+
+Presets are expanded first; any explicit argument in the same call overrides the preset value.
 
 Batch responses include `scannedFileCount`, `maxFiles`, `maxFilesHit`, and `unsupportedFileSummary`. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileSummary` summarizes all scanned non-font files that were ignored by extension.
 
@@ -180,6 +192,7 @@ Plan or copy-organize a source font directory into a cleaner staging layout.
 | `inputDir` | string | `.` | Directory to scan inside `FONT_SPLIT_ROOT`. |
 | `outputDir` | string | `organized-fonts` | Destination directory for organized copies. Must be different from `inputDir`. |
 | `maxFiles` | positive integer, MCP max `50000` | `50000` | Maximum source files to scan. |
+| `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | Named preset applied before explicit organization options. Explicit options override preset values. |
 | `dryRun` | boolean | `true` | Plan only without writing files. Set `false` only after reviewing `plan[]` and `organizationWarnings[]`. |
 | `includePlan` | boolean | `true` | Include per-font `plan[]` entries. Set `false` for compact summaries. |
 | `parseFonts` | boolean | `true` | Read font metadata for identity dedupe, glyph counts, invalid-font detection, and font-family grouping. Set `false` for a faster structure-only plan. |

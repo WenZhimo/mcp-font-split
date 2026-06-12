@@ -126,6 +126,7 @@
 | `maxFiles` | 正整数，MCP 最大 `50000` | `5000` | 扫描阶段最多读取多少个源文件。 |
 | `includeResults` | boolean | `true` | 是否返回每个字体的 `results[]` 详情；全量跑建议设为 `false`。 |
 | `dryRun` | boolean | `false` | 只预览扫描、去重、命名和 skip 决策，不写任何输出文件。 |
+| `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | 命名预设，会先展开为一组常用配置；显式参数仍会覆盖预设值。 |
 | `strictMode` | boolean | `false` | 一键严格默认值。未显式设置的 `skipMode` 会变为 `manifest`，未显式设置的 `batchErrorMode` 会变为 `fail-after`；显式参数仍可覆盖。 |
 | `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | 已有输出的跳过策略。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 第一层 family 目录策略。 |
@@ -135,6 +136,17 @@
 | `debugBatchDecisions` | boolean | `false` | 输出结构化调试日志，覆盖 dedupe、naming、skip 和 error 决策。 |
 
 `split_font_batch` 也接受 `split_font` 的处理参数，但不接受 `fontPath` 和 `outDir`。批量模式会把这些处理参数应用到每个选中的字体，并使用 `inputDir` / `outputRoot` 控制路径。
+
+`workflowPreset` 是常见配置的简写：
+
+- `safe-preview`：无写入严格预览。
+- `reviewed-write`：审查预览后用于真实写入的配置。
+- `structure-first`：无写入、紧凑、适合超大/嘈杂目录的第一遍结构扫描；批量侧使用 `same-path` 去重，目录整理侧跳过字体元数据解析。
+- `source-layout`：优先按源目录分组。
+- `metadata-family`：优先按字体内部 family metadata 分组。
+- `preserve-all`：关闭去重，同时保留冲突安全命名。
+
+预设会先展开；同一次调用里显式传入的参数会覆盖预设值。
 
 批量响应会包含 `scannedFileCount`、`maxFiles`、`maxFilesHit` 和 `unsupportedFileSummary`。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileSummary` 会按扩展名汇总所有已扫描但被忽略的非字体文件。
 
@@ -180,6 +192,7 @@
 | `inputDir` | string | `.` | `FONT_SPLIT_ROOT` 内要扫描的目录。 |
 | `outputDir` | string | `organized-fonts` | 整理后副本的目标目录，必须与 `inputDir` 不同。 |
 | `maxFiles` | 正整数，MCP 最大 `50000` | `50000` | 最多扫描多少个源文件。 |
+| `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | 命名预设，会先展开为一组整理配置；显式参数仍会覆盖预设值。 |
 | `dryRun` | boolean | `true` | 只生成计划，不写文件；只有检查过 `plan[]` 和 `organizationWarnings[]` 后才建议设为 `false`。 |
 | `includePlan` | boolean | `true` | 是否返回逐字体 `plan[]`；大目录只看摘要时可设为 `false`。 |
 | `parseFonts` | boolean | `true` | 是否读取字体元数据，用于 identity 去重、glyph count、坏字体检测和 font-family 分组。设为 `false` 时只做更快的结构优先计划。 |

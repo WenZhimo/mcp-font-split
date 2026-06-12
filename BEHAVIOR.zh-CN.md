@@ -320,6 +320,24 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `includeResults`：是否在批量响应中返回每个字体的 `results[]` 详情；默认 `true`。设为 `false` 时仍返回汇总统计、错误列表和 `resultsIncluded: false`，适合全量字体库处理。
 - `dryRun`：只执行扫描、去重、命名和 skip 判断，不调用 `split_font`，也不写任何输出文件。`includeResults: true` 时返回 `planned[]` 计划清单。
 
+### 4.12 `workflowPreset`（批量和目录整理）
+
+`workflowPreset` 是给 agent 使用的常见工作流快捷配置，当前用于 `split_font_batch` 和 `organize_font_directory`。
+
+可选值：
+
+- `default`：不改变工具默认行为。
+- `safe-preview`：第一次查看陌生目录时使用的无写入预览。批量模式会启用 `dryRun: true`、`includeResults: true`、`strictMode: true`、`skipMode: "manifest"`、`batchDedupeMode: "font-identity"` 等安全默认值；目录整理会保持 `dryRun: true`、解析字体并返回完整计划。
+- `reviewed-write`：已经审查过预览后使用的写入配置。批量模式会真实写拆分输出；目录整理只会 copy-only 写入 `outputDir`，仍不会移动或删除源文件。
+- `structure-first`：面向超大或嘈杂目录的快速无写入第一遍扫描。批量模式使用 `batchDedupeMode: "same-path"`，只做路径/stem 级去重；目录整理会使用 `parseFonts: false` 和 `includePlan: false`，此时 identity 去重会受限并回退到结构/路径级判断。
+- `source-layout`：优先按源目录分组，适合“每个压缩包/家族一个目录”的来源结构。
+- `metadata-family`：优先按字体内部 family metadata 分组，适合扁平 vendor dump。
+- `preserve-all`：关闭批量预处理去重，同时保留 `numeric-suffix` 冲突安全命名，适合必须保留每个源字体文件的场景。
+
+预设只是起点，不是锁定配置。工具会先展开 `workflowPreset`，再应用同一次调用中显式传入的参数；因此显式参数总是覆盖预设。例如 `workflowPreset: "safe-preview"` 加 `batchDedupeMode: "none"` 会保留无写入预览，但关闭去重。
+
+响应会回显实际使用的 `workflowPreset`。批量响应还会回显 `batchNamingMode` 和 `batchDedupeMode`，用于确认预设和显式覆盖后的最终策略。
+
 ---
 
 ## 5. 单文件 `split_font` 处理流程

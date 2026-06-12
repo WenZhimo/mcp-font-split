@@ -211,6 +211,7 @@ Use this only to learn the directory shape quickly. Because font parsing is skip
 
 | Option | Values | Default | Meaning |
 |--------|--------|---------|---------|
+| `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | Named configuration preset expanded before batch/organization options; explicit options still override preset values. |
 | `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | Choose how batch mode decides whether output is already current. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | Choose the family directory naming strategy for batch mode. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Choose how batch mode names per-font output directories when collisions exist. |
@@ -227,6 +228,17 @@ Use this only to learn the directory shape quickly. Because font parsing is skip
 - `legacy-css`: skip if the current batch output directory's `result.css` exists. This preserves old behavior but does not detect option changes.
 - `manifest`: skip only when `split-meta.json` matches source path, source size, source mtime, effective options, manifest version, and tool version.
 - `force`: never skip existing output.
+
+`workflowPreset` details:
+
+- `safe-preview`: no-write preview. In batch mode this applies safe defaults such as `dryRun: true`, `includeResults: true`, `strictMode: true`, and `skipMode: "manifest"`; in organization mode it parses fonts and returns the full plan.
+- `reviewed-write`: real write settings after a preview has been reviewed. Batch mode writes split output; organization mode performs copy-only writes into `outputDir` and still does not modify source files.
+- `structure-first`: no-write structure/path-oriented first pass for very large or noisy directories; batch mode uses `same-path` dedupe, and organization mode skips font metadata parsing.
+- `source-layout`: prefer source directories as family/group names, useful for archive-per-family folder layouts.
+- `metadata-family`: prefer internal font family metadata, useful for flat vendor dumps.
+- `preserve-all`: disable pre-processing dedupe while keeping `numeric-suffix` naming, useful when every source font file must be kept.
+
+Presets are starting points, not locked configurations. For example, `{"workflowPreset":"safe-preview","batchDedupeMode":"none"}` keeps the no-write preview behavior but disables dedupe.
 
 In batch mode, the output directory key is the bare `fontBaseName` unless another source has already claimed it. In that case the tool allocates a stable numeric suffix and reuses it on later reruns by manifest source matching.
 

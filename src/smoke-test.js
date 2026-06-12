@@ -259,8 +259,17 @@ if (scenario === 'single') {
   if (result.recommendedInspectOptions?.includeFiles !== false || result.recommendedInspectOptions?.includeFamilies !== false) {
     throw new Error('Expected agent guidance to recommend compact output inspection.');
   }
+  const presetIds = new Set((result.workflowPresets || []).map((item) => item.id));
+  for (const requiredPreset of ['safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all']) {
+    if (!presetIds.has(requiredPreset)) {
+      throw new Error(`Expected agent guidance workflowPresets to include ${requiredPreset}.`);
+    }
+  }
   if (!result.responseFieldsToCheck?.includes('cnFontSplit.runtimeVersion')) {
     throw new Error('Expected agent guidance to recommend checking cn-font-split runtime details.');
+  }
+  if (!result.responseFieldsToCheck?.includes('workflowPresets') || !result.responseFieldsToCheck?.includes('workflowPreset')) {
+    throw new Error('Expected agent guidance to recommend checking workflow preset fields.');
   }
   if (!result.responseFieldsToCheck?.includes('recommendedActions')) {
     throw new Error('Expected agent guidance to recommend checking remediation actions.');
@@ -365,6 +374,7 @@ if (scenario === 'single') {
     mismatchTemplate?.tool !== 'organize_font_directory'
     || mismatchTemplate?.writesFiles !== false
     || mismatchTemplate?.sourceDestructive !== false
+    || mismatchTemplate?.args?.workflowPreset !== 'safe-preview'
     || mismatchTemplate?.args?.dryRun !== true
     || !mismatchTemplate.inspectFields?.includes('sourceDestructive')
     || !mismatchTemplate.inspectFields?.includes('unsupportedFileSummary')
@@ -376,6 +386,7 @@ if (scenario === 'single') {
     copyTemplate?.tool !== 'organize_font_directory'
     || copyTemplate?.writesFiles !== true
     || copyTemplate?.sourceDestructive !== false
+    || copyTemplate?.args?.workflowPreset !== 'reviewed-write'
     || copyTemplate?.args?.dryRun !== false
     || copyTemplate?.args?.overwriteExisting !== false
     || !copyTemplate.inspectFields?.includes('writesSourceTree')
@@ -387,6 +398,7 @@ if (scenario === 'single') {
   if (
     batchPreviewTemplate?.tool !== 'split_font_batch'
     || batchPreviewTemplate?.writesFiles !== false
+    || batchPreviewTemplate?.args?.workflowPreset !== 'safe-preview'
     || batchPreviewTemplate?.args?.dryRun !== true
     || batchPreviewTemplate?.args?.includeResults !== true
   ) {
@@ -417,6 +429,8 @@ if (scenario === 'single') {
     }
   }
   const expectedFieldCatalogEntries = {
+    workflowPresets: 'get_agent_guidance',
+    workflowPreset: 'split_font_batch',
     recommendedBatchOptions: 'organize_font_directory',
     safetySummary: 'organize_font_directory',
     unsupportedFileSummary: 'organize_font_directory',
@@ -1150,6 +1164,163 @@ if (scenario === 'single') {
     throw new Error('Expected batch identity dry-runs not to create outputRoot.');
   }
   console.log(JSON.stringify({ inspection, identityDedupe, pathDedupe }, null, 2));
+} else if (scenario === 'workflow-presets') {
+  const inputDir = process.argv[3] || 'font-split-mcp/.font-split-preset-input';
+  const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-preset-output';
+  console.log('Workflow preset smoke:', inputDir, '->', outputRoot);
+  await fs.rm(inputDir, { recursive: true, force: true });
+  await fs.rm(outputRoot, { recursive: true, force: true });
+  await fs.mkdir(path.join(inputDir, 'Otf'), { recursive: true });
+  await fs.mkdir(path.join(inputDir, 'Ttf'), { recursive: true });
+  const otfPath = path.join(inputDir, 'Otf', 'FixtureSans-Regular.otf');
+  const ttfPath = path.join(inputDir, 'Ttf', 'FixtureSans-Regular.ttf');
+  await fs.writeFile(otfPath, buildMinimalTtf({ familyName: 'Fixture Sans', subfamilyName: 'Regular', glyphCount: 5 }));
+  await fs.writeFile(ttfPath, buildMinimalTtf({ familyName: 'Fixture Sans', subfamilyName: 'Regular', glyphCount: 3 }));
+  await fs.writeFile(path.join(inputDir, 'notes.txt'), 'not a font');
+
+  const safePreview = await splitFontBatch({
+    inputDir,
+    outputRoot,
+    workflowPreset: 'safe-preview',
+    limit: 10,
+    maxFiles: 20,
+    silent: true,
+  });
+  if (
+    safePreview.workflowPreset !== 'safe-preview'
+    || safePreview.dryRun !== true
+    || safePreview.resultsIncluded !== true
+    || safePreview.strictMode !== true
+    || safePreview.skipMode !== 'manifest'
+    || safePreview.batchErrorMode !== 'fail-after'
+    || safePreview.batchNamingMode !== 'numeric-suffix'
+    || safePreview.batchDedupeMode !== 'font-identity'
+    || safePreview.deduplicatedCount !== 1
+    || safePreview.skippedDuplicates !== 1
+    || safePreview.unsupportedFileSummary?.total !== 1
+  ) {
+    throw new Error('Expected safe-preview preset to apply no-write strict batch defaults.');
+  }
+  if (await fsExists(outputRoot)) {
+    throw new Error('Expected safe-preview preset not to create outputRoot.');
+  }
+
+  const preserveAll = await splitFontBatch({
+    inputDir,
+    outputRoot,
+    workflowPreset: 'preserve-all',
+    dryRun: true,
+    includeResults: true,
+    batchGroupBy: 'font-family',
+    limit: 10,
+    maxFiles: 20,
+    silent: true,
+  });
+  if (
+    preserveAll.workflowPreset !== 'preserve-all'
+    || preserveAll.batchDedupeMode !== 'none'
+    || preserveAll.deduplicatedCount !== 2
+    || preserveAll.skippedDuplicates !== 0
+  ) {
+    throw new Error('Expected preserve-all preset to disable batch dedupe while allowing explicit dryRun/group overrides.');
+  }
+
+  const structureFirstBatch = await splitFontBatch({
+    inputDir,
+    outputRoot,
+    workflowPreset: 'structure-first',
+    limit: 10,
+    maxFiles: 20,
+    silent: true,
+  });
+  if (
+    structureFirstBatch.workflowPreset !== 'structure-first'
+    || structureFirstBatch.dryRun !== true
+    || structureFirstBatch.resultsIncluded !== false
+    || structureFirstBatch.batchDedupeMode !== 'same-path'
+    || structureFirstBatch.deduplicatedCount !== 2
+    || structureFirstBatch.skippedDuplicates !== 0
+  ) {
+    throw new Error('Expected structure-first batch preset to use no-write same-path structural defaults.');
+  }
+
+  const structureFirstBatchOverride = await splitFontBatch({
+    inputDir,
+    outputRoot,
+    workflowPreset: 'structure-first',
+    batchDedupeMode: 'font-identity',
+    includeResults: true,
+    limit: 10,
+    maxFiles: 20,
+    silent: true,
+  });
+  if (
+    structureFirstBatchOverride.workflowPreset !== 'structure-first'
+    || structureFirstBatchOverride.batchDedupeMode !== 'font-identity'
+    || structureFirstBatchOverride.resultsIncluded !== true
+    || structureFirstBatchOverride.deduplicatedCount !== 1
+    || structureFirstBatchOverride.skippedDuplicates !== 1
+  ) {
+    throw new Error('Expected explicit batch arguments to override structure-first preset defaults.');
+  }
+
+  const undefinedOverridePreview = await splitFontBatch({
+    inputDir,
+    outputRoot,
+    workflowPreset: 'safe-preview',
+    dryRun: undefined,
+    includeResults: undefined,
+    limit: 10,
+    maxFiles: 20,
+    silent: true,
+  });
+  if (undefinedOverridePreview.dryRun !== true || undefinedOverridePreview.resultsIncluded !== true) {
+    throw new Error('Expected undefined explicit values not to erase workflowPreset defaults.');
+  }
+
+  const structureFirst = await organizeFontDirectory({
+    inputDir,
+    outputDir: outputRoot,
+    workflowPreset: 'structure-first',
+    maxFiles: 20,
+  });
+  if (
+    structureFirst.workflowPreset !== 'structure-first'
+    || structureFirst.dryRun !== true
+    || structureFirst.parsedFontMetadata !== false
+    || structureFirst.planIncluded !== false
+    || structureFirst.effectiveBatchDedupeMode !== 'same-path'
+    || structureFirst.dedupeLimitedByParsing !== true
+  ) {
+    throw new Error('Expected structure-first preset to apply no-write metadata-free organization defaults.');
+  }
+
+  const explicitOverride = await organizeFontDirectory({
+    inputDir,
+    outputDir: outputRoot,
+    workflowPreset: 'structure-first',
+    parseFonts: true,
+    includePlan: true,
+    maxFiles: 20,
+  });
+  if (
+    explicitOverride.workflowPreset !== 'structure-first'
+    || explicitOverride.parsedFontMetadata !== true
+    || explicitOverride.planIncluded !== true
+    || explicitOverride.effectiveBatchDedupeMode !== 'font-identity'
+  ) {
+    throw new Error('Expected explicit organization arguments to override workflowPreset defaults.');
+  }
+
+  console.log(JSON.stringify({
+    safePreview,
+    preserveAll,
+    structureFirstBatch,
+    structureFirstBatchOverride,
+    undefinedOverridePreview,
+    structureFirst,
+    explicitOverride,
+  }, null, 2));
 } else if (scenario === 'inspect-compact') {
   const inputDir = process.argv[3] || 'font-split-mcp/.font-split-inspect-compact';
   console.log('Compact output inspection smoke:', inputDir);
@@ -1245,7 +1416,69 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected stray output files to fail the structure audit.');
   }
-  console.log(JSON.stringify({ clean, noisy }, null, 2));
+
+  await fs.mkdir(path.join(outDir, 'FamilyA', 'FixtureSans-Regular', 'extra'), { recursive: true });
+  await fs.writeFile(path.join(outDir, 'FamilyA', 'FixtureSans-Regular', 'extra', 'deep.txt'), 'wrong depth');
+  const wrongDepth = await inspectSplitOutput({
+    outDir,
+    includeFiles: false,
+    includeFamilies: false,
+  });
+  if (
+    wrongDepth.structureSummary?.conforms !== false
+    || wrongDepth.structureSummary?.unexpectedDepthFileCount < 1
+    || !wrongDepth.structureSummary?.issues?.some((issue) => issue.code === 'unexpected-output-depth')
+  ) {
+    throw new Error('Expected files below the documented output depth to fail the structure audit.');
+  }
+
+  const batchInputDir = `${outDir}-batch-input`;
+  const batchOutputRoot = `${outDir}-batch-output`;
+  await fs.rm(batchInputDir, { recursive: true, force: true });
+  await fs.rm(batchOutputRoot, { recursive: true, force: true });
+  await fs.mkdir(batchInputDir, { recursive: true });
+  await fs.writeFile(
+    path.join(batchInputDir, 'FixtureSans-Regular.ttf'),
+    buildMinimalTtf({ familyName: 'Fixture Sans', subfamilyName: 'Regular', glyphCount: 5 }),
+  );
+  const batchWrite = await splitFontBatch({
+    inputDir: batchInputDir,
+    outputRoot: batchOutputRoot,
+    workflowPreset: 'reviewed-write',
+    batchGroupBy: 'font-family',
+    smallGlyphAction: 'copy-original',
+    limit: 10,
+    maxFiles: 20,
+    silent: true,
+  });
+  const batchInspect = await inspectSplitOutput({
+    outDir: batchOutputRoot,
+    includeFiles: false,
+    includeFamilies: false,
+  });
+  const batchInspectDetailed = await inspectSplitOutput({
+    outDir: batchOutputRoot,
+    includeFiles: false,
+    includeFamilies: true,
+  });
+  const batchManifest = batchInspectDetailed.families?.[0]?.fontEntries?.[0]?.manifest;
+  if (
+    batchWrite.workflowPreset !== 'reviewed-write'
+    || batchWrite.dryRun !== false
+    || batchWrite.processedFontCount !== 1
+    || batchInspect.structureSummary?.conforms !== true
+    || batchInspect.structureSummary?.layoutKind !== 'family-tree'
+    || batchInspect.structureSummary?.manifestCoverageOk !== true
+    || batchInspect.copyOriginalOutputCount !== 1
+    || batchInspect.structureSummary?.outputModeCounts?.['copy-original'] !== 1
+  ) {
+    throw new Error('Expected real batch copy-original output to match the documented output directory structure.');
+  }
+  if (Object.hasOwn(batchManifest?.effectiveConfig || {}, 'workflowPreset')) {
+    throw new Error('Expected workflowPreset shorthand not to be stored as an output-affecting manifest config.');
+  }
+
+  console.log(JSON.stringify({ clean, noisy, wrongDepth, batchWrite, batchInspect }, null, 2));
 } else if (scenario === 'mcp-error') {
   const detailedError = new Error('batch failed');
   detailedError.name = 'BatchSplitError';
@@ -1306,6 +1539,9 @@ if (scenario === 'single') {
       if (!Object.hasOwn(organizeProps, requiredOrganizeProp)) {
         throw new Error(`organize_font_directory is missing ${requiredOrganizeProp}`);
       }
+    }
+    if (!Object.hasOwn(batchProps, 'workflowPreset') || !Object.hasOwn(organizeProps, 'workflowPreset')) {
+      throw new Error('Expected batch and organization tools to expose workflowPreset.');
     }
     expectDescriptionIncludes('get_agent_guidance', ['directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);

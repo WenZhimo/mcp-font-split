@@ -211,6 +211,7 @@ fonts/
 
 | 参数 | 可选值 | 默认值 | 含义 |
 |------|--------|--------|------|
+| `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | 命名配置预设，会先展开为一组批量/整理参数；显式传入的具体参数仍会覆盖预设。 |
 | `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | 批量模式如何判断已有输出是否可跳过。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 批量模式如何决定家族目录名。 |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 批量模式如何决定每个字体输出目录的命名冲突策略。 |
@@ -227,6 +228,17 @@ fonts/
 - `legacy-css`：只要当前批量输出目录里的 `result.css` 存在就跳过。兼容旧行为，但不感知参数变化。
 - `manifest`：读取 `split-meta.json`，比较源文件路径、大小、mtime、有效参数、manifest 版本和工具版本。
 - `force`：永远不跳过，始终重跑。
+
+`workflowPreset` 说明：
+
+- `safe-preview`：无写入预览。批量时等价于 `dryRun: true`、`includeResults: true`、`strictMode: true`、`skipMode: "manifest"` 等安全默认值；整理时等价于解析字体并返回完整计划。
+- `reviewed-write`：用于已经审查过预览后的真实写入。批量会写拆分输出；整理会 copy-only 写入 `outputDir`，仍不会改动源文件。
+- `structure-first`：无写入、偏结构/路径的快速第一遍扫描，适合超大或嘈杂目录；批量侧使用 `same-path` 去重，目录整理侧跳过字体元数据解析。
+- `source-layout`：优先按源目录分组，适合每个压缩包/家族一个目录的来源结构。
+- `metadata-family`：优先按字体内部 family metadata 分组，适合扁平 vendor dump。
+- `preserve-all`：关闭预处理去重，并保留 `numeric-suffix` 命名，适合必须保留每个源字体文件的场景。
+
+预设只是起点，不是锁定配置；例如 `{"workflowPreset":"safe-preview","batchDedupeMode":"none"}` 会保留无写入预览，但覆盖为不去重。
 
 在批量模式下，输出目录 key 默认就是裸 `fontBaseName`；只有当该名字已经被别的源文件占用时，工具才会分配稳定的数字后缀，并在后续 rerun 中通过 manifest 复用。
 

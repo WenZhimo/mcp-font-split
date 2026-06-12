@@ -23,6 +23,133 @@ const MANIFEST_VERSION = 1;
 const ORGANIZATION_MANIFEST_FILE_NAME = 'font-organization-manifest.json';
 const ORGANIZATION_MANIFEST_VERSION = 1;
 const PACKAGE_VERSION = packageJson.version;
+const WORKFLOW_PRESETS = {
+  default: {
+    description: 'Use the tool defaults. Explicit arguments still apply normally.',
+    writesBatchFiles: 'depends-on-dryRun',
+    writesOrganizationFiles: 'depends-on-dryRun',
+    batch: {},
+    organize: {},
+  },
+  'safe-preview': {
+    description: 'No-write preview for unfamiliar sources. Good first call for agents before any batch write or organization copy.',
+    writesBatchFiles: false,
+    writesOrganizationFiles: false,
+    batch: {
+      dryRun: true,
+      includeResults: true,
+      strictMode: true,
+      skipMode: 'manifest',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+      batchErrorMode: 'fail-after',
+      splitFailureAction: 'single-woff2',
+    },
+    organize: {
+      dryRun: true,
+      includePlan: true,
+      parseFonts: true,
+      batchGroupBy: 'auto',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+      copyInvalidFonts: false,
+      overwriteExisting: false,
+    },
+  },
+  'reviewed-write': {
+    description: 'Write-oriented settings after a preview has been reviewed. Batch writes output; organization copies into outputDir only.',
+    writesBatchFiles: true,
+    writesOrganizationFiles: true,
+    batch: {
+      dryRun: false,
+      includeResults: false,
+      strictMode: true,
+      skipMode: 'manifest',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+      batchErrorMode: 'fail-after',
+      splitFailureAction: 'single-woff2',
+    },
+    organize: {
+      dryRun: false,
+      includePlan: true,
+      parseFonts: true,
+      batchGroupBy: 'auto',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+      copyInvalidFonts: false,
+      overwriteExisting: false,
+    },
+  },
+  'structure-first': {
+    description: 'Fast no-write structural scan for very large or noisy directories. Metadata-sensitive decisions remain limited.',
+    writesBatchFiles: false,
+    writesOrganizationFiles: false,
+    batch: {
+      dryRun: true,
+      includeResults: false,
+      strictMode: true,
+      skipMode: 'manifest',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'same-path',
+      batchErrorMode: 'fail-after',
+    },
+    organize: {
+      dryRun: true,
+      includePlan: false,
+      parseFonts: false,
+      batchGroupBy: 'auto',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+      copyInvalidFonts: false,
+      overwriteExisting: false,
+    },
+  },
+  'source-layout': {
+    description: 'Prefer source directory names as family/group names. Useful for archive-per-family folder layouts.',
+    writesBatchFiles: 'depends-on-dryRun',
+    writesOrganizationFiles: 'depends-on-dryRun',
+    batch: {
+      batchGroupBy: 'source-dir',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+    },
+    organize: {
+      batchGroupBy: 'source-dir',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+    },
+  },
+  'metadata-family': {
+    description: 'Prefer internal font metadata as family/group names. Useful for flat vendor dumps.',
+    writesBatchFiles: 'depends-on-dryRun',
+    writesOrganizationFiles: 'depends-on-dryRun',
+    batch: {
+      batchGroupBy: 'font-family',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+    },
+    organize: {
+      batchGroupBy: 'font-family',
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'font-identity',
+    },
+  },
+  'preserve-all': {
+    description: 'Disable pre-processing dedupe while keeping collision-safe numeric names. Useful when every source font file must be kept.',
+    writesBatchFiles: 'depends-on-dryRun',
+    writesOrganizationFiles: 'depends-on-dryRun',
+    batch: {
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'none',
+    },
+    organize: {
+      batchNamingMode: 'numeric-suffix',
+      batchDedupeMode: 'none',
+    },
+  },
+};
+const WORKFLOW_PRESET_NAMES = Object.keys(WORKFLOW_PRESETS);
 const GUIDANCE_DETAIL_LEVELS = ['compact', 'full'];
 const GUIDANCE_SECTION_NAMES = [
   'workspace',
@@ -55,7 +182,7 @@ const GUIDANCE_SECTION_FIELDS = {
   workspace: ['workspace'],
   tools: ['tools', 'supportedExtensions'],
   defaults: ['defaultPolicies'],
-  recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions'],
+  recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets'],
   'directory-workflows': ['directoryWorkflowDecisionMatrix'],
   examples: ['directoryWorkflowExamples'],
   verification: ['verificationChecklist'],
@@ -740,6 +867,16 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Whether per-item planned actions are included.',
     agentAction: 'If false, use summary fields or rerun with includeResults/includePlan true before detailed review.',
   },
+  workflowPreset: {
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
+    meaning: 'Named configuration preset applied before explicit arguments. Explicit tool arguments override preset values.',
+    agentAction: 'Use this to explain why effective defaults such as dryRun, strictMode, parseFonts, or dedupe mode were selected.',
+  },
+  workflowPresets: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Catalog of named workflow presets, their intended use, write behavior, and expanded batch/organization defaults.',
+    agentAction: 'Prefer these presets for common workflows, then pass explicit overrides only for user-specific choices.',
+  },
   manifestCount: {
     sourceTools: ['inspect_split_output'],
     meaning: 'Number of output entries backed by split-meta.json manifests.',
@@ -818,6 +955,7 @@ const SAFE_INVOCATION_TEMPLATES = [
     sourceDestructive: false,
     args: {
       inputDir: '<font-source-dir>',
+      workflowPreset: 'safe-preview',
       dryRun: true,
       parseFonts: true,
       includePlan: true,
@@ -826,7 +964,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       batchDedupeMode: 'font-identity',
       overwriteExisting: false,
     },
-    customizableFields: ['inputDir', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
+    customizableFields: ['inputDir', 'workflowPreset', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
     inspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
     nextStep: 'Use recommendedBatchOptions for a batch dry-run, or copy to a staging directory only after reviewing the plan.',
   },
@@ -838,11 +976,12 @@ const SAFE_INVOCATION_TEMPLATES = [
     sourceDestructive: false,
     args: {
       inputDir: '<font-source-dir>',
+      workflowPreset: 'structure-first',
       dryRun: true,
       parseFonts: false,
       includePlan: false,
     },
-    customizableFields: ['inputDir', 'maxFiles'],
+    customizableFields: ['inputDir', 'workflowPreset', 'maxFiles'],
     inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'layout', 'recommendedBatchOptions', 'planActionSummary'],
     nextStep: 'Rerun with parseFonts:true before trusting invalid-font counts, glyph counts, identity dedupe, or font-family grouping.',
   },
@@ -855,6 +994,7 @@ const SAFE_INVOCATION_TEMPLATES = [
     args: {
       inputDir: '<font-source-dir>',
       outputDir: 'organized-fonts',
+      workflowPreset: 'reviewed-write',
       dryRun: false,
       parseFonts: true,
       includePlan: true,
@@ -863,7 +1003,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       batchDedupeMode: 'font-identity',
       overwriteExisting: false,
     },
-    customizableFields: ['inputDir', 'outputDir', 'parseFonts', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'],
+    customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'parseFonts', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'],
     inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
     nextStep: 'Use outputDir as the next split_font_batch input only after checking organizationWarnings.',
   },
@@ -876,6 +1016,7 @@ const SAFE_INVOCATION_TEMPLATES = [
     args: {
       inputDir: '<font-source-dir-or-organized-outputDir>',
       outputRoot: 'split-output',
+      workflowPreset: 'safe-preview',
       dryRun: true,
       includeResults: true,
       strictMode: true,
@@ -883,7 +1024,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'font-identity',
     },
-    customizableFields: ['inputDir', 'outputRoot', 'limit', 'maxFiles', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
+    customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
     inspectFields: ['dryRun', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
     nextStep: 'If the plan is acceptable, rerun with dryRun:false; use includeResults:false for large real runs.',
   },
@@ -896,6 +1037,7 @@ const SAFE_INVOCATION_TEMPLATES = [
     args: {
       inputDir: '<font-source-dir-or-organized-outputDir>',
       outputRoot: 'split-output',
+      workflowPreset: 'reviewed-write',
       dryRun: false,
       includeResults: false,
       limit: 50000,
@@ -906,7 +1048,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       batchDedupeMode: 'font-identity',
       splitFailureAction: 'single-woff2',
     },
-    customizableFields: ['inputDir', 'outputRoot', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'splitFailureAction'],
+    customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'splitFailureAction'],
     inspectFields: ['batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileSummary'],
     nextStep: 'Run inspect_split_output on outputRoot before reporting completion.',
   },
@@ -1121,6 +1263,7 @@ export function getAgentGuidance(args = {}) {
   const workflows = {
     overview: [
       'Call get_agent_guidance to orient yourself.',
+      'Use workflowPreset safe-preview for first no-write batch or organization calls, then reviewed-write only after reviewing the preview.',
       'Call get_runtime_status when diagnosing setup, workspace, cn-font-split package, or WASM runtime availability.',
       'Call inspect_font_inputs for a no-write source preflight.',
       'Call organize_font_directory with dryRun true if directory layout is flat/mixed/unfamiliar or if the user asks to stage fonts into a cleaner structure.',
@@ -1136,7 +1279,7 @@ export function getAgentGuidance(args = {}) {
     batch: [
       'Call inspect_font_inputs with includeFiles false for a compact source summary.',
       'Call organize_font_directory with dryRun true when source directory structure and desired family grouping do not match.',
-      'Call split_font_batch with dryRun true and includeResults true to review planned paths.',
+      'Call split_font_batch with workflowPreset safe-preview to review planned paths without writing.',
       'Use batchNamingMode numeric-suffix and batchDedupeMode font-identity unless the user asks for another policy.',
       'Use includeResults false for large real runs.',
       'Call inspect_split_output on the outputRoot when done; require structureSummary.conforms true and use includeFiles false / includeFamilies false for large outputs.',
@@ -1148,8 +1291,8 @@ export function getAgentGuidance(args = {}) {
       'If maxFilesHit is true, rerun with a higher maxFiles before treating the summary as complete.',
     ],
     organize: [
-      'Call organize_font_directory with dryRun true first; review layout, recommendedBatchOptions, organizationWarnings, and plan before writing copies.',
-      'If the plan is acceptable, call organize_font_directory again with dryRun false to copy selected fonts into outputDir. This never moves or deletes source files.',
+      'Call organize_font_directory with workflowPreset safe-preview first; review layout, recommendedBatchOptions, organizationWarnings, and plan before writing copies.',
+      'If the plan is acceptable, call organize_font_directory again with workflowPreset reviewed-write to copy selected fonts into outputDir. This never moves or deletes source files.',
       'Use parseFonts false only when the user needs a fast structure-first plan; inspect parsedFontMetadata and dedupeLimitedByParsing before relying on identity dedupe or font-family grouping.',
       'After organizing, run inspect_font_inputs on outputDir or split_font_batch with inputDir set to outputDir.',
       'If organizationWarnings contains output-overwrite-enabled or output-inside-input, disclose the risk before proceeding.',
@@ -1423,6 +1566,7 @@ export function getAgentGuidance(args = {}) {
       copyInvalidFonts: false,
       overwriteExisting: false,
     },
+    workflowPresets: buildWorkflowPresetCatalog(),
     directoryWorkflowDecisionMatrix,
     directoryWorkflowExamples,
     verificationChecklist,
@@ -1442,6 +1586,8 @@ export function getAgentGuidance(args = {}) {
       'cnFontSplit.packageVersion',
       'cnFontSplit.runtimeVersion',
       'recommendedActions',
+      'workflowPresets',
+      'workflowPreset',
       'supportedFontCount',
       'unsupportedFileSummary',
       'validFontCount',
@@ -1611,6 +1757,44 @@ function normalizeOptionalBoolean(value) {
   return typeof value === 'boolean' ? value : undefined;
 }
 
+function getWorkflowPresetName(value) {
+  return typeof value === 'string' && WORKFLOW_PRESET_NAMES.includes(value) ? value : 'default';
+}
+
+function dropUndefinedOptions(args = {}) {
+  return Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined));
+}
+
+function applyWorkflowPreset(args = {}, scope) {
+  const workflowPreset = getWorkflowPresetName(args.workflowPreset);
+  const preset = WORKFLOW_PRESETS[workflowPreset] || WORKFLOW_PRESETS.default;
+  const scopePreset = preset[scope] || {};
+  const explicitArgs = dropUndefinedOptions(args);
+  return {
+    workflowPreset,
+    args: {
+      ...scopePreset,
+      ...explicitArgs,
+      workflowPreset,
+    },
+  };
+}
+
+function buildWorkflowPresetCatalog() {
+  return WORKFLOW_PRESET_NAMES.map((id) => {
+    const preset = WORKFLOW_PRESETS[id];
+    return {
+      id,
+      description: preset.description,
+      writesBatchFiles: preset.writesBatchFiles,
+      writesOrganizationFiles: preset.writesOrganizationFiles,
+      batchDefaults: preset.batch,
+      organizationDefaults: preset.organize,
+      explicitOptionsOverridePreset: true,
+    };
+  });
+}
+
 function normalizeProcessingOptions(args) {
   const smallGlyphAction = args.smallGlyphAction === 'skip' ? 'copy-original' : args.smallGlyphAction;
   const smallGlyphActions = ['subset', 'single-woff2', 'copy-original'];
@@ -1627,6 +1811,7 @@ function normalizeProcessingOptions(args) {
 function normalizeBatchOptions(args) {
   const strictMode = args.strictMode === true;
   return {
+    workflowPreset: getWorkflowPresetName(args.workflowPreset),
     strictMode,
     skipMode: ['legacy-css', 'manifest', 'force'].includes(args.skipMode) ? args.skipMode : strictMode ? 'manifest' : 'legacy-css',
     batchGroupBy: ['auto', 'source-dir', 'font-family'].includes(args.batchGroupBy) ? args.batchGroupBy : 'auto',
@@ -1639,6 +1824,7 @@ function normalizeBatchOptions(args) {
 
 function normalizeOrganizationOptions(args) {
   return {
+    workflowPreset: getWorkflowPresetName(args.workflowPreset),
     dryRun: args.dryRun !== false,
     includePlan: args.includePlan !== false,
     parseFonts: args.parseFonts !== false,
@@ -1674,7 +1860,6 @@ function buildEffectiveConfigSnapshot(args, processingOptions) {
   if (['collect', 'fail-fast', 'fail-after'].includes(args.batchErrorMode)) {
     snapshot.batchErrorMode = args.batchErrorMode;
   }
-
   const optionalStrings = [
     'fontFamily', 'fontWeight', 'fontStyle', 'fontDisplay', 'cssFileName',
     'previewText', 'previewName', 'renameOutputFont', 'buildMode',
@@ -1883,6 +2068,7 @@ function buildOrganizationNextActions({
       suggestedArgs: {
         inputDir: inputDirRelative,
         outputDir: outputDirRelative,
+        workflowPreset: options.parseFonts ? 'safe-preview' : 'structure-first',
         dryRun: true,
         parseFonts: options.parseFonts,
         includePlan: options.includePlan,
@@ -1901,6 +2087,7 @@ function buildOrganizationNextActions({
       suggestedArgs: {
         inputDir: inputDirRelative,
         outputDir: outputDirRelative,
+        workflowPreset: 'safe-preview',
         dryRun: true,
         parseFonts: true,
         includePlan: options.includePlan,
@@ -1921,6 +2108,7 @@ function buildOrganizationNextActions({
       suggestedArgs: {
         inputDir: inputDirRelative,
         outputDir: outputDirRelative,
+        workflowPreset: 'safe-preview',
         dryRun: true,
         copyInvalidFonts: true,
       },
@@ -1937,6 +2125,7 @@ function buildOrganizationNextActions({
       reason: 'Fonts were found both at the input root and in nested folders; direct batch grouping can surprise users.',
       suggestedArgs: {
         inputDir: inputDirRelative,
+        workflowPreset: 'safe-preview',
         dryRun: true,
         includeResults: true,
         ...layout.recommendedBatchOptions,
@@ -1953,6 +2142,7 @@ function buildOrganizationNextActions({
       reason: 'outputDir is inside inputDir, so future broad scans can accidentally process organized copies as source fonts.',
       suggestedArgs: {
         inputDir: outputDirRelative,
+        workflowPreset: 'safe-preview',
         dryRun: true,
         includeResults: true,
         ...layout.recommendedBatchOptions,
@@ -1989,6 +2179,7 @@ function buildOrganizationNextActions({
         reason: 'If the user only needs split output, preview splitting the original inputDir with the recommended batch options.',
         suggestedArgs: {
           inputDir: inputDirRelative,
+          workflowPreset: 'safe-preview',
           dryRun: true,
           includeResults: true,
           ...layout.recommendedBatchOptions,
@@ -2003,6 +2194,7 @@ function buildOrganizationNextActions({
         suggestedArgs: {
           inputDir: inputDirRelative,
           outputDir: outputDirRelative,
+          workflowPreset: 'reviewed-write',
           dryRun: false,
           parseFonts: options.parseFonts,
           batchGroupBy: options.batchGroupBy,
@@ -2032,6 +2224,7 @@ function buildOrganizationNextActions({
       reason: 'Preview splitting the organized staging directory before writing split output.',
       suggestedArgs: {
         inputDir: outputDirRelative,
+        workflowPreset: 'safe-preview',
         dryRun: true,
         includeResults: true,
         ...layout.recommendedBatchOptions,
@@ -3476,19 +3669,21 @@ export async function splitFont(args) {
   return result;
 }
 
-export async function splitFontBatch(args) {
-  const inputDir = await resolveWorkspacePath(args.inputDir || '.', { mustExist: true });
+export async function splitFontBatch(args = {}) {
+  const presetContext = applyWorkflowPreset(args, 'batch');
+  const effectiveArgs = presetContext.args;
+  const inputDir = await resolveWorkspacePath(effectiveArgs.inputDir || '.', { mustExist: true });
   const stat = await fs.stat(inputDir);
-  if (!stat.isDirectory()) throw new Error(`inputDir is not a directory: ${args.inputDir}`);
+  if (!stat.isDirectory()) throw new Error(`inputDir is not a directory: ${effectiveArgs.inputDir}`);
 
-  const batchOptions = normalizeBatchOptions(args);
-  const processingOptions = normalizeProcessingOptions(args);
-  const includeResults = args.includeResults !== false;
-  const dryRun = args.dryRun === true;
-  const outputRoot = args.outputRoot || 'split-output';
+  const batchOptions = normalizeBatchOptions(effectiveArgs);
+  const processingOptions = normalizeProcessingOptions(effectiveArgs);
+  const includeResults = effectiveArgs.includeResults !== false;
+  const dryRun = effectiveArgs.dryRun === true;
+  const outputRoot = effectiveArgs.outputRoot || 'split-output';
   const outputRootName = path.basename(outputRoot);
 
-  const maxFiles = args.maxFiles || 5000;
+  const maxFiles = effectiveArgs.maxFiles || 5000;
   const inputScan = await scanFilesRecursive(inputDir, {
     maxFiles,
     excludeDirs: [outputRootName],
@@ -3559,7 +3754,7 @@ export async function splitFontBatch(args) {
 
   const deduplicatedCount = deduplicated.length;
   const skippedCount = fontFiles.length - deduplicatedCount;
-  const selected = deduplicated.slice(0, args.limit || 20);
+  const selected = deduplicated.slice(0, effectiveArgs.limit || 20);
 
   const results = [];
   const planned = [];
@@ -3629,7 +3824,7 @@ export async function splitFontBatch(args) {
       });
 
       const inputStat = await fs.stat(file);
-      const effectiveConfig = buildEffectiveConfigSnapshot({ ...args, ...batchOptions, groupName }, processingOptions);
+      const effectiveConfig = buildEffectiveConfigSnapshot({ ...effectiveArgs, ...batchOptions, groupName }, processingOptions);
       const skipDecision = await shouldSkipExistingOutput({
         skipMode: batchOptions.skipMode,
         resolvedOutDir,
@@ -3663,7 +3858,7 @@ export async function splitFontBatch(args) {
             skipReason: skipDecision.reason,
           });
         }
-        args.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'skipped' });
+        effectiveArgs.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'skipped' });
         continue;
       }
       if (skipDecision.reason === 'stale-manifest' && skipDecision.manifest) {
@@ -3690,12 +3885,12 @@ export async function splitFontBatch(args) {
           wouldProcess: true,
           skipReason: skipDecision.reason,
         });
-        args.onProgress?.({ current: planned.length + errors.length, total: selected.length, file: relative, status: 'planned' });
+        effectiveArgs.onProgress?.({ current: planned.length + errors.length, total: selected.length, file: relative, status: 'planned' });
         continue;
       }
 
       const result = await splitFont({
-        ...args,
+        ...effectiveArgs,
         fontPath: relative,
         outDir,
         groupName,
@@ -3718,7 +3913,7 @@ export async function splitFontBatch(args) {
       } else {
         processingSummary.subsetOutputs++;
       }
-      args.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'done' });
+      effectiveArgs.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'done' });
     } catch (error) {
       resetWasmRuntime();
       logBatchDecision(batchOptions.debugBatchDecisions, 'error', {
@@ -3726,7 +3921,7 @@ export async function splitFontBatch(args) {
         message: error instanceof Error ? error.message : String(error),
       });
       errors.push({ file: relative, error: error instanceof Error ? error.message : String(error) });
-      args.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'error' });
+      effectiveArgs.onProgress?.({ current: results.length + errors.length + skippedExisting, total: selected.length, file: relative, status: 'error' });
       if (batchOptions.batchErrorMode === 'fail-fast') {
         throw buildBatchError({
           mode: batchOptions.batchErrorMode,
@@ -3762,10 +3957,13 @@ export async function splitFontBatch(args) {
     ok: true,
     inputDir: toRelativeWorkspacePath(inputDir),
     outputRoot,
+    workflowPreset: batchOptions.workflowPreset,
     dryRun,
     strictMode: batchOptions.strictMode,
     skipMode: batchOptions.skipMode,
     batchGroupBy: batchOptions.batchGroupBy,
+    batchNamingMode: batchOptions.batchNamingMode,
+    batchDedupeMode: batchOptions.batchDedupeMode,
     batchErrorMode: batchOptions.batchErrorMode,
     scannedFileCount: allFiles.length,
     maxFiles,
@@ -3871,18 +4069,20 @@ export async function inspectFontInputs(args) {
   };
 }
 
-export async function organizeFontDirectory(args) {
-  const inputDir = await resolveWorkspacePath(args.inputDir || '.', { mustExist: true });
+export async function organizeFontDirectory(args = {}) {
+  const presetContext = applyWorkflowPreset(args, 'organize');
+  const effectiveArgs = presetContext.args;
+  const inputDir = await resolveWorkspacePath(effectiveArgs.inputDir || '.', { mustExist: true });
   const stat = await fs.stat(inputDir);
-  if (!stat.isDirectory()) throw new Error(`inputDir is not a directory: ${args.inputDir}`);
+  if (!stat.isDirectory()) throw new Error(`inputDir is not a directory: ${effectiveArgs.inputDir}`);
 
-  const options = normalizeOrganizationOptions(args);
-  const outputDir = await resolveWorkspacePath(args.outputDir || 'organized-fonts');
+  const options = normalizeOrganizationOptions(effectiveArgs);
+  const outputDir = await resolveWorkspacePath(effectiveArgs.outputDir || 'organized-fonts');
   if (path.resolve(inputDir) === path.resolve(outputDir)) {
     throw new Error('outputDir must be different from inputDir.');
   }
 
-  const maxFiles = args.maxFiles || 50000;
+  const maxFiles = effectiveArgs.maxFiles || 50000;
   const scan = await scanFilesRecursive(inputDir, {
     maxFiles,
     excludeDirs: [path.basename(outputDir)],
@@ -4060,6 +4260,7 @@ export async function organizeFontDirectory(args) {
 
   const result = {
     ok: errors.length === 0,
+    workflowPreset: options.workflowPreset,
     dryRun: options.dryRun,
     inputDir: inputDirRelative,
     outputDir: outputDirRelative,

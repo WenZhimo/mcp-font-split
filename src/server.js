@@ -40,6 +40,7 @@ const SplitFontOptions = {
 };
 
 const BatchPolicyOptions = {
+  workflowPreset: z.enum(['default', 'safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all']).optional().describe('Named configuration preset applied before explicit arguments. default keeps current defaults, safe-preview is no-write, reviewed-write is for after preview review, structure-first is fast/no-write, source-layout groups by source folders, metadata-family groups by font metadata, and preserve-all disables dedupe. Explicit options override preset values.'),
   strictMode: z.boolean().optional().describe('Convenience strict defaults. In batch mode, unset skipMode becomes manifest and unset batchErrorMode becomes fail-after. Explicit options still override this. Default: false.'),
   skipMode: z.enum(['legacy-css', 'manifest', 'force']).optional().describe('Batch incremental mode. legacy-css preserves the old result.css existence check, manifest compares source and effective options, and force always reprocesses.'),
   batchGroupBy: z.enum(['auto', 'source-dir', 'font-family']).optional().describe('Batch family directory grouping mode. Default: auto. auto preserves directory-first behavior for nested inputs, source-dir groups by source directory, and font-family groups by internal font metadata.'),
@@ -160,6 +161,7 @@ server.registerTool(
       inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
       outputDir: z.string().optional().describe('Directory for organized copies, relative to the font workspace. Defaults to organized-fonts. Must differ from inputDir.'),
       maxFiles: z.number().int().positive().max(50000).optional().describe('Maximum source files to scan. Defaults to 50000.'),
+      workflowPreset: z.enum(['default', 'safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all']).optional().describe('Named configuration preset applied before explicit arguments. safe-preview is a no-write parsed plan, reviewed-write copies into outputDir after review, structure-first is a fast metadata-free dry-run, source-layout groups by source folders, metadata-family groups by font metadata, and preserve-all disables dedupe. Explicit options override preset values.'),
       dryRun: z.boolean().optional().describe('Plan only without writing directories or files. Default: true. Set false only after reviewing plan[] and organizationWarnings[].'),
       includePlan: z.boolean().optional().describe('Include per-font plan[] entries. Default: true. Set false for compact summaries.'),
       parseFonts: z.boolean().optional().describe('Read font metadata for identity dedupe, glyph counts, invalid-font detection, and font-family grouping. Default: true. Set false for a faster structure-only plan when metadata parsing is expensive or noisy.'),
