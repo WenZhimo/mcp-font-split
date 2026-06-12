@@ -64,9 +64,10 @@
 - 批量命名默认是 `batchNamingMode: "numeric-suffix"`：先用裸 `fontBaseName`，只有真实冲突时才分配稳定的 `-1`、`-2`、`-3`。
 - 当 OTF / TTF 仅容器不同但字体身份相同时，批量模式会去重并只保留一个代表。
 - 批量处理不会移动、删除或重写源字体文件：`sourceDestructive` 应始终为 `false`。如果 `outputRoot` 位于 `inputDir` 内，真实写入仍会落在输入目录树里，因此描述“源目录树无写入”前必须检查 `writesSourceTree` 和 `outputTreeInsideInputTree`。
-- 批量增量跳过默认是 `skipMode: "legacy-css"`，会保留旧版只看 `result.css` 的行为。
-- 更安全的批量重跑建议使用 `skipMode: "manifest"` 或 `skipMode: "force"`。
-- `strictMode: true` 是更安全批量默认值的快捷入口：未显式设置时使用 `skipMode: "manifest"` 和 `batchErrorMode: "fail-after"`。
+- 批量增量跳过默认是 `skipMode: "manifest"`，会用 `split-meta.json` 比较源文件和有效配置。
+- 旧版只看 `result.css` 的跳过行为需要显式选择 `skipMode: "legacy-css"`；需要强制重跑时使用 `skipMode: "force"`。
+- 批量错误处理默认是 `batchErrorMode: "fail-after"`，会处理完选中的字体后把任何单字体错误升级为批量错误。
+- `strictMode: true` 现在主要是自说明开关；默认已经采用 `manifest` 跳过和 `fail-after` 错误策略，显式参数仍优先生效。
 - 删除超大 `kern` 表必须显式设置 `oversizedKernAction: "strip"`。
 - 分割失败后回退为单 WOFF2 必须显式设置 `splitFailureAction: "single-woff2"`。
 - 小字形字体由 `smallGlyphAction` 控制：`subset`、`single-woff2` 或 `copy-original`。
@@ -213,20 +214,20 @@ fonts/
 | 参数 | 可选值 | 默认值 | 含义 |
 |------|--------|--------|------|
 | `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | 命名配置预设，会先展开为一组批量/整理参数；显式传入的具体参数仍会覆盖预设。 |
-| `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | 批量模式如何判断已有输出是否可跳过。 |
+| `skipMode` | `legacy-css`, `manifest`, `force` | `manifest` | 批量模式如何判断已有输出是否可跳过。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 批量模式如何决定家族目录名。 |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 批量模式如何决定每个字体输出目录的命名冲突策略。 |
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 批量模式如何在处理前对等价字体做去重。 |
-| `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `collect` | 每个字体处理失败时，是收集到响应里，还是为自动化场景直接抛错。 |
+| `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `fail-after` | 每个字体处理失败时，是收集到响应里，还是为自动化场景直接抛错。 |
 | `limit` | 正整数，MCP 最大 `50000` | `20` | 去重后最多处理多少个字体。全量跑时需要显式调高。 |
 | `maxFiles` | 正整数，MCP 最大 `50000` | `5000` | 扫描阶段最多读取多少个源文件，再过滤字体扩展名。 |
 | `includeResults` | `true`, `false` | `true` | 是否返回每个字体的详细 `results[]`。大批量只需要摘要和错误时可设为 `false`。 |
 | `dryRun` | `true`, `false` | `false` | 只预览扫描、去重、命名和 skip 决策，不写任何输出文件。 |
-| `strictMode` | `true`, `false` | `false` | 一键严格默认值。未显式设置的 `skipMode` 会变为 `manifest`，未显式设置的 `batchErrorMode` 会变为 `fail-after`；显式参数仍优先生效。 |
+| `strictMode` | `true`, `false` | `false` | 自说明严格开关。批量默认已经使用 `manifest` 和 `fail-after`；显式参数仍优先生效。 |
 
 `skipMode` 说明：
 
-- `legacy-css`：只要当前批量输出目录里的 `result.css` 存在就跳过。兼容旧行为，但不感知参数变化。
+- `legacy-css`：只要当前批量输出目录里的 `result.css` 存在就跳过。仅在明确需要旧行为时使用；它不感知参数变化。
 - `manifest`：读取 `split-meta.json`，比较源文件路径、大小、mtime、有效参数、manifest 版本和工具版本。
 - `force`：永远不跳过，始终重跑。
 
@@ -264,7 +265,7 @@ fonts/
 
 `batchErrorMode` 说明：
 
-- `collect`：继续处理，并返回 `ok: true`、`errors[]` 和 `errorCount`；这是兼容默认值。
+- `collect`：继续处理，并返回 `ok: true`、`errors[]` 和 `errorCount`；仅在调用方会主动检查错误列表时使用。
 - `fail-fast`：遇到第一个单字体错误就抛错。
 - `fail-after`：继续处理选中的字体，最后如果存在任何单字体错误则抛错。
 
@@ -542,7 +543,7 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。它默认使用 `strictMode: true`、`includeResults: false`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"` 和 `splitFailureAction: "single-woff2"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_DRY_RUN` 提供相同配置。它会在控制台摘要里打印 `batchWarnings[]` 的 code/message。高级覆盖项可使用 `FONT_SPLIT_STRICT_MODE`、`FONT_SPLIT_INCLUDE_RESULTS`、`FONT_SPLIT_SKIP_MODE`、`FONT_SPLIT_BATCH_GROUP_BY`、`FONT_SPLIT_BATCH_NAMING_MODE`、`FONT_SPLIT_BATCH_DEDUPE_MODE`、`FONT_SPLIT_BATCH_ERROR_MODE`、`FONT_SPLIT_SPLIT_FAILURE_ACTION` 和 `FONT_SPLIT_CHUNK_SIZE`。
+`batch:run` 是给 agent 和维护者使用的安全批量辅助入口。它默认使用 `strictMode: true`（自说明；核心批量默认已经是 `skipMode: "manifest"` 和 `batchErrorMode: "fail-after"`）、`includeResults: false`、`batchNamingMode: "numeric-suffix"`、`batchDedupeMode: "font-identity"` 和 `splitFailureAction: "single-woff2"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_DRY_RUN` 提供相同配置。它会在控制台摘要里打印 `batchWarnings[]` 的 code/message。高级覆盖项可使用 `FONT_SPLIT_STRICT_MODE`、`FONT_SPLIT_INCLUDE_RESULTS`、`FONT_SPLIT_SKIP_MODE`、`FONT_SPLIT_BATCH_GROUP_BY`、`FONT_SPLIT_BATCH_NAMING_MODE`、`FONT_SPLIT_BATCH_DEDUPE_MODE`、`FONT_SPLIT_BATCH_ERROR_MODE`、`FONT_SPLIT_SPLIT_FAILURE_ACTION` 和 `FONT_SPLIT_CHUNK_SIZE`。
 
 ### Smoke 检查
 

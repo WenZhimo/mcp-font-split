@@ -1218,7 +1218,7 @@ export function getAgentGuidance(args = {}) {
     'Use inspect_font_inputs before large or unfamiliar font libraries.',
     'Use organize_font_directory with dryRun true when the source directory layout does not match the desired batch grouping; it is source-non-destructive and defaults to plan-only.',
     'Use dryRun with includeResults true to preview batch naming, dedupe, and skip decisions without writing output.',
-    'For repeatable automation, prefer strictMode true or explicit skipMode manifest plus batchErrorMode fail-after.',
+    'Batch defaults already use skipMode manifest and batchErrorMode fail-after; pass legacy-css or collect only when that tradeoff is intentional.',
   ];
   const verificationChecklist = [
     {
@@ -1539,8 +1539,8 @@ export function getAgentGuidance(args = {}) {
     defaultPolicies: {
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'font-identity',
-      batchErrorMode: 'collect',
-      skipMode: 'legacy-css',
+      batchErrorMode: 'fail-after',
+      skipMode: 'manifest',
       strictMode: false,
       inspectInputMaxFiles: 50000,
       batchMaxFiles: 5000,
@@ -1552,7 +1552,8 @@ export function getAgentGuidance(args = {}) {
     recommendedBatchOptions: {
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'font-identity',
-      strictMode: true,
+      skipMode: 'manifest',
+      batchErrorMode: 'fail-after',
       includeResults: false,
       splitFailureAction: 'single-woff2',
     },
@@ -1819,11 +1820,11 @@ function normalizeBatchOptions(args) {
   return {
     workflowPreset: getWorkflowPresetName(args.workflowPreset),
     strictMode,
-    skipMode: ['legacy-css', 'manifest', 'force'].includes(args.skipMode) ? args.skipMode : strictMode ? 'manifest' : 'legacy-css',
+    skipMode: ['legacy-css', 'manifest', 'force'].includes(args.skipMode) ? args.skipMode : 'manifest',
     batchGroupBy: ['auto', 'source-dir', 'font-family'].includes(args.batchGroupBy) ? args.batchGroupBy : 'auto',
     batchNamingMode: ['plain', 'numeric-suffix', 'source-suffix'].includes(args.batchNamingMode) ? args.batchNamingMode : 'numeric-suffix',
     batchDedupeMode: ['none', 'same-path', 'font-identity'].includes(args.batchDedupeMode) ? args.batchDedupeMode : 'font-identity',
-    batchErrorMode: ['collect', 'fail-fast', 'fail-after'].includes(args.batchErrorMode) ? args.batchErrorMode : strictMode ? 'fail-after' : 'collect',
+    batchErrorMode: ['collect', 'fail-fast', 'fail-after'].includes(args.batchErrorMode) ? args.batchErrorMode : 'fail-after',
     debugBatchDecisions: args.debugBatchDecisions === true,
   };
 }

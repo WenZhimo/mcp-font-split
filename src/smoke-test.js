@@ -854,6 +854,7 @@ if (scenario === 'single') {
     outputRoot: `${outputDir}-split-preview`,
     dryRun: true,
     includeResults: true,
+    batchErrorMode: 'collect',
     maxFiles: 10,
     silent: true,
   });
@@ -1034,6 +1035,7 @@ if (scenario === 'single') {
     outputRoot: `${outputDir}-split-preview`,
     dryRun: true,
     includeResults: true,
+    batchErrorMode: 'collect',
     maxFiles: 10,
     silent: true,
   });
@@ -1087,6 +1089,7 @@ if (scenario === 'single') {
     outputRoot: `${inputDir}-split-preview`,
     dryRun: true,
     includeResults: true,
+    batchErrorMode: 'collect',
     maxFiles: 10,
     silent: true,
   });
@@ -1776,24 +1779,23 @@ if (scenario === 'single') {
   await fs.mkdir(inputDir, { recursive: true });
   await fs.writeFile(path.join(inputDir, 'not-a-font.ttf'), 'not a real font');
 
-  let strictThrew = false;
+  let defaultThrew = false;
   try {
     await splitFontBatch({
       inputDir,
       outputRoot,
       limit: 2,
       maxFiles: 10,
-      strictMode: true,
       silent: true,
     });
   } catch (error) {
-    strictThrew = true;
+    defaultThrew = true;
     if (error.name !== 'BatchSplitError' || error.details?.mode !== 'fail-after') {
       throw error;
     }
   }
-  if (!strictThrew) {
-    throw new Error('Expected strictMode to default batchErrorMode to fail-after.');
+  if (!defaultThrew) {
+    throw new Error('Expected default batchErrorMode to be fail-after.');
   }
 
   const overridden = await splitFontBatch({
@@ -1807,11 +1809,11 @@ if (scenario === 'single') {
     silent: true,
   });
   if (overridden.strictMode !== true || overridden.skipMode !== 'force' || overridden.batchErrorMode !== 'collect' || overridden.errorCount !== 1) {
-    throw new Error('Expected explicit batch options to override strictMode defaults.');
+    throw new Error('Expected explicit batch options to override the strictMode self-documenting flag.');
   }
 
   console.log(JSON.stringify({
-    strictThrew,
+    defaultThrew,
     overridden: {
       strictMode: overridden.strictMode,
       skipMode: overridden.skipMode,

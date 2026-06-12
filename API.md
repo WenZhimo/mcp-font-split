@@ -127,12 +127,12 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 | `includeResults` | boolean | `true` | Include per-font `results[]`; set `false` for compact large-batch responses. |
 | `dryRun` | boolean | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
 | `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | Named preset applied before explicit options. Explicit options override preset values. |
-| `strictMode` | boolean | `false` | Convenience strict defaults. Unset `skipMode` becomes `manifest` and unset `batchErrorMode` becomes `fail-after`; explicit options still override it. |
-| `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | Existing-output skip policy. |
+| `strictMode` | boolean | `false` | Self-documenting strict flag. Batch defaults already use `manifest` skip checks and `fail-after` errors; explicit options still override it. |
+| `skipMode` | `legacy-css`, `manifest`, `force` | `manifest` | Existing-output skip policy. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | First-level family directory strategy. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Per-font output directory naming strategy. |
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Pre-processing dedupe strategy. |
-| `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `collect` | Per-font error handling strategy. |
+| `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `fail-after` | Per-font error handling strategy. |
 | `debugBatchDecisions` | boolean | `false` | Emit structured decision logs for dedupe, naming, skip, and errors. |
 
 `split_font_batch` also accepts the split options from `split_font`, except `fontPath` and `outDir`. Batch mode applies those processing options to every selected font and uses `inputDir` / `outputRoot` for paths.
@@ -155,8 +155,8 @@ Batch dedupe priority is `.otf`, `.ttf`, `.woff2`, `.ttc`, `.otc`, `.woff`.
 `font-identity` compares normalized font identity across formats. It uses typographic family/subfamily when available, then legacy family/subfamily, then full name or PostScript name. `glyphCount` is diagnostic only and does not split otherwise equivalent OTF/TTF/WOFF inputs.
 If identity extraction fails for a file, batch dedupe falls back to that file's path stem so scanning can continue and the processing phase can report the actual per-font error.
 
-`batchErrorMode` defaults to `collect`, which keeps compatibility by returning `ok: true` with `errors[]`. Use `fail-fast` to throw on the first per-font error, or `fail-after` to finish selected fonts and then throw if any errors occurred.
-`strictMode: true` changes only unresolved batch defaults; it does not prevent explicit overrides.
+`batchErrorMode` defaults to `fail-after`, which finishes selected fonts and then throws if any per-font errors occurred. Use `collect` only when the caller will inspect `errors[]` and `errorCount` itself, or `fail-fast` to throw on the first per-font error.
+`strictMode: true` is now mostly self-documenting because batch defaults already use `manifest` and `fail-after`; it still does not prevent explicit overrides.
 When `fail-fast` or `fail-after` throws through the MCP server, the error response text is JSON with `ok: false`, `name`, `error`, and `details` so agents can still read `details.errors[]` and `details.summary`.
 
 Compact full-library example:

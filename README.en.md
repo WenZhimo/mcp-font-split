@@ -64,9 +64,10 @@ Key defaults and policy choices:
 - Batch naming defaults to `batchNamingMode: "numeric-suffix"`: bare `fontBaseName` first, then stable `-1`, `-2`, `-3` only on real collisions.
 - Equivalent OTF/TTF pairs are deduplicated in batch mode when they resolve to the same font identity, keeping only one representative.
 - Batch processing never moves, deletes, or rewrites source font files: `sourceDestructive` should stay `false`. If `outputRoot` is inside `inputDir`, real writes still land inside the input tree, so inspect `writesSourceTree` and `outputTreeInsideInputTree` before describing the run as source-tree no-write.
-- Batch incremental skipping defaults to `skipMode: "legacy-css"`, which preserves the old `result.css` marker behavior.
-- Safer batch reruns should use `skipMode: "manifest"` or `skipMode: "force"`.
-- `strictMode: true` is a shortcut for safer batch defaults: `skipMode: "manifest"` and `batchErrorMode: "fail-after"` when those fields are not explicitly set.
+- Batch incremental skipping defaults to `skipMode: "manifest"`, which compares source files and effective options through `split-meta.json`.
+- The old `result.css` marker behavior requires explicit `skipMode: "legacy-css"`; use `skipMode: "force"` when reprocessing is intentional.
+- Batch error handling defaults to `batchErrorMode: "fail-after"`, which finishes selected fonts and then upgrades any per-font error to a batch error.
+- `strictMode: true` is now mostly self-documenting; batch defaults are already `manifest` skipping and `fail-after` errors, and explicit options still win.
 - Oversized `kern` stripping is opt-in via `oversizedKernAction: "strip"`.
 - Split-failure single-WOFF2 fallback is opt-in via `splitFailureAction: "single-woff2"`.
 - Small glyph fonts are controlled by `smallGlyphAction`: `subset`, `single-woff2`, or `copy-original`.
@@ -213,20 +214,20 @@ Use this only to learn the directory shape quickly. Because font parsing is skip
 | Option | Values | Default | Meaning |
 |--------|--------|---------|---------|
 | `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | Named configuration preset expanded before batch/organization options; explicit options still override preset values. |
-| `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | Choose how batch mode decides whether output is already current. |
+| `skipMode` | `legacy-css`, `manifest`, `force` | `manifest` | Choose how batch mode decides whether output is already current. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | Choose the family directory naming strategy for batch mode. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Choose how batch mode names per-font output directories when collisions exist. |
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Choose how batch mode deduplicates equivalent fonts before processing. |
-| `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `collect` | Choose whether per-font errors are collected in the response or thrown for automation. |
+| `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `fail-after` | Choose whether per-font errors are collected in the response or thrown for automation. |
 | `limit` | positive integer, MCP max `50000` | `20` | Maximum fonts to process after dedupe. Raise it explicitly for full-library runs. |
 | `maxFiles` | positive integer, MCP max `50000` | `5000` | Maximum source files to scan before filtering fonts. |
 | `includeResults` | `true`, `false` | `true` | Include per-font result objects. Set `false` for large runs that only need summary counters and errors. |
 | `dryRun` | `true`, `false` | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
-| `strictMode` | `true`, `false` | `false` | Convenience strict defaults. Unset `skipMode` becomes `manifest` and unset `batchErrorMode` becomes `fail-after`; explicit options still win. |
+| `strictMode` | `true`, `false` | `false` | Self-documenting strict flag. Batch defaults already use `manifest` and `fail-after`; explicit options still win. |
 
 `skipMode` details:
 
-- `legacy-css`: skip if the current batch output directory's `result.css` exists. This preserves old behavior but does not detect option changes.
+- `legacy-css`: skip if the current batch output directory's `result.css` exists. Use only when the old behavior is intentional; it does not detect option changes.
 - `manifest`: skip only when `split-meta.json` matches source path, source size, source mtime, effective options, manifest version, and tool version.
 - `force`: never skip existing output.
 
@@ -264,7 +265,7 @@ In batch mode, the output directory key is the bare `fontBaseName` unless anothe
 
 `batchErrorMode` details:
 
-- `collect`: keep processing and return `ok: true` with `errors[]` and `errorCount`; this preserves compatibility.
+- `collect`: keep processing and return `ok: true` with `errors[]` and `errorCount`; use it only when the caller will inspect the error list.
 - `fail-fast`: throw on the first per-font error.
 - `fail-after`: keep processing selected fonts, then throw if any per-font errors occurred.
 
@@ -542,7 +543,7 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` is a safe standalone batch helper for agents and maintainers. It defaults to `strictMode: true`, `includeResults: false`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, and `splitFailureAction: "single-woff2"`. Positional arguments are `inputDir`, `outputRoot`, `limit`, and `maxFiles`; the same values can be supplied with `FONT_SPLIT_INPUT_DIR`, `FONT_SPLIT_OUTPUT_ROOT`, `FONT_SPLIT_LIMIT`, `FONT_SPLIT_MAX_FILES`, and `FONT_SPLIT_DRY_RUN`. It prints `batchWarnings[]` codes/messages in the console summary. Advanced overrides are available through `FONT_SPLIT_STRICT_MODE`, `FONT_SPLIT_INCLUDE_RESULTS`, `FONT_SPLIT_SKIP_MODE`, `FONT_SPLIT_BATCH_GROUP_BY`, `FONT_SPLIT_BATCH_NAMING_MODE`, `FONT_SPLIT_BATCH_DEDUPE_MODE`, `FONT_SPLIT_BATCH_ERROR_MODE`, `FONT_SPLIT_SPLIT_FAILURE_ACTION`, and `FONT_SPLIT_CHUNK_SIZE`.
+`batch:run` is a safe standalone batch helper for agents and maintainers. It defaults to `strictMode: true` (self-documenting; core batch defaults are already `skipMode: "manifest"` and `batchErrorMode: "fail-after"`), `includeResults: false`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, and `splitFailureAction: "single-woff2"`. Positional arguments are `inputDir`, `outputRoot`, `limit`, and `maxFiles`; the same values can be supplied with `FONT_SPLIT_INPUT_DIR`, `FONT_SPLIT_OUTPUT_ROOT`, `FONT_SPLIT_LIMIT`, `FONT_SPLIT_MAX_FILES`, and `FONT_SPLIT_DRY_RUN`. It prints `batchWarnings[]` codes/messages in the console summary. Advanced overrides are available through `FONT_SPLIT_STRICT_MODE`, `FONT_SPLIT_INCLUDE_RESULTS`, `FONT_SPLIT_SKIP_MODE`, `FONT_SPLIT_BATCH_GROUP_BY`, `FONT_SPLIT_BATCH_NAMING_MODE`, `FONT_SPLIT_BATCH_DEDUPE_MODE`, `FONT_SPLIT_BATCH_ERROR_MODE`, `FONT_SPLIT_SPLIT_FAILURE_ACTION`, and `FONT_SPLIT_CHUNK_SIZE`.
 
 ### Smoke checks
 

@@ -127,12 +127,12 @@
 | `includeResults` | boolean | `true` | 是否返回每个字体的 `results[]` 详情；全量跑建议设为 `false`。 |
 | `dryRun` | boolean | `false` | 只预览扫描、去重、命名和 skip 决策，不写任何输出文件。 |
 | `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | 命名预设，会先展开为一组常用配置；显式参数仍会覆盖预设值。 |
-| `strictMode` | boolean | `false` | 一键严格默认值。未显式设置的 `skipMode` 会变为 `manifest`，未显式设置的 `batchErrorMode` 会变为 `fail-after`；显式参数仍可覆盖。 |
-| `skipMode` | `legacy-css`, `manifest`, `force` | `legacy-css` | 已有输出的跳过策略。 |
+| `strictMode` | boolean | `false` | 自说明严格开关。批量默认已经使用 `manifest` 跳过检查和 `fail-after` 错误策略；显式参数仍可覆盖。 |
+| `skipMode` | `legacy-css`, `manifest`, `force` | `manifest` | 已有输出的跳过策略。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 第一层 family 目录策略。 |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 每个字体输出目录的命名策略。 |
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 处理前的去重策略。 |
-| `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `collect` | 单字体错误的处理策略。 |
+| `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `fail-after` | 单字体错误的处理策略。 |
 | `debugBatchDecisions` | boolean | `false` | 输出结构化调试日志，覆盖 dedupe、naming、skip 和 error 决策。 |
 
 `split_font_batch` 也接受 `split_font` 的处理参数，但不接受 `fontPath` 和 `outDir`。批量模式会把这些处理参数应用到每个选中的字体，并使用 `inputDir` / `outputRoot` 控制路径。
@@ -155,8 +155,8 @@
 `font-identity` 会跨格式比较归一化后的字体身份。身份键优先使用 typographic family/subfamily，再回退到 legacy family/subfamily，再回退到 full name 或 PostScript name。`glyphCount` 只用于诊断，不参与等价判定，因此不会把等价的 OTF/TTF/WOFF 输入拆开。
 如果某个文件的身份解析失败，批量去重会回退到该文件的路径 stem，保证扫描继续进行，并把真正的单字体错误留到处理阶段报告。
 
-`batchErrorMode` 默认是 `collect`，会保持兼容：即使存在单字体错误，也返回 `ok: true` 和 `errors[]`。自动化场景可以用 `fail-fast` 在首个错误时抛错，或用 `fail-after` 处理完选中字体后如果有错误再抛错。
-`strictMode: true` 只改变未显式设置的批量默认值，不会禁止显式覆盖。
+`batchErrorMode` 默认是 `fail-after`，会处理完选中的字体后，如果存在任何单字体错误就抛错。只有当调用方会主动检查 `errors[]` 和 `errorCount` 时才建议显式使用 `collect`；需要首个错误立刻失败时使用 `fail-fast`。
+`strictMode: true` 现在主要是自说明开关，因为批量默认已经使用 `manifest` 和 `fail-after`；它仍不会禁止显式覆盖。
 当 `fail-fast` 或 `fail-after` 通过 MCP Server 抛错时，错误响应文本是 JSON，包含 `ok: false`、`name`、`error` 和 `details`，因此 agent 仍可读取 `details.errors[]` 与 `details.summary`。
 
 全量字体库的简洁响应示例：

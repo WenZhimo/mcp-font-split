@@ -220,10 +220,10 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 ### 4.5 `strictMode`
 
-`strictMode: true` 是一键严格默认值：
+`strictMode: true` 是自说明严格开关：
 
-- 批量模式下，如果没有显式设置 `skipMode`，默认变为 `manifest`
-- 批量模式下，如果没有显式设置 `batchErrorMode`，默认变为 `fail-after`
+- 批量模式默认已经使用 `skipMode: "manifest"`
+- 批量模式默认已经使用 `batchErrorMode: "fail-after"`
 - 显式参数优先级高于 `strictMode`，所以仍可手动覆盖
 - 单文件模式下，当前默认已经偏严格：`splitFailureAction` 默认 `error`，`smallGlyphAction` 默认 `subset`
 
@@ -231,8 +231,8 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 可选值：
 
-- `legacy-css`（默认）
-- `manifest`
+- `legacy-css`
+- `manifest`（默认）
 - `force`
 
 行为：
@@ -299,9 +299,9 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 可选值：
 
-- `collect`（默认）
+- `collect`
 - `fail-fast`
-- `fail-after`
+- `fail-after`（默认）
 
 行为：
 
@@ -737,18 +737,18 @@ split-meta.json
 每个处理过的字体都会把原文件复制到输出 family 根目录。
 这不是软链接，是实体副本。
 
-### 10.3 默认批量跳过仍偏兼容
+### 10.3 旧版批量跳过需要显式选择
 
-默认 `skipMode = legacy-css` 只看 `result.css`，不比较参数。
-如果你希望更严格，请显式使用：
+默认 `skipMode = manifest` 会读取 `split-meta.json` 并比较源文件和有效参数。
+如果你明确需要旧版只看 `result.css` 的行为，请显式使用：
 
 ```json
 {
-  "skipMode": "manifest"
+  "skipMode": "legacy-css"
 }
 ```
 
-或：
+如果你希望忽略任何已有输出并强制重跑，请使用：
 
 ```json
 {

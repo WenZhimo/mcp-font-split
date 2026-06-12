@@ -41,12 +41,12 @@ const SplitFontOptions = {
 
 const BatchPolicyOptions = {
   workflowPreset: z.enum(['default', 'safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all']).optional().describe('Named configuration preset applied before explicit arguments. default keeps current defaults, safe-preview is no-write, reviewed-write is for after preview review, structure-first is fast/no-write, source-layout groups by source folders, metadata-family groups by font metadata, and preserve-all disables dedupe. Explicit options override preset values.'),
-  strictMode: z.boolean().optional().describe('Convenience strict defaults. In batch mode, unset skipMode becomes manifest and unset batchErrorMode becomes fail-after. Explicit options still override this. Default: false.'),
-  skipMode: z.enum(['legacy-css', 'manifest', 'force']).optional().describe('Batch incremental mode. legacy-css preserves the old result.css existence check, manifest compares source and effective options, and force always reprocesses.'),
+  strictMode: z.boolean().optional().describe('Self-documenting strict-defaults flag. Batch defaults are already manifest skip checks and fail-after errors; explicit options still override this. Default: false.'),
+  skipMode: z.enum(['legacy-css', 'manifest', 'force']).optional().describe('Batch incremental mode. Default: manifest. legacy-css uses only the old result.css existence check, manifest compares source and effective options, and force always reprocesses.'),
   batchGroupBy: z.enum(['auto', 'source-dir', 'font-family']).optional().describe('Batch family directory grouping mode. Default: auto. auto preserves directory-first behavior for nested inputs, source-dir groups by source directory, and font-family groups by internal font metadata.'),
   batchNamingMode: z.enum(['plain', 'numeric-suffix', 'source-suffix']).optional().describe('Batch output naming mode. Default: numeric-suffix. plain keeps bare fontBaseName, numeric-suffix appends -1/-2 only on real conflicts, and source-suffix appends a source-derived suffix.'),
   batchDedupeMode: z.enum(['none', 'same-path', 'font-identity']).optional().describe('Batch dedupe mode. Default: font-identity. none disables dedupe, same-path preserves old same-stem dedupe, and font-identity dedupes equivalent fonts across formats.'),
-  batchErrorMode: z.enum(['collect', 'fail-fast', 'fail-after']).optional().describe('Batch error mode. Default: collect. collect returns ok:true with errors[], fail-fast throws on the first per-font error, and fail-after throws after processing selected fonts if any errors occurred.'),
+  batchErrorMode: z.enum(['collect', 'fail-fast', 'fail-after']).optional().describe('Batch error mode. Default: fail-after. collect returns ok:true with errors[], fail-fast throws on the first per-font error, and fail-after throws after processing selected fonts if any errors occurred.'),
   debugBatchDecisions: z.boolean().optional().describe('Emit structured batch decision logs for dedupe, naming, skip, and error diagnosis. Default: false.'),
 };
 
