@@ -1613,6 +1613,13 @@ if (scenario === 'single') {
       }
     }
   };
+  const parseCliJson = (stdout, context) => {
+    try {
+      return JSON.parse(stdout);
+    } catch (error) {
+      throw new Error(`${context}: expected batch-run CLI output to be parseable JSON. ${error.message}`);
+    }
+  };
 
   const { stdout: safePreviewStdout } = await execFileAsync(process.execPath, ['batch-run.js', inputDir, outputRoot, '1', '1', '--dry-run'], {
     cwd: process.cwd(),
@@ -1658,10 +1665,55 @@ if (scenario === 'single') {
     throw new Error('includeResults env override run: expected includeResults true to keep dry-run plan details.');
   }
 
+  const { stdout: jsonSuccessStdout, stderr: jsonSuccessStderr } = await execFileAsync(process.execPath, ['batch-run.js', '--json', inputDir, outputRoot, '1', '1', '--dry-run'], {
+    cwd: process.cwd(),
+  });
+  if (jsonSuccessStderr.trim() !== '') {
+    throw new Error('json success run: expected stderr to stay empty.');
+  }
+  const jsonSuccess = parseCliJson(jsonSuccessStdout, 'json success run');
+  if (
+    jsonSuccess.ok !== true
+    || jsonSuccess.runner?.outputMode !== 'json'
+    || jsonSuccess.options?.workflowPreset !== 'safe-preview'
+    || jsonSuccess.options?.dryRun !== true
+    || jsonSuccess.result?.dryRun !== true
+    || jsonSuccess.result?.resultsIncluded !== true
+    || jsonSuccess.result?.maxFilesHit !== true
+  ) {
+    throw new Error('json success run: expected machine-readable safe-preview dry-run result.');
+  }
+
+  let jsonFailureStdout = '';
+  try {
+    await execFileAsync(process.execPath, ['batch-run.js', '--json', inputDir, outputRoot, '2', '2'], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        FONT_SPLIT_WORKFLOW_PRESET: 'structure-first',
+      },
+    });
+  } catch (error) {
+    jsonFailureStdout = error.stdout || '';
+  }
+  const jsonFailure = parseCliJson(jsonFailureStdout, 'json failure run');
+  if (
+    jsonFailure.ok !== false
+    || jsonFailure.runner?.outputMode !== 'json'
+    || jsonFailure.options?.workflowPreset !== 'structure-first'
+    || jsonFailure.name !== 'BatchSplitError'
+    || jsonFailure.details?.summary?.workflowPreset !== 'structure-first'
+    || jsonFailure.details?.summary?.errorCount !== 1
+  ) {
+    throw new Error('json failure run: expected machine-readable batch error details.');
+  }
+
   console.log(JSON.stringify({
     safePreview: safePreviewStdout,
     structureFirst: structureFirstStdout,
     includeResultsOverride: includeResultsOverrideStdout,
+    jsonSuccess,
+    jsonFailure,
   }, null, 2));
 } else if (scenario === 'batch-identity-dedupe') {
   const inputDir = process.argv[3] || '.font-split-batch-identity-input';
