@@ -680,10 +680,32 @@ function assertDirectoryWorkflowSummary(summary, {
   if (!summary.policySnapshot?.batchGroupBy || !summary.policySnapshot?.effectiveBatchDedupeMode) {
     throw new Error(`${context}: expected directoryWorkflowSummary.policySnapshot.`);
   }
+  const sourceLayoutMismatchSummary = summary.sourceLayoutMismatchSummary;
+  if (
+    !sourceLayoutMismatchSummary
+    || sourceLayoutMismatchSummary.summaryType !== 'source-layout-mismatch'
+    || sourceLayoutMismatchSummary.appliesToTool !== 'organize_font_directory'
+    || sourceLayoutMismatchSummary.currentLayoutKind !== expectedLayoutKind
+    || sourceLayoutMismatchSummary.copyOnlyStaging?.sourceDestructive !== false
+    || sourceLayoutMismatchSummary.copyOnlyStaging?.sourceFilesPreserved !== true
+    || sourceLayoutMismatchSummary.copyOnlyStaging?.sourceFilesMovedDeletedOrRewritten !== false
+    || sourceLayoutMismatchSummary.directOriginalInput?.previewRequiredBeforeWrite !== true
+    || !Array.isArray(sourceLayoutMismatchSummary.successCriteria)
+    || !sourceLayoutMismatchSummary.nonIntuitiveBehavior?.some((item) => item.includes('never source-destructive'))
+  ) {
+    throw new Error(`${context}: expected directoryWorkflowSummary.sourceLayoutMismatchSummary to explain layout match, direct preview, copy-only staging, and source safety.`);
+  }
+  if (expectedRoute === 'review-mixed-layout' && sourceLayoutMismatchSummary.mismatchDetected !== true) {
+    throw new Error(`${context}: expected mixed layout summary to mark a layout mismatch.`);
+  }
+  if (expectedRoute === 'preview-organized-output' && sourceLayoutMismatchSummary.directOriginalInput?.status !== 'use-organized-output') {
+    throw new Error(`${context}: expected copied organization summary to point at the organized output.`);
+  }
   if (
     typeof summary.planVisibility?.planIncluded !== 'boolean'
     || !Array.isArray(summary.planVisibility?.detailsOmitted)
     || !summary.planVisibility?.availableSummaryFields?.includes('planActionSummary')
+    || !summary.planVisibility?.availableSummaryFields?.includes('sourceLayoutMismatchSummary')
     || !summary.planVisibility?.successCriteria
   ) {
     throw new Error(`${context}: expected directoryWorkflowSummary.planVisibility to describe compact plan visibility.`);
@@ -1425,6 +1447,7 @@ if (scenario === 'single') {
     unsupportedFileCategoryCatalog: 'get_agent_guidance',
     recommendedBatchOptions: 'organize_font_directory',
     recommendedBatchPreviewArgs: 'organize_font_directory',
+    sourceLayoutMismatchSummary: 'organize_font_directory',
     recommendedNextActions: 'split_font_batch',
     safetySummary: 'split_font_batch',
     unsupportedFileSummary: 'organize_font_directory',
@@ -1524,6 +1547,7 @@ if (scenario === 'single') {
     structureDecision?.recommendedOptions?.workflowPreset !== 'structure-first'
     || !structureDecision.mustInspectFields?.includes('dedupeLimitedByParsing')
     || !structureDecision.mustInspectFields?.includes('organizationDecision')
+    || !structureDecision.mustInspectFields?.includes('sourceLayoutMismatchSummary')
     || !structureDecision.mustInspectFields?.includes('unsupportedFileSummary')
     || !structureDecision.mustInspectFields?.includes('planActionSummary')
     || !structureDecision.mustInspectFields?.includes('recommendedBatchPreviewArgs')
@@ -1551,6 +1575,7 @@ if (scenario === 'single') {
     mixedDecision?.recommendedOptions?.workflowPreset !== 'safe-preview'
     || mixedDecision?.followUpOptions?.workflowPreset !== 'safe-preview'
     || !mixedDecision?.mustInspectFields?.includes('organizationDecision')
+    || !mixedDecision?.mustInspectFields?.includes('sourceLayoutMismatchSummary')
     || !mixedDecision?.mustInspectFields?.includes('planActionSummary')
     || !mixedDecision?.mustInspectFields?.includes('recommendedBatchPreviewArgs')
     || !mixedDecision?.successCriteria?.includes('sourceDestructive false')
@@ -1565,6 +1590,7 @@ if (scenario === 'single') {
     || stagingDecision?.recommendedOptions?.workflowPreset !== 'safe-preview'
     || stagingDecision?.followUpOptions?.workflowPreset !== 'reviewed-write'
     || !stagingDecision.mustInspectFields?.includes('organizationDecision')
+    || !stagingDecision.mustInspectFields?.includes('sourceLayoutMismatchSummary')
     || !stagingDecision.mustInspectFields?.includes('unsupportedFileSummary')
     || !stagingDecision.mustInspectFields?.includes('planActionSummary')
     || !stagingDecision.mustInspectFields?.includes('outputTreeInsideInputTree')
@@ -1653,6 +1679,9 @@ if (scenario === 'single') {
   }
   if (!layoutChecklist?.responseFields?.includes('recommendedBatchPreviewArgs')) {
     throw new Error('Expected layout verification checklist to include recommendedBatchPreviewArgs.');
+  }
+  if (!layoutChecklist?.responseFields?.includes('sourceLayoutMismatchSummary')) {
+    throw new Error('Expected layout verification checklist to include sourceLayoutMismatchSummary.');
   }
   if (!layoutChecklist?.responseFields?.includes('organizationDecision')) {
     throw new Error('Expected layout verification checklist to include organizationDecision.');
@@ -1917,6 +1946,13 @@ if (scenario === 'single') {
     expectedCurrentStep: 'layout-plan',
     expectedReviewReason: 'invalid-fonts-skipped',
   });
+  if (
+    result.sourceLayoutMismatchSummary?.summaryType !== 'source-layout-mismatch'
+    || result.sourceLayoutMismatchSummary?.currentLayoutKind !== result.directoryWorkflowSummary?.sourceLayoutMismatchSummary?.currentLayoutKind
+    || result.sourceLayoutMismatchSummary?.copyOnlyStaging?.sourceDestructive !== false
+  ) {
+    throw new Error('Expected organizeFontDirectory to expose sourceLayoutMismatchSummary both top-level and inside directoryWorkflowSummary.');
+  }
   const unsupportedOrganizationExtensions = new Set((result.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
   const unsupportedOrganizationCategories = Object.fromEntries((result.unsupportedFileSummary?.byCategory || []).map((item) => [item.category, item.count]));
   const unsupportedOrganizationCategoryDetails = Object.fromEntries((result.unsupportedFileSummary?.categoryDetails || []).map((item) => [item.category, item]));
@@ -1987,11 +2023,13 @@ if (scenario === 'single') {
     compact.directoryWorkflowSummary?.planVisibility?.planIncluded !== false
     || !compact.directoryWorkflowSummary?.planVisibility?.detailsOmitted?.includes('plan')
     || !compact.directoryWorkflowSummary?.planVisibility?.availableSummaryFields?.includes('planActionSummary')
+    || !compact.directoryWorkflowSummary?.planVisibility?.availableSummaryFields?.includes('sourceLayoutMismatchSummary')
     || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanBeforeWrite !== true
     || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanArgs?.workflowPreset !== 'safe-preview'
     || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanArgs?.includePlan !== true
     || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanArgs?.inputDir !== inputDir
     || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanArgs?.outputDir !== outputDir
+    || compact.sourceLayoutMismatchSummary?.summaryType !== 'source-layout-mismatch'
   ) {
     throw new Error('Expected compact organization dry-run to explain omitted plan[] details and provide rerun guidance.');
   }
@@ -3292,6 +3330,7 @@ if (scenario === 'single') {
       'batchPolicyGuide',
       'batchPolicySummary',
       'directoryWorkflowSummary',
+      'sourceLayoutMismatchSummary',
       'planVisibility',
       'directoryWorkflowSummary.planVisibility',
       'unsupportedFileCategoryCatalog',
@@ -3370,6 +3409,7 @@ if (scenario === 'single') {
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
     '`directoryWorkflowSummary`',
+    '`sourceLayoutMismatchSummary`',
     '`planVisibility`',
     '`directoryWorkflowSummary.planVisibility`',
     '`unsupportedFileCategoryCatalog`',

@@ -263,6 +263,7 @@
 | `dedupeLimitedByParsing` | 请求 identity 去重但因为跳过字体解析而无法执行时为 `true`。 |
 | `batchPolicySummary` | 本次整理调用所采用的分组、命名和去重策略摘要，以及对应的 `batchPolicyGuide` 成功标准。若 `parseFonts: false` 导致 identity 去重降级，`effectiveValues.batchDedupeMode` 会显示真实回退值。 |
 | `directoryWorkflowSummary` | 本次响应里的目录工作流导航摘要，用来串起源布局复核、安全批量预览、可选 copy-only 暂存、reviewed 批量写入和必须执行的输出审计。它包含 `planVisibility`、`workflowSteps[]`、路线、安全信号、成功标准和非直觉行为提示。 |
+| `sourceLayoutMismatchSummary` | 源目录结构判断摘要：当前布局与推荐分组是否匹配、能否直接对原目录做安全预览、copy-only 暂存是不需要/可选/已经写出，以及暂存为什么不破坏源文件。 |
 | `directoryWorkflowSummary.planVisibility` | 说明本次响应是否包含详细 `plan[]`。当 `includePlan: false` 时，`plan[]` 会被省略；可用 `availableSummaryFields` 做压缩 triage，但如果写入前需要确认逐文件目标路径，应按 `rerunWithPlanArgs` 重跑。 |
 | `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、带处理语义的 `categoryDetails`、总体 `handlingSummary`、无扩展文件的 `<none>` 计数，以及少量示例路径。它用于解释为什么嘈杂源目录里有很多压缩包、文档、图片、生成产物或无扩展文件，但不会被复制或拆分。 |
 | `layout.layoutKind` | `empty`、`flat`、`nested` 或 `mixed`。`mixed` 表示输入根目录和子目录里都发现了字体。 |
@@ -289,7 +290,7 @@
 
 常见 `recommendedNextActions[].id` 包括批量动作 `run-reviewed-batch-write`、`audit-split-output`、`rerun-batch-with-higher-maxFiles`、`inspect-batch-errors`，以及整理动作 `review-plan-before-writing`、`preview-batch-split-original-layout`、`copy-organized-staging-directory`、`inspect-organized-output`、`preview-batch-split-organized-output`、`rerun-with-font-parsing`、`rerun-with-higher-maxFiles`、`decide-on-invalid-fonts`、`review-mixed-layout-grouping` 和 `avoid-reprocessing-organized-copies`。这些是后续行动建议，不是成功证明；agent 仍必须检查每项列出的 `inspectFields`，并满足 `successCriteria`。
 
-`organizationDecision` 和 `directoryWorkflowSummary` 是压缩路线提示，不是路线已经完成的证明。用它们选择下一步分支后，仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility`，以及可用时的 `plan[]`。
+`organizationDecision`、`directoryWorkflowSummary` 和 `sourceLayoutMismatchSummary` 是压缩路线提示，不是路线已经完成的证明。用它们选择下一步分支后，仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility`，以及可用时的 `plan[]`。
 
 `planActionSummary` 是压缩概览，不替代写文件前审查详细 `plan[]`。它主要服务自动化和大响应场景，尤其是使用 `includePlan: false` 时。当后续动作依赖理解复制/跳过计划形态时，organizer 的 `recommendedNextActions[].inspectFields` 会包含 `planActionSummary`。
 
