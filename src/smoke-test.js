@@ -72,6 +72,8 @@ function summarizeRealCorpusSubprocess(scenario, result) {
     return {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
+      corpusUnsupportedByCategory: result.corpus?.unsupportedFileSummary?.byCategory,
+      corpusUnsupportedArchiveCount: getUnsupportedCategoryCount(result.corpus?.unsupportedFileSummary, 'archive'),
       corpusMaxFilesHit: result.corpus?.maxFilesHit,
       sampleInputDir: result.sample?.inputDir,
       sampleSupportedFontCount: result.inspection?.supportedFontCount,
@@ -82,6 +84,8 @@ function summarizeRealCorpusSubprocess(scenario, result) {
     return {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
+      corpusUnsupportedByCategory: result.corpus?.unsupportedFileSummary?.byCategory,
+      corpusUnsupportedArchiveCount: getUnsupportedCategoryCount(result.corpus?.unsupportedFileSummary, 'archive'),
       corpusMaxFilesHit: result.corpus?.maxFilesHit,
       selectionMode: result.selection?.mode,
       availableTargetCount: result.selection?.availableTargetCount,
@@ -94,6 +98,8 @@ function summarizeRealCorpusSubprocess(scenario, result) {
     return {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
+      corpusUnsupportedByCategory: result.corpus?.unsupportedFileSummary?.byCategory,
+      corpusUnsupportedArchiveCount: getUnsupportedCategoryCount(result.corpus?.unsupportedFileSummary, 'archive'),
       corpusMaxFilesHit: result.corpus?.maxFilesHit,
       sampleInputDir: result.sample?.inputDir,
       sampleFontPath: result.sampleFontPath,
@@ -109,6 +115,10 @@ function summarizeRealCorpusSubprocess(scenario, result) {
   return null;
 }
 
+function getUnsupportedCategoryCount(summary, category) {
+  return (summary?.byCategory || []).find((item) => item.category === category)?.count ?? 0;
+}
+
 function buildRealCorpusSuiteCoverageSummary(runs) {
   const byScenario = Object.fromEntries((runs || []).map((run) => [run.scenario, run.summary || {}]));
   const readonly = byScenario['real-corpus-readonly'] || {};
@@ -119,6 +129,8 @@ function buildRealCorpusSuiteCoverageSummary(runs) {
     perDirectoryAcceptanceAudit: false,
     corpusSupportedFontCount: readonly.corpusSupportedFontCount ?? targets.corpusSupportedFontCount ?? integration.corpusSupportedFontCount,
     corpusUnsupportedFileCount: readonly.corpusUnsupportedFileCount ?? targets.corpusUnsupportedFileCount ?? integration.corpusUnsupportedFileCount,
+    corpusUnsupportedByCategory: readonly.corpusUnsupportedByCategory ?? targets.corpusUnsupportedByCategory ?? integration.corpusUnsupportedByCategory,
+    corpusUnsupportedArchiveCount: readonly.corpusUnsupportedArchiveCount ?? targets.corpusUnsupportedArchiveCount ?? integration.corpusUnsupportedArchiveCount,
     corpusMaxFilesHit: readonly.corpusMaxFilesHit ?? targets.corpusMaxFilesHit ?? integration.corpusMaxFilesHit,
     fixedRegressionTargets: DEFAULT_REAL_CORPUS_TARGETS,
     targetSelectionMode: targets.selectionMode,
@@ -1175,14 +1187,19 @@ if (scenario === 'single') {
     throw new Error('Expected maxFilesHit false when the scan did not exceed maxFiles.');
   }
   const unsupportedInputExtensions = new Set((result.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
+  const unsupportedInputCategories = Object.fromEntries((result.unsupportedFileSummary?.byCategory || []).map((item) => [item.category, item.count]));
   if (
     result.unsupportedFileSummary?.total !== 4
     || !unsupportedInputExtensions.has('.txt')
     || !unsupportedInputExtensions.has('.zip')
     || !unsupportedInputExtensions.has('.png')
     || !unsupportedInputExtensions.has('<none>')
+    || unsupportedInputCategories.document !== 1
+    || unsupportedInputCategories.archive !== 1
+    || unsupportedInputCategories.image !== 1
+    || unsupportedInputCategories.extensionless !== 1
   ) {
-    throw new Error('Expected input inspection to summarize all unsupported file extensions.');
+    throw new Error('Expected input inspection to summarize unsupported file extensions and categories.');
   }
   const truncated = await inspectFontInputs({
     inputDir,
@@ -1334,14 +1351,19 @@ if (scenario === 'single') {
     throw new Error('Expected organization dry-run to summarize skipped-invalid plan actions.');
   }
   const unsupportedOrganizationExtensions = new Set((result.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
+  const unsupportedOrganizationCategories = Object.fromEntries((result.unsupportedFileSummary?.byCategory || []).map((item) => [item.category, item.count]));
   if (
     result.unsupportedFileSummary?.total !== 4
     || !unsupportedOrganizationExtensions.has('.txt')
     || !unsupportedOrganizationExtensions.has('.zip')
     || !unsupportedOrganizationExtensions.has('.png')
     || !unsupportedOrganizationExtensions.has('<none>')
+    || unsupportedOrganizationCategories.document !== 1
+    || unsupportedOrganizationCategories.archive !== 1
+    || unsupportedOrganizationCategories.image !== 1
+    || unsupportedOrganizationCategories.extensionless !== 1
   ) {
-    throw new Error('Expected organization dry-run to summarize all unsupported file extensions.');
+    throw new Error('Expected organization dry-run to summarize unsupported file extensions and categories.');
   }
   const dryRunNextActionIds = new Set((result.recommendedNextActions || []).map((action) => action.id));
   for (const expectedAction of ['review-plan-before-writing', 'decide-on-invalid-fonts']) {
@@ -2574,6 +2596,7 @@ if (scenario === 'single') {
       'structureSummary',
       'maxFilesHit',
       'unsupportedFileSummary',
+      'unsupportedFileSummary.byCategory',
       'debugBatchDecisions',
     ]) {
       assertDocsContainAny(`important field ${fieldName}`, [`\`${fieldName}\``, `\`${fieldName}[]\``]);
@@ -2635,6 +2658,7 @@ if (scenario === 'single') {
     '`recommendedNextActions[]`',
     '`planActionSummary`',
     '`unsupportedFileSummary`',
+    '`unsupportedFileSummary.byCategory[]`',
     '`auditStatus`',
     '`auditPassed`',
     '`auditBlockingReasons[]`',
@@ -2916,10 +2940,11 @@ if (scenario === 'single') {
   if (
     coverageSummary.perDirectoryAcceptanceAudit !== false
     || coverageSummary.corpusSupportedFontCount < 1
+    || !Array.isArray(coverageSummary.corpusUnsupportedByCategory)
     || coverageSummary.selectedTargetCount < 1
     || coverageSummary.batchAuditStatus !== 'pass'
   ) {
-    throw new Error('Expected real-corpus-suite compact coverage summary to expose root counts, selected targets, and passing output audits.');
+    throw new Error('Expected real-corpus-suite compact coverage summary to expose root counts, unsupported categories, selected targets, and passing output audits.');
   }
 
   console.log(JSON.stringify({

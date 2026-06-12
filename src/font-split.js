@@ -17,6 +17,15 @@ export const DEFAULT_WORKSPACE_ROOT = path.resolve(process.cwd());
 const CN_FONT_SPLIT_PACKAGE_JSON = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/package.json');
 const CN_FONT_SPLIT_VERSION_FILE = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/dist/version');
 const FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.ttc', '.otc', '.woff', '.woff2']);
+const UNSUPPORTED_FILE_EXTENSION_CATEGORIES = {
+  archive: new Set(['.zip', '.rar', '.7z', '.tar', '.gz', '.tgz', '.bz2', '.xz', '.br']),
+  document: new Set(['.txt', '.md', '.markdown', '.pdf', '.doc', '.docx', '.rtf', '.odt', '.ofl', '.license']),
+  image: new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.tif', '.tiff', '.avif']),
+  web: new Set(['.html', '.htm', '.css', '.js', '.mjs', '.cjs']),
+  metadata: new Set(['.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.url', '.csv', '.tsv']),
+  signature: new Set(['.asc', '.sig']),
+  'unsupported-font': new Set(['.eot', '.svg', '.dfont', '.suit', '.fon', '.bdf', '.pcf', '.pfa', '.pfb', '.pfm', '.afm', '.cff', '.cid', '.ttx', '.ufo', '.glyphs']),
+};
 const FORMAT_PRIORITY = { '.otf': 0, '.ttf': 1, '.woff2': 2, '.ttc': 3, '.otc': 4, '.woff': 5 };
 const MANIFEST_FILE_NAME = 'split-meta.json';
 const MANIFEST_VERSION = 1;
@@ -2150,9 +2159,12 @@ async function summarizeFiles(dir, { maxFiles = 5000 } = {}) {
 function buildUnsupportedFileSummary(files, { maxExamples = 20 } = {}) {
   const unsupportedFiles = files.filter((file) => !FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
   const byExtension = new Map();
+  const byCategory = new Map();
   for (const file of unsupportedFiles) {
     const extension = path.extname(file).toLowerCase() || '<none>';
     byExtension.set(extension, (byExtension.get(extension) || 0) + 1);
+    const category = categorizeUnsupportedFileExtension(extension);
+    byCategory.set(category, (byCategory.get(category) || 0) + 1);
   }
 
   return {
@@ -2160,11 +2172,22 @@ function buildUnsupportedFileSummary(files, { maxExamples = 20 } = {}) {
     byExtension: [...byExtension.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([extension, count]) => ({ extension, count })),
+    byCategory: [...byCategory.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([category, count]) => ({ category, count })),
     examples: unsupportedFiles
       .slice(0, maxExamples)
       .map((file) => toRelativeWorkspacePath(file)),
     examplesTruncated: unsupportedFiles.length > maxExamples,
   };
+}
+
+function categorizeUnsupportedFileExtension(extension) {
+  if (extension === '<none>') return 'extensionless';
+  for (const [category, extensions] of Object.entries(UNSUPPORTED_FILE_EXTENSION_CATEGORIES)) {
+    if (extensions.has(extension)) return category;
+  }
+  return 'other';
 }
 
 function normalizeOptionalString(value) {

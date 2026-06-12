@@ -141,7 +141,7 @@ Important result fields:
 | Field | Meaning |
 |-------|---------|
 | `supportedFontCount` | Files with supported font extensions. |
-| `unsupportedFileSummary` | Compact summary of all ignored non-font files, including extension counts, `<none>` for extensionless files, and a small set of example paths. Useful when a source tree mixes fonts with archives, docs, screenshots, or generated assets. |
+| `unsupportedFileSummary` | Compact summary of all ignored non-font files, including exact `byExtension`, overview `byCategory`, `<none>` for extensionless files, and a small set of example paths. Useful when a source tree mixes fonts with archives, docs, screenshots, or generated assets. |
 | `validFontCount` | Supported files whose basic metadata can be parsed. |
 | `invalidFontCount` | Supported extension files that failed parsing. |
 | `missingIdentityCount` | Parseable fonts without a usable batch identity key. |
@@ -149,6 +149,8 @@ Important result fields:
 | `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level inspection notices with machine-readable `code` and human-readable `message`. |
 | `invalidFonts[]` | Compact list of invalid font-like files and parse errors. |
 | `files[]` | Optional per-font entries with extension, container, identity, identity key, glyph count, and parse status. |
+
+`unsupportedFileSummary.byCategory[]` uses coarse categories for agent triage: `archive`, `document`, `image`, `web`, `metadata`, `signature`, `unsupported-font`, `extensionless`, and `other`. This does not change behavior; unsupported files remain ignored.
 
 ## `split_font_batch`
 
@@ -251,7 +253,7 @@ Important result fields:
 | `unparsedFontCount` | Number of supported-extension files intentionally not parsed because `parseFonts` was false. |
 | `effectiveBatchDedupeMode` | Actual dedupe mode used. When `parseFonts: false` and `batchDedupeMode: "font-identity"`, this falls back to `same-path`. |
 | `dedupeLimitedByParsing` | `true` when requested identity dedupe could not run because font parsing was skipped. |
-| `unsupportedFileSummary` | Compact summary of all ignored non-font files, including extension counts, `<none>` for extensionless files, and a small set of example paths. It explains noisy source trees where archives, documents, images, generated assets, or extensionless files are present but will not be copied or split. |
+| `unsupportedFileSummary` | Compact summary of all ignored non-font files, including exact `byExtension`, overview `byCategory`, `<none>` for extensionless files, and a small set of example paths. It explains noisy source trees where archives, documents, images, generated assets, or extensionless files are present but will not be copied or split. |
 | `layout.layoutKind` | `empty`, `flat`, `nested`, or `mixed`. Mixed means fonts exist both at the input root and below subdirectories. |
 | `recommendedBatchOptions` | Suggested `split_font_batch` policy fragment for the detected layout. Nested or mixed inputs usually recommend `batchGroupBy: "source-dir"`; flat inputs usually recommend `font-family`. This is not a complete safe invocation by itself. |
 | `recommendedBatchPreviewArgs` | Copyable no-write `split_font_batch` preview arguments for the detected layout. It includes `inputDir`, `workflowPreset: "safe-preview"`, and only layout-specific overrides such as `batchGroupBy`. Prefer this before any real batch write. |
@@ -260,6 +262,8 @@ Important result fields:
 | `planActionSummary` | Always returned. Counts planned actions by `action`, including `would-copy`, `copied`, `skipped-duplicate`, `skipped-invalid`, `skipped-target-exists`, `would-skip-target-exists`, and `error`. Use this when `includePlan: false` omits detailed entries. |
 | `plan[]` | Optional per-font copy/skip entries. Copy entries include `source`, `target`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`. |
 | `organizationManifestPath` | Written only when `dryRun: false`; points to `font-organization-manifest.json` in `outputDir`. |
+
+`unsupportedFileSummary.byCategory[]` uses the same coarse categories as `inspect_font_inputs`; `archive` files such as `.zip` are reported but not extracted, copied, or split.
 
 Non-intuitive behavior to watch:
 

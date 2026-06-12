@@ -141,7 +141,7 @@
 | 字段 | 含义 |
 |------|------|
 | `supportedFontCount` | 扩展名属于受支持字体格式的文件数。 |
-| `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含扩展名计数、无扩展文件的 `<none>` 计数，以及少量示例路径。源目录混有压缩包、说明文档、截图或生成产物时优先看它。 |
+| `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、无扩展文件的 `<none>` 计数，以及少量示例路径。源目录混有压缩包、说明文档、截图或生成产物时优先看它。 |
 | `validFontCount` | 基础字体元数据可解析的文件数。 |
 | `invalidFontCount` | 扩展名像字体、但解析失败的文件数。 |
 | `missingIdentityCount` | 可解析、但没有可用于批量去重的身份 key 的字体数。 |
@@ -149,6 +149,8 @@
 | `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级预检提示，每项包含机器可读 `code` 和人类可读 `message`。 |
 | `invalidFonts[]` | 解析失败字体的紧凑清单和错误信息。 |
 | `files[]` | 可选的逐字体详情，包含扩展名、容器、身份信息、identity key、glyph count 和解析状态。 |
+
+`unsupportedFileSummary.byCategory[]` 使用面向 agent 的粗分类：`archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other`。这不改变处理行为；不支持文件仍会被忽略。
 
 ## `split_font_batch`
 
@@ -251,7 +253,7 @@
 | `unparsedFontCount` | 因 `parseFonts: false` 而被有意跳过元数据解析的受支持扩展名文件数。 |
 | `effectiveBatchDedupeMode` | 实际使用的去重策略。当 `parseFonts: false` 且请求 `batchDedupeMode: "font-identity"` 时，会回退到 `same-path`。 |
 | `dedupeLimitedByParsing` | 请求 identity 去重但因为跳过字体解析而无法执行时为 `true`。 |
-| `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含扩展名计数、无扩展文件的 `<none>` 计数，以及少量示例路径。它用于解释为什么嘈杂源目录里有很多压缩包、文档、图片、生成产物或无扩展文件，但不会被复制或拆分。 |
+| `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、无扩展文件的 `<none>` 计数，以及少量示例路径。它用于解释为什么嘈杂源目录里有很多压缩包、文档、图片、生成产物或无扩展文件，但不会被复制或拆分。 |
 | `layout.layoutKind` | `empty`、`flat`、`nested` 或 `mixed`。`mixed` 表示输入根目录和子目录里都发现了字体。 |
 | `recommendedBatchOptions` | 根据目录形态建议的 `split_font_batch` 策略片段；嵌套或混合目录通常建议 `batchGroupBy: "source-dir"`，扁平目录通常建议 `font-family`。它本身不是完整安全调用。 |
 | `recommendedBatchPreviewArgs` | 可直接复制的 `split_font_batch` 无写入预览参数，包含 `inputDir`、`workflowPreset: "safe-preview"` 和 `batchGroupBy` 等目录形态覆盖项。真实批量写入前优先使用它。 |
@@ -260,6 +262,8 @@
 | `planActionSummary` | 始终返回。按 `action` 统计计划动作数量，包括 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists`、`would-skip-target-exists` 和 `error`。当 `includePlan: false` 省略明细时，用它快速判断计划形态。 |
 | `plan[]` | 可选的逐字体复制/跳过计划。复制条目包含 `source`、`target`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`。 |
 | `organizationManifestPath` | 仅在 `dryRun: false` 时写入，指向 `outputDir` 中的 `font-organization-manifest.json`。 |
+
+`unsupportedFileSummary.byCategory[]` 使用与 `inspect_font_inputs` 相同的粗分类；`.zip` 等 `archive` 文件只会被报告，不会被解压、复制或拆分。
 
 需要特别注意的非直觉行为：
 
