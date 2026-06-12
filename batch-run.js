@@ -1,6 +1,7 @@
 import { splitFontBatch } from './src/font-split.js';
 
 const WORKFLOW_PRESETS = ['default', 'safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all'];
+const COMPACT_ERROR_LIMIT = 20;
 
 function numberOption(value, fallback) {
   const parsed = Number(value);
@@ -27,28 +28,101 @@ function enumOption(value, allowed, fallback) {
   return allowed.includes(value) ? value : fallback;
 }
 
-function buildBatchRunSummary({ ok, startedAt, batchOptions, result, error }) {
+function limitArray(items, limit) {
+  const source = Array.isArray(items) ? items : [];
+  return {
+    items: source.slice(0, limit),
+    truncated: source.length > limit,
+    omittedCount: Math.max(0, source.length - limit),
+  };
+}
+
+function buildCompactBatchResult(result) {
+  if (!result || typeof result !== 'object') return null;
+  const omittedDetailFields = [];
+  if (Object.hasOwn(result, 'planned')) omittedDetailFields.push('planned');
+  if (Object.hasOwn(result, 'results')) omittedDetailFields.push('results');
+
+  const compact = {
+    ok: result.ok,
+    inputDir: result.inputDir,
+    outputRoot: result.outputRoot,
+    workflowPreset: result.workflowPreset,
+    safetySummary: result.safetySummary,
+    sourceDestructive: result.sourceDestructive,
+    sourceFilesPreserved: result.sourceFilesPreserved,
+    writesSourceTree: result.writesSourceTree,
+    writesOutputTree: result.writesOutputTree,
+    outputTreeInsideInputTree: result.outputTreeInsideInputTree,
+    mayOverwriteOutputTree: result.mayOverwriteOutputTree,
+    dryRun: result.dryRun,
+    skipMode: result.skipMode,
+    batchGroupBy: result.batchGroupBy,
+    batchNamingMode: result.batchNamingMode,
+    batchDedupeMode: result.batchDedupeMode,
+    batchErrorMode: result.batchErrorMode,
+    scannedFileCount: result.scannedFileCount,
+    maxFiles: result.maxFiles,
+    maxFilesHit: result.maxFilesHit,
+    unsupportedFileSummary: result.unsupportedFileSummary,
+    discoveredFontCount: result.discoveredFontCount,
+    deduplicatedCount: result.deduplicatedCount,
+    skippedDuplicates: result.skippedDuplicates,
+    selectedFontCount: result.selectedFontCount,
+    skippedExisting: result.skippedExisting,
+    skippedLegacy: result.skippedLegacy,
+    skippedByManifest: result.skippedByManifest,
+    reprocessedBecauseSourceChanged: result.reprocessedBecauseSourceChanged,
+    reprocessedBecauseOptionsChanged: result.reprocessedBecauseOptionsChanged,
+    processedFontCount: result.processedFontCount,
+    errorCount: result.errorCount,
+    batchWarningCount: result.batchWarningCount,
+    batchWarnings: result.batchWarnings || [],
+    recommendedNextActionCount: result.recommendedNextActionCount,
+    recommendedNextActions: result.recommendedNextActions || [],
+    resultsIncluded: result.resultsIncluded,
+    processingSummary: result.processingSummary,
+    plannedCount: result.plannedCount,
+    wouldProcessCount: result.wouldProcessCount,
+    planIncluded: result.planIncluded,
+    omittedDetailFields,
+  };
+  const limitedErrors = limitArray(result.errors, COMPACT_ERROR_LIMIT);
+  compact.errors = limitedErrors.items;
+  compact.errorsTruncated = limitedErrors.truncated;
+  compact.omittedErrorCount = limitedErrors.omittedCount;
+  return compact;
+}
+
+function buildBatchRunSummary({ ok, startedAt, batchOptions, result, error, summaryOnly }) {
   const elapsedMs = Date.now() - startedAt;
   const errorName = error instanceof Error ? error.name : 'Error';
   const errorMessage = error instanceof Error ? error.message : String(error);
+  const outputMode = summaryOnly ? 'json-summary' : 'json';
   return {
     ok,
     runner: {
       name: 'batch-run',
-      outputMode: 'json',
+      outputMode,
       elapsedMs,
     },
     options: batchOptions,
-    ...(result ? { result } : {}),
+    ...(result ? (summaryOnly ? { summary: buildCompactBatchResult(result) } : { result }) : {}),
     ...(error ? {
       name: errorName,
       error: errorMessage,
-      ...(error.details ? { details: error.details } : {}),
+      ...(summaryOnly && error.details?.summary ? { summary: buildCompactBatchResult(error.details.summary) } : {}),
+      ...(summaryOnly && error.details?.errors ? {
+        errors: limitArray(error.details.errors, COMPACT_ERROR_LIMIT).items,
+        errorsTruncated: limitArray(error.details.errors, COMPACT_ERROR_LIMIT).truncated,
+        omittedErrorCount: limitArray(error.details.errors, COMPACT_ERROR_LIMIT).omittedCount,
+      } : {}),
+      ...(!summaryOnly && error.details ? { details: error.details } : {}),
     } : {}),
   };
 }
 
-const flagArgs = new Set(['--dry-run', '--json']);
+const flagArgs = new Set(['--dry-run', '--json', '--json-summary']);
 const positionalArgs = process.argv.slice(2).filter((arg) => !flagArgs.has(arg));
 const inputDir = process.env.FONT_SPLIT_INPUT_DIR || positionalArgs[0] || '.';
 const outputRoot = process.env.FONT_SPLIT_OUTPUT_ROOT || positionalArgs[1] || 'split-output';
@@ -57,7 +131,8 @@ const maxFiles = numberOption(process.env.FONT_SPLIT_MAX_FILES || positionalArgs
 const dryRunFlag = process.argv.includes('--dry-run');
 const dryRunEnvProvided = hasEnv('FONT_SPLIT_DRY_RUN');
 const dryRun = dryRunFlag || booleanEnv(process.env.FONT_SPLIT_DRY_RUN);
-const jsonOutput = process.argv.includes('--json') || booleanEnv(process.env.FONT_SPLIT_JSON);
+const jsonSummaryOutput = process.argv.includes('--json-summary') || booleanEnv(process.env.FONT_SPLIT_JSON_SUMMARY);
+const jsonOutput = jsonSummaryOutput || process.argv.includes('--json') || booleanEnv(process.env.FONT_SPLIT_JSON);
 const includeResults = booleanOption(process.env.FONT_SPLIT_INCLUDE_RESULTS, undefined);
 const chunkSize = numberOption(process.env.FONT_SPLIT_CHUNK_SIZE, 70 * 1024);
 const workflowPreset = enumOption(process.env.FONT_SPLIT_WORKFLOW_PRESET, WORKFLOW_PRESETS, dryRun ? 'safe-preview' : 'reviewed-write');
@@ -111,6 +186,7 @@ try {
       startedAt,
       batchOptions,
       result,
+      summaryOnly: jsonSummaryOutput,
     }), null, 2));
   } else {
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
@@ -142,6 +218,7 @@ try {
       startedAt,
       batchOptions,
       error,
+      summaryOnly: jsonSummaryOutput,
     }), null, 2));
   } else {
     console.error('\nBatch run failed.');

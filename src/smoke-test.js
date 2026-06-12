@@ -1708,12 +1708,54 @@ if (scenario === 'single') {
     throw new Error('json failure run: expected machine-readable batch error details.');
   }
 
+  const { stdout: jsonSummarySuccessStdout } = await execFileAsync(process.execPath, ['batch-run.js', '--json-summary', inputDir, outputRoot, '1', '1', '--dry-run'], {
+    cwd: process.cwd(),
+  });
+  const jsonSummarySuccess = parseCliJson(jsonSummarySuccessStdout, 'json summary success run');
+  if (
+    jsonSummarySuccess.ok !== true
+    || jsonSummarySuccess.runner?.outputMode !== 'json-summary'
+    || Object.hasOwn(jsonSummarySuccess, 'result')
+    || jsonSummarySuccess.summary?.workflowPreset !== 'safe-preview'
+    || jsonSummarySuccess.summary?.resultsIncluded !== true
+    || !jsonSummarySuccess.summary?.omittedDetailFields?.includes('planned')
+  ) {
+    throw new Error('json summary success run: expected compact safe-preview summary without full result.');
+  }
+
+  let jsonSummaryFailureStdout = '';
+  try {
+    await execFileAsync(process.execPath, ['batch-run.js', '--json-summary', inputDir, outputRoot, '2', '2'], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        FONT_SPLIT_WORKFLOW_PRESET: 'structure-first',
+      },
+    });
+  } catch (error) {
+    jsonSummaryFailureStdout = error.stdout || '';
+  }
+  const jsonSummaryFailure = parseCliJson(jsonSummaryFailureStdout, 'json summary failure run');
+  if (
+    jsonSummaryFailure.ok !== false
+    || jsonSummaryFailure.runner?.outputMode !== 'json-summary'
+    || Object.hasOwn(jsonSummaryFailure, 'details')
+    || jsonSummaryFailure.name !== 'BatchSplitError'
+    || jsonSummaryFailure.summary?.workflowPreset !== 'structure-first'
+    || jsonSummaryFailure.summary?.errorCount !== 1
+    || jsonSummaryFailure.errors?.length !== 1
+  ) {
+    throw new Error('json summary failure run: expected compact batch error summary without full details.');
+  }
+
   console.log(JSON.stringify({
     safePreview: safePreviewStdout,
     structureFirst: structureFirstStdout,
     includeResultsOverride: includeResultsOverrideStdout,
     jsonSuccess,
     jsonFailure,
+    jsonSummarySuccess,
+    jsonSummaryFailure,
   }, null, 2));
 } else if (scenario === 'batch-identity-dedupe') {
   const inputDir = process.argv[3] || '.font-split-batch-identity-input';
