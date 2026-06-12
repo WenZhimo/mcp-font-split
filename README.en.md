@@ -337,14 +337,14 @@ Treat `batchDecision` as a route hint, not proof of success. It helps agents cho
 - `layout.layoutKind`: `empty`, `flat`, `nested`, or `mixed`
 - `recommendedBatchOptions`: a suggested follow-up `split_font_batch` policy fragment for the detected layout; not a complete safe invocation
 - `recommendedBatchPreviewArgs`: copyable no-write `split_font_batch` preview args containing `inputDir`, `workflowPreset: "safe-preview"`, and the necessary layout overrides
-- `recommendedNextActionCount`, `recommendedNextActions[]`: machine-readable follow-up actions for agents, each with an `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, and `inspectFields`
+- `recommendedNextActionCount`, `recommendedNextActions[]`: machine-readable follow-up actions for agents, each with an `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, `inspectFields`, and `successCriteria`
 - `organizationDecision`: compact main-route recommendation for the organizer response, distinguishing rerun, font parsing, invalid-font, original-layout preview, mixed-layout review, and organized-output preview branches
 - `organizationWarningCount`, `organizationWarnings[]` with machine-readable `code` and `message`
 - `planActionSummary`: always returned; counts plan actions such as `would-copy`, `copied`, `skipped-duplicate`, `skipped-invalid`, `skipped-target-exists`, and `error`, even when `includePlan: false`
 - optional `plan[]` entries with `source`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`
 
 Treat `organizationDecision` as a main-route hint, not proof of success. It helps agents choose the next branch; before continuing, still inspect `recommendedNextActions[]`, `organizationWarnings[]`, `planActionSummary`, and `plan[]` when available.
-Treat `recommendedNextActions[]` as a checklist, not automation. Agents should still inspect the action's `inspectFields`, especially when an action recommends writing files, auditing output, or rerunning with different scan/parsing limits. `suggestedArgs` prefer `workflowPreset` and only keep overrides that differ from that preset. Batch dry-runs can return `run-reviewed-batch-write`; real batch writes can return `audit-split-output`, whose suggested next tool is `inspect_split_output`.
+Treat `recommendedNextActions[]` as a checklist, not automation. Agents should still inspect the action's `inspectFields` and satisfy `successCriteria` before continuing or reporting completion, especially when an action recommends writing files, auditing output, or rerunning with different scan/parsing limits. `suggestedArgs` prefer `workflowPreset` and only keep overrides that differ from that preset. Batch dry-runs can return `run-reviewed-batch-write`; real batch writes can return `audit-split-output`, whose suggested next tool is `inspect_split_output`.
 Treat `planActionSummary` as a compact overview, not approval to write files without reviewing the detailed plan when it is included.
 
 `inspect_split_output` keeps flat file stats and adds structured output inventory:

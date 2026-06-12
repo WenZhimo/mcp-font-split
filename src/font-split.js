@@ -819,8 +819,8 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   recommendedNextActions: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
-    meaning: 'Machine-readable follow-up checklist for batch and directory organization workflows.',
-    agentAction: 'Treat as guidance and inspect each action inspectFields before proceeding.',
+    meaning: 'Machine-readable follow-up checklist for batch and directory organization workflows. Each action includes inspectFields and successCriteria.',
+    agentAction: 'Treat as guidance, inspect each action inspectFields, and satisfy successCriteria before proceeding or reporting completion.',
   },
   operationMode: {
     sourceTools: ['organize_font_directory'],
@@ -2751,6 +2751,7 @@ function buildBatchNextActions({
         batchOptions,
       }),
       inspectFields: ['batchDecision', 'maxFilesHit', 'unsupportedFileSummary', 'batchWarnings', 'discoveredFontCount', 'deduplicatedCount', 'selectedFontCount'],
+      successCriteria: 'Rerun with a higher maxFiles value and require maxFilesHit false before trusting batch counts, dedupe results, or planned output paths.',
     });
   }
 
@@ -2761,6 +2762,7 @@ function buildBatchNextActions({
       tool: 'split_font_batch',
       reason: 'The batch response contains per-font errors; inspect errors[] before reporting the batch as successful.',
       inspectFields: ['batchDecision', 'errorCount', 'errors', 'batchWarnings', 'processedFontCount'],
+      successCriteria: 'Resolve or disclose every errors[] entry and require errorCount zero before treating the batch as successful.',
     });
   }
 
@@ -2778,6 +2780,7 @@ function buildBatchNextActions({
           batchOptions,
         }),
         inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileSummary'],
+        successCriteria: 'The reviewed write should return dryRun false, sourceDestructive false, errorCount zero, and an audit-split-output next action whenever output was written.',
       });
     }
     return actions;
@@ -2949,6 +2952,7 @@ function buildOrganizationNextActions({
         extraArgs: { maxFiles: '<higher-than-current>' },
       }),
       inspectFields: ['organizationDecision', 'maxFilesHit', 'layout', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
+      successCriteria: 'Rerun with a higher maxFiles value and require maxFilesHit false before trusting layout, warning, or copy-plan counts.',
     });
   }
 
@@ -2966,6 +2970,7 @@ function buildOrganizationNextActions({
         optionOverrides: { dryRun: true, parseFonts: true },
       }),
       inspectFields: ['organizationDecision', 'parsedFontMetadata', 'validFontCount', 'invalidFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
+      successCriteria: 'The rerun should parse font metadata before relying on invalid-font counts, identity dedupe, glyph counts, or metadata family grouping.',
     });
   }
 
@@ -2984,6 +2989,7 @@ function buildOrganizationNextActions({
       }),
       inspectFields: ['organizationDecision', 'invalidFontCount', 'organizationWarnings', 'planActionSummary', 'plan'],
       note: 'Use copyInvalidFonts:true only when preserving broken font-like files is intentional.',
+      successCriteria: 'Continue only after deciding whether preserving invalid font-like files is intentional and verifying the resulting plan actions match that choice.',
     });
   }
 
@@ -2998,6 +3004,7 @@ function buildOrganizationNextActions({
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
       inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      successCriteria: 'The batch preview should remain dryRun true and sourceDestructive false, with planned grouping and warnings reviewed before any real write.',
     });
   }
 
@@ -3013,6 +3020,7 @@ function buildOrganizationNextActions({
       }),
       inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'inputDir', 'maxFilesHit', 'unsupportedFileSummary', 'batchWarnings', 'planned'],
       note: 'Use the organized outputDir intentionally as the next inputDir, or keep future scans scoped so they do not reprocess organized copies.',
+      successCriteria: 'The follow-up batch preview should intentionally target the organized outputDir, remain no-write, and be reviewed before any real batch write.',
     });
   }
 
@@ -3023,6 +3031,7 @@ function buildOrganizationNextActions({
       tool: 'organize_font_directory',
       reason: 'The organization run reported per-file errors.',
       inspectFields: ['organizationDecision', 'errorCount', 'errors', 'planActionSummary', 'plan'],
+      successCriteria: 'Resolve or disclose every organization error and require errorCount zero before treating organization as successful.',
     });
   }
 
@@ -3033,6 +3042,7 @@ function buildOrganizationNextActions({
       tool: 'organize_font_directory',
       reason: 'dryRun:true wrote no files; review the plan and warnings before choosing a write step.',
       inspectFields: ['safetySummary', 'organizationDecision', 'planActionSummary', 'plan', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree'],
+      successCriteria: 'Proceed to copy only after safetySummary confirms sourceDestructive false and the plan, planActionSummary, and organizationWarnings are acceptable.',
     });
 
     if (selectedFontCount > 0) {
@@ -3046,6 +3056,7 @@ function buildOrganizationNextActions({
           recommendedBatchOptions: layout.recommendedBatchOptions,
         }),
         inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+        successCriteria: 'The original-layout batch preview should remain dryRun true and sourceDestructive false, with planned paths and grouping reviewed before a real write.',
       });
       push({
         id: 'copy-organized-staging-directory',
@@ -3060,6 +3071,7 @@ function buildOrganizationNextActions({
           optionOverrides: { dryRun: false, overwriteExisting: false },
         }),
         inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
+        successCriteria: 'The reviewed organization copy should be sourceDestructive false and copy-only, with copiedCount or planActionSummary matching the reviewed plan.',
       });
     }
   } else if (copiedCount > 0) {
@@ -3073,6 +3085,7 @@ function buildOrganizationNextActions({
         includeFiles: false,
       },
       inspectFields: ['supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
+      successCriteria: 'The staging inspection should complete without scan truncation and show the expected supported fonts before using the staging directory for splitting.',
     });
     push({
       id: 'preview-batch-split-organized-output',
@@ -3084,6 +3097,7 @@ function buildOrganizationNextActions({
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
       inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      successCriteria: 'The organized-output batch preview should remain dryRun true and sourceDestructive false, with planned paths and warnings reviewed before a real write.',
     });
   }
 

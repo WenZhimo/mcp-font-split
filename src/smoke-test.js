@@ -397,6 +397,9 @@ function assertInspectFieldsExist(action, responsesByTool, context) {
   if (!action) {
     throw new Error(`${context}: expected action for inspectFields check.`);
   }
+  if (typeof action.successCriteria !== 'string' || action.successCriteria.trim() === '') {
+    throw new Error(`${context}: action ${action.id} (${action.tool}) is missing successCriteria.`);
+  }
   if (!Array.isArray(action.inspectFields)) return;
   const response = responsesByTool[action.tool];
   if (!response) return;
@@ -2818,6 +2821,7 @@ if (scenario === 'single') {
       'workflowPresets',
       'recommendedBatchPreviewArgs',
       'recommendedNextActions',
+      'successCriteria',
       'safetySummary',
       'batchDecision',
       'organizationDecision',
@@ -2897,6 +2901,7 @@ if (scenario === 'single') {
     '`mayOverwriteOutputTree`',
     '`recommendedBatchPreviewArgs`',
     '`recommendedNextActions[]`',
+    '`successCriteria`',
     '`planActionSummary`',
     '`batchDecision`',
     '`organizationDecision`',
