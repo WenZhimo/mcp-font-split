@@ -12,7 +12,7 @@
 | `detailLevel` | `compact`, `full` | `compact` | 响应体量。`compact` 保留工作流关键 section，并默认省略较大的 catalog / 示例；`full` 返回全部指南 section。 |
 | `sections` | section 名称数组 | 不设置 | 聚焦返回指定 section。设置后会覆盖 `detailLevel` 的默认 section 集。 |
 
-响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
 当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["warning-catalog", "field-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
 
@@ -21,6 +21,8 @@
 `directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，提供具体源目录树模式，例如扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。示例调用也遵循 preset-first 风格。
 
 `safeInvocationTemplates[]` 提供常见 agent 工作流的可复制起步调用，包括运行时诊断、紧凑输入预检、源目录结构不匹配时的整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理，以及紧凑输出审计。每个模板都会声明是否写文件、是否可能修改源文件、哪些参数应该由调用方自定义，以及必须检查哪些响应字段。模板会刻意保持 `args` 精简：`workflowPreset` 已提供的默认项不会在每个模板中重复展开，需要查看完整展开值时使用 `workflowPresets[]`。
+
+`recommendedWorkflowPlan` 是当前 `workflow` 对应的有序执行计划。它把安全模板 ID 编排成输入预检、目录形态决策、批量预览、审查后写入和输出审计等阶段。它是路线图，不替代工具响应检查；agent 从预览进入写入、或向用户宣称完成前，仍然必须检查每个步骤列出的字段。
 
 `warningCodeCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["warning-catalog"]` 时返回，会把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的机器可读 warning code 映射到响应来源、严重度和建议 agent 动作。
 
@@ -42,7 +44,7 @@
 | `safe-templates` | 常见工作流的可复制安全调用模板。 |
 | `response-fields` | agent 应检查的响应字段短清单。 |
 | `path-rules` | 路径限制和相对路径规则。 |
-| `workflow` | 针对当前指南重点推荐的工作流。 |
+| `workflow` | 针对当前指南重点推荐的工作流文本和 `recommendedWorkflowPlan`。 |
 
 工作流预设：
 

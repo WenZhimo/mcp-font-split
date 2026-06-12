@@ -12,7 +12,7 @@ Return machine-readable usage guidance for AI coding assistants.
 | `detailLevel` | `compact`, `full` | `compact` | Response size. `compact` keeps the workflow-critical sections and omits bulky catalogs/examples; `full` returns every guidance section. |
 | `sections` | array of section names | unset | Focused section filter. When set, it overrides the default section set from `detailLevel`. |
 
-The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available. By default the response is compact: it includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `safeInvocationTemplates[]`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available. By default the response is compact: it includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `safeInvocationTemplates[]`, `recommendedWorkflowPlan`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
 
 Use `detailLevel: "full"` when the agent needs every catalog and example in one response. Use `sections` when it only needs specific data, for example `["warning-catalog", "field-catalog"]`. Available sections are reported in `guidanceView.availableSections`.
 
@@ -21,6 +21,8 @@ Use `detailLevel: "full"` when the agent needs every catalog and example in one 
 `directoryWorkflowExamples[]` is returned with `detailLevel: "full"` or `sections: ["examples"]`. It gives concrete source-tree patterns such as flat vendor dumps, archive-per-family folders, mixed root+nested libraries, and large/noisy first-pass scans. Example calls follow the same preset-first style.
 
 `safeInvocationTemplates[]` gives copyable starting calls for common agent workflows, including runtime diagnostics, compact source preflight, source-layout mismatch planning, structure-first scans for large directories, copy-only staging, batch dry-run preview, reviewed batch processing, and compact output audit. Each template declares whether it writes files, whether it can modify source files, which arguments are meant to be customized, and which response fields must be inspected. Templates intentionally keep `args` minimal: defaults supplied by `workflowPreset` are not repeated in every template, and the expanded preset defaults are available in `workflowPresets[]`.
+
+`recommendedWorkflowPlan` is an ordered plan for the selected `workflow`. It composes the safe template IDs into phases such as preflight, layout decision, batch preview, reviewed write, and output audit. It is a route map, not a replacement for checking each tool response: agents should still inspect every field listed in each step before moving from preview to write or claiming completion.
 
 `warningCodeCatalog` is returned with `detailLevel: "full"` or `sections: ["warning-catalog"]`. It maps machine-readable warning codes from `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]` to their response sources, severity, and suggested agent action.
 
@@ -42,7 +44,7 @@ Guidance section names:
 | `safe-templates` | Copyable safe invocation templates for common workflows. |
 | `response-fields` | Short list of response fields agents should inspect. |
 | `path-rules` | Path containment and relative-path rules. |
-| `workflow` | Recommended workflow for the requested guidance focus. |
+| `workflow` | Recommended workflow text and `recommendedWorkflowPlan` for the requested guidance focus. |
 
 Workflow presets:
 

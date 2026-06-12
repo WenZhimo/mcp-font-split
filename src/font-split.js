@@ -188,7 +188,7 @@ const GUIDANCE_SECTION_FIELDS = {
   'safe-templates': ['safeInvocationTemplatesVersion', 'safeInvocationTemplates'],
   'response-fields': ['responseFieldsToCheck'],
   'path-rules': ['pathRules'],
-  workflow: ['recommendedWorkflow'],
+  workflow: ['recommendedWorkflow', 'recommendedWorkflowPlanVersion', 'recommendedWorkflowPlan'],
 };
 let wasmRuntimePromise;
 let wasmPath;
@@ -679,6 +679,16 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Version of safeInvocationTemplates.',
     agentAction: 'Use this for compatibility checks in automated agents.',
   },
+  recommendedWorkflowPlan: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Ordered workflow plan that composes safeInvocationTemplates into phases for the selected guidance workflow.',
+    agentAction: 'Follow the ordered steps, inspect each listed field, and only advance from preview to write after the reviewed conditions are satisfied.',
+  },
+  recommendedWorkflowPlanVersion: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Version of recommendedWorkflowPlan.',
+    agentAction: 'Use this for compatibility checks in automated agents.',
+  },
   batchWarnings: {
     sourceTools: ['split_font_batch'],
     meaning: 'Summary-level batch notices with machine-readable codes.',
@@ -1048,6 +1058,274 @@ const SAFE_INVOCATION_TEMPLATES = [
     nextStep: 'Require structureSummary.conforms true; if maxFilesHit is true or legacy/structure issues are detected, disclose uncertainty or rerun with more detail.',
   },
 ];
+const RECOMMENDED_WORKFLOW_PLAN_VERSION = 1;
+
+function buildRecommendedWorkflowPlan(workflow) {
+  const auditStep = {
+    id: 'audit-output',
+    templateId: 'output-audit-compact',
+    required: true,
+    writesFiles: false,
+    sourceDestructive: false,
+    goal: 'Audit the generated output directory before reporting completion.',
+    inspectFields: ['structureSummary', 'maxFilesHit', 'inspectionWarnings', 'manifestCount', 'legacyOutputCount'],
+    completeWhen: 'structureSummary.conforms is true, maxFilesHit is false, and inspectionWarnings contain no action-required structure or truncation issues.',
+  };
+  const plans = {
+    overview: {
+      id: 'safe-agent-batch-workflow',
+      summary: 'Default AI-agent path for an unfamiliar font directory: diagnose, preflight, resolve layout ambiguity, preview batch output, write only after review, then audit output.',
+      orderedSteps: [
+        {
+          id: 'runtime-check',
+          templateId: 'runtime-diagnostic',
+          required: false,
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Confirm the workspace, Node runtime, package versions, and WASM runtime are usable when setup is uncertain.',
+          inspectFields: ['ok', 'recommendedActions', 'workspace', 'wasm', 'cnFontSplit'],
+          completeWhen: 'ok is true, or every recommendedActions item has been handled.',
+        },
+        {
+          id: 'source-preflight',
+          templateId: 'source-preflight-compact',
+          required: true,
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Count supported fonts and ignored non-font files without writing output.',
+          inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount'],
+          completeWhen: 'maxFilesHit is false, or the caller intentionally accepts a bounded summary.',
+        },
+        {
+          id: 'layout-decision',
+          templateId: 'directory-mismatch-plan',
+          required: 'when-layout-is-flat-mixed-unfamiliar-or-user-wants-staging',
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Use the organizer dry-run to decide whether direct batch splitting is safe or whether a copy-only staging directory is useful.',
+          inspectFields: ['safetySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationWarnings', 'planActionSummary'],
+          completeWhen: 'The desired grouping is clear and any organizationWarnings have been reviewed.',
+        },
+        {
+          id: 'batch-preview',
+          templateId: 'batch-dry-run-preview',
+          required: true,
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Preview dedupe, naming, skip checks, warnings, and planned output paths before writing.',
+          inspectFields: ['safetySummary', 'dryRun', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
+          completeWhen: 'dryRun is true, sourceDestructive is false, maxFilesHit is false, and planned paths/warnings are acceptable.',
+        },
+        {
+          id: 'reviewed-write',
+          templateId: 'batch-process-reviewed-plan',
+          required: 'after-preview-review',
+          writesFiles: true,
+          sourceDestructive: false,
+          goal: 'Write split output only after the preview has been reviewed.',
+          inspectFields: ['safetySummary', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+          completeWhen: 'errorCount is zero and the response recommends or allows output audit.',
+        },
+        auditStep,
+      ],
+      decisionPoints: [
+        {
+          id: 'staging-needed',
+          when: 'The user wants a cleaner source staging directory, or the source layout is too ambiguous for direct grouping.',
+          useTemplateId: 'copy-organized-staging',
+          inspectFields: ['safetySummary', 'copiedCount', 'organizationWarnings', 'organizationManifestPath'],
+          nextInput: 'Use the organizer outputDir as split_font_batch inputDir only after reviewing warnings.',
+        },
+        {
+          id: 'direct-batch-ok',
+          when: 'The source layout already matches the desired grouping.',
+          useTemplateId: 'batch-dry-run-preview',
+          inspectFields: ['safetySummary', 'planned', 'batchWarnings', 'unsupportedFileSummary'],
+          nextInput: 'Use the original inputDir for split_font_batch.',
+        },
+      ],
+    },
+    single: {
+      id: 'single-font-workflow',
+      summary: 'Process one known font path, then interpret resultType/outputMode instead of treating ok:true as normal subset proof.',
+      orderedSteps: [
+        {
+          id: 'runtime-check',
+          templateId: 'runtime-diagnostic',
+          required: false,
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Check setup when the workspace or runtime is uncertain.',
+          inspectFields: ['ok', 'recommendedActions', 'workspace', 'wasm'],
+          completeWhen: 'ok is true, or every recommendedActions item has been handled.',
+        },
+        {
+          id: 'split-known-font',
+          tool: 'split_font',
+          required: true,
+          writesFiles: true,
+          sourceDestructive: false,
+          goal: 'Process the named font file.',
+          inspectFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'manifestPath'],
+          completeWhen: 'manifestPath exists and any fallback/copy-original result has been disclosed.',
+        },
+        {
+          id: 'audit-single-output',
+          templateId: 'output-audit-compact',
+          required: true,
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Audit the single-font output directory when reporting generated files.',
+          inspectFields: ['structureSummary', 'manifestCount', 'inspectionWarnings'],
+          completeWhen: 'structureSummary.conforms is true, or any structure limitation is disclosed.',
+        },
+      ],
+      decisionPoints: [
+        {
+          id: 'fallback-result',
+          when: 'resultType is single-woff2-* or copy-original-small-glyph.',
+          action: 'Tell the user this was not a normal multi-subset split.',
+          inspectFields: ['resultType', 'outputMode', 'usedFallback', 'warnings'],
+        },
+      ],
+    },
+    batch: {
+      id: 'batch-workflow',
+      summary: 'Preflight source inputs, optionally resolve layout mismatch, preview batch output, write reviewed output, then audit structure.',
+      orderedSteps: [
+        {
+          id: 'source-preflight',
+          templateId: 'source-preflight-compact',
+          required: true,
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Understand source size, ignored files, invalid fonts, and scan truncation before batch processing.',
+          inspectFields: ['maxFilesHit', 'supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
+          completeWhen: 'The source scan is complete enough for the requested batch scope.',
+        },
+        {
+          id: 'layout-decision',
+          templateId: 'directory-mismatch-plan',
+          required: 'when-layout-is-not-obviously-compatible',
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Check whether source directory layout matches desired family grouping.',
+          inspectFields: ['layout', 'recommendedBatchPreviewArgs', 'organizationWarnings', 'planActionSummary'],
+          completeWhen: 'The grouping strategy is chosen and any layout warnings are reviewed.',
+        },
+        {
+          id: 'batch-preview',
+          templateId: 'batch-dry-run-preview',
+          required: true,
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Preview selected fonts, dedupe, naming, skip decisions, and warnings.',
+          inspectFields: ['safetySummary', 'dryRun', 'planned', 'batchWarnings', 'skippedDuplicates', 'errorCount', 'errors'],
+          completeWhen: 'The preview paths, warnings, and dedupe policy match the user intent.',
+        },
+        {
+          id: 'reviewed-write',
+          templateId: 'batch-process-reviewed-plan',
+          required: 'after-preview-review',
+          writesFiles: true,
+          sourceDestructive: false,
+          goal: 'Run the reviewed batch write.',
+          inspectFields: ['safetySummary', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+          completeWhen: 'errorCount is zero and output audit is available.',
+        },
+        auditStep,
+      ],
+      decisionPoints: [
+        {
+          id: 'preserve-all-files',
+          when: 'The user requires every supported source font file to be preserved even if duplicates appear equivalent.',
+          action: 'Use workflowPreset preserve-all or explicitly set batchDedupeMode none before previewing.',
+          inspectFields: ['batchDedupeMode', 'planned', 'skippedDuplicates'],
+        },
+      ],
+    },
+    inspect: {
+      id: 'inspection-workflow',
+      summary: 'Use read-only tools to verify source inputs or generated output, increasing maxFiles when scans are truncated.',
+      orderedSteps: [
+        {
+          id: 'source-preflight',
+          templateId: 'source-preflight-compact',
+          required: 'when-inspecting-source-fonts',
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Inspect source font inputs without writing output.',
+          inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary'],
+          completeWhen: 'maxFilesHit is false, or truncation is disclosed.',
+        },
+        auditStep,
+      ],
+      decisionPoints: [
+        {
+          id: 'need-details',
+          when: 'A compact scan shows warnings, missing manifests, invalid fonts, or structure issues.',
+          action: 'Rerun with includeFiles:true or includeFamilies:true only for the narrowed area that needs detail.',
+          inspectFields: ['inspectionWarnings', 'structureSummary', 'filesIncluded', 'familiesIncluded'],
+        },
+      ],
+    },
+    organize: {
+      id: 'organization-workflow',
+      summary: 'Plan directory cleanup with a dry run, copy to a staging directory only after review, then inspect or batch-preview that staged directory.',
+      orderedSteps: [
+        {
+          id: 'organization-plan',
+          templateId: 'directory-mismatch-plan',
+          required: true,
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Plan source grouping and copy actions without writing.',
+          inspectFields: ['safetySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationWarnings', 'planActionSummary', 'plan'],
+          completeWhen: 'The copy plan and grouping policy are acceptable.',
+        },
+        {
+          id: 'copy-staging',
+          templateId: 'copy-organized-staging',
+          required: 'only-if-user-wants-staging',
+          writesFiles: true,
+          sourceDestructive: false,
+          goal: 'Copy selected fonts into outputDir without moving or deleting source files.',
+          inspectFields: ['safetySummary', 'copiedCount', 'organizationWarnings', 'organizationManifestPath'],
+          completeWhen: 'sourceDestructive is false and copiedCount/organizationWarnings match the reviewed plan.',
+        },
+        {
+          id: 'inspect-staging',
+          templateId: 'source-preflight-compact',
+          required: 'after-copy-staging',
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Inspect the staging output as the next source directory.',
+          inspectFields: ['supportedFontCount', 'unsupportedFileSummary', 'maxFilesHit', 'inspectionWarnings'],
+          completeWhen: 'The staging directory contains the expected supported fonts.',
+        },
+        {
+          id: 'preview-next-batch',
+          templateId: 'batch-dry-run-preview',
+          required: 'before-splitting-staging-or-original-source',
+          writesFiles: false,
+          sourceDestructive: false,
+          goal: 'Preview split output using either recommendedBatchPreviewArgs or the staged outputDir.',
+          inspectFields: ['safetySummary', 'planned', 'batchWarnings', 'skippedDuplicates'],
+          completeWhen: 'The batch preview matches the selected grouping and dedupe policy.',
+        },
+      ],
+      decisionPoints: [
+        {
+          id: 'copy-not-needed',
+          when: 'The user only wants split output and recommendedBatchPreviewArgs are acceptable.',
+          action: 'Skip copy-organized-staging and run split_font_batch safe-preview on the original inputDir.',
+          inspectFields: ['recommendedBatchPreviewArgs', 'layout', 'organizationWarnings'],
+        },
+      ],
+    },
+  };
+  return plans[workflow] || plans.overview;
+}
 
 export async function getRuntimeStatus() {
   const configuredRoot = process.env.FONT_SPLIT_ROOT || null;
@@ -1558,6 +1836,8 @@ export function getAgentGuidance(args = {}) {
       'safetySummary',
       'toolResponseFieldCatalog',
       'safeInvocationTemplates',
+      'recommendedWorkflowPlan',
+      'recommendedWorkflowPlanVersion',
       'batchWarnings',
       'batchWarningCount',
       'errorCount',
@@ -1611,6 +1891,8 @@ export function getAgentGuidance(args = {}) {
     ],
     pathRules: commonPathRules,
     recommendedWorkflow: workflows[workflow],
+    recommendedWorkflowPlanVersion: RECOMMENDED_WORKFLOW_PLAN_VERSION,
+    recommendedWorkflowPlan: buildRecommendedWorkflowPlan(workflow),
   };
   return selectGuidanceSections(guidance, guidanceView.sectionsIncluded);
 }

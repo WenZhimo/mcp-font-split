@@ -409,6 +409,7 @@ if (scenario === 'single') {
     || Object.hasOwn(defaultGuidance, 'directoryWorkflowExamples')
     || !defaultGuidance.safeInvocationTemplates?.length
     || !defaultGuidance.directoryWorkflowDecisionMatrix?.length
+    || !defaultGuidance.recommendedWorkflowPlan?.orderedSteps?.length
   ) {
     throw new Error('Expected default agent guidance to be compact and omit bulky catalogs/examples.');
   }
@@ -516,6 +517,12 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('guidanceView')) {
     throw new Error('Expected agent guidance to recommend checking guidance view metadata.');
   }
+  if (!result.responseFieldsToCheck?.includes('recommendedWorkflowPlan')) {
+    throw new Error('Expected agent guidance to recommend checking the ordered workflow plan.');
+  }
+  if (!result.responseFieldsToCheck?.includes('recommendedWorkflowPlanVersion')) {
+    throw new Error('Expected agent guidance to recommend checking the ordered workflow plan version.');
+  }
   const expectedWarningCodes = [
     'dry-run-no-write',
     'input-scan-truncated',
@@ -562,6 +569,9 @@ if (scenario === 'single') {
   }
   if (result.safeInvocationTemplatesVersion !== 1) {
     throw new Error('Expected agent guidance to version safe invocation templates.');
+  }
+  if (result.recommendedWorkflowPlanVersion !== 1) {
+    throw new Error('Expected agent guidance to version recommended workflow plans.');
   }
   const templateIds = new Set((result.safeInvocationTemplates || []).map((item) => item.id));
   for (const requiredTemplate of ['runtime-diagnostic', 'directory-mismatch-plan', 'structure-first-large-directory', 'copy-organized-staging', 'batch-dry-run-preview', 'batch-process-reviewed-plan', 'output-audit-compact']) {
@@ -636,6 +646,27 @@ if (scenario === 'single') {
   if (!outputAuditTemplate?.inspectFields?.includes('structureSummary')) {
     throw new Error('Expected output audit template to require structureSummary inspection.');
   }
+  const workflowPlan = result.recommendedWorkflowPlan;
+  if (
+    workflowPlan?.id !== 'batch-workflow'
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-dry-run-preview' && step.writesFiles === false)
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true)
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('structureSummary'))
+  ) {
+    throw new Error('Expected batch recommendedWorkflowPlan to order preview, reviewed write, and output audit steps.');
+  }
+  const referencedTemplateIds = new Set();
+  for (const step of workflowPlan.orderedSteps || []) {
+    if (step.templateId) referencedTemplateIds.add(step.templateId);
+  }
+  for (const decision of workflowPlan.decisionPoints || []) {
+    if (decision.useTemplateId) referencedTemplateIds.add(decision.useTemplateId);
+  }
+  for (const templateId of referencedTemplateIds) {
+    if (!templateIds.has(templateId)) {
+      throw new Error(`Expected recommendedWorkflowPlan to reference existing safe template ${templateId}.`);
+    }
+  }
   for (const fieldName of result.responseFieldsToCheck || []) {
     const entry = result.toolResponseFieldCatalog?.[fieldName];
     if (!entry || !Array.isArray(entry.sourceTools) || entry.sourceTools.length === 0 || !entry.meaning || !entry.agentAction) {
@@ -674,6 +705,7 @@ if (scenario === 'single') {
     batchWarnings: 'split_font_batch',
     inspectionWarnings: 'inspect_split_output',
     warningCodeCatalog: 'get_agent_guidance',
+    recommendedWorkflowPlan: 'get_agent_guidance',
   };
   for (const [fieldName, toolName] of Object.entries(expectedFieldCatalogEntries)) {
     if (!result.toolResponseFieldCatalog?.[fieldName]?.sourceTools?.includes(toolName)) {
@@ -2060,6 +2092,7 @@ if (scenario === 'single') {
     }
     for (const fieldName of [
       'guidanceView',
+      'recommendedWorkflowPlan',
       'directoryWorkflowDecisionMatrix',
       'safeInvocationTemplates',
       'warningCodeCatalog',
@@ -2110,6 +2143,7 @@ if (scenario === 'single') {
   for (const token of [
     '`FONT_SPLIT_ROOT`',
     '`guidanceView`',
+    '`recommendedWorkflowPlan`',
     '`verificationChecklist[]`',
     '`directoryWorkflowDecisionMatrix[]`',
     '`directoryWorkflowExamples[]`',
@@ -2177,7 +2211,7 @@ if (scenario === 'single') {
     ok: true,
     toolCount: guidance.tools?.length || 0,
     documentedWorkflowPresetCount: guidance.workflowPresets?.length || 0,
-    checkedHighRiskTokenCount: 44,
+    checkedHighRiskTokenCount: 45,
     checkedWarningCodeCount: 10,
     checkedDebugEventCount: 5,
   }, null, 2));
