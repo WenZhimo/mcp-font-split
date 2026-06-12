@@ -242,6 +242,53 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('planActionSummary')) {
     throw new Error('Expected agent guidance to recommend checking organization plan action summaries.');
   }
+  if (!result.responseFieldsToCheck?.includes('warningCodeCatalog')) {
+    throw new Error('Expected agent guidance to recommend checking the warning code catalog.');
+  }
+  if (!result.responseFieldsToCheck?.includes('warningCodeCatalogVersion')) {
+    throw new Error('Expected agent guidance to recommend checking the warning code catalog version.');
+  }
+  const expectedWarningCodes = [
+    'dry-run-no-write',
+    'input-scan-truncated',
+    'batch-limit-truncated',
+    'batch-plan-omitted',
+    'batch-results-omitted',
+    'existing-output-skipped',
+    'errors-collected',
+    'input-files-omitted',
+    'invalid-fonts-found',
+    'font-identity-missing',
+    'output-scan-truncated',
+    'output-files-omitted',
+    'output-families-omitted',
+    'legacy-output-detected',
+    'organization-dry-run',
+    'organization-writes-output',
+    'font-parsing-skipped',
+    'output-overwrite-enabled',
+    'unsupported-files-ignored',
+    'invalid-fonts-skipped',
+    'duplicate-fonts-skipped',
+    'mixed-layout-detected',
+    'output-inside-input',
+  ];
+  if (result.warningCodeCatalogVersion !== 1) {
+    throw new Error('Expected agent guidance to version the warning code catalog.');
+  }
+  for (const code of expectedWarningCodes) {
+    const entry = result.warningCodeCatalog?.[code];
+    if (!entry || !Array.isArray(entry.sources) || entry.sources.length === 0 || !entry.severity || !entry.suggestedAction) {
+      throw new Error(`Expected warningCodeCatalog to describe ${code}.`);
+    }
+  }
+  const sourceText = await fs.readFile(new URL('./font-split.js', import.meta.url), 'utf8');
+  const sourceWarningCodes = new Set([...sourceText.matchAll(/push\('([^']+)',/g)].map((match) => match[1]));
+  for (const code of sourceWarningCodes) {
+    if (!result.warningCodeCatalog?.[code]) {
+      throw new Error(`Expected warningCodeCatalog to cover source warning code ${code}.`);
+    }
+  }
   const decisionIds = new Set((result.directoryWorkflowDecisionMatrix || []).map((item) => item.id));
   for (const requiredDecision of ['known-good-batch-layout', 'unknown-or-mixed-directory-layout', 'large-or-noisy-directory-first-pass', 'user-wants-clean-staging-directory']) {
     if (!decisionIds.has(requiredDecision)) {

@@ -19,7 +19,7 @@
 - 批量扫描并处理字体目录。
 - 在大批量处理前预检输入目录，先发现坏字体或身份解析问题。
 - 当源字体目录结构与预期批量分组不一致时，生成整理计划，或把字体非破坏性复制到更规整的暂存目录。
-- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南选择安全工作流。
+- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南和 warning code 含义选择安全工作流。
 - 提供 `get_runtime_status`，让 agent 在处理前确认工作区、Node engine 兼容性、包版本和 WASM 是否可用。
 - 在输出目录中保留原字体副本。
 - 为每个处理过的字体写入 `split-meta.json`。
@@ -30,7 +30,7 @@
 
 | 工具 | 说明 |
 |------|------|
-| `get_agent_guidance` | 返回面向 AI agent 的工作流指南、路径规则、默认策略、需要检查的响应字段和完成验证清单。 |
+| `get_agent_guidance` | 返回面向 AI agent 的工作流指南、路径规则、默认策略、warning code 目录、需要检查的响应字段和完成验证清单。 |
 | `get_runtime_status` | 返回工作区、Node engine 兼容性、包版本、平台、cn-font-split 运行时和 WASM 可用性的只读诊断信息。 |
 | `split_font` | 处理单个字体。根据参数，结果可能是真正分片、单 WOFF2 fallback，或 copy-original 元数据登记。 |
 | `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count 和坏字体清单。 |
@@ -48,6 +48,7 @@
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。
 - 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它会返回推荐工具顺序、默认策略、路径规则、必须检查的响应字段和完成验证清单。
 - `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。
+- `get_agent_guidance` 包含 `warningCodeCatalog`，把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的 code 映射到严重度和建议 agent 动作。
 - 当安装或运行环境不确定时，使用 `get_runtime_status`；它会只读检查解析后的工作区、Node engine 兼容性、包版本、cn-font-split 运行时版本和 WASM 文件，并返回便于 agent 执行/提示的 `recommendedActions[]`。
 - 当源目录是扁平、混合或与预期 family 分组不一致时，先用 `organize_font_directory` 的默认 `dryRun: true` 生成整理计划。它对源目录非破坏：不会移动或删除源文件；真正执行时也只是复制选中的字体到 `outputDir`。
 - 批量扫描会跳过依赖目录、已生成输出目录、`__MACOSX` 和 AppleDouble `._*` 资源叉文件。
