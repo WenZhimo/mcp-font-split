@@ -12,6 +12,117 @@ const scenario = process.argv[2] || 'single';
 const fontPath = process.argv[3] || '0xA000/0xA000-Regular.ttf';
 const outDir = process.argv[4] || 'font-split-mcp/.font-split-smoke-output';
 
+function pad4(buffer) {
+  const remainder = buffer.length % 4;
+  if (remainder === 0) return buffer;
+  return Buffer.concat([buffer, Buffer.alloc(4 - remainder)]);
+}
+
+function checksumTable(buffer) {
+  const padded = pad4(buffer);
+  let sum = 0;
+  for (let offset = 0; offset < padded.length; offset += 4) {
+    sum = (sum + padded.readUInt32BE(offset)) >>> 0;
+  }
+  return sum;
+}
+
+function writeUtf16Be(value) {
+  const buffer = Buffer.alloc(value.length * 2);
+  for (let i = 0; i < value.length; i++) {
+    buffer.writeUInt16BE(value.charCodeAt(i), i * 2);
+  }
+  return buffer;
+}
+
+function buildNameTable(records) {
+  const encodedRecords = records.map(([nameId, value]) => ({
+    nameId,
+    data: writeUtf16Be(value),
+  }));
+  const headerSize = 6;
+  const recordSize = 12;
+  const stringOffset = headerSize + encodedRecords.length * recordSize;
+  const stringData = Buffer.concat(encodedRecords.map((record) => record.data));
+  const table = Buffer.alloc(stringOffset + stringData.length);
+
+  table.writeUInt16BE(0, 0);
+  table.writeUInt16BE(encodedRecords.length, 2);
+  table.writeUInt16BE(stringOffset, 4);
+
+  let dataOffset = 0;
+  encodedRecords.forEach((record, index) => {
+    const recordOffset = headerSize + index * recordSize;
+    table.writeUInt16BE(3, recordOffset);
+    table.writeUInt16BE(1, recordOffset + 2);
+    table.writeUInt16BE(0x0409, recordOffset + 4);
+    table.writeUInt16BE(record.nameId, recordOffset + 6);
+    table.writeUInt16BE(record.data.length, recordOffset + 8);
+    table.writeUInt16BE(dataOffset, recordOffset + 10);
+    dataOffset += record.data.length;
+  });
+  stringData.copy(table, stringOffset);
+  return table;
+}
+
+// Minimal sfnt fixture for organizer metadata parsing; it is not meant for real splitting/rendering.
+function buildMinimalTtf({ familyName = 'Fixture Sans', subfamilyName = 'Regular', glyphCount = 3 } = {}) {
+  const tables = [
+    {
+      tag: 'maxp',
+      data: Buffer.from([0x00, 0x01, 0x00, 0x00, (glyphCount >> 8) & 0xff, glyphCount & 0xff]),
+    },
+    {
+      tag: 'name',
+      data: buildNameTable([
+        [1, familyName],
+        [2, subfamilyName],
+        [4, `${familyName} ${subfamilyName}`],
+        [6, `${familyName.replace(/\s+/g, '')}-${subfamilyName.replace(/\s+/g, '')}`],
+        [16, familyName],
+        [17, subfamilyName],
+      ]),
+    },
+  ].sort((a, b) => a.tag.localeCompare(b.tag));
+
+  const numTables = tables.length;
+  const entrySelector = Math.floor(Math.log2(numTables));
+  const searchRange = 16 * (2 ** entrySelector);
+  const rangeShift = numTables * 16 - searchRange;
+  const headerSize = 12 + numTables * 16;
+  let dataOffset = headerSize;
+  const tableRecords = tables.map((table) => {
+    const data = pad4(table.data);
+    const record = {
+      ...table,
+      checksum: checksumTable(table.data),
+      offset: dataOffset,
+      length: table.data.length,
+      paddedData: data,
+    };
+    dataOffset += data.length;
+    return record;
+  });
+  const font = Buffer.alloc(dataOffset);
+
+  font.writeUInt32BE(0x00010000, 0);
+  font.writeUInt16BE(numTables, 4);
+  font.writeUInt16BE(searchRange, 6);
+  font.writeUInt16BE(entrySelector, 8);
+  font.writeUInt16BE(rangeShift, 10);
+
+  tableRecords.forEach((table, index) => {
+    const recordOffset = 12 + index * 16;
+    font.write(table.tag, recordOffset, 4, 'ascii');
+    font.writeUInt32BE(table.checksum, recordOffset + 4);
+    font.writeUInt32BE(table.offset, recordOffset + 8);
+    font.writeUInt32BE(table.length, recordOffset + 12);
+    table.paddedData.copy(font, table.offset);
+  });
+
+  return font;
+}
+
 if (scenario === 'single') {
   console.log('Splitting:', fontPath, '->', outDir);
   const result = await splitFont({
@@ -359,6 +470,71 @@ if (scenario === 'single') {
   }
 
   console.log(JSON.stringify({ copied, overwritten }, null, 2));
+} else if (scenario === 'organize-valid-font') {
+  const inputDir = process.argv[3] || '.font-split-organize-valid-input';
+  const outputDir = process.argv[4] || '.font-split-organize-valid-output';
+  const sourceA = path.join(inputDir, 'Loose', 'FixtureSans-Regular.ttf');
+  const sourceB = path.join(inputDir, 'Duplicate', 'FixtureSans-Regular.ttf');
+  const targetPath = path.join(outputDir, 'Fixture Sans', 'FixtureSans-Regular.ttf');
+  const fixtureFont = buildMinimalTtf({
+    familyName: 'Fixture Sans',
+    subfamilyName: 'Regular',
+    glyphCount: 3,
+  });
+  console.log('Directory organization valid-font smoke:', inputDir, '->', outputDir);
+  await fs.rm(inputDir, { recursive: true, force: true });
+  await fs.rm(outputDir, { recursive: true, force: true });
+  await fs.mkdir(path.dirname(sourceA), { recursive: true });
+  await fs.mkdir(path.dirname(sourceB), { recursive: true });
+  await fs.writeFile(sourceA, fixtureFont);
+  await fs.writeFile(sourceB, fixtureFont);
+
+  const inspection = await inspectFontInputs({
+    inputDir,
+    includeFiles: true,
+    maxFiles: 10,
+  });
+  if (inspection.validFontCount !== 2 || inspection.invalidFontCount !== 0 || inspection.files?.[0]?.glyphCount !== 3) {
+    throw new Error('Expected generated fixture fonts to parse as valid inputs with glyph counts.');
+  }
+  if (!inspection.files?.every((file) => file.identityBasis === 'family-subfamily')) {
+    throw new Error('Expected generated fixture fonts to expose family/subfamily identity.');
+  }
+
+  const result = await organizeFontDirectory({
+    inputDir,
+    outputDir,
+    dryRun: false,
+    includePlan: true,
+    batchGroupBy: 'font-family',
+    batchNamingMode: 'plain',
+    batchDedupeMode: 'font-identity',
+    maxFiles: 10,
+  });
+  if (result.operationMode !== 'copy-only' || result.validFontCount !== 2 || result.invalidFontCount !== 0 || result.deduplicatedCount !== 1 || result.skippedDuplicates !== 1 || result.copiedCount !== 1) {
+    throw new Error('Expected valid-font organization to parse, identity-dedupe, and copy one representative.');
+  }
+  if (result.layout?.layoutKind !== 'nested' || result.recommendedBatchOptions?.batchGroupBy !== 'source-dir') {
+    throw new Error('Expected valid-font organization to still summarize the source directory layout.');
+  }
+  if (result.plan?.filter((item) => item.action === 'skipped-duplicate').length !== 1) {
+    throw new Error('Expected valid-font organization plan to disclose the duplicate skipped by identity.');
+  }
+  const copiedPlan = result.plan?.find((item) => item.action === 'copied');
+  if (!copiedPlan || copiedPlan.groupName !== 'Fixture Sans' || copiedPlan.status !== 'valid' || copiedPlan.glyphCount !== 3 || !copiedPlan.identityKey) {
+    throw new Error('Expected copied valid-font plan entry to include metadata-derived group and identity details.');
+  }
+  if (!result.organizationWarnings?.some((warning) => warning.code === 'duplicate-fonts-skipped')) {
+    throw new Error('Expected valid-font organization to warn when identity dedupe skips a duplicate.');
+  }
+  if (await fs.readFile(targetPath).then((content) => !content.equals(fixtureFont)).catch(() => true)) {
+    throw new Error('Expected valid-font organization to copy the generated fixture font.');
+  }
+  const manifest = JSON.parse(await fs.readFile(path.join(outputDir, 'font-organization-manifest.json'), 'utf8'));
+  if (manifest.summary?.copiedCount !== 1 || manifest.entries?.[0]?.groupName !== 'Fixture Sans') {
+    throw new Error('Expected valid-font organization manifest to record metadata-derived grouping.');
+  }
+  console.log(JSON.stringify({ inspection, result }, null, 2));
 } else if (scenario === 'organize-structure-only') {
   const inputDir = process.argv[3] || '.font-split-organize-structure-input';
   const outputDir = process.argv[4] || '.font-split-organize-structure-output';

@@ -525,6 +525,7 @@ npm run smoke:font-inputs
 npm run smoke:scan-limits
 npm run smoke:organize
 npm run smoke:organize-copy
+npm run smoke:organize-valid
 npm run smoke:organize-structure
 npm run smoke:organize-output-inside
 npm run smoke:batch-run
