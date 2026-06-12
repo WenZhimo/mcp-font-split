@@ -780,6 +780,82 @@ if (scenario === 'single') {
     }
   }
   console.log(stdout);
+} else if (scenario === 'batch-identity-dedupe') {
+  const inputDir = process.argv[3] || '.font-split-batch-identity-input';
+  const outputRoot = process.argv[4] || '.font-split-batch-identity-output';
+  const ttfPath = path.join(inputDir, 'Ttf', 'FixtureSans-Regular.ttf');
+  const otfPath = path.join(inputDir, 'Otf', 'FixtureSans-Regular.otf');
+  console.log('Batch identity dedupe smoke:', inputDir, '->', outputRoot);
+  await fs.rm(inputDir, { recursive: true, force: true });
+  await fs.rm(outputRoot, { recursive: true, force: true });
+  await fs.mkdir(path.dirname(ttfPath), { recursive: true });
+  await fs.mkdir(path.dirname(otfPath), { recursive: true });
+  await fs.writeFile(ttfPath, buildMinimalTtf({
+    familyName: 'Fixture Sans',
+    subfamilyName: 'Regular',
+    glyphCount: 3,
+  }));
+  await fs.writeFile(otfPath, buildMinimalTtf({
+    familyName: 'Fixture Sans',
+    subfamilyName: 'Regular',
+    glyphCount: 5,
+  }));
+
+  const inspection = await inspectFontInputs({
+    inputDir,
+    includeFiles: true,
+    maxFiles: 10,
+  });
+  const identityKeys = new Set((inspection.files || []).map((file) => file.identityKey));
+  const glyphCounts = new Set((inspection.files || []).map((file) => file.glyphCount));
+  if (inspection.validFontCount !== 2 || identityKeys.size !== 1 || glyphCounts.size !== 2) {
+    throw new Error('Expected fixture fonts to share identity while exposing different glyph counts.');
+  }
+
+  const identityDedupe = await splitFontBatch({
+    inputDir,
+    outputRoot,
+    dryRun: true,
+    includeResults: true,
+    limit: 10,
+    maxFiles: 10,
+    batchGroupBy: 'font-family',
+    batchDedupeMode: 'font-identity',
+    batchNamingMode: 'numeric-suffix',
+    skipMode: 'force',
+    silent: true,
+  });
+  if (identityDedupe.discoveredFontCount !== 2 || identityDedupe.deduplicatedCount !== 1 || identityDedupe.skippedDuplicates !== 1 || identityDedupe.planned?.length !== 1) {
+    throw new Error('Expected font-identity batch dedupe to collapse same-identity fonts despite glyph count differences.');
+  }
+  if (identityDedupe.planned[0].input !== `${inputDir}/Otf/FixtureSans-Regular.otf`) {
+    throw new Error('Expected .otf representative to win over .ttf for same-identity batch inputs.');
+  }
+
+  const pathDedupe = await splitFontBatch({
+    inputDir,
+    outputRoot,
+    dryRun: true,
+    includeResults: true,
+    limit: 10,
+    maxFiles: 10,
+    batchGroupBy: 'font-family',
+    batchDedupeMode: 'same-path',
+    batchNamingMode: 'numeric-suffix',
+    skipMode: 'force',
+    silent: true,
+  });
+  if (pathDedupe.deduplicatedCount !== 2 || pathDedupe.skippedDuplicates !== 0 || pathDedupe.planned?.length !== 2) {
+    throw new Error('Expected same-path batch dedupe to keep same-identity fonts from different source paths.');
+  }
+  const pathDedupeSplitDirNames = new Set(pathDedupe.planned.map((item) => item.splitDirName));
+  if (!pathDedupeSplitDirNames.has('FixtureSans-Regular') || !pathDedupeSplitDirNames.has('FixtureSans-Regular-1')) {
+    throw new Error('Expected numeric-suffix batch naming to avoid same-run splitDirName collisions.');
+  }
+  if (await fsExists(outputRoot)) {
+    throw new Error('Expected batch identity dry-runs not to create outputRoot.');
+  }
+  console.log(JSON.stringify({ inspection, identityDedupe, pathDedupe }, null, 2));
 } else if (scenario === 'inspect-compact') {
   const inputDir = process.argv[3] || 'font-split-mcp/.font-split-inspect-compact';
   console.log('Compact output inspection smoke:', inputDir);

@@ -1722,14 +1722,14 @@ async function listExistingSplitDirNames(resolvedOutDir, fontBaseName) {
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
-async function resolveStableBatchOutputNames({ resolvedOutDir, fontBaseName, fontFileName, inputRelativePath }) {
+async function resolveStableBatchOutputNames({ resolvedOutDir, fontBaseName, fontFileName, inputRelativePath, reservedNames = new Set() }) {
   const extension = path.extname(fontFileName);
   const existingNames = await listExistingSplitDirNames(resolvedOutDir, fontBaseName);
-  const seen = new Set(existingNames);
+  const seen = new Set([...existingNames, ...reservedNames]);
 
   for (const name of existingNames) {
     const manifest = await readSplitManifest(path.join(resolvedOutDir, name));
-    if (manifest?.source?.input === inputRelativePath) {
+    if (manifest?.source?.input === inputRelativePath && !reservedNames.has(name)) {
       return {
         splitDirName: name,
         copiedOriginalFileName: `${name}${extension}`,
@@ -1742,7 +1742,7 @@ async function resolveStableBatchOutputNames({ resolvedOutDir, fontBaseName, fon
     const candidate = appendCollisionSuffix(fontBaseName, index);
     const candidateDir = path.join(resolvedOutDir, candidate);
     const manifest = await readSplitManifest(candidateDir);
-    if (manifest?.source?.input === inputRelativePath) {
+    if (manifest?.source?.input === inputRelativePath && !reservedNames.has(candidate)) {
       return {
         splitDirName: candidate,
         copiedOriginalFileName: `${candidate}${extension}`,
@@ -2631,6 +2631,7 @@ export async function splitFontBatch(args) {
   let reprocessedBecauseSourceChanged = 0;
   let reprocessedBecauseOptionsChanged = 0;
   let wouldProcessCount = 0;
+  const batchOutputNameReservations = new Map();
 
   for (const file of selected) {
     const relative = toRelativeWorkspacePath(file);
@@ -2657,12 +2658,17 @@ export async function splitFontBatch(args) {
           fontFileName,
         });
       } else {
+        const reservationKey = path.resolve(resolvedOutDir);
+        const reservedNames = batchOutputNameReservations.get(reservationKey) || new Set();
         batchOutputNames = await resolveStableBatchOutputNames({
           resolvedOutDir,
           fontBaseName,
           fontFileName,
           inputRelativePath: relative,
+          reservedNames,
         });
+        reservedNames.add(batchOutputNames.splitDirName);
+        batchOutputNameReservations.set(reservationKey, reservedNames);
       }
       logBatchDecision(batchOptions.debugBatchDecisions, 'naming', {
         mode: batchOptions.batchNamingMode,
