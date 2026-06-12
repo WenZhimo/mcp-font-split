@@ -861,11 +861,13 @@ if (scenario === 'single') {
     || !defaultGuidance.safeInvocationTemplates?.length
     || !defaultGuidance.directoryWorkflowDecisionMatrix?.length
     || !defaultGuidance.configurationRecipes?.length
+    || !defaultGuidance.batchPolicyGuide?.length
     || !defaultGuidance.unsupportedFileCategoryCatalog?.archive
     || !defaultGuidance.recommendedWorkflowPlan?.orderedSteps?.length
   ) {
     throw new Error('Expected default agent guidance to be compact and omit bulky catalogs/examples.');
   }
+  assertBatchPolicyGuide(defaultGuidance.batchPolicyGuide || []);
   const result = getAgentGuidance({ workflow: 'batch', detailLevel: 'full' });
   if (result.agentOptimized !== true || result.workflow !== 'batch' || !result.tools.some((tool) => tool.name === 'inspect_font_inputs')) {
     throw new Error('Expected agent guidance to describe the batch workflow and preflight tool.');
@@ -889,10 +891,12 @@ if (scenario === 'single') {
     || !compactGuidance.safeInvocationTemplates?.length
     || !compactGuidance.directoryWorkflowDecisionMatrix?.length
     || !compactGuidance.configurationRecipes?.length
+    || !compactGuidance.batchPolicyGuide?.length
     || !compactGuidance.unsupportedFileCategoryCatalog?.archive
   ) {
     throw new Error('Expected compact agent guidance to keep workflow essentials and omit bulky catalogs/examples.');
   }
+  assertBatchPolicyGuide(compactGuidance.batchPolicyGuide || []);
   const catalogGuidance = getAgentGuidance({ sections: ['warning-catalog', 'field-catalog'] });
   if (
     catalogGuidance.guidanceView?.sectionsIncluded?.length !== 2
