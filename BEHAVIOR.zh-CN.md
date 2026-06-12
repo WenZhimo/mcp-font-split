@@ -320,6 +320,20 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `includeResults`：是否在批量响应中返回每个字体的 `results[]` 详情；默认 `true`。设为 `false` 时仍返回汇总统计、错误列表和 `resultsIncluded: false`，适合全量字体库处理。
 - `dryRun`：只执行扫描、去重、命名和 skip 判断，不调用 `split_font`，也不写任何输出文件。`includeResults: true` 时返回 `planned[]` 计划清单。
 
+### 4.11.1 `debugBatchDecisions`（批量调试专用）
+
+`debugBatchDecisions: true` 会在批量处理过程中输出结构化调试日志，用来定位为什么某个字体被去重、为什么选择某个输出名、为什么跳过已有输出，或为什么某个文件进入错误路径。
+
+当前事件类型包括：
+
+- `dedupe-drop`
+- `dedupe-replace`
+- `naming`
+- `skip-check`
+- `error`
+
+这个开关只影响调试输出，不改变 `batchDedupeMode`、`batchNamingMode`、`skipMode`、`dryRun` 或写入行为。它适合在少数样本上定位问题；大规模真实语料运行时通常保持 `false`，避免日志过大。调试日志也不能替代正式响应字段，agent 仍必须检查 `safetySummary`、`planned[]` / `results[]`、`batchWarnings[]`、`errorCount`、`errors[]` 和后续 `inspect_split_output` 审计结果。
+
 ### 4.12 `workflowPreset`（批量和目录整理）
 
 `workflowPreset` 是给 agent 使用的常见工作流快捷配置，当前用于 `split_font_batch` 和 `organize_font_directory`。
@@ -447,7 +461,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 4. 根据 `batchDedupeMode` 对等价字体去重，默认仍是 `font-identity`。
 5. 根据 `batchGroupBy` 计算整理后的分组目录。
 6. 根据 `batchNamingMode` 计算整理后的目标文件名。
-7. 返回 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`recommendedNextActions[]`、`organizationWarnings[]` 和可选 `plan[]`。
+7. 返回 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary` 和可选 `plan[]`。
 
 `parseFonts` 控制是否读取字体元数据：
 
@@ -456,6 +470,12 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 在结构优先模式下，`validFontCount` 和 `invalidFontCount` 返回 `null`，表示“未检查”，不是 0。
 - 在结构优先模式下，请求 `batchDedupeMode: "font-identity"` 会回退为 `effectiveBatchDedupeMode: "same-path"`，并返回 `dedupeLimitedByParsing: true`。
 - 在结构优先模式下，`batchGroupBy: "font-family"` 无法读取真实 metadata，会使用文件 basename 作为 fallback。
+
+`includePlan` 控制是否返回完整逐字体 `plan[]`：
+
+- 默认 `includePlan: true`，适合人工或 agent 审查每个字体会被复制、跳过还是去重。
+- `includePlan: false` 会省略详细 `plan[]`，但仍返回 `planActionSummary`，适合大目录的压缩响应。
+- 写入前如果需要判断具体文件会落到哪里，应保留 `includePlan: true` 或重新运行一次包含计划详情的 dry-run。
 
 真正执行时：
 
@@ -476,9 +496,9 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `dryRun` 默认值与 `split_font_batch` 不同。`organize_font_directory` 默认 `true`，`split_font_batch` 默认 `false`。
 - `parseFonts: false` 会跳过坏字体检测和真实 identity 去重；不要把 `invalidFontCount: null` 解读为没有坏字体。
 - 非字体文件会被忽略，但会进入 `unsupportedFileSummary`。该字段统计所有非字体扩展名，包含无扩展文件的 `<none>` 计数和少量示例路径。
-- 扩展名像字体但解析失败的文件默认跳过；只有 `copyInvalidFonts: true` 时才会纳入复制计划。
+- 扩展名像字体但解析失败的文件默认跳过；只有显式启用 `copyInvalidFonts`（例如 `copyInvalidFonts: true`）时才会纳入复制计划。
 - 如果 `outputDir` 位于 `inputDir` 里面，响应会给出 `output-inside-input` 警告和 `outputTreeInsideInputTree: true`；后续扫描应排除该目录，避免把整理后的副本再次当作源字体。
-- 如果设置 `overwriteExisting: true`，可能替换 `outputDir` 里的目标文件，但仍不会影响源文件。
+- 如果显式启用 `overwriteExisting`（例如 `overwriteExisting: true`），可能替换 `outputDir` 里的目标文件，但仍不会影响源文件。
 
 推荐 agent 工作流：
 
@@ -652,6 +672,16 @@ split-meta.json
 
 `recommendedNextActions[]` 是检查清单，不会自动执行。真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
 
+常见 `batchWarnings[].code`：
+
+- `dry-run-no-write`：当前是 dry-run，没有写输出。
+- `input-scan-truncated`：输入扫描命中 `maxFiles`，不能把本次统计视为完整。
+- `batch-limit-truncated`：`limit` 只选中了去重后字体的一部分。
+- `batch-plan-omitted`：dry-run 计划详情因 `includeResults: false` 被省略。
+- `batch-results-omitted`：真实批量结果详情因 `includeResults: false` 被省略。
+- `existing-output-skipped`：已有输出按 `skipMode` 被跳过。
+- `errors-collected`：`batchErrorMode: "collect"` 收集了单字体错误，必须检查 `errors[]`。
+
 ### 9.3 `organize_font_directory`
 
 关键字段：
@@ -728,6 +758,14 @@ split-meta.json
 
 如果有 manifest，检查结果优先使用 manifest 分类。
 如果没有 manifest，会使用文件结构做保守推断；无法判断时应视为 legacy / unknown 状态。
+
+常见 `inspectionWarnings[].code`：
+
+- `output-scan-truncated`：输出扫描命中 `maxFiles`，不能把本次审计视为完整。
+- `output-files-omitted`：因为 `includeFiles: false` 省略了扁平 `files[]`。
+- `output-families-omitted`：因为 `includeFamilies: false` 省略了结构化 `families[]`。
+- `legacy-output-detected`：发现没有 `split-meta.json` 的旧输出，只能保守推断。
+- `output-structure-issues`：`structureSummary` 发现结构问题，必须检查 `issues[]`。
 
 ---
 

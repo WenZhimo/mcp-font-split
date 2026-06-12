@@ -2092,6 +2092,95 @@ if (scenario === 'single') {
   } finally {
     await client.close();
   }
+} else if (scenario === 'behavior-docs') {
+  const behaviorDoc = await fs.readFile('BEHAVIOR.zh-CN.md', 'utf8');
+  const guidance = getAgentGuidance({ workflow: 'batch', detailLevel: 'full' });
+  const assertBehaviorContains = (label, token) => {
+    if (!behaviorDoc.includes(token)) {
+      throw new Error(`BEHAVIOR.zh-CN.md is missing documented ${label}: ${token}`);
+    }
+  };
+
+  for (const tool of guidance.tools || []) {
+    assertBehaviorContains(`tool ${tool.name}`, `\`${tool.name}\``);
+  }
+  for (const preset of guidance.workflowPresets || []) {
+    assertBehaviorContains(`workflowPreset ${preset.id}`, `\`${preset.id}\``);
+  }
+  for (const token of [
+    '`FONT_SPLIT_ROOT`',
+    '`guidanceView`',
+    '`verificationChecklist[]`',
+    '`directoryWorkflowDecisionMatrix[]`',
+    '`directoryWorkflowExamples[]`',
+    '`safeInvocationTemplates[]`',
+    '`toolResponseFieldCatalog`',
+    '`workflowPreset`',
+    '`dryRun`',
+    '`includeResults`',
+    '`includePlan`',
+    '`parseFonts`',
+    '`copyInvalidFonts`',
+    '`overwriteExisting`',
+    '`safetySummary`',
+    '`sourceDestructive`',
+    '`writesSourceTree`',
+    '`writesOutputTree`',
+    '`outputTreeInsideInputTree`',
+    '`mayOverwriteOutputTree`',
+    '`recommendedBatchPreviewArgs`',
+    '`recommendedNextActions[]`',
+    '`planActionSummary`',
+    '`unsupportedFileSummary`',
+    '`structureSummary`',
+    '`maxFilesHit`',
+    '`batchWarnings[]`',
+    '`organizationWarnings[]`',
+    '`inspectionWarnings[]`',
+    '`batchGroupBy`',
+    '`batchNamingMode`',
+    '`batchDedupeMode`',
+    '`batchErrorMode`',
+    '`skipMode`',
+    '`debugBatchDecisions`',
+    '`font-identity`',
+    '`glyphCount`',
+    '`resultType`',
+    '`outputMode`',
+    '`performedSplit`',
+    '`usedFallback`',
+    '`ok: true`',
+    '`splitFailureAction`',
+    '`smallGlyphAction`',
+  ]) {
+    assertBehaviorContains(`high-risk behavior token ${token}`, token);
+  }
+  for (const warningCode of [
+    'input-scan-truncated',
+    'output-structure-issues',
+    'legacy-output-detected',
+    'organization-dry-run',
+    'organization-writes-output',
+    'font-parsing-skipped',
+    'output-overwrite-enabled',
+    'unsupported-files-ignored',
+    'duplicate-fonts-skipped',
+    'output-inside-input',
+  ]) {
+    assertBehaviorContains(`warning code ${warningCode}`, `\`${warningCode}\``);
+  }
+  for (const debugEvent of ['dedupe-drop', 'dedupe-replace', 'naming', 'skip-check', 'error']) {
+    assertBehaviorContains(`debugBatchDecisions event ${debugEvent}`, `\`${debugEvent}\``);
+  }
+
+  console.log(JSON.stringify({
+    ok: true,
+    toolCount: guidance.tools?.length || 0,
+    documentedWorkflowPresetCount: guidance.workflowPresets?.length || 0,
+    checkedHighRiskTokenCount: 44,
+    checkedWarningCodeCount: 10,
+    checkedDebugEventCount: 5,
+  }, null, 2));
 } else if (scenario === 'batch-compact') {
   const inputDir = process.argv[3] || '0xA000';
   const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-batch-compact-output';

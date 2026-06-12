@@ -570,6 +570,7 @@ npm run smoke:real-corpus-write -- <字体语料目录>
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
 npm run smoke:api-docs
+npm run smoke:behavior-docs
 npm run smoke:inspect
 npm run smoke:small-skip
 ```
@@ -585,6 +586,8 @@ npm run smoke:small-skip
 `smoke:real-corpus-write` 是显式的本机真实语料写入/审计检查，也不包含在 `npm run check` 中。它会先检查语料根目录，再选择一个真实样本目录，只删除并重建生成用的 `.font-split-*` 输出根，使用 `workflowPreset: "reviewed-write"` 运行 `split_font_batch`，随后通过返回的 `audit-split-output` 动作调用 `inspect_split_output`，并要求 `structureSummary.conforms: true`。可选参数为 `<字体语料目录> [样本输入目录] [输出根目录] [maxFiles] [limit]`；默认输出根是 `font-split-mcp/.font-split-real-corpus-write-output`。
 
 `smoke:api-docs` 会启动 MCP server 读取真实工具 schema，并检查 `API.md` / `API.zh-CN.md` 是否覆盖所有工具、输入参数、`get_agent_guidance` section、`workflowPreset` 和关键安全/审计字段。它包含在 `npm run check` 中，用来防止实现变化后 API 文档静默漂移。
+
+`smoke:behavior-docs` 会检查 `BEHAVIOR.zh-CN.md` 是否覆盖当前工具清单、`workflowPreset`、关键安全/审计字段、批量调试事件和高风险 warning code。它包含在 `npm run check` 中，用来防止行为说明漏掉反直觉或 agent 容易误判的行为。
 
 `smoke:small-skip` 当前验证的是 `copy-original` 小字体策略；脚本名保留是为了兼容。`smoke:incremental` 也会额外打印一个示例 `splitDir`，用于确认新的批量命名在重复运行时仍然稳定。
 
