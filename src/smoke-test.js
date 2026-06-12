@@ -367,6 +367,7 @@ if (scenario === 'single') {
     || mismatchTemplate?.sourceDestructive !== false
     || mismatchTemplate?.args?.dryRun !== true
     || !mismatchTemplate.inspectFields?.includes('sourceDestructive')
+    || !mismatchTemplate.inspectFields?.includes('unsupportedFileSummary')
   ) {
     throw new Error('Expected directory mismatch template to be a source-safe dry-run organization plan.');
   }
@@ -378,6 +379,7 @@ if (scenario === 'single') {
     || copyTemplate?.args?.dryRun !== false
     || copyTemplate?.args?.overwriteExisting !== false
     || !copyTemplate.inspectFields?.includes('writesSourceTree')
+    || !copyTemplate.inspectFields?.includes('unsupportedFileSummary')
   ) {
     throw new Error('Expected copy staging template to disclose copy-only source safety.');
   }
@@ -417,6 +419,8 @@ if (scenario === 'single') {
   const expectedFieldCatalogEntries = {
     recommendedBatchOptions: 'organize_font_directory',
     safetySummary: 'organize_font_directory',
+    unsupportedFileSummary: 'organize_font_directory',
+    structureSummary: 'inspect_split_output',
     sourceDestructive: 'organize_font_directory',
     batchWarnings: 'split_font_batch',
     inspectionWarnings: 'inspect_split_output',
@@ -437,9 +441,14 @@ if (scenario === 'single') {
   if (
     structureDecision?.recommendedOptions?.parseFonts !== false
     || !structureDecision.mustInspectFields?.includes('dedupeLimitedByParsing')
+    || !structureDecision.mustInspectFields?.includes('unsupportedFileSummary')
     || !structureDecision.mustInspectFields?.includes('planActionSummary')
   ) {
     throw new Error('Expected structure-first guidance to recommend parseFonts:false and dedupe checks.');
+  }
+  const knownBatchDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'known-good-batch-layout');
+  if (!knownBatchDecision?.mustInspectFields?.includes('unsupportedFileSummary')) {
+    throw new Error('Expected direct batch guidance to require unsupportedFileSummary inspection.');
   }
   const mixedDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'unknown-or-mixed-directory-layout');
   if (!mixedDecision?.mustInspectFields?.includes('planActionSummary')) {
@@ -449,6 +458,7 @@ if (scenario === 'single') {
   if (
     stagingDecision?.sourceDestructive !== false
     || stagingDecision?.followUpOptions?.dryRun !== false
+    || !stagingDecision.mustInspectFields?.includes('unsupportedFileSummary')
     || !stagingDecision.mustInspectFields?.includes('planActionSummary')
   ) {
     throw new Error('Expected staging guidance to disclose source safety and copy-only follow-up.');
@@ -463,9 +473,14 @@ if (scenario === 'single') {
   if (
     noisyExample?.firstCall?.parseFonts !== false
     || !noisyExample.mustInspectFields?.includes('dedupeLimitedByParsing')
+    || !noisyExample.mustInspectFields?.includes('unsupportedFileSummary')
     || !noisyExample.mustInspectFields?.includes('planActionSummary')
   ) {
     throw new Error('Expected noisy-directory example to use parseFonts:false and require dedupe limitation checks.');
+  }
+  const archiveExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'archive-per-family-folders');
+  if (!archiveExample?.mustInspectFields?.includes('unsupportedFileSummary')) {
+    throw new Error('Expected archive-per-family example to require unsupportedFileSummary inspection.');
   }
   const mixedExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'mixed-root-and-nested-fonts');
   if (
@@ -488,8 +503,15 @@ if (scenario === 'single') {
   if (!layoutChecklist?.responseFields?.includes('recommendedNextActions')) {
     throw new Error('Expected layout verification checklist to include recommendedNextActions.');
   }
+  if (!layoutChecklist?.responseFields?.includes('unsupportedFileSummary')) {
+    throw new Error('Expected layout verification checklist to include unsupportedFileSummary.');
+  }
   if (!layoutChecklist?.responseFields?.includes('planActionSummary')) {
     throw new Error('Expected layout verification checklist to include planActionSummary.');
+  }
+  const outputChecklist = (result.verificationChecklist || []).find((item) => item.id === 'output-audited');
+  if (!outputChecklist?.responseFields?.includes('structureSummary')) {
+    throw new Error('Expected output verification checklist to include structureSummary.');
   }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'runtime-status') {
@@ -519,6 +541,9 @@ if (scenario === 'single') {
   await fs.rm(inputDir, { recursive: true, force: true });
   await fs.mkdir(inputDir, { recursive: true });
   await fs.writeFile(path.join(inputDir, 'notes.txt'), 'not a font');
+  await fs.writeFile(path.join(inputDir, 'archive.zip'), 'not a font archive');
+  await fs.writeFile(path.join(inputDir, 'preview.png'), 'not a font image');
+  await fs.writeFile(path.join(inputDir, 'LICENSE'), 'not a font license');
   await fs.writeFile(path.join(inputDir, 'not-a-font.ttf'), 'not a real font');
 
   const result = await inspectFontInputs({
@@ -534,6 +559,16 @@ if (scenario === 'single') {
   }
   if (result.maxFilesHit !== false) {
     throw new Error('Expected maxFilesHit false when the scan did not exceed maxFiles.');
+  }
+  const unsupportedInputExtensions = new Set((result.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
+  if (
+    result.unsupportedFileSummary?.total !== 4
+    || !unsupportedInputExtensions.has('.txt')
+    || !unsupportedInputExtensions.has('.zip')
+    || !unsupportedInputExtensions.has('.png')
+    || !unsupportedInputExtensions.has('<none>')
+  ) {
+    throw new Error('Expected input inspection to summarize all unsupported file extensions.');
   }
   const truncated = await inspectFontInputs({
     inputDir,
@@ -579,6 +614,9 @@ if (scenario === 'single') {
   if (batchPlan.scannedFileCount !== 1 || batchPlan.maxFilesHit !== true || batchPlan.processedFontCount !== 0) {
     throw new Error('Expected splitFontBatch dry-run to report accurate scan truncation without processing.');
   }
+  if (batchPlan.unsupportedFileSummary?.total !== 1 || batchPlan.unsupportedFileSummary?.byExtension?.[0]?.extension !== '.txt') {
+    throw new Error('Expected splitFontBatch dry-run to summarize scanned unsupported files.');
+  }
   const batchWarningCodes = new Set((batchPlan.batchWarnings || []).map((warning) => warning.code));
   for (const expectedWarning of ['dry-run-no-write', 'input-scan-truncated', 'batch-plan-omitted']) {
     if (!batchWarningCodes.has(expectedWarning)) {
@@ -595,6 +633,25 @@ if (scenario === 'single') {
   }
 
   console.log(JSON.stringify({ inputInspect, batchPlan, outputInspect }, null, 2));
+} else if (scenario === 'workspace-root-path') {
+  const inputDir = process.argv[3] || '.';
+  const outputDir = process.argv[4] || '.font-split-root-path-output';
+  console.log('Workspace root path smoke:', inputDir, '->', outputDir);
+  const result = await organizeFontDirectory({
+    inputDir,
+    outputDir,
+    dryRun: true,
+    parseFonts: false,
+    includePlan: false,
+    maxFiles: 5,
+  });
+  if (result.inputDir !== '.') {
+    throw new Error(`Expected workspace root inputDir to normalize to "." but got ${JSON.stringify(result.inputDir)}.`);
+  }
+  if (!result.recommendedNextActions?.some((action) => action.suggestedArgs?.inputDir === '.')) {
+    throw new Error('Expected recommended next actions to normalize root inputDir to ".".');
+  }
+  console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'organize-dry-run') {
   const inputDir = process.argv[3] || '.font-split-organize-input';
   const outputDir = process.argv[4] || '.font-split-organize-output';
@@ -604,6 +661,9 @@ if (scenario === 'single') {
   await fs.mkdir(path.join(inputDir, 'FamilyA'), { recursive: true });
   await fs.writeFile(path.join(inputDir, 'FamilyA', 'not-a-font.ttf'), 'not a real font');
   await fs.writeFile(path.join(inputDir, 'notes.txt'), 'not a font');
+  await fs.writeFile(path.join(inputDir, 'archive.zip'), 'not a font archive');
+  await fs.writeFile(path.join(inputDir, 'preview.png'), 'not a font image');
+  await fs.writeFile(path.join(inputDir, 'LICENSE'), 'not a font license');
 
   const result = await organizeFontDirectory({
     inputDir,
@@ -637,6 +697,16 @@ if (scenario === 'single') {
   }
   if (result.planActionSummary?.total !== 1 || result.planActionSummary?.byAction?.['skipped-invalid'] !== 1) {
     throw new Error('Expected organization dry-run to summarize skipped-invalid plan actions.');
+  }
+  const unsupportedOrganizationExtensions = new Set((result.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
+  if (
+    result.unsupportedFileSummary?.total !== 4
+    || !unsupportedOrganizationExtensions.has('.txt')
+    || !unsupportedOrganizationExtensions.has('.zip')
+    || !unsupportedOrganizationExtensions.has('.png')
+    || !unsupportedOrganizationExtensions.has('<none>')
+  ) {
+    throw new Error('Expected organization dry-run to summarize all unsupported file extensions.');
   }
   const dryRunNextActionIds = new Set((result.recommendedNextActions || []).map((action) => action.id));
   for (const expectedAction of ['review-plan-before-writing', 'decide-on-invalid-fonts']) {
@@ -1109,6 +1179,73 @@ if (scenario === 'single') {
     }
   }
   console.log(JSON.stringify(compact, null, 2));
+} else if (scenario === 'inspect-structure') {
+  const outDir = process.argv[3] || 'font-split-mcp/.font-split-inspect-structure';
+  console.log('Structured output inspection smoke:', outDir);
+  await fs.rm(outDir, { recursive: true, force: true });
+  await fs.mkdir(path.join(outDir, 'FamilyA', 'FixtureSans-Regular'), { recursive: true });
+  await fs.mkdir(path.join(outDir, 'FamilyB', 'FixtureSerif-Regular'), { recursive: true });
+  await fs.writeFile(path.join(outDir, 'FamilyA', 'FixtureSans-Regular.ttf'), 'font-a');
+  await fs.writeFile(path.join(outDir, 'FamilyA', 'FixtureSans-Regular', 'FixtureSans-Regular.woff2'), 'woff2-a');
+  await fs.writeFile(path.join(outDir, 'FamilyA', 'FixtureSans-Regular', 'result.css'), 'body{}');
+  await fs.writeFile(
+    path.join(outDir, 'FamilyA', 'FixtureSans-Regular', 'split-meta.json'),
+    JSON.stringify({
+      manifestVersion: 1,
+      toolVersion: '0.0.0',
+      result: {
+        outputMode: 'subset',
+        resultType: 'subset',
+      },
+    }, null, 2),
+  );
+  await fs.writeFile(path.join(outDir, 'FamilyB', 'FixtureSerif-Regular.otf'), 'font-b');
+  await fs.writeFile(path.join(outDir, 'FamilyB', 'FixtureSerif-Regular', 'FixtureSerif-Regular.woff2'), 'woff2-b');
+  await fs.writeFile(path.join(outDir, 'FamilyB', 'FixtureSerif-Regular', 'result.css'), 'body{}');
+  await fs.writeFile(
+    path.join(outDir, 'FamilyB', 'FixtureSerif-Regular', 'split-meta.json'),
+    JSON.stringify({
+      manifestVersion: 1,
+      toolVersion: '0.0.0',
+      result: {
+        outputMode: 'subset',
+        resultType: 'subset',
+      },
+    }, null, 2),
+  );
+
+  const clean = await inspectSplitOutput({
+    outDir,
+    includeFiles: false,
+    includeFamilies: false,
+  });
+  if (
+    clean.structureSummary?.conforms !== true
+    || clean.structureSummary?.layoutKind !== 'family-tree'
+    || clean.structureSummary?.unexpectedFileCount !== 0
+    || clean.structureSummary?.manifestCoverageOk !== true
+  ) {
+    throw new Error('Expected clean structured output to conform to the documented directory layout.');
+  }
+  if ((clean.inspectionWarnings || []).some((warning) => warning.code === 'output-structure-issues')) {
+    throw new Error('Expected clean structured output not to raise structure warnings.');
+  }
+
+  await fs.writeFile(path.join(outDir, 'notes.txt'), 'stray file');
+  const noisy = await inspectSplitOutput({
+    outDir,
+    includeFiles: false,
+    includeFamilies: false,
+  });
+  if (
+    noisy.structureSummary?.conforms !== false
+    || noisy.structureSummary?.unexpectedFileCount < 1
+    || !noisy.structureSummary?.issues?.some((issue) => issue.code === 'unexpected-output-files')
+    || !noisy.inspectionWarnings?.some((warning) => warning.code === 'output-structure-issues')
+  ) {
+    throw new Error('Expected stray output files to fail the structure audit.');
+  }
+  console.log(JSON.stringify({ clean, noisy }, null, 2));
 } else if (scenario === 'mcp-error') {
   const detailedError = new Error('batch failed');
   detailedError.name = 'BatchSplitError';
@@ -1174,7 +1311,7 @@ if (scenario === 'single') {
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'batchWarnings']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files']);
-    expectDescriptionIncludes('inspect_split_output', ['maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
+    expectDescriptionIncludes('inspect_split_output', ['structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
       guidancePropertyCount: Object.keys(guidanceProps).length,

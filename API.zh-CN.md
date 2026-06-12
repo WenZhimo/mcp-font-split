@@ -1,6 +1,6 @@
 # API 参考
 
-本 MCP Server 暴露 7 个工具。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。
+本 MCP Server 暴露 7 个工具。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。响应路径会用 `.` 表示工作区根目录，而不是空字符串；推荐后续调用参数也遵循这个规则。
 
 ## `get_agent_guidance`
 
@@ -105,6 +105,7 @@
 | 字段 | 含义 |
 |------|------|
 | `supportedFontCount` | 扩展名属于受支持字体格式的文件数。 |
+| `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含扩展名计数、无扩展文件的 `<none>` 计数，以及少量示例路径。源目录混有压缩包、说明文档、截图或生成产物时优先看它。 |
 | `validFontCount` | 基础字体元数据可解析的文件数。 |
 | `invalidFontCount` | 扩展名像字体、但解析失败的文件数。 |
 | `missingIdentityCount` | 可解析、但没有可用于批量去重的身份 key 的字体数。 |
@@ -135,7 +136,7 @@
 
 `split_font_batch` 也接受 `split_font` 的处理参数，但不接受 `fontPath` 和 `outDir`。批量模式会把这些处理参数应用到每个选中的字体，并使用 `inputDir` / `outputRoot` 控制路径。
 
-批量响应会包含 `scannedFileCount`、`maxFiles` 和 `maxFilesHit`。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。
+批量响应会包含 `scannedFileCount`、`maxFiles`、`maxFilesHit` 和 `unsupportedFileSummary`。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileSummary` 会按扩展名汇总所有已扫描但被忽略的非字体文件。
 
 批量格式代表优先级为：`.otf`、`.ttf`、`.woff2`、`.ttc`、`.otc`、`.woff`。
 
@@ -204,6 +205,7 @@
 | `unparsedFontCount` | 因 `parseFonts: false` 而被有意跳过元数据解析的受支持扩展名文件数。 |
 | `effectiveBatchDedupeMode` | 实际使用的去重策略。当 `parseFonts: false` 且请求 `batchDedupeMode: "font-identity"` 时，会回退到 `same-path`。 |
 | `dedupeLimitedByParsing` | 请求 identity 去重但因为跳过字体解析而无法执行时为 `true`。 |
+| `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含扩展名计数、无扩展文件的 `<none>` 计数，以及少量示例路径。它用于解释为什么嘈杂源目录里有很多压缩包、文档、图片、生成产物或无扩展文件，但不会被复制或拆分。 |
 | `layout.layoutKind` | `empty`、`flat`、`nested` 或 `mixed`。`mixed` 表示输入根目录和子目录里都发现了字体。 |
 | `recommendedBatchOptions` | 根据目录形态建议的 `split_font_batch` 参数；嵌套或混合目录通常建议 `batchGroupBy: "source-dir"`，扁平目录通常建议 `font-family`。 |
 | `recommendedNextActionCount` / `recommendedNextActions[]` | 面向 agent 的机器可读后续动作。每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields`。 |
@@ -217,7 +219,7 @@
 - `dryRun` 默认是 `true`，这与 `split_font_batch` 的默认 `dryRun: false` 不同。
 - 该工具只整理/复制字体，不会拆分字体，也不会生成 CSS。
 - `parseFonts: false` 是结构优先模式：它会跳过字体元数据解析，因此不能检测坏字体、不能提供 glyph count，也不能做真正的 identity 去重或完全基于 metadata 的 family 分组。
-- 非字体文件会被忽略；扩展名像字体但解析失败的文件默认跳过，除非 `copyInvalidFonts: true`。
+- 非字体文件会被忽略；当源目录混有压缩包、文档、截图或生成产物时，先看 `unsupportedFileSummary`。扩展名像字体但解析失败的文件默认跳过，除非 `copyInvalidFonts: true`。
 - 如果 `outputDir` 位于 `inputDir` 内，响应会包含 `output-inside-input`；后续扫描应排除该输出目录，避免把整理后的副本再次当作源字体处理。
 
 当你需要可信的坏字体数量、glyph count、内部 family 名或跨格式 identity 去重时，使用 `parseFonts: true`。只有在超大或嘈杂目录上先快速了解结构时，才使用 `parseFonts: false`。此时 `font-parsing-skipped` 应被视为警告：这个计划不适合直接支撑依赖字体元数据的判断。
@@ -244,7 +246,8 @@
 | `familyCount` | 检测到的 family 目录数量。 |
 | `maxFilesHit` | 只有当 `maxFiles` 之外确实还存在更多输出文件时才为 `true`。 |
 | `filesIncluded` / `familiesIncluded` | 响应中是否包含 `files[]` 和 `families[]`。 |
-| `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略和 legacy 输出推断等状态。 |
+| `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略、legacy 输出推断和输出结构问题等状态。 |
+| `structureSummary` | 机器可读输出结构审计。`conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`。 |
 | `fontEntryCount` | 检测到的字体输出条目数量。 |
 | `manifestCount` | 带 `split-meta.json` 的条目数量。 |
 | `legacyOutputCount` | 没有 manifest、只能保守推断的旧输出数量。 |

@@ -50,7 +50,7 @@
 
 关键默认行为：
 
-- 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。
+- 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。工具响应和 `recommendedNextActions[].suggestedArgs` 中会用 `.` 表示工作区根目录，不会用空字符串表示根目录。
 - 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、必须检查的响应字段和完成验证清单。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
 - `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。
 - `get_agent_guidance` 包含 `safeInvocationTemplates[]`，提供运行时检查、输入预检、目录不匹配整理计划、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和紧凑输出审计等可复制起步调用。每个模板都会声明是否写文件、是否可能修改源文件。
@@ -273,6 +273,7 @@ fonts/
 `inspect_font_inputs` 是不写输出的输入预检：
 
 - `supportedFontCount`、`validFontCount`、`invalidFontCount`
+- `unsupportedFileSummary`：所有被忽略的非字体文件扩展名统计、无扩展 `<none>` 计数和少量示例路径
 - `missingIdentityCount`
 - `maxFilesHit`：只有当 `maxFiles` 之外确实还有更多文件时才为 true
 - `inspectionWarningCount`、`inspectionWarnings[]`，每项包含机器可读的 `code` 和 `message`
@@ -283,6 +284,7 @@ fonts/
 
 - `resultsIncluded`：是否包含每个字体的 `results[]` 详情
 - `scannedFileCount`、`maxFiles`、`maxFilesHit`
+- `unsupportedFileSummary`：所有已扫描但被忽略的非字体文件扩展名统计、无扩展 `<none>` 计数和少量示例路径
 - `dryRun`、`plannedCount`、`wouldProcessCount`、`planIncluded`
 - `batchWarningCount`、`batchWarnings[]`，每项包含机器可读的 `code` 和 `message`
 - `batchErrorMode`、`errorCount`、`errors[]`
@@ -307,6 +309,7 @@ fonts/
 - `sourceFilesPreserved`：恒为 `true`
 - `parsedFontMetadata`：`parseFonts: false` 时为 false；此时 `validFontCount` / `invalidFontCount` 是 `null`
 - `effectiveBatchDedupeMode`、`dedupeLimitedByParsing`：说明 identity 去重是否真正可用
+- `unsupportedFileSummary`：所有被忽略的非字体文件扩展名统计、无扩展 `<none>` 计数和少量示例路径；源目录混有压缩包、图片、文档或生成产物时优先看它
 - `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`
 - `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 建议配置
 - `recommendedNextActionCount`、`recommendedNextActions[]`：面向 agent 的机器可读后续动作，每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields`
@@ -323,7 +326,8 @@ fonts/
 - `maxFilesHit` 只有当 `maxFiles` 之外确实还有更多输出文件时才为 true。
 - `includeFiles: false` 会省略扁平 `files[]`，但保留摘要计数。
 - `includeFamilies: false` 会省略结构化 `families[]`，但保留 family 和输出模式计数。
-- `inspectionWarningCount` 和 `inspectionWarnings[]` 会用机器可读 `code` 汇总截断、详情数组省略和 legacy 输出推断等状态。
+- `inspectionWarningCount` 和 `inspectionWarnings[]` 会用机器可读 `code` 汇总截断、详情数组省略、legacy 输出推断和结构问题等状态。
+- `structureSummary` 检查输出目录是否符合文档化结构；只有 `structureSummary.conforms: true` 时，才表示没有发现杂项文件、manifest 缺失或输出模式文件缺失等结构问题。
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`

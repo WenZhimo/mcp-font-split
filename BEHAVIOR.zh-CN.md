@@ -37,6 +37,8 @@
 
 如果没有设置 `FONT_SPLIT_ROOT`，默认值为 MCP Server 进程启动时的当前工作目录。
 
+当工具响应需要表示工作区根目录时，会返回 `.`，包括 `inputDir`、`outputDir` 以及 `recommendedNextActions[].suggestedArgs` 中的后续调用参数。它不会用空字符串表示根目录，避免 AI agent 复制参数时产生歧义。
+
 建议使用者根据自己的字体存放位置显式设置：
 
 ```text
@@ -112,6 +114,8 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 避免扫描工具自身源码和依赖
 - 避免把已生成的输出再次当作输入
 - 避免把 macOS 压缩包里的资源叉伪文件误当成字体
+
+未被这些规则跳过、但扩展名不是受支持字体格式的文件，会计入 `unsupportedFileSummary`。该摘要按所有非字体扩展名统计，包含无扩展文件的 `<none>` 计数和少量示例路径；它不是只统计 `.zip` 或 `.txt`。
 
 ---
 
@@ -312,6 +316,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `limit`：去重后最多处理多少个字体；默认 `20`，MCP 入口最大 `50000`。
 - `maxFiles`：递归扫描阶段最多读取多少个源文件；默认 `5000`，MCP 入口最大 `50000`。
 - `maxFilesHit`：批量响应中的机器可读截断信号；只有当 `maxFiles` 之外确实还存在更多源文件时才为 `true`。
+- `unsupportedFileSummary`：批量扫描中所有已扫描但被忽略的非字体文件摘要，按扩展名统计，并用 `<none>` 表示无扩展文件。
 - `includeResults`：是否在批量响应中返回每个字体的 `results[]` 详情；默认 `true`。设为 `false` 时仍返回汇总统计、错误列表和 `resultsIncluded: false`，适合全量字体库处理。
 - `dryRun`：只执行扫描、去重、命名和 skip 判断，不调用 `split_font`，也不写任何输出文件。`includeResults: true` 时返回 `planned[]` 计划清单。
 
@@ -439,7 +444,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 - `dryRun` 默认值与 `split_font_batch` 不同。`organize_font_directory` 默认 `true`，`split_font_batch` 默认 `false`。
 - `parseFonts: false` 会跳过坏字体检测和真实 identity 去重；不要把 `invalidFontCount: null` 解读为没有坏字体。
-- 非字体文件会被忽略。
+- 非字体文件会被忽略，但会进入 `unsupportedFileSummary`。该字段统计所有非字体扩展名，包含无扩展文件的 `<none>` 计数和少量示例路径。
 - 扩展名像字体但解析失败的文件默认跳过；只有 `copyInvalidFonts: true` 时才会纳入复制计划。
 - 如果 `outputDir` 位于 `inputDir` 里面，响应会给出 `output-inside-input` 警告；后续扫描应排除该目录，避免把整理后的副本再次当作源字体。
 - 如果设置 `overwriteExisting: true`，可能替换 `outputDir` 里的目标文件，但仍不会影响源文件。
@@ -651,7 +656,9 @@ split-meta.json
 
 `maxFilesHit` 只有当 `maxFiles` 之外确实还有更多输出文件时才为 `true`。如果它为 `true`，不要把本次输出审计视为完整结果，应调高 `maxFiles` 后重跑。
 
-`includeFiles: false` 会省略扁平 `files[]` 清单；`includeFamilies: false` 会省略结构化 `families[]` 清单。它们只影响响应体大小，不影响 `fileCount`、`familyCount`、`fontEntryCount`、manifest 数量或输出模式计数。
+`includeFiles: false` 会省略扁平 `files[]` 清单；`includeFamilies: false` 会省略结构化 `families[]` 清单。它们只影响响应体大小，不影响 `fileCount`、`familyCount`、`fontEntryCount`、manifest 数量、输出模式计数或 `structureSummary`。
+
+`structureSummary` 是输出目录结构验收摘要。它会检查输出是否是文档化的 `single-family` 或 `family-tree` 结构，是否有无法归类到 family/font entry 的杂项文件，每个字体条目是否都有 `split-meta.json`，以及 manifest 声明为 `subset` / `single-woff2` / `copy-original` 时是否具备对应文件。只有 `structureSummary.conforms: true` 时，才应把输出目录视为结构合格。若为 false，优先查看 `structureSummary.issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 会出现 `output-structure-issues`。
 
 保留基础统计：
 
@@ -672,6 +679,7 @@ split-meta.json
 - `singleWoff2OutputCount`
 - `copyOriginalOutputCount`
 - `legacyOutputCount`
+- `structureSummary`
 - `families`
 
 如果有 manifest，检查结果优先使用 manifest 分类。

@@ -126,7 +126,8 @@ export function resolveWorkspacePath(inputPath, { mustExist = false } = {}) {
 }
 
 export function toRelativeWorkspacePath(absolutePath) {
-  return path.relative(workspaceRoot(), absolutePath).replaceAll(path.sep, '/');
+  const relativePath = path.relative(workspaceRoot(), absolutePath).replaceAll(path.sep, '/');
+  return relativePath === '' ? '.' : relativePath;
 }
 
 async function pathStatus(targetPath) {
@@ -350,6 +351,11 @@ const WARNING_CODE_CATALOG = {
     severity: 'warning',
     suggestedAction: 'Treat manifest-free output as inferred; prefer manifest-backed output for strict audits.',
   },
+  'output-structure-issues': {
+    sources: ['inspectionWarnings'],
+    severity: 'action-required',
+    suggestedAction: 'Inspect structureSummary.conforms, issues[], and unexpectedFileExamples[] before treating generated output as valid.',
+  },
   'organization-dry-run': {
     sources: ['organizationWarnings'],
     severity: 'info',
@@ -463,6 +469,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
     meaning: 'Number of scanned files with supported font extensions.',
     agentAction: 'Use with maxFilesHit and warning fields before trusting source coverage.',
+  },
+  unsupportedFileSummary: {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Compact summary of all ignored non-font files, including extension counts, <none> for extensionless files, and a small set of example paths.',
+    agentAction: 'Use this when source directories include archives, docs, generated files, or other noise that will not be organized or split.',
   },
   validFontCount: {
     sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
@@ -739,6 +750,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Number of output entries inferred without manifests.',
     agentAction: 'Treat these as less certain and consider rerunning processing with manifest output.',
   },
+  structureSummary: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Machine-readable check for whether output files fit the documented split-output directory structure, including unexpected files, manifest coverage, and per-entry output-mode requirements.',
+    agentAction: 'Require structureSummary.conforms true before claiming the output directory is structurally valid; inspect issues[] and unexpectedFileExamples[] when false.',
+  },
   subsetOutputCount: {
     sourceTools: ['inspect_split_output'],
     meaning: 'Number of inspected output entries that look like normal subset output.',
@@ -791,7 +807,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       includeFiles: false,
     },
     customizableFields: ['inputDir', 'maxFiles', 'includeFiles'],
-    inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
+    inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
     nextStep: 'If maxFilesHit is true or invalid fonts are found, resolve that before relying on batch counts.',
   },
   {
@@ -811,7 +827,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       overwriteExisting: false,
     },
     customizableFields: ['inputDir', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
-    inspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+    inspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
     nextStep: 'Use recommendedBatchOptions for a batch dry-run, or copy to a staging directory only after reviewing the plan.',
   },
   {
@@ -827,7 +843,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       includePlan: false,
     },
     customizableFields: ['inputDir', 'maxFiles'],
-    inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings', 'layout', 'recommendedBatchOptions', 'planActionSummary'],
+    inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'layout', 'recommendedBatchOptions', 'planActionSummary'],
     nextStep: 'Rerun with parseFonts:true before trusting invalid-font counts, glyph counts, identity dedupe, or font-family grouping.',
   },
   {
@@ -848,7 +864,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       overwriteExisting: false,
     },
     customizableFields: ['inputDir', 'outputDir', 'parseFonts', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'],
-    inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
+    inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
     nextStep: 'Use outputDir as the next split_font_batch input only after checking organizationWarnings.',
   },
   {
@@ -868,7 +884,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       batchDedupeMode: 'font-identity',
     },
     customizableFields: ['inputDir', 'outputRoot', 'limit', 'maxFiles', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
-    inspectFields: ['dryRun', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
+    inspectFields: ['dryRun', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
     nextStep: 'If the plan is acceptable, rerun with dryRun:false; use includeResults:false for large real runs.',
   },
   {
@@ -891,7 +907,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       splitFailureAction: 'single-woff2',
     },
     customizableFields: ['inputDir', 'outputRoot', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'splitFailureAction'],
-    inspectFields: ['batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit'],
+    inspectFields: ['batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileSummary'],
     nextStep: 'Run inspect_split_output on outputRoot before reporting completion.',
   },
   {
@@ -907,8 +923,8 @@ const SAFE_INVOCATION_TEMPLATES = [
       includeFamilies: false,
     },
     customizableFields: ['outDir', 'maxFiles', 'includeFiles', 'includeFamilies'],
-    inspectFields: ['maxFilesHit', 'inspectionWarnings', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
-    nextStep: 'If maxFilesHit is true or legacy output is detected, disclose uncertainty or rerun with more detail.',
+    inspectFields: ['maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
+    nextStep: 'Require structureSummary.conforms true; if maxFilesHit is true or legacy/structure issues are detected, disclose uncertainty or rerun with more detail.',
   },
 ];
 
@@ -1068,13 +1084,13 @@ export function getAgentGuidance(args = {}) {
       id: 'input-scan-complete',
       appliesTo: ['overview', 'batch', 'inspect', 'organize'],
       check: 'Before trusting a source scan, inspect maxFilesHit and inspectionWarnings; rerun with a higher maxFiles when truncated.',
-      responseFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'invalidFontCount', 'missingIdentityCount'],
+      responseFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
     },
     {
       id: 'layout-plan-reviewed',
       appliesTo: ['overview', 'batch', 'organize'],
       check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect safetySummary, layout, recommendedBatchOptions, sourceDestructive, writesSourceTree, writesOutputTree, mayOverwriteOutputTree, organizationWarnings, and planActionSummary before applying any copy plan.',
-      responseFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedNextActions', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
+      responseFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedNextActions', 'unsupportedFileSummary', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'batch-plan-reviewed',
@@ -1097,8 +1113,8 @@ export function getAgentGuidance(args = {}) {
     {
       id: 'output-audited',
       appliesTo: ['overview', 'batch', 'inspect'],
-      check: 'After batch processing, inspect the output directory and verify maxFilesHit and inspectionWarnings before treating the audit as complete.',
-      responseFields: ['maxFilesHit', 'inspectionWarnings', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
+      check: 'After batch processing, inspect the output directory and require structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating the audit as complete.',
+      responseFields: ['maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
     },
   ];
 
@@ -1110,7 +1126,7 @@ export function getAgentGuidance(args = {}) {
       'Call organize_font_directory with dryRun true if directory layout is flat/mixed/unfamiliar or if the user asks to stage fonts into a cleaner structure.',
       'Call split_font_batch with dryRun true to preview output layout.',
       'Call split_font_batch with includeResults false for full-library processing.',
-      'Call inspect_split_output after processing; use includeFiles false and includeFamilies false for compact summaries.',
+      'Call inspect_split_output after processing; require structureSummary.conforms true and use includeFiles false / includeFamilies false for compact summaries.',
     ],
     single: [
       'Call split_font with one fontPath.',
@@ -1123,12 +1139,12 @@ export function getAgentGuidance(args = {}) {
       'Call split_font_batch with dryRun true and includeResults true to review planned paths.',
       'Use batchNamingMode numeric-suffix and batchDedupeMode font-identity unless the user asks for another policy.',
       'Use includeResults false for large real runs.',
-      'Call inspect_split_output on the outputRoot when done; use includeFiles false and includeFamilies false for large outputs.',
+      'Call inspect_split_output on the outputRoot when done; require structureSummary.conforms true and use includeFiles false / includeFamilies false for large outputs.',
     ],
     inspect: [
       'Call get_runtime_status to verify workspace, cn-font-split package, and WASM runtime availability when setup is uncertain.',
       'Call inspect_font_inputs to audit source directories before processing.',
-      'Call inspect_split_output to audit generated output directories; set includeFiles false and includeFamilies false when only summary counts are needed.',
+      'Call inspect_split_output to audit generated output directories; require structureSummary.conforms true and set includeFiles false / includeFamilies false when only summary counts are needed.',
       'If maxFilesHit is true, rerun with a higher maxFiles before treating the summary as complete.',
     ],
     organize: [
@@ -1170,7 +1186,7 @@ export function getAgentGuidance(args = {}) {
         dryRun: false,
         includeResults: false,
       },
-      mustInspectFields: ['dryRun', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
+      mustInspectFields: ['dryRun', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
       nonIntuitiveBehavior: 'split_font_batch dryRun defaults to false, so agents should set dryRun:true explicitly for planning.',
     },
     {
@@ -1193,7 +1209,7 @@ export function getAgentGuidance(args = {}) {
         dryRun: true,
         strictMode: true,
       },
-      mustInspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+      mustInspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
       nonIntuitiveBehavior: 'organize_font_directory defaults to dryRun:true and never moves or deletes source files; dryRun:false copies into outputDir only.',
     },
     {
@@ -1207,7 +1223,7 @@ export function getAgentGuidance(args = {}) {
         includePlan: false,
         parseFonts: false,
       },
-      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings', 'planActionSummary', 'layout', 'recommendedBatchOptions'],
+      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'layout', 'recommendedBatchOptions'],
       nonIntuitiveBehavior: 'parseFonts:false means validFontCount and invalidFontCount are null, not zero; identity dedupe and metadata family grouping are limited.',
     },
     {
@@ -1227,7 +1243,7 @@ export function getAgentGuidance(args = {}) {
         dryRun: false,
         overwriteExisting: false,
       },
-      mustInspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
+      mustInspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
       nonIntuitiveBehavior: 'A real organize run is copy-only. overwriteExisting:true can replace files in outputDir but still does not modify source files.',
     },
   ];
@@ -1258,7 +1274,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'organizationWarnings', 'planActionSummary', 'plan'],
+      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'archive-per-family-folders',
@@ -1289,7 +1305,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'not-needed-unless-staging',
       },
-      mustInspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errors'],
+      mustInspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
     },
     {
       id: 'mixed-root-and-nested-fonts',
@@ -1319,7 +1335,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'organizationWarnings', 'recommendedBatchOptions', 'sourceDestructive', 'writesSourceTree', 'planActionSummary'],
+      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'organizationWarnings', 'recommendedBatchOptions', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'planActionSummary'],
     },
     {
       id: 'large-noisy-first-pass',
@@ -1346,7 +1362,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only-when-dryRun-false',
       },
-      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings', 'planActionSummary'],
+      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
     },
   ];
 
@@ -1427,6 +1443,7 @@ export function getAgentGuidance(args = {}) {
       'cnFontSplit.runtimeVersion',
       'recommendedActions',
       'supportedFontCount',
+      'unsupportedFileSummary',
       'validFontCount',
       'invalidFontCount',
       'missingIdentityCount',
@@ -1483,6 +1500,7 @@ export function getAgentGuidance(args = {}) {
       'planIncluded',
       'manifestCount',
       'legacyOutputCount',
+      'structureSummary',
       'subsetOutputCount',
       'singleWoff2OutputCount',
       'copyOriginalOutputCount',
@@ -1559,6 +1577,26 @@ async function summarizeFilesDetailed(dir, { maxFiles = 5000 } = {}) {
 
 async function summarizeFiles(dir, { maxFiles = 5000 } = {}) {
   return (await summarizeFilesDetailed(dir, { maxFiles })).files;
+}
+
+function buildUnsupportedFileSummary(files, { maxExamples = 20 } = {}) {
+  const unsupportedFiles = files.filter((file) => !FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
+  const byExtension = new Map();
+  for (const file of unsupportedFiles) {
+    const extension = path.extname(file).toLowerCase() || '<none>';
+    byExtension.set(extension, (byExtension.get(extension) || 0) + 1);
+  }
+
+  return {
+    total: unsupportedFiles.length,
+    byExtension: [...byExtension.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([extension, count]) => ({ extension, count })),
+    examples: unsupportedFiles
+      .slice(0, maxExamples)
+      .map((file) => toRelativeWorkspacePath(file)),
+    examplesTruncated: unsupportedFiles.length > maxExamples,
+  };
 }
 
 function normalizeOptionalString(value) {
@@ -1748,7 +1786,7 @@ function buildInputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, inv
   return warnings;
 }
 
-function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, includeFamilies, legacyOutputCount }) {
+function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, includeFamilies, legacyOutputCount, structureIssueCount }) {
   const warnings = [];
   const push = (code, message) => warnings.push({ code, message });
 
@@ -1763,6 +1801,9 @@ function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, in
   }
   if (legacyOutputCount > 0) {
     push('legacy-output-detected', `${legacyOutputCount} output entries were inferred without split-meta.json manifests.`);
+  }
+  if (structureIssueCount > 0) {
+    push('output-structure-issues', `${structureIssueCount} output structure issue(s) were detected; inspect structureSummary before treating the output as valid.`);
   }
 
   return warnings;
@@ -1847,7 +1888,7 @@ function buildOrganizationNextActions({
         includePlan: options.includePlan,
         maxFiles: '<higher-than-current>',
       },
-      inspectFields: ['maxFilesHit', 'layout', 'organizationWarnings', 'planActionSummary', 'plan'],
+      inspectFields: ['maxFilesHit', 'layout', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
     });
   }
 
@@ -1867,7 +1908,7 @@ function buildOrganizationNextActions({
         batchNamingMode: options.batchNamingMode,
         batchDedupeMode: options.batchDedupeMode,
       },
-      inspectFields: ['parsedFontMetadata', 'validFontCount', 'invalidFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings', 'planActionSummary'],
+      inspectFields: ['parsedFontMetadata', 'validFontCount', 'invalidFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
     });
   }
 
@@ -1900,7 +1941,7 @@ function buildOrganizationNextActions({
         includeResults: true,
         ...layout.recommendedBatchOptions,
       },
-      inspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errors'],
+      inspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
     });
   }
 
@@ -1916,7 +1957,7 @@ function buildOrganizationNextActions({
         includeResults: true,
         ...layout.recommendedBatchOptions,
       },
-      inspectFields: ['inputDir', 'maxFilesHit', 'batchWarnings', 'planned'],
+      inspectFields: ['inputDir', 'maxFilesHit', 'unsupportedFileSummary', 'batchWarnings', 'planned'],
       note: 'Use the organized outputDir intentionally as the next inputDir, or keep future scans scoped so they do not reprocess organized copies.',
     });
   }
@@ -1937,7 +1978,7 @@ function buildOrganizationNextActions({
       priority: 'high',
       tool: 'organize_font_directory',
       reason: 'dryRun:true wrote no files; review the plan and warnings before choosing a write step.',
-      inspectFields: ['safetySummary', 'planActionSummary', 'plan', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree'],
+      inspectFields: ['safetySummary', 'planActionSummary', 'plan', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree'],
     });
 
     if (selectedFontCount > 0) {
@@ -1952,7 +1993,7 @@ function buildOrganizationNextActions({
           includeResults: true,
           ...layout.recommendedBatchOptions,
         },
-        inspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errors'],
+        inspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
       });
       push({
         id: 'copy-organized-staging-directory',
@@ -1969,7 +2010,7 @@ function buildOrganizationNextActions({
           batchDedupeMode: options.batchDedupeMode,
           overwriteExisting: false,
         },
-        inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
+        inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
       });
     }
   } else if (copiedCount > 0) {
@@ -1982,7 +2023,7 @@ function buildOrganizationNextActions({
         inputDir: outputDirRelative,
         includeFiles: false,
       },
-      inspectFields: ['supportedFontCount', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
+      inspectFields: ['supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
     });
     push({
       id: 'preview-batch-split-organized-output',
@@ -1995,7 +2036,7 @@ function buildOrganizationNextActions({
         includeResults: true,
         ...layout.recommendedBatchOptions,
       },
-      inspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errors'],
+      inspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
     });
   }
 
@@ -2160,6 +2201,153 @@ function buildFontEntryInspection(groupName, splitDirName, originalFiles, output
     manifest,
     outputMode: manifest?.result?.outputMode || (resultType === 'subset' ? 'subset' : resultType.startsWith('single-woff2') ? 'single-woff2' : resultType === 'copy-original-small-glyph' ? 'copy-original' : 'unknown'),
     resultType,
+  };
+}
+
+function relativePathInside(baseRelativePath, itemRelativePath) {
+  if (baseRelativePath === '.') return itemRelativePath;
+  if (itemRelativePath === baseRelativePath) return '';
+  const prefix = `${baseRelativePath}/`;
+  return itemRelativePath.startsWith(prefix) ? itemRelativePath.slice(prefix.length) : itemRelativePath;
+}
+
+function relativePathDepth(relativePath) {
+  return relativePath.split('/').filter(Boolean).length;
+}
+
+function buildOutputStructureSummary({
+  outDirRelative,
+  files,
+  families,
+  fontEntryCount,
+  manifestCount,
+  legacyOutputCount,
+}) {
+  const classifiedPaths = new Set();
+  const originalDepthCounts = {};
+  const outputModeCounts = {};
+  const entryIssueExamples = [];
+  let unknownOutputModeCount = 0;
+  let webOutputMissingCount = 0;
+  let copyOriginalExtraOutputCount = 0;
+
+  const recordOriginalDepth = (file) => {
+    const depth = relativePathDepth(relativePathInside(outDirRelative, file.path));
+    originalDepthCounts[depth] = (originalDepthCounts[depth] || 0) + 1;
+  };
+
+  for (const family of families) {
+    for (const originalFile of family.originalFiles || []) {
+      classifiedPaths.add(originalFile.path);
+      recordOriginalDepth(originalFile);
+    }
+
+    for (const entry of family.fontEntries || []) {
+      const outputMode = entry.outputMode || 'unknown';
+      outputModeCounts[outputMode] = (outputModeCounts[outputMode] || 0) + 1;
+      for (const outputFile of entry.outputFiles || []) classifiedPaths.add(outputFile.path);
+
+      if (!['subset', 'single-woff2', 'copy-original'].includes(outputMode)) {
+        unknownOutputModeCount++;
+        entryIssueExamples.push({
+          code: 'unknown-output-mode',
+          familyName: entry.groupName,
+          fontBaseName: entry.fontBaseName,
+          outputMode,
+        });
+        continue;
+      }
+
+      if ((outputMode === 'subset' || outputMode === 'single-woff2') && (!entry.hasCss || entry.woff2Count === 0)) {
+        webOutputMissingCount++;
+        entryIssueExamples.push({
+          code: 'web-output-missing',
+          familyName: entry.groupName,
+          fontBaseName: entry.fontBaseName,
+          outputMode,
+          hasCss: entry.hasCss,
+          woff2Count: entry.woff2Count,
+        });
+      }
+
+      if (outputMode === 'copy-original' && (entry.hasCss || entry.woff2Count > 0)) {
+        copyOriginalExtraOutputCount++;
+        entryIssueExamples.push({
+          code: 'copy-original-extra-output',
+          familyName: entry.groupName,
+          fontBaseName: entry.fontBaseName,
+          hasCss: entry.hasCss,
+          woff2Count: entry.woff2Count,
+        });
+      }
+    }
+  }
+
+  const rootOriginalCount = originalDepthCounts[1] || 0;
+  const familyTreeOriginalCount = originalDepthCounts[2] || 0;
+  const unexpectedOriginalDepthCount = Object.entries(originalDepthCounts)
+    .filter(([depth]) => depth !== '1' && depth !== '2')
+    .reduce((count, [, value]) => count + value, 0);
+
+  const layoutKind = files.length === 0
+    ? 'empty'
+    : rootOriginalCount > 0 && familyTreeOriginalCount === 0 && unexpectedOriginalDepthCount === 0
+      ? 'single-family'
+      : familyTreeOriginalCount > 0 && rootOriginalCount === 0 && unexpectedOriginalDepthCount === 0
+        ? 'family-tree'
+        : rootOriginalCount > 0 && familyTreeOriginalCount > 0
+          ? 'mixed'
+          : 'unknown';
+
+  const depthIssueFiles = [];
+  for (const file of files) {
+    const depth = relativePathDepth(relativePathInside(outDirRelative, file.path));
+    if (
+      (layoutKind === 'single-family' && depth > 2)
+      || (layoutKind === 'family-tree' && (depth === 1 || depth > 3))
+    ) {
+      depthIssueFiles.push(file);
+    }
+  }
+
+  const unexpectedFiles = files.filter((file) => !classifiedPaths.has(file.path));
+  const issues = [];
+  const pushIssue = (code, message, count) => {
+    if (count > 0) issues.push({ code, message, count });
+  };
+
+  pushIssue('empty-output', 'No output files were found.', files.length === 0 ? 1 : 0);
+  pushIssue('mixed-output-layout', 'Original font files appear at both root and family-directory depths.', layoutKind === 'mixed' ? 1 : 0);
+  pushIssue('unknown-output-layout', 'The output tree does not match the expected single-family or family-tree layout.', layoutKind === 'unknown' ? 1 : 0);
+  pushIssue('unexpected-original-depth', 'Original font files were detected at unexpected path depths.', unexpectedOriginalDepthCount);
+  pushIssue('unexpected-output-files', 'Files were found outside recognized family/font-entry output locations.', unexpectedFiles.length);
+  pushIssue('unexpected-output-depth', 'Files were found at path depths outside the documented output structure.', depthIssueFiles.length);
+  pushIssue('missing-manifests', 'Some font entries do not include split-meta.json and were inferred as legacy output.', legacyOutputCount);
+  pushIssue('unknown-output-mode', 'Some font entries have an unknown output mode.', unknownOutputModeCount);
+  pushIssue('web-output-missing', 'Some subset or single-WOFF2 entries are missing result.css or WOFF2 files.', webOutputMissingCount);
+  pushIssue('copy-original-extra-output', 'Some copy-original entries unexpectedly contain generated CSS or WOFF2 files.', copyOriginalExtraOutputCount);
+
+  const maxExamples = 20;
+  return {
+    conforms: issues.length === 0,
+    layoutKind,
+    familyCount: families.length,
+    fontEntryCount,
+    manifestCount,
+    legacyOutputCount,
+    manifestCoverageOk: manifestCount === fontEntryCount,
+    classifiedFileCount: classifiedPaths.size,
+    unexpectedFileCount: unexpectedFiles.length,
+    unexpectedFileExamples: unexpectedFiles
+      .slice(0, maxExamples)
+      .map((file) => file.path),
+    unexpectedFileExamplesTruncated: unexpectedFiles.length > maxExamples,
+    unexpectedDepthFileCount: depthIssueFiles.length,
+    outputModeCounts,
+    entryIssueExamples: entryIssueExamples.slice(0, maxExamples),
+    entryIssueExamplesTruncated: entryIssueExamples.length > maxExamples,
+    issueCount: issues.length,
+    issues,
   };
 }
 
@@ -3307,6 +3495,7 @@ export async function splitFontBatch(args) {
   });
   const allFiles = inputScan.files;
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
+  const unsupportedFileSummary = buildUnsupportedFileSummary(allFiles);
 
   let deduplicated;
   if (batchOptions.batchDedupeMode === 'none') {
@@ -3581,6 +3770,7 @@ export async function splitFontBatch(args) {
     scannedFileCount: allFiles.length,
     maxFiles,
     maxFilesHit: inputScan.truncated,
+    unsupportedFileSummary,
     discoveredFontCount: fontFiles.length,
     deduplicatedCount,
     skippedDuplicates: skippedCount,
@@ -3627,6 +3817,7 @@ export async function inspectFontInputs(args) {
   const inputScan = await scanFilesRecursive(inputDir, { maxFiles });
   const allFiles = inputScan.files;
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
+  const unsupportedFileSummary = buildUnsupportedFileSummary(allFiles);
   const entries = [];
   const byExtension = {};
   const byStatus = {};
@@ -3658,6 +3849,7 @@ export async function inspectFontInputs(args) {
     scannedFileCount: allFiles.length,
     supportedFontCount: fontFiles.length,
     unsupportedFileCount: allFiles.length - fontFiles.length,
+    unsupportedFileSummary,
     validFontCount: entries.length - invalidFonts.length,
     invalidFontCount: invalidFonts.length,
     missingIdentityCount: missingIdentity.length,
@@ -3697,6 +3889,7 @@ export async function organizeFontDirectory(args) {
   });
   const allFiles = scan.files;
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
+  const unsupportedFileSummary = buildUnsupportedFileSummary(allFiles);
   const layout = buildDirectoryLayoutSummary({ inputDir, allFiles, fontFiles });
   const entries = [];
 
@@ -3879,6 +4072,7 @@ export async function organizeFontDirectory(args) {
     validFontCount: options.parseFonts ? validEntries.length : null,
     invalidFontCount: options.parseFonts ? invalidEntries.length : null,
     unsupportedFileCount: layout.unsupportedFileCount,
+    unsupportedFileSummary,
     deduplicatedCount: dedupe.selected.length,
     skippedDuplicates: dedupe.duplicates.length,
     selectedFontCount: selectedEntries.length,
@@ -3953,7 +4147,7 @@ export async function inspectSplitOutput(args) {
 
   const relativeEntries = files.map((file) => ({
     ...file,
-    relativePath: file.path === outDirRelative ? '' : file.path.slice(`${outDirRelative}/`.length),
+    relativePath: relativePathInside(outDirRelative, file.path),
   }));
   const maxDepth = relativeEntries.reduce((depth, file) => Math.max(depth, file.relativePath.split('/').filter(Boolean).length), 0);
   const singleFamilyLayout = maxDepth <= 2;
@@ -3971,13 +4165,13 @@ export async function inspectSplitOutput(args) {
     if (relativeParts.length === 0) continue;
 
     if (singleFamilyLayout) {
-      const familyName = path.basename(outDirRelative);
-      const family = ensureFamily(familyName);
       if (relativeParts.length === 1 && FONT_EXTENSIONS.has(file.extension)) {
+        const family = ensureFamily(path.basename(outDirRelative));
         family.originals.push(file);
         continue;
       }
       if (relativeParts.length >= 2) {
+        const family = ensureFamily(path.basename(outDirRelative));
         const splitDirName = relativeParts[0];
         if (!family.splitDirs.has(splitDirName)) family.splitDirs.set(splitDirName, []);
         family.splitDirs.get(splitDirName).push(file);
@@ -3986,12 +4180,13 @@ export async function inspectSplitOutput(args) {
     }
 
     const familyName = relativeParts[0];
-    const family = ensureFamily(familyName);
     if (relativeParts.length === 2 && FONT_EXTENSIONS.has(file.extension)) {
+      const family = ensureFamily(familyName);
       family.originals.push(file);
       continue;
     }
     if (relativeParts.length >= 3) {
+      const family = ensureFamily(familyName);
       const splitDirName = relativeParts[1];
       if (!family.splitDirs.has(splitDirName)) family.splitDirs.set(splitDirName, []);
       family.splitDirs.get(splitDirName).push(file);
@@ -4033,12 +4228,22 @@ export async function inspectSplitOutput(args) {
     });
   }
 
+  const structureSummary = buildOutputStructureSummary({
+    outDirRelative,
+    files,
+    families,
+    fontEntryCount,
+    manifestCount,
+    legacyOutputCount,
+  });
+
   const inspectionWarnings = buildOutputInspectionWarnings({
     maxFilesHit: outputSummary.truncated,
     maxFiles,
     includeFiles,
     includeFamilies,
     legacyOutputCount,
+    structureIssueCount: structureSummary.issueCount,
   });
 
   return {
@@ -4059,6 +4264,7 @@ export async function inspectSplitOutput(args) {
     singleWoff2OutputCount,
     copyOriginalOutputCount,
     legacyOutputCount,
+    structureSummary,
     familiesIncluded: includeFamilies,
     ...(includeFiles ? { files } : {}),
     ...(includeFamilies ? { families } : {}),

@@ -50,7 +50,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 
 Key defaults and policy choices:
 
-- Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server.
+- Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server. Tool responses and `recommendedNextActions[].suggestedArgs` use `.` for the workspace root, never an empty string.
 - For AI coding assistants, call `get_agent_guidance` first when the workflow is unclear. It returns compact guidance by default: recommended tool order, default policies, path rules, response fields, and a verification checklist that should be inspected before claiming success. `guidanceView` reports which sections were included or omitted.
 - `get_agent_guidance` also returns `directoryWorkflowDecisionMatrix[]`, a machine-readable decision table for choosing direct batch splitting, dry-run organization, copy-only organization, or structure-only planning.
 - `get_agent_guidance` includes `safeInvocationTemplates[]`, copyable starting calls for runtime checks, source preflight, directory-mismatch planning, copy-only staging, batch dry-run preview, reviewed batch processing, and compact output audits. Each template declares whether it writes files and whether it can modify source files.
@@ -273,6 +273,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 `inspect_font_inputs` is a no-write preflight for source directories:
 
 - `supportedFontCount`, `validFontCount`, `invalidFontCount`
+- `unsupportedFileSummary`: extension counts for all ignored non-font files, `<none>` counts for extensionless files, and a small set of example paths
 - `missingIdentityCount`
 - `maxFilesHit`: true only when more files exist beyond `maxFiles`
 - `inspectionWarningCount`, `inspectionWarnings[]` with machine-readable `code` and `message`
@@ -283,6 +284,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 
 - `resultsIncluded`: whether per-font `results[]` objects are present
 - `scannedFileCount`, `maxFiles`, `maxFilesHit`
+- `unsupportedFileSummary`: extension counts for all scanned ignored non-font files, `<none>` counts for extensionless files, and a small set of example paths
 - `dryRun`, `plannedCount`, `wouldProcessCount`, `planIncluded`
 - `batchWarningCount`, `batchWarnings[]` with machine-readable `code` and `message`
 - `batchErrorMode`, `errorCount`, `errors[]`
@@ -307,6 +309,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `sourceFilesPreserved`: always `true`
 - `parsedFontMetadata`: false when `parseFonts: false`; then `validFontCount` / `invalidFontCount` are `null`
 - `effectiveBatchDedupeMode`, `dedupeLimitedByParsing`: explain whether identity dedupe was available
+- `unsupportedFileSummary`: extension counts for all ignored non-font files, `<none>` counts for extensionless files, and a small set of example paths; inspect it first when the source tree mixes fonts with archives, images, docs, or generated assets
 - `layout.layoutKind`: `empty`, `flat`, `nested`, or `mixed`
 - `recommendedBatchOptions`: a suggested follow-up `split_font_batch` configuration for the detected layout
 - `recommendedNextActionCount`, `recommendedNextActions[]`: machine-readable follow-up actions for agents, each with an `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, and `inspectFields`
@@ -323,7 +326,8 @@ Treat `planActionSummary` as a compact overview, not approval to write files wit
 - `maxFilesHit` is true only when more output files exist beyond `maxFiles`.
 - `includeFiles: false` omits flat `files[]` while keeping summary counters.
 - `includeFamilies: false` omits structured `families[]` while keeping family and output-mode counters.
-- `inspectionWarningCount` and `inspectionWarnings[]` summarize truncation, omitted detail arrays, and legacy output inference with machine-readable `code` values.
+- `inspectionWarningCount` and `inspectionWarnings[]` summarize truncation, omitted detail arrays, legacy output inference, and structure issues with machine-readable `code` values.
+- `structureSummary` checks whether the output directory matches the documented structure; require `structureSummary.conforms: true` before treating an output tree as free of stray files, missing manifests, or missing files required by the declared output mode.
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`

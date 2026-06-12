@@ -1,6 +1,6 @@
 # API Reference
 
-This server exposes seven MCP tools. All paths are resolved inside `FONT_SPLIT_ROOT`; if that environment variable is not set, paths are resolved from the process working directory.
+This server exposes seven MCP tools. All paths are resolved inside `FONT_SPLIT_ROOT`; if that environment variable is not set, paths are resolved from the process working directory. Response paths use `.` for the workspace root instead of an empty string, including suggested follow-up arguments.
 
 ## `get_agent_guidance`
 
@@ -105,6 +105,7 @@ Important result fields:
 | Field | Meaning |
 |-------|---------|
 | `supportedFontCount` | Files with supported font extensions. |
+| `unsupportedFileSummary` | Compact summary of all ignored non-font files, including extension counts, `<none>` for extensionless files, and a small set of example paths. Useful when a source tree mixes fonts with archives, docs, screenshots, or generated assets. |
 | `validFontCount` | Supported files whose basic metadata can be parsed. |
 | `invalidFontCount` | Supported extension files that failed parsing. |
 | `missingIdentityCount` | Parseable fonts without a usable batch identity key. |
@@ -135,7 +136,7 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 
 `split_font_batch` also accepts the split options from `split_font`, except `fontPath` and `outDir`. Batch mode applies those processing options to every selected font and uses `inputDir` / `outputRoot` for paths.
 
-Batch responses include `scannedFileCount`, `maxFiles`, and `maxFilesHit`. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete.
+Batch responses include `scannedFileCount`, `maxFiles`, `maxFilesHit`, and `unsupportedFileSummary`. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileSummary` summarizes all scanned non-font files that were ignored by extension.
 
 Batch dedupe priority is `.otf`, `.ttf`, `.woff2`, `.ttc`, `.otc`, `.woff`.
 
@@ -204,6 +205,7 @@ Important result fields:
 | `unparsedFontCount` | Number of supported-extension files intentionally not parsed because `parseFonts` was false. |
 | `effectiveBatchDedupeMode` | Actual dedupe mode used. When `parseFonts: false` and `batchDedupeMode: "font-identity"`, this falls back to `same-path`. |
 | `dedupeLimitedByParsing` | `true` when requested identity dedupe could not run because font parsing was skipped. |
+| `unsupportedFileSummary` | Compact summary of all ignored non-font files, including extension counts, `<none>` for extensionless files, and a small set of example paths. It explains noisy source trees where archives, documents, images, generated assets, or extensionless files are present but will not be copied or split. |
 | `layout.layoutKind` | `empty`, `flat`, `nested`, or `mixed`. Mixed means fonts exist both at the input root and below subdirectories. |
 | `recommendedBatchOptions` | Suggested `split_font_batch` options for the detected layout. Nested or mixed inputs usually recommend `batchGroupBy: "source-dir"`; flat inputs usually recommend `font-family`. |
 | `recommendedNextActionCount` / `recommendedNextActions[]` | Machine-readable follow-up actions for agents. Entries include `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, and `inspectFields`. |
@@ -217,7 +219,7 @@ Non-intuitive behavior to watch:
 - `dryRun` defaults to `true`, unlike `split_font_batch`, where `dryRun` defaults to `false`.
 - The tool copies fonts into a staging directory; it does not split fonts and does not generate CSS.
 - `parseFonts: false` is structure-only. It avoids metadata parsing, but cannot detect invalid fonts, cannot provide glyph counts, and cannot do true identity dedupe or metadata-driven family grouping.
-- Non-font files are ignored. Invalid font-like files are skipped unless `copyInvalidFonts: true`.
+- Non-font files are ignored; inspect `unsupportedFileSummary` when the source tree includes archives, docs, screenshots, or generated assets. Invalid font-like files are skipped unless `copyInvalidFonts: true`.
 - If `outputDir` is inside `inputDir`, the response includes `output-inside-input`; future scans should exclude that output directory to avoid processing organized copies as new source fonts.
 
 Use `parseFonts: true` when you need trustworthy invalid-font counts, glyph counts, internal family names, or cross-format identity dedupe. Use `parseFonts: false` only for a quick structural first pass over a very large or noisy tree. In that mode, `font-parsing-skipped` should be treated as a warning that the plan is incomplete for metadata-sensitive decisions.
@@ -244,7 +246,8 @@ Important result fields:
 | `familyCount` | Number of detected family directories. |
 | `maxFilesHit` | `true` only when more output files existed beyond `maxFiles`. |
 | `filesIncluded` / `familiesIncluded` | Whether `files[]` and `families[]` are present. |
-| `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, and legacy output inference. |
+| `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, legacy output inference, and output structure issues. |
+| `structureSummary` | Machine-readable output-structure audit. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
 | `fontEntryCount` | Number of detected per-font output entries. |
 | `manifestCount` | Number of entries with `split-meta.json`. |
 | `legacyOutputCount` | Number of entries inferred without manifest. |
