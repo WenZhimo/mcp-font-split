@@ -398,6 +398,41 @@ if (scenario === 'single') {
     throw new Error('Expected structure-only dry-run not to create outputDir.');
   }
   console.log(JSON.stringify(result, null, 2));
+} else if (scenario === 'organize-output-inside-input') {
+  const inputDir = process.argv[3] || '.font-split-organize-inside-input';
+  const outputDirName = process.argv[4] || 'organized-fonts';
+  const outputDir = path.join(inputDir, outputDirName);
+  console.log('Directory organization output-inside-input smoke:', inputDir, '->', outputDir);
+  await fs.rm(inputDir, { recursive: true, force: true });
+  await fs.mkdir(path.join(inputDir, 'FamilyA'), { recursive: true });
+  await fs.writeFile(path.join(inputDir, 'FamilyA', 'not-a-font.ttf'), 'not a real font');
+
+  const result = await organizeFontDirectory({
+    inputDir,
+    outputDir,
+    dryRun: true,
+    includePlan: true,
+    copyInvalidFonts: true,
+    batchNamingMode: 'plain',
+    maxFiles: 10,
+  });
+  if (result.dryRun !== true || result.sourceDestructive !== false || result.writesSourceTree !== false || result.writesOutputTree !== false) {
+    throw new Error('Expected output-inside-input organization smoke to stay dry-run and source-safe.');
+  }
+  if (!result.organizationWarnings?.some((warning) => warning.code === 'output-inside-input')) {
+    throw new Error('Expected organization warning when outputDir is inside inputDir.');
+  }
+  const avoidAction = (result.recommendedNextActions || []).find((action) => action.id === 'avoid-reprocessing-organized-copies');
+  if (!avoidAction || avoidAction.tool !== 'split_font_batch' || avoidAction.suggestedArgs?.inputDir !== `${inputDir}/${outputDirName}`) {
+    throw new Error('Expected next action to guide agents away from reprocessing organized copies.');
+  }
+  if (!avoidAction.inspectFields?.includes('batchWarnings')) {
+    throw new Error('Expected avoid-reprocessing next action to require batch warning inspection.');
+  }
+  if (await fsExists(outputDir)) {
+    throw new Error('Expected output-inside-input dry-run not to create outputDir.');
+  }
+  console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'batch-run-cli') {
   const inputDir = process.argv[3] || '.font-split-batch-run-cli';
   const outputRoot = process.argv[4] || '.font-split-batch-run-cli-output';
