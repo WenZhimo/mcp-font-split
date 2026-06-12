@@ -63,7 +63,7 @@ Key defaults and policy choices:
 - Batch grouping defaults to `batchGroupBy: "auto"`, which preserves the directory-first behavior for nested inputs.
 - Batch naming defaults to `batchNamingMode: "numeric-suffix"`: bare `fontBaseName` first, then stable `-1`, `-2`, `-3` only on real collisions.
 - Equivalent OTF/TTF pairs are deduplicated in batch mode when they resolve to the same font identity, keeping only one representative.
-- Batch processing does not modify the source directory: `sourceDestructive` and `writesSourceTree` should always be `false`. Real writes are limited to `outputRoot`, where generated output, original-font copies, and manifests may be created or replaced.
+- Batch processing never moves, deletes, or rewrites source font files: `sourceDestructive` should stay `false`. If `outputRoot` is inside `inputDir`, real writes still land inside the input tree, so inspect `writesSourceTree` and `outputTreeInsideInputTree` before describing the run as source-tree no-write.
 - Batch incremental skipping defaults to `skipMode: "legacy-css"`, which preserves the old `result.css` marker behavior.
 - Safer batch reruns should use `skipMode: "manifest"` or `skipMode: "force"`.
 - `strictMode: true` is a shortcut for safer batch defaults: `skipMode: "manifest"` and `batchErrorMode: "fail-after"` when those fields are not explicitly set.
@@ -176,7 +176,7 @@ fonts/
     Regular.otf
 ```
 
-This is the easiest layout to misread. Call `organize_font_directory` with `dryRun: true` first and inspect `safetySummary`, `layout.layoutKind`, `recommendedBatchOptions`, `organizationWarnings`, `sourceDestructive`, and `writesSourceTree`.
+This is the easiest layout to misread. Call `organize_font_directory` with `dryRun: true` first and inspect `safetySummary`, `layout.layoutKind`, `recommendedBatchOptions`, `organizationWarnings`, `sourceDestructive`, `writesSourceTree`, and `outputTreeInsideInputTree`.
 
 Large or noisy library first pass:
 
@@ -301,9 +301,11 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `dryRun`, `plannedCount`, `wouldProcessCount`, `planIncluded`
 - `batchWarningCount`, `batchWarnings[]` with machine-readable `code` and `message`
 - `batchErrorMode`, `errorCount`, `errors[]`
-- `safetySummary`: source/output safety summary for the batch call. Prefer it when deciding whether the call writes files or affects the source tree; source files are preserved and writes are limited to `outputRoot`.
-- `sourceDestructive`, `writesSourceTree`: should always be `false` for batch mode
+- `safetySummary`: source/output safety summary for the batch call. Prefer it when deciding whether the call writes files or affects the source tree; source font files are preserved, and writes are limited to `outputRoot`.
+- `sourceDestructive`: should always be `false` for batch mode
+- `writesSourceTree`: true only when a real batch write places `outputRoot` inside `inputDir`
 - `writesOutputTree`: true when `dryRun: false`
+- `outputTreeInsideInputTree`: whether `outputRoot` is inside or equal to `inputDir`; future broad scans can reprocess generated output when this is true
 - `mayOverwriteOutputTree`: true for non-dry-run calls with selected fonts, meaning existing files under `outputRoot` may be replaced
 - `skippedExisting`, `skippedLegacy`, `skippedByManifest`
 - `reprocessedBecauseSourceChanged`, `reprocessedBecauseOptionsChanged`
@@ -320,8 +322,9 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `operationMode`: `plan-only` for default dry-run, or `copy-only` when `dryRun: false`
 - `destructive`: true only when the current non-dry-run call may overwrite files in `outputDir`
 - `sourceDestructive`: always `false`
-- `writesSourceTree`: always `false`
+- `writesSourceTree`: true only when a real copy writes `outputDir` inside `inputDir`
 - `writesOutputTree`: true only when `dryRun: false`
+- `outputTreeInsideInputTree`: whether `outputDir` is inside or equal to `inputDir`; future broad scans can reprocess organized copies when this is true
 - `mayOverwriteOutputTree`: true only when `dryRun: false` and `overwriteExisting: true`
 - `sourceFilesPreserved`: always `true`
 - `parsedFontMetadata`: false when `parseFonts: false`; then `validFontCount` / `invalidFontCount` are `null`

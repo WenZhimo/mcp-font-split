@@ -70,7 +70,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 `directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段和非直觉行为。它不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
 `directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions` 和 warning 字段为准。
 `safeInvocationTemplates[]` 是可复制的安全起步调用模板；其中包括运行时诊断、输入预检、源目录结构不匹配时的 dry-run 整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和输出审计。每个模板都会声明 `writesFiles`、`sourceDestructive`、可自定义参数和必须检查的响应字段。
-`toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
+`toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
 
 `get_runtime_status` 也是只读工具。它会检查：
 
@@ -384,10 +384,11 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 批量工具不会移动、删除或重写源字体文件。
 - `sourceDestructive` 恒为 `false`。
 - `sourceFilesPreserved` 恒为 `true`。
-- `writesSourceTree` 恒为 `false`。
+- `outputTreeInsideInputTree` 表示 `outputRoot` 是否位于或等于 `inputDir`。
+- `writesSourceTree` 只有在 `dryRun: false` 且 `outputTreeInsideInputTree: true` 时才为 `true`；这表示输入目录树内会出现输出文件，不表示源字体文件被移动、删除或重写。
 - `dryRun: true` 时 `writesOutputTree: false`，不会写 `outputRoot`。
 - `dryRun: false` 时 `writesOutputTree: true`，只会在 `outputRoot` 下写生成文件、原字体副本和 `split-meta.json`。
-- 非 dry-run 且有选中字体时 `mayOverwriteOutputTree: true`，表示已有输出文件可能被替换；这个风险只限输出目录，不影响源目录。
+- 非 dry-run 且有选中字体时 `mayOverwriteOutputTree: true`，表示已有输出文件可能被替换；这个风险只限输出目录，不表示源字体文件会被替换。
 - `safetySummary` 会集中重复这些字段，agent 判断批量工具是否破坏源目录时应优先看它。
 
 ### 6.1 批量去重策略
@@ -464,7 +465,8 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `safetySummary` 会用一个对象集中说明 operation mode、写入范围、覆盖范围和源目录保留状态。判断整理工具是否破坏源目录时，应优先看这个字段。
 - `sourceDestructive` 恒为 `false`。
 - `destructive` 只有在当前调用为 `dryRun: false` 且 `overwriteExisting: true`、可能覆盖 `outputDir` 文件时才为 `true`。
-- `writesSourceTree` 恒为 `false`。
+- `outputTreeInsideInputTree` 表示 `outputDir` 是否位于或等于 `inputDir`。
+- `writesSourceTree` 只有在 `dryRun: false` 且 `outputTreeInsideInputTree: true` 时才为 `true`；这表示输入目录树内会出现整理副本，不表示源字体文件被移动、删除或重写。
 - `writesOutputTree` 只有在 `dryRun: false` 时才为 `true`。
 - `mayOverwriteOutputTree` 只有在当前非 dry-run 调用可能覆盖 `outputDir` 文件时才为 `true`。
 - 执行后会在 `outputDir` 写入 `font-organization-manifest.json`，记录本次整理摘要和条目。
@@ -475,13 +477,13 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `parseFonts: false` 会跳过坏字体检测和真实 identity 去重；不要把 `invalidFontCount: null` 解读为没有坏字体。
 - 非字体文件会被忽略，但会进入 `unsupportedFileSummary`。该字段统计所有非字体扩展名，包含无扩展文件的 `<none>` 计数和少量示例路径。
 - 扩展名像字体但解析失败的文件默认跳过；只有 `copyInvalidFonts: true` 时才会纳入复制计划。
-- 如果 `outputDir` 位于 `inputDir` 里面，响应会给出 `output-inside-input` 警告；后续扫描应排除该目录，避免把整理后的副本再次当作源字体。
+- 如果 `outputDir` 位于 `inputDir` 里面，响应会给出 `output-inside-input` 警告和 `outputTreeInsideInputTree: true`；后续扫描应排除该目录，避免把整理后的副本再次当作源字体。
 - 如果设置 `overwriteExisting: true`，可能替换 `outputDir` 里的目标文件，但仍不会影响源文件。
 
 推荐 agent 工作流：
 
 1. 先调用 `organize_font_directory`，保持默认 `dryRun: true`。
-2. 检查 `safetySummary`、`layout.layoutKind`、`recommendedBatchOptions`、`recommendedNextActions[]`、`organizationWarnings[]`、`sourceDestructive`、`destructive`、`writesSourceTree`、`writesOutputTree` 和 `mayOverwriteOutputTree`。
+2. 检查 `safetySummary`、`layout.layoutKind`、`recommendedBatchOptions`、`recommendedNextActions[]`、`organizationWarnings[]`、`sourceDestructive`、`destructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree` 和 `mayOverwriteOutputTree`。
 3. 如果用户只是想调整批量参数，不一定需要真的整理目录；可直接把 `recommendedBatchOptions` 应用到 `split_font_batch`。
 4. 如果用户明确希望得到更规整的暂存目录，再用 `dryRun: false` 执行 copy-only 整理。
 5. 整理完成后，对 `outputDir` 调用 `inspect_font_inputs` 或把它作为后续 `split_font_batch.inputDir`。
@@ -625,8 +627,9 @@ split-meta.json
 - `safetySummary`：集中的源目录/输出目录安全摘要；优先用于判断批量工具是否会写文件、是否影响源目录、覆盖风险是否只限输出目录
 - `sourceDestructive`：恒为 `false`
 - `sourceFilesPreserved`：恒为 `true`
-- `writesSourceTree`：恒为 `false`
+- `writesSourceTree`：只有真实批量写入且 `outputRoot` 位于 `inputDir` 内时才为 `true`
 - `writesOutputTree`：`dryRun: false` 时为 `true`
+- `outputTreeInsideInputTree`：`outputRoot` 是否位于或等于 `inputDir`
 - `mayOverwriteOutputTree`：当前非 dry-run 调用是否可能覆盖 `outputRoot` 中的文件
 - `batchWarningCount`
 - `batchWarnings[]`：批量摘要级提示，每项包含 `code` 和 `message`
@@ -656,8 +659,9 @@ split-meta.json
 | `destructive` | 当前调用是否可能覆盖 `outputDir` 中的文件 |
 | `sourceDestructive` | 恒为 `false` |
 | `sourceFilesPreserved` | 恒为 `true` |
-| `writesSourceTree` | 恒为 `false` |
+| `writesSourceTree` | 只有真实整理复制且 `outputDir` 位于 `inputDir` 内时才为 `true` |
 | `writesOutputTree` | `dryRun: false` 时为 `true` |
+| `outputTreeInsideInputTree` | `outputDir` 是否位于或等于 `inputDir` |
 | `mayOverwriteOutputTree` | 当前非 dry-run 调用是否可能覆盖目标目录文件 |
 | `parsedFontMetadata` | 是否读取了字体元数据 |
 | `unparsedFontCount` | 被有意跳过元数据解析的受支持扩展名文件数 |
@@ -680,7 +684,7 @@ split-meta.json
 - `invalid-fonts-skipped`：坏字体/伪字体文件被跳过。
 - `duplicate-fonts-skipped`：等价字体被去重。
 - `mixed-layout-detected`：根目录和子目录中都发现了字体。
-- `output-inside-input`：整理输出目录位于输入目录内，后续扫描需要排除它。
+- `output-inside-input`：批量或整理输出目录位于输入目录内，后续扫描需要排除它，或明确把该输出目录作为下一步输入。
 - `font-parsing-skipped`：`parseFonts: false`，本次只做结构优先计划，没有读取字体元数据。
 
 `planActionSummary.byAction` 会统计 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists`、`would-skip-target-exists` 和 `error` 等动作。它服务于 agent 快速判断计划形态；真正写文件前仍应审查 `plan[]` 明细和 `organizationWarnings[]`。

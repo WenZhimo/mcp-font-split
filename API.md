@@ -148,7 +148,7 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 
 Presets are expanded first; any explicit argument in the same call overrides the preset value.
 
-Batch responses include `safetySummary`, `sourceDestructive`, `writesSourceTree`, `writesOutputTree`, `mayOverwriteOutputTree`, `scannedFileCount`, `maxFiles`, `maxFilesHit`, and `unsupportedFileSummary`. `sourceDestructive` and `writesSourceTree` should always be `false`: batch processing does not move, delete, or rewrite source fonts. With `dryRun: false`, `writesOutputTree: true` means the tool writes generated files, original-font copies, and manifests under `outputRoot`, and may replace existing output files. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileSummary` summarizes all scanned non-font files that were ignored by extension.
+Batch responses include `safetySummary`, `sourceDestructive`, `writesSourceTree`, `writesOutputTree`, `outputTreeInsideInputTree`, `mayOverwriteOutputTree`, `scannedFileCount`, `maxFiles`, `maxFilesHit`, and `unsupportedFileSummary`. `sourceDestructive` should always be `false`: batch processing does not move, delete, or rewrite source fonts. With `dryRun: false`, `writesOutputTree: true` means the tool writes generated files, original-font copies, and manifests under `outputRoot`, and may replace existing output files. `writesSourceTree` is true only when that real output tree is inside `inputDir`; in that case source font files are still preserved, but the input tree receives generated output. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileSummary` summarizes all scanned non-font files that were ignored by extension.
 
 Batch dedupe priority is `.otf`, `.ttf`, `.woff2`, `.ttc`, `.otc`, `.woff`.
 
@@ -210,8 +210,9 @@ Important result fields:
 | `operationMode` | `plan-only` when `dryRun` is true, otherwise `copy-only`. |
 | `destructive` | `true` only when `dryRun: false` and `overwriteExisting: true` allow replacing files in `outputDir`. It never means source files are modified. |
 | `sourceDestructive` | Always `false`; source files are never moved, deleted, or rewritten. |
-| `writesSourceTree` | Always `false`; source files are preserved. |
+| `writesSourceTree` | `true` only when `dryRun: false` writes `outputDir` inside `inputDir`; source files are still preserved. |
 | `writesOutputTree` | `true` only when `dryRun` is false. |
+| `outputTreeInsideInputTree` | Whether `outputDir` is inside or equal to `inputDir`; future broad scans can reprocess organized copies when this is true. |
 | `mayOverwriteOutputTree` | `true` only when the current non-dry-run call may replace files in `outputDir`. |
 | `sourceFilesPreserved` | Always `true`; included for agents that need a direct source-preservation signal. |
 | `parsedFontMetadata` | `false` when `parseFonts: false`; in that mode `validFontCount` and `invalidFontCount` are `null`, not zero. |
@@ -233,7 +234,7 @@ Non-intuitive behavior to watch:
 - The tool copies fonts into a staging directory; it does not split fonts and does not generate CSS.
 - `parseFonts: false` is structure-only. It avoids metadata parsing, but cannot detect invalid fonts, cannot provide glyph counts, and cannot do true identity dedupe or metadata-driven family grouping.
 - Non-font files are ignored; inspect `unsupportedFileSummary` when the source tree includes archives, docs, screenshots, or generated assets. Invalid font-like files are skipped unless `copyInvalidFonts: true`.
-- If `outputDir` is inside `inputDir`, the response includes `output-inside-input`; future scans should exclude that output directory to avoid processing organized copies as new source fonts.
+- If `outputDir` is inside `inputDir`, the response includes `output-inside-input` and `outputTreeInsideInputTree: true`; future scans should exclude that output directory to avoid processing organized copies as new source fonts.
 
 Use `parseFonts: true` when you need trustworthy invalid-font counts, glyph counts, internal family names, or cross-format identity dedupe. Use `parseFonts: false` only for a quick structural first pass over a very large or noisy tree. In that mode, `font-parsing-skipped` should be treated as a warning that the plan is incomplete for metadata-sensitive decisions.
 

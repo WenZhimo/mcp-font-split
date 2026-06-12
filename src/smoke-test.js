@@ -404,6 +404,7 @@ if (scenario === 'single') {
     || !batchPreviewTemplate.inspectFields?.includes('safetySummary')
     || !batchPreviewTemplate.inspectFields?.includes('sourceDestructive')
     || !batchPreviewTemplate.inspectFields?.includes('writesOutputTree')
+    || !batchPreviewTemplate.inspectFields?.includes('outputTreeInsideInputTree')
   ) {
     throw new Error('Expected batch preview template to be a no-write dry run with included results.');
   }
@@ -439,6 +440,7 @@ if (scenario === 'single') {
     unsupportedFileSummary: 'organize_font_directory',
     structureSummary: 'inspect_split_output',
     sourceDestructive: 'split_font_batch',
+    outputTreeInsideInputTree: 'split_font_batch',
     batchWarnings: 'split_font_batch',
     inspectionWarnings: 'inspect_split_output',
     warningCodeCatalog: 'get_agent_guidance',
@@ -464,8 +466,12 @@ if (scenario === 'single') {
     throw new Error('Expected structure-first guidance to recommend parseFonts:false and dedupe checks.');
   }
   const knownBatchDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'known-good-batch-layout');
-  if (!knownBatchDecision?.mustInspectFields?.includes('unsupportedFileSummary') || !knownBatchDecision?.mustInspectFields?.includes('safetySummary')) {
-    throw new Error('Expected direct batch guidance to require unsupportedFileSummary and safetySummary inspection.');
+  if (
+    !knownBatchDecision?.mustInspectFields?.includes('unsupportedFileSummary')
+    || !knownBatchDecision?.mustInspectFields?.includes('safetySummary')
+    || !knownBatchDecision?.mustInspectFields?.includes('outputTreeInsideInputTree')
+  ) {
+    throw new Error('Expected direct batch guidance to require unsupportedFileSummary and full safety inspection.');
   }
   const mixedDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'unknown-or-mixed-directory-layout');
   if (!mixedDecision?.mustInspectFields?.includes('planActionSummary')) {
@@ -477,6 +483,7 @@ if (scenario === 'single') {
     || stagingDecision?.followUpOptions?.dryRun !== false
     || !stagingDecision.mustInspectFields?.includes('unsupportedFileSummary')
     || !stagingDecision.mustInspectFields?.includes('planActionSummary')
+    || !stagingDecision.mustInspectFields?.includes('outputTreeInsideInputTree')
   ) {
     throw new Error('Expected staging guidance to disclose source safety and copy-only follow-up.');
   }
@@ -503,6 +510,7 @@ if (scenario === 'single') {
   if (
     mixedExample?.safety?.sourceDestructive !== false
     || !mixedExample.mustInspectFields?.includes('writesSourceTree')
+    || !mixedExample.mustInspectFields?.includes('outputTreeInsideInputTree')
     || !mixedExample.mustInspectFields?.includes('planActionSummary')
   ) {
     throw new Error('Expected mixed-layout example to disclose source safety fields.');
@@ -637,6 +645,7 @@ if (scenario === 'single') {
     || batchPlan.sourceFilesPreserved !== true
     || batchPlan.writesSourceTree !== false
     || batchPlan.writesOutputTree !== false
+    || batchPlan.outputTreeInsideInputTree !== false
     || batchPlan.mayOverwriteOutputTree !== false
   ) {
     throw new Error('Expected splitFontBatch dry-run safety summary to be source-safe and no-write.');
@@ -699,7 +708,7 @@ if (scenario === 'single') {
     includePlan: true,
     maxFiles: 10,
   });
-  if (result.dryRun !== true || result.operationMode !== 'plan-only' || result.destructive !== false || result.sourceDestructive !== false || result.writesSourceTree !== false || result.writesOutputTree !== false || result.mayOverwriteOutputTree !== false) {
+  if (result.dryRun !== true || result.operationMode !== 'plan-only' || result.destructive !== false || result.sourceDestructive !== false || result.writesSourceTree !== false || result.writesOutputTree !== false || result.outputTreeInsideInputTree !== false || result.mayOverwriteOutputTree !== false) {
     throw new Error('Expected organizeFontDirectory dry-run to be source-non-destructive and plan-only.');
   }
   if (
@@ -708,6 +717,7 @@ if (scenario === 'single') {
     || result.safetySummary?.sourceFilesPreserved !== true
     || result.safetySummary?.writesSourceTree !== false
     || result.safetySummary?.writesOutputTree !== false
+    || result.safetySummary?.outputTreeInsideInputTree !== false
     || result.safetySummary?.writeScope !== 'none'
     || result.safetySummary?.overwriteScope !== 'none'
   ) {
@@ -790,7 +800,7 @@ if (scenario === 'single') {
     batchNamingMode: 'plain',
     maxFiles: 10,
   });
-  if (copied.operationMode !== 'copy-only' || copied.sourceDestructive !== false || copied.writesSourceTree !== false || copied.writesOutputTree !== true || copied.mayOverwriteOutputTree !== false || copied.destructive !== false) {
+  if (copied.operationMode !== 'copy-only' || copied.sourceDestructive !== false || copied.writesSourceTree !== false || copied.writesOutputTree !== true || copied.outputTreeInsideInputTree !== false || copied.mayOverwriteOutputTree !== false || copied.destructive !== false) {
     throw new Error('Expected organizeFontDirectory copy mode to write only the output tree without overwrite risk.');
   }
   if (
@@ -799,6 +809,7 @@ if (scenario === 'single') {
     || copied.safetySummary?.sourceFilesPreserved !== true
     || copied.safetySummary?.writesSourceTree !== false
     || copied.safetySummary?.writesOutputTree !== true
+    || copied.safetySummary?.outputTreeInsideInputTree !== false
     || copied.safetySummary?.mayOverwriteOutputTree !== false
     || copied.safetySummary?.writeScope !== 'output-tree-only'
     || copied.safetySummary?.overwriteScope !== 'none'
@@ -862,13 +873,14 @@ if (scenario === 'single') {
     overwriteExisting: true,
     maxFiles: 10,
   });
-  if (overwritten.sourceDestructive !== false || overwritten.writesSourceTree !== false || overwritten.writesOutputTree !== true || overwritten.mayOverwriteOutputTree !== true || overwritten.destructive !== true) {
+  if (overwritten.sourceDestructive !== false || overwritten.writesSourceTree !== false || overwritten.writesOutputTree !== true || overwritten.outputTreeInsideInputTree !== false || overwritten.mayOverwriteOutputTree !== true || overwritten.destructive !== true) {
     throw new Error('Expected overwrite mode to flag output-tree overwrite risk while preserving source safety.');
   }
   if (
     overwritten.safetySummary?.sourceDestructive !== false
     || overwritten.safetySummary?.writesSourceTree !== false
     || overwritten.safetySummary?.writesOutputTree !== true
+    || overwritten.safetySummary?.outputTreeInsideInputTree !== false
     || overwritten.safetySummary?.mayOverwriteOutputTree !== true
     || overwritten.safetySummary?.overwriteScope !== 'output-tree-only'
     || overwritten.safetySummary?.destructiveMeaning !== 'may-overwrite-output-tree-only'
@@ -1050,8 +1062,15 @@ if (scenario === 'single') {
     batchNamingMode: 'plain',
     maxFiles: 10,
   });
-  if (result.dryRun !== true || result.sourceDestructive !== false || result.writesSourceTree !== false || result.writesOutputTree !== false) {
-    throw new Error('Expected output-inside-input organization smoke to stay dry-run and source-safe.');
+  if (
+    result.dryRun !== true
+    || result.sourceDestructive !== false
+    || result.writesSourceTree !== false
+    || result.writesOutputTree !== false
+    || result.outputTreeInsideInputTree !== true
+    || result.safetySummary?.outputTreeInsideInputTree !== true
+  ) {
+    throw new Error('Expected output-inside-input organization smoke to stay dry-run while disclosing nested output.');
   }
   if (!result.organizationWarnings?.some((warning) => warning.code === 'output-inside-input')) {
     throw new Error('Expected organization warning when outputDir is inside inputDir.');
@@ -1077,7 +1096,67 @@ if (scenario === 'single') {
   if (await fsExists(outputDir)) {
     throw new Error('Expected output-inside-input dry-run not to create outputDir.');
   }
-  console.log(JSON.stringify(result, null, 2));
+  const copiedInside = await organizeFontDirectory({
+    inputDir,
+    outputDir,
+    dryRun: false,
+    includePlan: true,
+    copyInvalidFonts: true,
+    batchNamingMode: 'plain',
+    maxFiles: 10,
+  });
+  if (
+    copiedInside.sourceDestructive !== false
+    || copiedInside.sourceFilesPreserved !== true
+    || copiedInside.writesSourceTree !== true
+    || copiedInside.writesOutputTree !== true
+    || copiedInside.outputTreeInsideInputTree !== true
+    || copiedInside.mayOverwriteOutputTree !== false
+    || copiedInside.safetySummary?.writeScope !== 'output-tree-inside-input-tree'
+    || !copiedInside.organizationWarnings?.some((warning) => warning.code === 'output-inside-input')
+  ) {
+    throw new Error('Expected real organization inside inputDir to disclose source-tree writes without source destruction.');
+  }
+
+  const batchInputDir = `${inputDir}-batch`;
+  const batchOutputRoot = path.join(batchInputDir, 'split-output');
+  await fs.rm(batchInputDir, { recursive: true, force: true });
+  await fs.mkdir(batchInputDir, { recursive: true });
+  await fs.writeFile(
+    path.join(batchInputDir, 'FixtureSans-Regular.ttf'),
+    buildMinimalTtf({ familyName: 'Fixture Sans', subfamilyName: 'Regular', glyphCount: 5 }),
+  );
+  const batchInside = await splitFontBatch({
+    inputDir: batchInputDir,
+    outputRoot: batchOutputRoot,
+    workflowPreset: 'reviewed-write',
+    smallGlyphAction: 'copy-original',
+    limit: 10,
+    maxFiles: 20,
+    silent: true,
+  });
+  if (
+    batchInside.sourceDestructive !== false
+    || batchInside.sourceFilesPreserved !== true
+    || batchInside.writesSourceTree !== true
+    || batchInside.writesOutputTree !== true
+    || batchInside.outputTreeInsideInputTree !== true
+    || batchInside.mayOverwriteOutputTree !== true
+    || batchInside.safetySummary?.writeScope !== 'output-tree-inside-input-tree'
+    || !batchInside.batchWarnings?.some((warning) => warning.code === 'output-inside-input')
+  ) {
+    throw new Error('Expected real batch output inside inputDir to disclose source-tree writes without source destruction.');
+  }
+  const batchInsideInspect = await inspectSplitOutput({
+    outDir: batchOutputRoot,
+    includeFiles: false,
+    includeFamilies: false,
+  });
+  if (batchInsideInspect.structureSummary?.conforms !== true) {
+    throw new Error('Expected nested batch outputRoot to remain structurally valid when inspected directly.');
+  }
+
+  console.log(JSON.stringify({ result, copiedInside, batchInside, batchInsideInspect }, null, 2));
 } else if (scenario === 'batch-run-cli') {
   const inputDir = process.argv[3] || '.font-split-batch-run-cli';
   const outputRoot = process.argv[4] || '.font-split-batch-run-cli-output';
@@ -1206,6 +1285,7 @@ if (scenario === 'single') {
     || safePreview.sourceDestructive !== false
     || safePreview.writesSourceTree !== false
     || safePreview.writesOutputTree !== false
+    || safePreview.outputTreeInsideInputTree !== false
     || safePreview.mayOverwriteOutputTree !== false
     || safePreview.resultsIncluded !== true
     || safePreview.strictMode !== true
@@ -1256,6 +1336,7 @@ if (scenario === 'single') {
     || structureFirstBatch.dryRun !== true
     || structureFirstBatch.safetySummary?.operationMode !== 'preview-only'
     || structureFirstBatch.writesOutputTree !== false
+    || structureFirstBatch.outputTreeInsideInputTree !== false
     || structureFirstBatch.resultsIncluded !== false
     || structureFirstBatch.batchDedupeMode !== 'same-path'
     || structureFirstBatch.deduplicatedCount !== 2
@@ -1490,6 +1571,7 @@ if (scenario === 'single') {
     || batchWrite.sourceFilesPreserved !== true
     || batchWrite.writesSourceTree !== false
     || batchWrite.writesOutputTree !== true
+    || batchWrite.outputTreeInsideInputTree !== false
     || batchWrite.mayOverwriteOutputTree !== true
     || batchWrite.processedFontCount !== 1
     || batchInspect.structureSummary?.conforms !== true
@@ -1571,8 +1653,8 @@ if (scenario === 'single') {
     }
     expectDescriptionIncludes('get_agent_guidance', ['directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
-    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'batchWarnings']);
-    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files']);
+    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'outputTreeInsideInputTree', 'batchWarnings']);
+    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'outputTreeInsideInputTree']);
     expectDescriptionIncludes('inspect_split_output', ['structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,

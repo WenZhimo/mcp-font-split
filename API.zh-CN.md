@@ -148,7 +148,7 @@
 
 预设会先展开；同一次调用里显式传入的参数会覆盖预设值。
 
-批量响应会包含 `safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`mayOverwriteOutputTree`、`scannedFileCount`、`maxFiles`、`maxFilesHit` 和 `unsupportedFileSummary`。`sourceDestructive` 和 `writesSourceTree` 应始终为 `false`：批量处理不会移动、删除或重写源字体。`dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileSummary` 会按扩展名汇总所有已扫描但被忽略的非字体文件。
+批量响应会包含 `safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree`、`mayOverwriteOutputTree`、`scannedFileCount`、`maxFiles`、`maxFilesHit` 和 `unsupportedFileSummary`。`sourceDestructive` 应始终为 `false`：批量处理不会移动、删除或重写源字体。`dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。只有当真实输出树位于 `inputDir` 内时，`writesSourceTree` 才为 `true`；此时源字体文件仍会保留，但输入目录树会新增生成输出。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileSummary` 会按扩展名汇总所有已扫描但被忽略的非字体文件。
 
 批量格式代表优先级为：`.otf`、`.ttf`、`.woff2`、`.ttc`、`.otc`、`.woff`。
 
@@ -210,8 +210,9 @@
 | `operationMode` | `dryRun` 为 true 时是 `plan-only`，否则是 `copy-only`。 |
 | `destructive` | 只有当前调用为 `dryRun: false` 且 `overwriteExisting: true`、可能替换 `outputDir` 文件时才为 `true`；它不表示源文件会被修改。 |
 | `sourceDestructive` | 恒为 `false`；源文件不会被移动、删除或重写。 |
-| `writesSourceTree` | 恒为 `false`；源文件会被保留。 |
+| `writesSourceTree` | 只有 `dryRun: false` 且 `outputDir` 位于 `inputDir` 内时才为 `true`；源文件仍会保留。 |
 | `writesOutputTree` | 只有 `dryRun: false` 时才为 `true`。 |
+| `outputTreeInsideInputTree` | `outputDir` 是否位于或等于 `inputDir`；为 `true` 时，后续宽泛扫描可能再次处理整理副本。 |
 | `mayOverwriteOutputTree` | 只有当前非 dry-run 调用可能替换 `outputDir` 中的文件时才为 `true`。 |
 | `sourceFilesPreserved` | 恒为 `true`；给需要直接判断源文件是否保留的 agent 使用。 |
 | `parsedFontMetadata` | `parseFonts: false` 时为 `false`；此时 `validFontCount` 和 `invalidFontCount` 是 `null`，不是 0。 |
@@ -233,7 +234,7 @@
 - 该工具只整理/复制字体，不会拆分字体，也不会生成 CSS。
 - `parseFonts: false` 是结构优先模式：它会跳过字体元数据解析，因此不能检测坏字体、不能提供 glyph count，也不能做真正的 identity 去重或完全基于 metadata 的 family 分组。
 - 非字体文件会被忽略；当源目录混有压缩包、文档、截图或生成产物时，先看 `unsupportedFileSummary`。扩展名像字体但解析失败的文件默认跳过，除非 `copyInvalidFonts: true`。
-- 如果 `outputDir` 位于 `inputDir` 内，响应会包含 `output-inside-input`；后续扫描应排除该输出目录，避免把整理后的副本再次当作源字体处理。
+- 如果 `outputDir` 位于 `inputDir` 内，响应会包含 `output-inside-input` 和 `outputTreeInsideInputTree: true`；后续扫描应排除该输出目录，避免把整理后的副本再次当作源字体处理。
 
 当你需要可信的坏字体数量、glyph count、内部 family 名或跨格式 identity 去重时，使用 `parseFonts: true`。只有在超大或嘈杂目录上先快速了解结构时，才使用 `parseFonts: false`。此时 `font-parsing-skipped` 应被视为警告：这个计划不适合直接支撑依赖字体元数据的判断。
 
