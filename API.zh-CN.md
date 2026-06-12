@@ -1,6 +1,6 @@
 # API 参考
 
-本 MCP Server 暴露 6 个工具。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。
+本 MCP Server 暴露 7 个工具。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。
 
 ## `get_agent_guidance`
 
@@ -8,9 +8,9 @@
 
 | 字段 | 类型 / 可选值 | 默认值 | 说明 |
 |------|---------------|--------|------|
-| `workflow` | `overview`, `single`, `batch`, `inspect` | `overview` | 指南侧重点。 |
+| `workflow` | `overview`, `single`, `batch`, `inspect`, `organize` | `overview` | 指南侧重点。 |
 
-响应会包含工作区路径规则、支持扩展名、默认策略、推荐批量参数、需要检查的响应字段、完成验证清单，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应会包含工作区路径规则、支持扩展名、默认策略、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
 ## `get_runtime_status`
 
@@ -95,6 +95,7 @@
 | `invalidFontCount` | 扩展名像字体、但解析失败的文件数。 |
 | `missingIdentityCount` | 可解析、但没有可用于批量去重的身份 key 的字体数。 |
 | `maxFilesHit` | 只有当 `maxFiles` 之外确实还存在更多源文件时才为 `true`。 |
+| `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级预检提示，每项包含机器可读 `code` 和人类可读 `message`。 |
 | `invalidFonts[]` | 解析失败字体的紧凑清单和错误信息。 |
 | `files[]` | 可选的逐字体详情，包含扩展名、容器、身份信息、identity key、glyph count 和解析状态。 |
 
@@ -152,6 +153,49 @@
 
 批量响应包含 `batchWarningCount` 和 `batchWarnings[]`，用于提示 dry-run 未写文件、扫描被 `maxFiles` 截断、`limit` 截断、每字体详情被省略、已有输出被跳过、错误被收集等摘要级状态。每个 warning 都包含机器可读的 `code` 和人类可读的 `message`。
 
+## `organize_font_directory`
+
+为源字体目录生成整理计划，或把字体复制整理到一个更规整的暂存目录。
+
+> [!WARNING]
+> 这个工具对源目录是非破坏性的：它不会移动、删除或重写源字体文件。默认 `dryRun: true`，只返回计划；只有显式设置 `dryRun: false` 时才会在 `outputDir` 中创建目录并复制字体。如果设置 `overwriteExisting: true`，可能会替换 `outputDir` 中的目标文件，但源文件仍不会被修改。
+
+| 字段 | 类型 / 可选值 | 默认值 | 说明 |
+|------|---------------|--------|------|
+| `inputDir` | string | `.` | `FONT_SPLIT_ROOT` 内要扫描的目录。 |
+| `outputDir` | string | `organized-fonts` | 整理后副本的目标目录，必须与 `inputDir` 不同。 |
+| `maxFiles` | 正整数，MCP 最大 `50000` | `50000` | 最多扫描多少个源文件。 |
+| `dryRun` | boolean | `true` | 只生成计划，不写文件；只有检查过 `plan[]` 和 `organizationWarnings[]` 后才建议设为 `false`。 |
+| `includePlan` | boolean | `true` | 是否返回逐字体 `plan[]`；大目录只看摘要时可设为 `false`。 |
+| `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 整理副本的目录分组策略，含义与 `split_font_batch` 相同。 |
+| `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 复制字体文件名的冲突处理策略。 |
+| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 复制计划前如何对等价字体去重。 |
+| `copyInvalidFonts` | boolean | `false` | 即使字体元数据解析失败，也复制扩展名受支持的文件。除非明确要保留坏字体/伪字体文件，否则保持 `false`。 |
+| `overwriteExisting` | boolean | `false` | 是否允许替换 `outputDir` 中的匹配文件；源文件仍不会被修改。 |
+
+重要返回字段：
+
+| 字段 | 含义 |
+|------|------|
+| `operationMode` | `dryRun` 为 true 时是 `plan-only`，否则是 `copy-only`。 |
+| `destructive` | 只有当前调用为 `dryRun: false` 且 `overwriteExisting: true`、可能替换 `outputDir` 文件时才为 `true`；它不表示源文件会被修改。 |
+| `sourceDestructive` | 恒为 `false`；源文件不会被移动、删除或重写。 |
+| `writesSourceTree` | 恒为 `false`；源文件会被保留。 |
+| `writesOutputTree` | 只有 `dryRun: false` 时才为 `true`。 |
+| `mayOverwriteOutputTree` | 只有当前非 dry-run 调用可能替换 `outputDir` 中的文件时才为 `true`。 |
+| `layout.layoutKind` | `empty`、`flat`、`nested` 或 `mixed`。`mixed` 表示输入根目录和子目录里都发现了字体。 |
+| `recommendedBatchOptions` | 根据目录形态建议的 `split_font_batch` 参数；嵌套或混合目录通常建议 `batchGroupBy: "source-dir"`，扁平目录通常建议 `font-family`。 |
+| `organizationWarningCount` / `organizationWarnings[]` | 摘要级提示，例如 `organization-dry-run`、`organization-writes-output`、`output-overwrite-enabled`、`mixed-layout-detected`、`invalid-fonts-skipped`、`output-inside-input`。 |
+| `plan[]` | 可选的逐字体复制/跳过计划。复制条目包含 `source`、`target`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`。 |
+| `organizationManifestPath` | 仅在 `dryRun: false` 时写入，指向 `outputDir` 中的 `font-organization-manifest.json`。 |
+
+需要特别注意的非直觉行为：
+
+- `dryRun` 默认是 `true`，这与 `split_font_batch` 的默认 `dryRun: false` 不同。
+- 该工具只整理/复制字体，不会拆分字体，也不会生成 CSS。
+- 非字体文件会被忽略；扩展名像字体但解析失败的文件默认跳过，除非 `copyInvalidFonts: true`。
+- 如果 `outputDir` 位于 `inputDir` 内，响应会包含 `output-inside-input`；后续扫描应排除该输出目录，避免把整理后的副本再次当作源字体处理。
+
 ## `inspect_split_output`
 
 检查已生成的输出目录。
@@ -170,6 +214,7 @@
 | `familyCount` | 检测到的 family 目录数量。 |
 | `maxFilesHit` | 只有当 `maxFiles` 之外确实还存在更多输出文件时才为 `true`。 |
 | `filesIncluded` / `familiesIncluded` | 响应中是否包含 `files[]` 和 `families[]`。 |
+| `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略和 legacy 输出推断等状态。 |
 | `fontEntryCount` | 检测到的字体输出条目数量。 |
 | `manifestCount` | 带 `split-meta.json` 的条目数量。 |
 | `legacyOutputCount` | 没有 manifest、只能保守推断的旧输出数量。 |

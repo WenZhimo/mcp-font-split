@@ -18,6 +18,7 @@
 - 将 TTF/OTF/TTC/OTC/WOFF/WOFF2 字体处理为 web-font 输出。
 - 批量扫描并处理字体目录。
 - 在大批量处理前预检输入目录，先发现坏字体或身份解析问题。
+- 当源字体目录结构与预期批量分组不一致时，生成整理计划，或把字体非破坏性复制到更规整的暂存目录。
 - 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南选择安全工作流。
 - 提供 `get_runtime_status`，让 agent 在处理前确认工作区、Node engine 兼容性、包版本和 WASM 是否可用。
 - 在输出目录中保留原字体副本。
@@ -34,6 +35,7 @@
 | `split_font` | 处理单个字体。根据参数，结果可能是真正分片、单 WOFF2 fallback，或 copy-original 元数据登记。 |
 | `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count 和坏字体清单。 |
 | `split_font_batch` | 扫描目录、按 `batchDedupeMode` 去重、按家族目录分组，并处理每个选中的字体。 |
+| `organize_font_directory` | 生成目录整理计划，或把源字体复制整理到暂存目录。默认 `dryRun: true`；不会移动或删除源文件。 |
 | `inspect_split_output` | 汇总输出目录，并优先使用 `split-meta.json` 对 family/font 条目做结构化分类。 |
 
 ## 重要行为摘要
@@ -46,6 +48,7 @@
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。
 - 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它会返回推荐工具顺序、默认策略、路径规则、必须检查的响应字段和完成验证清单。
 - 当安装或运行环境不确定时，使用 `get_runtime_status`；它会只读检查解析后的工作区、Node engine 兼容性、包版本、cn-font-split 运行时版本和 WASM 文件，并返回便于 agent 执行/提示的 `recommendedActions[]`。
+- 当源目录是扁平、混合或与预期 family 分组不一致时，先用 `organize_font_directory` 的默认 `dryRun: true` 生成整理计划。它对源目录非破坏：不会移动或删除源文件；真正执行时也只是复制选中的字体到 `outputDir`。
 - 批量扫描会跳过依赖目录、已生成输出目录、`__MACOSX` 和 AppleDouble `._*` 资源叉文件。
 - `.woff` / `.woff2` 输入会先解压成 sfnt-like 数据，再进入处理流程。
 - 批量模式会按照 `batchDedupeMode` 去重；默认 `font-identity` 会在任意格式之间比较等价字体身份，并按 `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff` 的优先级保留一个代表。
@@ -102,6 +105,17 @@ split-output/
 在批量模式下，默认先使用裸名。只有当同一 family 目录里确实已有别的源文件占用了这个名字时，才会分配 `-1`、`-2` 这类数字后缀，并通过 manifest 在后续重复运行中稳定复用。
 
 `copy-original` 不会生成 `.woff2` 或 `result.css`；它只表示该字体已经被处理流程登记，并明确跳过了分片。
+
+`organize_font_directory` 整理后的暂存结构：
+
+```text
+organized-fonts/
+  <GroupName>/
+    <OriginalFontFile> 或 <OriginalFontFile-1>
+  font-organization-manifest.json   # 仅 dryRun=false 时写入
+```
+
+这个暂存目录不是拆分结果，也不包含 CSS。它只是一个 copy-only 的整理辅助输出，用于在后续 `split_font_batch` 前准备更稳定的源目录。
 
 ## 关键参数
 
@@ -188,6 +202,7 @@ split-output/
 - `supportedFontCount`、`validFontCount`、`invalidFontCount`
 - `missingIdentityCount`
 - `maxFilesHit`：只有当 `maxFiles` 之外确实还有更多文件时才为 true
+- `inspectionWarningCount`、`inspectionWarnings[]`，每项包含机器可读的 `code` 和 `message`
 - `invalidFonts[]`
 - 可选 `files[]` 条目，包含 `container`、`identity`、`identityKey`、`identityBasis` 和 `glyphCount`
 
@@ -207,12 +222,26 @@ split-output/
 - `processingSummary.smallGlyphCopyOriginals`
 - `processingSummary.failureFallbacks`
 
+`organize_font_directory` 会返回源目录安全性摘要和可选整理计划：
+
+- `operationMode`：默认 dry-run 时为 `plan-only`，`dryRun: false` 时为 `copy-only`
+- `destructive`：只有当前非 dry-run 调用可能覆盖 `outputDir` 中的文件时才为 true
+- `sourceDestructive`：恒为 `false`
+- `writesSourceTree`：恒为 `false`
+- `writesOutputTree`：只有 `dryRun: false` 时为 true
+- `mayOverwriteOutputTree`：只有 `dryRun: false` 且 `overwriteExisting: true` 时为 true
+- `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`
+- `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 建议配置
+- `organizationWarningCount`、`organizationWarnings[]`，每项包含机器可读的 `code` 和 `message`
+- 可选 `plan[]` 条目，包含 `source`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`
+
 `inspect_split_output` 保留基础文件统计，并增加结构化输出清单：
 
 - `maxFiles` 可以调整输出扫描上限；默认是 `200000`，避免大型批量输出在检查时被截断。
 - `maxFilesHit` 只有当 `maxFiles` 之外确实还有更多输出文件时才为 true。
 - `includeFiles: false` 会省略扁平 `files[]`，但保留摘要计数。
 - `includeFamilies: false` 会省略结构化 `families[]`，但保留 family 和输出模式计数。
+- `inspectionWarningCount` 和 `inspectionWarnings[]` 会用机器可读 `code` 汇总截断、详情数组省略和 legacy 输出推断等状态。
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`
@@ -299,6 +328,34 @@ split-output/
 }
 ```
 
+预览一次非破坏性的目录整理计划：
+
+```json
+{
+  "inputDir": ".",
+  "outputDir": "organized-fonts",
+  "dryRun": true,
+  "includePlan": true,
+  "batchGroupBy": "auto",
+  "batchNamingMode": "numeric-suffix",
+  "batchDedupeMode": "font-identity"
+}
+```
+
+执行已经审阅过的 copy-only 整理计划：
+
+```json
+{
+  "inputDir": ".",
+  "outputDir": "organized-fonts",
+  "dryRun": false,
+  "batchGroupBy": "auto",
+  "batchNamingMode": "numeric-suffix",
+  "batchDedupeMode": "font-identity",
+  "overwriteExisting": false
+}
+```
+
 按字体 metadata 分组：
 
 ```json
@@ -381,6 +438,7 @@ npm run smoke:runtime-status
 npm run smoke:incremental
 npm run smoke:font-inputs
 npm run smoke:scan-limits
+npm run smoke:organize
 npm run smoke:batch-run
 npm run smoke:inspect-compact
 npm run smoke:mcp-error

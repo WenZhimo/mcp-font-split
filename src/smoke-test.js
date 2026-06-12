@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
+import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
 import { errorText } from './mcp-response.js';
 
 const execFileAsync = promisify(execFile);
@@ -73,6 +73,9 @@ if (scenario === 'single') {
   if (result.agentOptimized !== true || result.workflow !== 'batch' || !result.tools.some((tool) => tool.name === 'inspect_font_inputs')) {
     throw new Error('Expected agent guidance to describe the batch workflow and preflight tool.');
   }
+  if (!result.tools.some((tool) => tool.name === 'organize_font_directory')) {
+    throw new Error('Expected agent guidance to describe the directory organization tool.');
+  }
   if (!result.tools.some((tool) => tool.name === 'get_runtime_status')) {
     throw new Error('Expected agent guidance to describe the runtime status tool.');
   }
@@ -94,8 +97,14 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('batchWarnings')) {
     throw new Error('Expected agent guidance to recommend checking batch warnings.');
   }
+  if (!result.responseFieldsToCheck?.includes('inspectionWarnings')) {
+    throw new Error('Expected agent guidance to recommend checking inspection warnings.');
+  }
+  if (!result.responseFieldsToCheck?.includes('organizationWarnings')) {
+    throw new Error('Expected agent guidance to recommend checking organization warnings.');
+  }
   const checklistIds = new Set((result.verificationChecklist || []).map((item) => item.id));
-  for (const requiredId of ['runtime-ready', 'process-outcome-checked', 'fallback-disclosed', 'output-audited']) {
+  for (const requiredId of ['runtime-ready', 'layout-plan-reviewed', 'process-outcome-checked', 'fallback-disclosed', 'output-audited']) {
     if (!checklistIds.has(requiredId)) {
       throw new Error(`Expected agent guidance verification checklist to include ${requiredId}.`);
     }
@@ -138,6 +147,9 @@ if (scenario === 'single') {
   if (result.supportedFontCount !== 1 || result.invalidFontCount !== 1 || result.files?.[0]?.status !== 'invalid') {
     throw new Error('Expected input inspection to report one invalid font-like file.');
   }
+  if (!result.inspectionWarnings?.some((warning) => warning.code === 'invalid-fonts-found')) {
+    throw new Error('Expected input inspection to warn about invalid fonts.');
+  }
   if (result.maxFilesHit !== false) {
     throw new Error('Expected maxFilesHit false when the scan did not exceed maxFiles.');
   }
@@ -148,6 +160,12 @@ if (scenario === 'single') {
   });
   if (truncated.scannedFileCount !== 1 || truncated.maxFilesHit !== true || truncated.filesIncluded !== false) {
     throw new Error('Expected input inspection to report accurate maxFiles truncation.');
+  }
+  const truncatedInputWarningCodes = new Set((truncated.inspectionWarnings || []).map((warning) => warning.code));
+  for (const expectedWarning of ['input-scan-truncated', 'input-files-omitted']) {
+    if (!truncatedInputWarningCodes.has(expectedWarning)) {
+      throw new Error(`Expected input inspection warning ${expectedWarning}.`);
+    }
   }
   console.log(JSON.stringify(result, null, 2));
   console.log(JSON.stringify({ truncated }, null, 2));
@@ -162,6 +180,9 @@ if (scenario === 'single') {
   const inputInspect = await inspectFontInputs({ inputDir, maxFiles: 1, includeFiles: false });
   if (inputInspect.scannedFileCount !== 1 || inputInspect.maxFilesHit !== true) {
     throw new Error('Expected inspectFontInputs to report maxFilesHit only when more files exist.');
+  }
+  if (!inputInspect.inspectionWarnings?.some((warning) => warning.code === 'input-scan-truncated')) {
+    throw new Error('Expected inspectFontInputs to warn about scan truncation.');
   }
 
   const batchPlan = await splitFontBatch({
@@ -187,8 +208,44 @@ if (scenario === 'single') {
   if (outputInspect.fileCount !== 1 || outputInspect.maxFilesHit !== true) {
     throw new Error('Expected inspectSplitOutput to report accurate scan truncation.');
   }
+  if (!outputInspect.inspectionWarnings?.some((warning) => warning.code === 'output-scan-truncated')) {
+    throw new Error('Expected inspectSplitOutput to warn about output scan truncation.');
+  }
 
   console.log(JSON.stringify({ inputInspect, batchPlan, outputInspect }, null, 2));
+} else if (scenario === 'organize-dry-run') {
+  const inputDir = process.argv[3] || '.font-split-organize-input';
+  const outputDir = process.argv[4] || '.font-split-organize-output';
+  console.log('Directory organization dry-run smoke:', inputDir, '->', outputDir);
+  await fs.rm(inputDir, { recursive: true, force: true });
+  await fs.rm(outputDir, { recursive: true, force: true });
+  await fs.mkdir(path.join(inputDir, 'FamilyA'), { recursive: true });
+  await fs.writeFile(path.join(inputDir, 'FamilyA', 'not-a-font.ttf'), 'not a real font');
+  await fs.writeFile(path.join(inputDir, 'notes.txt'), 'not a font');
+
+  const result = await organizeFontDirectory({
+    inputDir,
+    outputDir,
+    dryRun: true,
+    includePlan: true,
+    maxFiles: 10,
+  });
+  if (result.dryRun !== true || result.operationMode !== 'plan-only' || result.destructive !== false || result.sourceDestructive !== false || result.writesSourceTree !== false || result.writesOutputTree !== false || result.mayOverwriteOutputTree !== false) {
+    throw new Error('Expected organizeFontDirectory dry-run to be source-non-destructive and plan-only.');
+  }
+  if (result.layout?.layoutKind !== 'nested' || result.recommendedBatchOptions?.batchGroupBy !== 'source-dir') {
+    throw new Error('Expected organization layout analysis to recommend source-dir grouping for nested input.');
+  }
+  if (!result.organizationWarnings?.some((warning) => warning.code === 'organization-dry-run')) {
+    throw new Error('Expected organization dry-run warning.');
+  }
+  if (!result.organizationWarnings?.some((warning) => warning.code === 'invalid-fonts-skipped')) {
+    throw new Error('Expected organization warning about skipped invalid fonts.');
+  }
+  if (await fsExists(outputDir)) {
+    throw new Error('Expected organization dry-run not to create outputDir.');
+  }
+  console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'batch-run-cli') {
   const inputDir = process.argv[3] || '.font-split-batch-run-cli';
   const outputRoot = process.argv[4] || '.font-split-batch-run-cli-output';
@@ -234,6 +291,12 @@ if (scenario === 'single') {
   if (compact.fileCount !== 2 || compact.familyCount < 1) {
     throw new Error('Expected compact output inspection to retain summary counts.');
   }
+  const compactWarningCodes = new Set((compact.inspectionWarnings || []).map((warning) => warning.code));
+  for (const expectedWarning of ['output-files-omitted', 'output-families-omitted', 'legacy-output-detected']) {
+    if (!compactWarningCodes.has(expectedWarning)) {
+      throw new Error(`Expected compact output inspection warning ${expectedWarning}.`);
+    }
+  }
   console.log(JSON.stringify(compact, null, 2));
 } else if (scenario === 'mcp-error') {
   const detailedError = new Error('batch failed');
@@ -267,6 +330,7 @@ if (scenario === 'single') {
     const tools = Object.fromEntries(result.tools.map((tool) => [tool.name, tool]));
     const splitFontProps = tools.split_font?.inputSchema?.properties || {};
     const batchProps = tools.split_font_batch?.inputSchema?.properties || {};
+    const organizeProps = tools.organize_font_directory?.inputSchema?.properties || {};
     const batchOnly = ['strictMode', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'debugBatchDecisions'];
     const leaked = batchOnly.filter((key) => Object.hasOwn(splitFontProps, key));
     const missing = batchOnly.filter((key) => !Object.hasOwn(batchProps, key));
@@ -276,11 +340,18 @@ if (scenario === 'single') {
     if (missing.length > 0) {
       throw new Error(`split_font_batch is missing batch-only properties: ${missing.join(', ')}`);
     }
+    for (const requiredOrganizeProp of ['dryRun', 'outputDir', 'overwriteExisting', 'copyInvalidFonts']) {
+      if (!Object.hasOwn(organizeProps, requiredOrganizeProp)) {
+        throw new Error(`organize_font_directory is missing ${requiredOrganizeProp}`);
+      }
+    }
     console.log(JSON.stringify({
       ok: true,
       splitFontPropertyCount: Object.keys(splitFontProps).length,
       splitFontBatchPropertyCount: Object.keys(batchProps).length,
+      organizeFontDirectoryPropertyCount: Object.keys(organizeProps).length,
       splitFontBatchHasBatchGroupBy: Object.hasOwn(batchProps, 'batchGroupBy'),
+      organizeFontDirectoryHasDryRun: Object.hasOwn(organizeProps, 'dryRun'),
     }, null, 2));
   } finally {
     await client.close();

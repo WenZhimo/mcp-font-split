@@ -9,7 +9,7 @@
 
 ## 1. 工具能力总览
 
-当前 MCP 服务暴露 6 个工具：
+当前 MCP 服务暴露 7 个工具：
 
 | 工具 | 作用 |
 |------|------|
@@ -18,6 +18,7 @@
 | `split_font` | 处理单个字体文件 |
 | `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count 和坏字体清单 |
 | `split_font_batch` | 批量扫描目录、去重、分组并处理字体文件 |
+| `organize_font_directory` | 当源目录结构不适合直接批量处理时，生成整理计划，或把字体非破坏性复制到暂存目录 |
 | `inspect_split_output` | 汇总和结构化检查输出目录 |
 
 `split_font` 的结果不一定是多分片 web-font。根据参数和字体状态，它可能产生：
@@ -82,6 +83,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `outDir`
 - `inputDir`
 - `outputRoot`
+- `outputDir`
 
 都会指向不同位置。
 
@@ -390,6 +392,50 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 ---
 
+### 6.5 `organize_font_directory` 目录整理流程
+
+`organize_font_directory` 用于处理“源字体目录结构和工具预期不一致”的情况。它不是字体拆分工具，不会调用 cn-font-split，也不会生成 `.woff2`、`result.css` 或 web-font 输出。
+
+默认行为：
+
+1. `dryRun` 默认是 `true`，只生成整理计划，不创建目录、不复制文件。
+2. 所有路径仍限制在 `FONT_SPLIT_ROOT` 内。
+3. 扫描支持的字体扩展名，并复用输入预检逻辑解析 identity 和 glyph count。
+4. 根据 `batchDedupeMode` 对等价字体去重，默认仍是 `font-identity`。
+5. 根据 `batchGroupBy` 计算整理后的分组目录。
+6. 根据 `batchNamingMode` 计算整理后的目标文件名。
+7. 返回 `layout`、`recommendedBatchOptions`、`organizationWarnings[]` 和可选 `plan[]`。
+
+真正执行时：
+
+- 只有显式设置 `dryRun: false` 才会写入文件。
+- 写入模式是 `copy-only`：只把选中的字体复制到 `outputDir`。
+- 不会移动、删除或重写源目录中的任何文件。
+- `sourceDestructive` 恒为 `false`。
+- `destructive` 只有在当前调用为 `dryRun: false` 且 `overwriteExisting: true`、可能覆盖 `outputDir` 文件时才为 `true`。
+- `writesSourceTree` 恒为 `false`。
+- `writesOutputTree` 只有在 `dryRun: false` 时才为 `true`。
+- `mayOverwriteOutputTree` 只有在当前非 dry-run 调用可能覆盖 `outputDir` 文件时才为 `true`。
+- 执行后会在 `outputDir` 写入 `font-organization-manifest.json`，记录本次整理摘要和条目。
+
+需要特别注意：
+
+- `dryRun` 默认值与 `split_font_batch` 不同。`organize_font_directory` 默认 `true`，`split_font_batch` 默认 `false`。
+- 非字体文件会被忽略。
+- 扩展名像字体但解析失败的文件默认跳过；只有 `copyInvalidFonts: true` 时才会纳入复制计划。
+- 如果 `outputDir` 位于 `inputDir` 里面，响应会给出 `output-inside-input` 警告；后续扫描应排除该目录，避免把整理后的副本再次当作源字体。
+- 如果设置 `overwriteExisting: true`，可能替换 `outputDir` 里的目标文件，但仍不会影响源文件。
+
+推荐 agent 工作流：
+
+1. 先调用 `organize_font_directory`，保持默认 `dryRun: true`。
+2. 检查 `layout.layoutKind`、`recommendedBatchOptions`、`organizationWarnings[]`、`sourceDestructive`、`destructive`、`writesSourceTree`、`writesOutputTree` 和 `mayOverwriteOutputTree`。
+3. 如果用户只是想调整批量参数，不一定需要真的整理目录；可直接把 `recommendedBatchOptions` 应用到 `split_font_batch`。
+4. 如果用户明确希望得到更规整的暂存目录，再用 `dryRun: false` 执行 copy-only 整理。
+5. 整理完成后，对 `outputDir` 调用 `inspect_font_inputs` 或把它作为后续 `split_font_batch.inputDir`。
+
+---
+
 ## 7. 输出目录结构
 
 ### 7.1 正常多分片输出
@@ -443,6 +489,22 @@ split-output/
 - `index.html`
 - `reporter.bin`
 - `index.proto`
+
+### 7.4 `organize_font_directory` 暂存输出
+
+```text
+organized-fonts/
+  <GroupName>/
+    <OriginalFontFile> 或 <OriginalFontFile-1>
+  font-organization-manifest.json
+```
+
+说明：
+
+- 只有 `dryRun: false` 时才会创建这个结构。
+- 这不是 web-font 输出，不包含 CSS 或拆分后的 WOFF2 分片。
+- 它只用于把源字体复制到更适合后续批量处理的暂存目录。
+- 源目录不会被移动、删除或重写。
 
 ---
 
@@ -524,7 +586,36 @@ split-meta.json
 - `oversizedKernDetected`
 - `oversizedKernStripped`
 
-### 9.3 `inspect_split_output`
+### 9.3 `organize_font_directory`
+
+关键字段：
+
+| 字段 | 含义 |
+|------|------|
+| `operationMode` | `plan-only` 或 `copy-only` |
+| `destructive` | 当前调用是否可能覆盖 `outputDir` 中的文件 |
+| `sourceDestructive` | 恒为 `false` |
+| `writesSourceTree` | 恒为 `false` |
+| `writesOutputTree` | `dryRun: false` 时为 `true` |
+| `mayOverwriteOutputTree` | 当前非 dry-run 调用是否可能覆盖目标目录文件 |
+| `layout.layoutKind` | `empty` / `flat` / `nested` / `mixed` |
+| `recommendedBatchOptions` | 根据目录结构建议的后续批量参数 |
+| `organizationWarnings[]` | 摘要级风险和状态提示 |
+| `plan[]` | 可选的逐字体复制/跳过计划 |
+| `organizationManifestPath` | 执行 copy-only 后的 manifest 路径 |
+
+常见 `organizationWarnings[].code`：
+
+- `organization-dry-run`：当前只是计划，不写文件。
+- `organization-writes-output`：当前会写入 `outputDir`。
+- `output-overwrite-enabled`：允许覆盖目标目录中的文件。
+- `unsupported-files-ignored`：非字体文件被忽略。
+- `invalid-fonts-skipped`：坏字体/伪字体文件被跳过。
+- `duplicate-fonts-skipped`：等价字体被去重。
+- `mixed-layout-detected`：根目录和子目录中都发现了字体。
+- `output-inside-input`：整理输出目录位于输入目录内，后续扫描需要排除它。
+
+### 9.4 `inspect_split_output`
 
 `maxFiles` 默认是 `200000`。它只影响输出检查阶段的文件扫描上限，不影响批量处理阶段的 `maxFiles`。
 
@@ -610,6 +701,18 @@ split-meta.json
 - copy-original metadata-only 处理
 
 必须结合 `outputMode` / `resultType` 判断。
+
+---
+
+### 10.6 目录整理工具不是破坏性重排工具
+
+`organize_font_directory` 的名字容易让人以为它会“整理原目录”。实际不是：
+
+- 默认 `dryRun: true`，只返回计划。
+- `dryRun: false` 时也只是复制文件到 `outputDir`。
+- 源目录不移动、不删除、不覆盖。
+- `overwriteExisting: true` 只允许覆盖 `outputDir` 中的目标文件，不会影响源文件。
+- 如果用户想真正移动/重命名源目录，当前工具不会做；应由用户另行确认并使用其他文件管理流程。
 
 ---
 

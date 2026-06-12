@@ -20,6 +20,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 - Split TTF/OTF/TTC/OTC/WOFF/WOFF2 fonts into web-font output files.
 - Batch-process font directories under the configured workspace.
 - Preflight input directories to find invalid font-like files before large batch runs.
+- Plan or copy-organize source font directories into a cleaner staging layout when the source structure does not match the desired batch grouping.
 - Provide `get_agent_guidance` so AI coding assistants can choose a safe workflow from machine-readable guidance.
 - Provide `get_runtime_status` so agents can verify workspace, Node engine compatibility, package versions, and WASM availability before processing.
 - Preserve original font files in the output family directory.
@@ -36,6 +37,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 | `split_font` | Process one font file. Depending on options, it may create subset WOFF2 chunks, a single WOFF2 fallback, or a copy-original metadata entry. |
 | `inspect_font_inputs` | Scan input fonts without writing output; reports parse status, identity keys, glyph counts, and invalid font-like files. |
 | `split_font_batch` | Scan a directory, deduplicate according to `batchDedupeMode`, group fonts into family directories, and process each selected font. |
+| `organize_font_directory` | Plan or copy-organize source fonts into a staging directory. Defaults to `dryRun: true`; never moves or deletes source files. |
 | `inspect_split_output` | Summarize output files and classify family/font entries using `split-meta.json` when available. |
 
 ## Important behavior summary
@@ -48,6 +50,7 @@ Key defaults and policy choices:
 - Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server.
 - For AI coding assistants, call `get_agent_guidance` first when the workflow is unclear. It returns recommended tool order, default policies, path rules, response fields, and a verification checklist that should be inspected before claiming success.
 - Use `get_runtime_status` when setup is uncertain; it checks the resolved workspace, Node engine compatibility, package versions, cn-font-split runtime version, and WASM file without writing anything, then returns `recommendedActions[]` for agent-friendly remediation.
+- Use `organize_font_directory` with `dryRun: true` when the source directory is flat, mixed, or otherwise does not match the intended batch grouping. This tool is source-non-destructive: it never moves or deletes source files, and real runs only copy selected fonts into `outputDir`.
 - Batch scanning skips dependencies, generated output directories, `__MACOSX`, and AppleDouble `._*` resource-fork files.
 - `.woff` and `.woff2` inputs are decompressed to sfnt-like data before processing.
 - Batch mode deduplicates fonts according to `batchDedupeMode`; by default `font-identity` keeps one representative for equivalent fonts across formats using the priority `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff`.
@@ -104,6 +107,17 @@ split-output/
 In batch mode, the bare name is used first. Only true collisions allocate stable numeric suffixes (`-1`, `-2`, ...), and those suffixes are reused on reruns through manifest matching.
 
 `copy-original` intentionally does not generate `.woff2` or `result.css`; it records that the font was handled and skipped from subsetting.
+
+Organized staging output from `organize_font_directory`:
+
+```text
+organized-fonts/
+  <GroupName>/
+    <OriginalFontFile> or <OriginalFontFile-1>
+  font-organization-manifest.json   # only when dryRun=false
+```
+
+This staging layout is not a split result and does not contain CSS. It is a copy-only helper for preparing a source directory before a later `split_font_batch` run.
 
 ## Key options
 
@@ -190,6 +204,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `supportedFontCount`, `validFontCount`, `invalidFontCount`
 - `missingIdentityCount`
 - `maxFilesHit`: true only when more files exist beyond `maxFiles`
+- `inspectionWarningCount`, `inspectionWarnings[]` with machine-readable `code` and `message`
 - `invalidFonts[]`
 - optional `files[]` entries with `container`, `identity`, `identityKey`, `identityBasis`, and `glyphCount`
 
@@ -209,12 +224,26 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `processingSummary.smallGlyphCopyOriginals`
 - `processingSummary.failureFallbacks`
 
+`organize_font_directory` returns a source-safety summary plus an optional copy plan:
+
+- `operationMode`: `plan-only` for default dry-run, or `copy-only` when `dryRun: false`
+- `destructive`: true only when the current non-dry-run call may overwrite files in `outputDir`
+- `sourceDestructive`: always `false`
+- `writesSourceTree`: always `false`
+- `writesOutputTree`: true only when `dryRun: false`
+- `mayOverwriteOutputTree`: true only when `dryRun: false` and `overwriteExisting: true`
+- `layout.layoutKind`: `empty`, `flat`, `nested`, or `mixed`
+- `recommendedBatchOptions`: a suggested follow-up `split_font_batch` configuration for the detected layout
+- `organizationWarningCount`, `organizationWarnings[]` with machine-readable `code` and `message`
+- optional `plan[]` entries with `source`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`
+
 `inspect_split_output` keeps flat file stats and adds structured output inventory:
 
 - `maxFiles` can raise or lower the output scan cap; it defaults to `200000` so large batch outputs are not truncated during inspection.
 - `maxFilesHit` is true only when more output files exist beyond `maxFiles`.
 - `includeFiles: false` omits flat `files[]` while keeping summary counters.
 - `includeFamilies: false` omits structured `families[]` while keeping family and output-mode counters.
+- `inspectionWarningCount` and `inspectionWarnings[]` summarize truncation, omitted detail arrays, and legacy output inference with machine-readable `code` values.
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`
@@ -301,6 +330,34 @@ Preview a full-library run without writing files:
 }
 ```
 
+Preview a non-destructive directory organization plan:
+
+```json
+{
+  "inputDir": ".",
+  "outputDir": "organized-fonts",
+  "dryRun": true,
+  "includePlan": true,
+  "batchGroupBy": "auto",
+  "batchNamingMode": "numeric-suffix",
+  "batchDedupeMode": "font-identity"
+}
+```
+
+Apply the reviewed copy-only organization plan:
+
+```json
+{
+  "inputDir": ".",
+  "outputDir": "organized-fonts",
+  "dryRun": false,
+  "batchGroupBy": "auto",
+  "batchNamingMode": "numeric-suffix",
+  "batchDedupeMode": "font-identity",
+  "overwriteExisting": false
+}
+```
+
 Metadata-driven batch grouping:
 
 ```json
@@ -383,6 +440,7 @@ npm run smoke:runtime-status
 npm run smoke:incremental
 npm run smoke:font-inputs
 npm run smoke:scan-limits
+npm run smoke:organize
 npm run smoke:batch-run
 npm run smoke:inspect-compact
 npm run smoke:mcp-error

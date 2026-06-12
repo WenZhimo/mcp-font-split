@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, splitFont, splitFontBatch } from './font-split.js';
+import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
 import { errorText, jsonText } from './mcp-response.js';
 
 const require = createRequire(import.meta.url);
@@ -60,7 +60,7 @@ server.registerTool(
     title: 'Get AI agent usage guidance',
     description: 'Call this first when an AI coding assistant needs to choose a safe font-splitting workflow. It returns workspace path rules, recommended tool order, defaults, and response fields to inspect.',
     inputSchema: {
-      workflow: z.enum(['overview', 'single', 'batch', 'inspect']).optional().describe('Guidance focus. Default: overview.'),
+      workflow: z.enum(['overview', 'single', 'batch', 'inspect', 'organize']).optional().describe('Guidance focus. Default: overview.'),
     },
   },
   async (args) => {
@@ -143,6 +143,33 @@ server.registerTool(
   async (args) => {
     try {
       return jsonText(await inspectFontInputs(args));
+    } catch (error) {
+      return errorText(error);
+    }
+  },
+);
+
+server.registerTool(
+  'organize_font_directory',
+  {
+    title: 'Plan or copy-organize a font directory',
+    description: 'Call this when the source font directory layout does not match the desired batch grouping. It defaults to dryRun true and is source-non-destructive: it never moves or deletes source files, and when dryRun is false it only copies selected fonts into outputDir.',
+    inputSchema: {
+      inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
+      outputDir: z.string().optional().describe('Directory for organized copies, relative to the font workspace. Defaults to organized-fonts. Must differ from inputDir.'),
+      maxFiles: z.number().int().positive().max(50000).optional().describe('Maximum source files to scan. Defaults to 50000.'),
+      dryRun: z.boolean().optional().describe('Plan only without writing directories or files. Default: true. Set false only after reviewing plan[] and organizationWarnings[].'),
+      includePlan: z.boolean().optional().describe('Include per-font plan[] entries. Default: true. Set false for compact summaries.'),
+      batchGroupBy: z.enum(['auto', 'source-dir', 'font-family']).optional().describe('How organized copy folders are grouped. Default: auto. Uses the same meanings as split_font_batch.'),
+      batchNamingMode: z.enum(['plain', 'numeric-suffix', 'source-suffix']).optional().describe('How copied font filenames avoid collisions. Default: numeric-suffix.'),
+      batchDedupeMode: z.enum(['none', 'same-path', 'font-identity']).optional().describe('How equivalent fonts are deduped before copy planning. Default: font-identity.'),
+      copyInvalidFonts: z.boolean().optional().describe('Copy files with supported font extensions even when metadata parsing fails. Default: false.'),
+      overwriteExisting: z.boolean().optional().describe('Allow replacing matching files in outputDir. Default: false. Source files are still never modified.'),
+    },
+  },
+  async (args) => {
+    try {
+      return jsonText(await organizeFontDirectory(args));
     } catch (error) {
       return errorText(error);
     }

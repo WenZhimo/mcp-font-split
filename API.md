@@ -1,6 +1,6 @@
 # API Reference
 
-This server exposes six MCP tools. All paths are resolved inside `FONT_SPLIT_ROOT`; if that environment variable is not set, paths are resolved from the process working directory.
+This server exposes seven MCP tools. All paths are resolved inside `FONT_SPLIT_ROOT`; if that environment variable is not set, paths are resolved from the process working directory.
 
 ## `get_agent_guidance`
 
@@ -8,9 +8,9 @@ Return machine-readable usage guidance for AI coding assistants.
 
 | Field | Type / values | Default | Description |
 |-------|---------------|---------|-------------|
-| `workflow` | `overview`, `single`, `batch`, `inspect` | `overview` | Guidance focus. |
+| `workflow` | `overview`, `single`, `batch`, `inspect`, `organize` | `overview` | Guidance focus. |
 
-The response includes workspace path rules, supported extensions, default policies, recommended batch options, response fields to inspect, a verification checklist, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
 
 ## `get_runtime_status`
 
@@ -95,6 +95,7 @@ Important result fields:
 | `invalidFontCount` | Supported extension files that failed parsing. |
 | `missingIdentityCount` | Parseable fonts without a usable batch identity key. |
 | `maxFilesHit` | `true` only when more source files existed beyond `maxFiles`. |
+| `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level inspection notices with machine-readable `code` and human-readable `message`. |
 | `invalidFonts[]` | Compact list of invalid font-like files and parse errors. |
 | `files[]` | Optional per-font entries with extension, container, identity, identity key, glyph count, and parse status. |
 
@@ -152,6 +153,49 @@ Dry-run responses use `planned[]` instead of `results[]` when `includeResults` i
 
 Batch responses include `batchWarningCount` and `batchWarnings[]` for summary-level notices such as dry-run no-write mode, scan truncation, limit truncation, omitted per-font details, existing-output skips, and collected per-font errors. Each warning has a machine-readable `code` and a human-readable `message`.
 
+## `organize_font_directory`
+
+Plan or copy-organize a source font directory into a cleaner staging layout.
+
+> [!WARNING]
+> This tool is source-non-destructive. It never moves, deletes, or rewrites source files. By default `dryRun` is `true`, so it only returns a plan. When `dryRun: false`, it creates directories and copies selected fonts into `outputDir`; if `overwriteExisting: true`, destination files in `outputDir` may be replaced.
+
+| Field | Type / values | Default | Description |
+|-------|---------------|---------|-------------|
+| `inputDir` | string | `.` | Directory to scan inside `FONT_SPLIT_ROOT`. |
+| `outputDir` | string | `organized-fonts` | Destination directory for organized copies. Must be different from `inputDir`. |
+| `maxFiles` | positive integer, MCP max `50000` | `50000` | Maximum source files to scan. |
+| `dryRun` | boolean | `true` | Plan only without writing files. Set `false` only after reviewing `plan[]` and `organizationWarnings[]`. |
+| `includePlan` | boolean | `true` | Include per-font `plan[]` entries. Set `false` for compact summaries. |
+| `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | Folder grouping strategy for organized copies, using the same meanings as `split_font_batch`. |
+| `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Copied filename collision strategy. |
+| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Equivalent-font dedupe strategy before copy planning. |
+| `copyInvalidFonts` | boolean | `false` | Copy supported-extension files even when font metadata parsing fails. Keep this `false` unless preserving broken font-like files is intentional. |
+| `overwriteExisting` | boolean | `false` | Allow replacing matching files in `outputDir`. Source files are still never modified. |
+
+Important result fields:
+
+| Field | Meaning |
+|-------|---------|
+| `operationMode` | `plan-only` when `dryRun` is true, otherwise `copy-only`. |
+| `destructive` | `true` only when `dryRun: false` and `overwriteExisting: true` allow replacing files in `outputDir`. It never means source files are modified. |
+| `sourceDestructive` | Always `false`; source files are never moved, deleted, or rewritten. |
+| `writesSourceTree` | Always `false`; source files are preserved. |
+| `writesOutputTree` | `true` only when `dryRun` is false. |
+| `mayOverwriteOutputTree` | `true` only when the current non-dry-run call may replace files in `outputDir`. |
+| `layout.layoutKind` | `empty`, `flat`, `nested`, or `mixed`. Mixed means fonts exist both at the input root and below subdirectories. |
+| `recommendedBatchOptions` | Suggested `split_font_batch` options for the detected layout. Nested or mixed inputs usually recommend `batchGroupBy: "source-dir"`; flat inputs usually recommend `font-family`. |
+| `organizationWarningCount` / `organizationWarnings[]` | Machine-readable notices such as `organization-dry-run`, `organization-writes-output`, `output-overwrite-enabled`, `mixed-layout-detected`, `invalid-fonts-skipped`, and `output-inside-input`. |
+| `plan[]` | Optional per-font copy/skip entries. Copy entries include `source`, `target`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`. |
+| `organizationManifestPath` | Written only when `dryRun: false`; points to `font-organization-manifest.json` in `outputDir`. |
+
+Non-intuitive behavior to watch:
+
+- `dryRun` defaults to `true`, unlike `split_font_batch`, where `dryRun` defaults to `false`.
+- The tool copies fonts into a staging directory; it does not split fonts and does not generate CSS.
+- Non-font files are ignored. Invalid font-like files are skipped unless `copyInvalidFonts: true`.
+- If `outputDir` is inside `inputDir`, the response includes `output-inside-input`; future scans should exclude that output directory to avoid processing organized copies as new source fonts.
+
 ## `inspect_split_output`
 
 Inspect a generated output directory.
@@ -170,6 +214,7 @@ Important result fields:
 | `familyCount` | Number of detected family directories. |
 | `maxFilesHit` | `true` only when more output files existed beyond `maxFiles`. |
 | `filesIncluded` / `familiesIncluded` | Whether `files[]` and `families[]` are present. |
+| `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, and legacy output inference. |
 | `fontEntryCount` | Number of detected per-font output entries. |
 | `manifestCount` | Number of entries with `split-meta.json`. |
 | `legacyOutputCount` | Number of entries inferred without manifest. |
