@@ -30,7 +30,7 @@
 
 `recommendedWorkflowPlan` 是当前 `workflow` 对应的有序执行计划。它把安全模板 ID 编排成输入预检、目录形态决策、批量预览、审查后写入和输出审计等阶段。每个 `orderedSteps[]` 和 `decisionPoints[]` 条目都会包含 `inspectFields` 与 `successCriteria`。它是路线图，不替代工具响应检查；agent 从预览进入写入、或向用户宣称完成前，仍然必须检查列出的字段并满足对应条件。
 
-`verificationChecklist[]` 也包含面向本包维护者的 `local-real-corpus-suite-passed`。当 agent 修改了会影响功能行为的代码后，应在本机真实语料库上运行 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，再宣称本阶段完成。这是代表性可靠性门禁，不是逐个目录验收，也不是运行时 MCP 工具调用。suite 输出里的 `testScope` 会把范围拆清楚：`corpusScan` 是全库有界根扫描，`targetSampling` 是代表性 dry-run 抽样，`representativeWriteAudit` 是一个有界真实写入和输出审计路径。
+`verificationChecklist[]` 也包含面向本包维护者的 `local-real-corpus-suite-passed`。当 agent 修改了会影响功能行为的代码后，应在本机真实语料库上运行 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，再宣称本阶段完成。这是代表性可靠性门禁，不是逐个目录验收，也不是运行时 MCP 工具调用。suite 会先打印简短的 `real-corpus suite summary`，并在 JSON `humanSummary` 中保留同样信息，用于避免把固定目标数量误读成全库扫描数量。suite 输出里的 `testScope` 会把范围拆清楚：`corpusScan` 是全库有界根扫描，`targetSampling` 是代表性 dry-run 抽样，`representativeWriteAudit` 是一个有界真实写入和输出审计路径。
 
 `warningCodeCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["warning-catalog"]` 时返回，会把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的机器可读 warning code 映射到响应来源、严重度和建议 agent 动作。
 

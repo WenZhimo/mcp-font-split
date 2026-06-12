@@ -288,6 +288,46 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
   };
 }
 
+function buildRealCorpusSuiteHumanSummary(coverageSummary) {
+  const corpusScan = coverageSummary.testScope?.corpusScan || {};
+  const targetSampling = coverageSummary.testScope?.targetSampling || {};
+  const writeAudit = coverageSummary.testScope?.representativeWriteAudit || {};
+  const fixedCount = targetSampling.fixedRegressionTargetCount ?? coverageSummary.fixedRegressionTargets?.length;
+  const selectedCount = targetSampling.selectedTargetCount ?? coverageSummary.selectedTargetCount;
+  const availableCount = targetSampling.availableTargetCount ?? coverageSummary.availableTargetCount;
+  const functionalCoverage = coverageSummary.functionalCoverage || [];
+  const coveredCount = functionalCoverage.filter((item) => item.covered === true).length;
+  const totalCoverageCount = functionalCoverage.length;
+  const lines = [
+    `Full corpus scan: ${corpusScan.supportedFontCount ?? 'unknown'} supported font files and ${corpusScan.unsupportedFileCount ?? 'unknown'} ignored/non-font files; maxFilesHit=${corpusScan.maxFilesHit}.`,
+    `Target sampling: ${fixedCount ?? 'unknown'} fixed regression targets and ${selectedCount ?? 'unknown'} selected representative targets out of ${availableCount ?? 'unknown'} available target directories; this is not per-directory acceptance.`,
+    `Representative write audit: sample=${writeAudit.sampleInputDir || 'unknown'}, single=${writeAudit.singleAuditStatus || 'unknown'}, batch=${writeAudit.batchAuditStatus || 'unknown'}.`,
+    `Interpretation: small numbers such as ${fixedCount ?? 'fixed'} or ${selectedCount ?? 'selected'} are target counts, not the full corpus font count; use testScope.corpusScan.supportedFontCount for the root-level font total.`,
+    `Functional coverage: ${coveredCount}/${totalCoverageCount} real-corpus feature paths covered.`,
+  ];
+  return {
+    summaryType: 'real-corpus-suite-human-summary',
+    purpose: 'Short human-readable explanation of the representative real-corpus gate.',
+    lines,
+    fullCorpusSupportedFontCount: corpusScan.supportedFontCount,
+    fullCorpusUnsupportedFileCount: corpusScan.unsupportedFileCount,
+    fixedRegressionTargetCount: fixedCount,
+    selectedTargetCount: selectedCount,
+    availableTargetCount: availableCount,
+    representativeWriteSample: writeAudit.sampleInputDir,
+    singleAuditStatus: writeAudit.singleAuditStatus,
+    batchAuditStatus: writeAudit.batchAuditStatus,
+    perDirectoryAcceptanceAudit: false,
+  };
+}
+
+function printRealCorpusSuiteHumanSummary(humanSummary) {
+  console.log('\n--- real-corpus suite summary ---');
+  for (const line of humanSummary.lines || []) {
+    console.log(line);
+  }
+}
+
 async function runSmokeSubprocess(args, label, { verbose = false } = {}) {
   const startedAt = Date.now();
   console.log(`\n--- ${label} ---`);
@@ -3256,6 +3296,7 @@ if (scenario === 'single') {
       'unsupportedFileSummary.byCategory',
       'unsupportedFileSummary.examples',
       'debugBatchDecisions',
+      'humanSummary',
     ]) {
       assertDocsContainAny(`important field ${fieldName}`, [`\`${fieldName}\``, `\`${fieldName}[]\``]);
     }
@@ -3302,6 +3343,7 @@ if (scenario === 'single') {
     '`unsupportedFileCategoryCatalog`',
     '`verificationChecklist[]`',
     '`smoke:real-corpus-suite`',
+    '`humanSummary`',
     '`testScope`',
     '`functionalCoverage[]`',
     '`directoryWorkflowDecisionMatrix[]`',
@@ -3635,6 +3677,7 @@ if (scenario === 'single') {
     integrationLimit,
     sampleCount,
   });
+  const humanSummary = buildRealCorpusSuiteHumanSummary(coverageSummary);
   if (
     coverageSummary.perDirectoryAcceptanceAudit !== false
     || coverageSummary.testScope?.corpusScan?.scopeKind !== 'full-root-bounded-scan'
@@ -3652,10 +3695,16 @@ if (scenario === 'single') {
     || !Array.isArray(coverageSummary.corpusUnsupportedByCategory)
     || coverageSummary.selectedTargetCount < 1
     || coverageSummary.batchAuditStatus !== 'pass'
+    || humanSummary.summaryType !== 'real-corpus-suite-human-summary'
+    || humanSummary.fullCorpusSupportedFontCount !== coverageSummary.corpusSupportedFontCount
+    || humanSummary.selectedTargetCount !== coverageSummary.selectedTargetCount
+    || humanSummary.perDirectoryAcceptanceAudit !== false
+    || !humanSummary.lines?.some((line) => line.includes('not the full corpus font count'))
   ) {
-    throw new Error('Expected real-corpus-suite compact coverage summary to expose explicit testScope, covered function paths, root counts, unsupported categories, selected targets, and passing output audits.');
+    throw new Error('Expected real-corpus-suite compact coverage summary to expose explicit testScope, humanSummary, covered function paths, root counts, unsupported categories, selected targets, and passing output audits.');
   }
 
+  printRealCorpusSuiteHumanSummary(humanSummary);
   console.log(JSON.stringify({
     ok: true,
     purpose: 'Representative reliability gate over a local real font corpus; not a per-directory acceptance audit.',
@@ -3665,6 +3714,7 @@ if (scenario === 'single') {
     targetLimit,
     integrationLimit,
     sampleCount,
+    humanSummary,
     testScope: coverageSummary.testScope,
     coverageSummary,
     runs,
