@@ -273,7 +273,7 @@ fonts/
 
 ## 如何解释返回结果
 
-`split_font` 返回兼容字段，也返回更明确的分类字段：
+`split_font` 返回更明确的分类字段：
 
 - `outputMode`：`subset`、`single-woff2` 或 `copy-original`
 - `resultType`：`subset`、`single-woff2-small-glyph`、`single-woff2-split-failure`、`single-woff2` 或 `copy-original-small-glyph`
@@ -319,9 +319,8 @@ fonts/
 
 `organize_font_directory` 会返回源目录安全性摘要和可选整理计划：
 
-- `safetySummary`：紧凑的源目录/输出目录安全摘要。判断整理工具是否破坏性时优先看它；它会确认源文件会被保留，并把任何覆盖风险限定到 `outputDir`。
+- `safetySummary`：紧凑的源目录/输出目录安全摘要。判断整理工具是否写文件、是否影响源目录树时优先看它；它会确认源文件会被保留，并把任何覆盖风险限定到 `outputDir`。
 - `operationMode`：默认 dry-run 时为 `plan-only`，`dryRun: false` 时为 `copy-only`
-- `destructive`：只有当前非 dry-run 调用可能覆盖 `outputDir` 中的文件时才为 true
 - `sourceDestructive`：恒为 `false`
 - `writesSourceTree`：只有真实整理复制且 `outputDir` 位于 `inputDir` 内时才为 `true`
 - `writesOutputTree`：只有 `dryRun: false` 时为 true

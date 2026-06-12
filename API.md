@@ -239,9 +239,8 @@ Important result fields:
 
 | Field | Meaning |
 |-------|---------|
-| `safetySummary` | Compact source/output safety summary. It repeats the operation mode, confirms source files are preserved, declares the write scope, and scopes overwrite risk to the output tree only. Prefer this field before interpreting the legacy boolean fields below. |
+| `safetySummary` | Compact source/output safety summary. It repeats the operation mode, confirms source files are preserved, declares the write scope, and scopes overwrite risk to the output tree only. Prefer this field before interpreting individual safety booleans. |
 | `operationMode` | `plan-only` when `dryRun` is true, otherwise `copy-only`. |
-| `destructive` | `true` only when `dryRun: false` and `overwriteExisting: true` allow replacing files in `outputDir`. It never means source files are modified. |
 | `sourceDestructive` | Always `false`; source files are never moved, deleted, or rewritten. |
 | `writesSourceTree` | `true` only when `dryRun: false` writes `outputDir` inside `inputDir`; source files are still preserved. |
 | `writesOutputTree` | `true` only when `dryRun` is false. |

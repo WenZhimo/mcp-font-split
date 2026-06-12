@@ -789,11 +789,6 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Per-font copy or skip plan entries for directory organization.',
     agentAction: 'Review before running with dryRun:false, especially when overwriteExisting or duplicate skipping is involved.',
   },
-  destructive: {
-    sourceTools: ['organize_font_directory'],
-    meaning: 'Whether the current organization call may replace files in the output tree.',
-    agentAction: 'Distinguish output overwrites from source modifications before reporting risk.',
-  },
   sourceDestructive: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Whether source files can be moved, deleted, or rewritten. Batch and organization calls should report false.',
@@ -1509,7 +1504,7 @@ export function getAgentGuidance(args = {}) {
       id: 'layout-plan-reviewed',
       appliesTo: ['overview', 'batch', 'organize'],
       check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect safetySummary, layout, recommendedBatchOptions, recommendedBatchPreviewArgs, sourceDestructive, writesSourceTree, writesOutputTree, outputTreeInsideInputTree, mayOverwriteOutputTree, organizationWarnings, and planActionSummary before applying any copy plan.',
-      responseFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'recommendedNextActions', 'unsupportedFileSummary', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
+      responseFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'recommendedNextActions', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'batch-plan-reviewed',
@@ -2048,7 +2043,6 @@ export function getAgentGuidance(args = {}) {
       'organizationManifestPath',
       'planActionSummary',
       'plan',
-      'destructive',
       'sourceDestructive',
       'sourceFilesPreserved',
       'writesSourceTree',
@@ -2390,9 +2384,6 @@ function buildBatchSafetySummary({ dryRun, selectedCount, outputTreeInsideInputT
   const overwriteScope = !mayOverwriteOutputTree
     ? 'none'
     : outputTreeInsideInputTree ? 'output-tree-inside-input-tree' : 'output-tree-only';
-  const destructiveMeaning = !mayOverwriteOutputTree
-    ? 'none'
-    : outputTreeInsideInputTree ? 'may-overwrite-output-tree-inside-input-tree-only' : 'may-overwrite-output-tree-only';
   const summary = dryRun
     ? 'Batch dry run; no output files were written and source files were only scanned.'
     : outputTreeInsideInputTree
@@ -2408,7 +2399,6 @@ function buildBatchSafetySummary({ dryRun, selectedCount, outputTreeInsideInputT
     mayOverwriteOutputTree,
     writeScope,
     overwriteScope,
-    destructiveMeaning,
     summary,
   };
 }
@@ -4895,7 +4885,6 @@ export async function organizeFontDirectory(args = {}) {
   const writesOutputTree = !options.dryRun;
   const writesSourceTree = writesOutputTree && outputDirInsideInput;
   const mayOverwriteOutputTree = !options.dryRun && options.overwriteExisting;
-  const destructive = mayOverwriteOutputTree;
   const operationMode = options.dryRun ? 'plan-only' : 'copy-only';
   const writeScope = !writesOutputTree
     ? 'none'
@@ -4903,9 +4892,6 @@ export async function organizeFontDirectory(args = {}) {
   const overwriteScope = !mayOverwriteOutputTree
     ? 'none'
     : outputDirInsideInput ? 'output-tree-inside-input-tree' : 'output-tree-only';
-  const destructiveMeaning = !destructive
-    ? 'none'
-    : outputDirInsideInput ? 'may-overwrite-output-tree-inside-input-tree-only' : 'may-overwrite-output-tree-only';
   const summary = options.dryRun
     ? 'Plan-only dry run; no files are written and source files are only scanned.'
     : outputDirInsideInput
@@ -4923,7 +4909,6 @@ export async function organizeFontDirectory(args = {}) {
     mayOverwriteOutputTree,
     writeScope,
     overwriteScope,
-    destructiveMeaning,
     summary,
   };
   const warnings = buildOrganizationWarnings({
@@ -4981,7 +4966,6 @@ export async function organizeFontDirectory(args = {}) {
     errorCount: errors.length,
     errors,
     safetySummary,
-    destructive,
     sourceDestructive,
     writesSourceTree,
     writesOutputTree,

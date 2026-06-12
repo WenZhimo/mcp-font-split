@@ -239,9 +239,8 @@
 
 | 字段 | 含义 |
 |------|------|
-| `safetySummary` | 紧凑的源目录/输出目录安全摘要。它会重复 operation mode，确认源文件会被保留，声明写入范围，并把覆盖风险限定到输出目录。解释下面这些兼容布尔字段前，优先看这个字段。 |
+| `safetySummary` | 紧凑的源目录/输出目录安全摘要。它会重复 operation mode，确认源文件会被保留，声明写入范围，并把覆盖风险限定到输出目录。解释单个安全布尔字段前，优先看这个字段。 |
 | `operationMode` | `dryRun` 为 true 时是 `plan-only`，否则是 `copy-only`。 |
-| `destructive` | 只有当前调用为 `dryRun: false` 且 `overwriteExisting: true`、可能替换 `outputDir` 文件时才为 `true`；它不表示源文件会被修改。 |
 | `sourceDestructive` | 恒为 `false`；源文件不会被移动、删除或重写。 |
 | `writesSourceTree` | 只有 `dryRun: false` 且 `outputDir` 位于 `inputDir` 内时才为 `true`；源文件仍会保留。 |
 | `writesOutputTree` | 只有 `dryRun: false` 时才为 `true`。 |

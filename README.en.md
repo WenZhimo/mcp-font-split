@@ -273,7 +273,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 
 ## Result interpretation
 
-`split_font` returns compatibility fields plus explicit classification fields:
+`split_font` returns explicit classification fields:
 
 - `outputMode`: `subset`, `single-woff2`, or `copy-original`
 - `resultType`: `subset`, `single-woff2-small-glyph`, `single-woff2-split-failure`, `single-woff2`, or `copy-original-small-glyph`
@@ -319,9 +319,8 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 
 `organize_font_directory` returns a source-safety summary plus an optional copy plan:
 
-- `safetySummary`: compact source/output safety summary. Prefer it when deciding whether the organizer is destructive; it confirms source preservation and scopes any overwrite risk to `outputDir`.
+- `safetySummary`: compact source/output safety summary. Prefer it when deciding whether the organizer writes files or can affect the source tree; it confirms source preservation and scopes any overwrite risk to `outputDir`.
 - `operationMode`: `plan-only` for default dry-run, or `copy-only` when `dryRun: false`
-- `destructive`: true only when the current non-dry-run call may overwrite files in `outputDir`
 - `sourceDestructive`: always `false`
 - `writesSourceTree`: true only when a real copy writes `outputDir` inside `inputDir`
 - `writesOutputTree`: true only when `dryRun: false`

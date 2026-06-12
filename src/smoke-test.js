@@ -1302,7 +1302,7 @@ if (scenario === 'single') {
     includePlan: true,
     maxFiles: 10,
   });
-  if (result.dryRun !== true || result.operationMode !== 'plan-only' || result.destructive !== false || result.sourceDestructive !== false || result.writesSourceTree !== false || result.writesOutputTree !== false || result.outputTreeInsideInputTree !== false || result.mayOverwriteOutputTree !== false) {
+  if (result.dryRun !== true || result.operationMode !== 'plan-only' || result.sourceDestructive !== false || result.writesSourceTree !== false || result.writesOutputTree !== false || result.outputTreeInsideInputTree !== false || result.mayOverwriteOutputTree !== false || Object.hasOwn(result, 'destructive')) {
     throw new Error('Expected organizeFontDirectory dry-run to be source-non-destructive and plan-only.');
   }
   if (
@@ -1406,7 +1406,7 @@ if (scenario === 'single') {
     batchNamingMode: 'plain',
     maxFiles: 10,
   });
-  if (copied.operationMode !== 'copy-only' || copied.sourceDestructive !== false || copied.writesSourceTree !== false || copied.writesOutputTree !== true || copied.outputTreeInsideInputTree !== false || copied.mayOverwriteOutputTree !== false || copied.destructive !== false) {
+  if (copied.operationMode !== 'copy-only' || copied.sourceDestructive !== false || copied.writesSourceTree !== false || copied.writesOutputTree !== true || copied.outputTreeInsideInputTree !== false || copied.mayOverwriteOutputTree !== false || Object.hasOwn(copied, 'destructive')) {
     throw new Error('Expected organizeFontDirectory copy mode to write only the output tree without overwrite risk.');
   }
   if (
@@ -1488,7 +1488,7 @@ if (scenario === 'single') {
     overwriteExisting: true,
     maxFiles: 10,
   });
-  if (overwritten.sourceDestructive !== false || overwritten.writesSourceTree !== false || overwritten.writesOutputTree !== true || overwritten.outputTreeInsideInputTree !== false || overwritten.mayOverwriteOutputTree !== true || overwritten.destructive !== true) {
+  if (overwritten.sourceDestructive !== false || overwritten.writesSourceTree !== false || overwritten.writesOutputTree !== true || overwritten.outputTreeInsideInputTree !== false || overwritten.mayOverwriteOutputTree !== true || Object.hasOwn(overwritten, 'destructive')) {
     throw new Error('Expected overwrite mode to flag output-tree overwrite risk while preserving source safety.');
   }
   if (
@@ -1498,7 +1498,7 @@ if (scenario === 'single') {
     || overwritten.safetySummary?.outputTreeInsideInputTree !== false
     || overwritten.safetySummary?.mayOverwriteOutputTree !== true
     || overwritten.safetySummary?.overwriteScope !== 'output-tree-only'
-    || overwritten.safetySummary?.destructiveMeaning !== 'may-overwrite-output-tree-only'
+    || Object.hasOwn(overwritten.safetySummary || {}, 'destructiveMeaning')
   ) {
     throw new Error('Expected overwrite safetySummary to scope destructive risk to the output tree only.');
   }
