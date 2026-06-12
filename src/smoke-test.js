@@ -709,6 +709,17 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('configurationRecipes')) {
     throw new Error('Expected agent guidance to recommend checking configuration recipes.');
   }
+  for (const fieldName of [
+    'unsupportedFileSummary.total',
+    'unsupportedFileSummary.byExtension',
+    'unsupportedFileSummary.byCategory',
+    'unsupportedFileSummary.examples',
+    'unsupportedFileSummary.examplesTruncated',
+  ]) {
+    if (!result.responseFieldsToCheck?.includes(fieldName)) {
+      throw new Error(`Expected agent guidance to recommend checking ${fieldName}.`);
+    }
+  }
   if (!result.responseFieldsToCheck?.includes('recommendedBatchPreviewArgs')) {
     throw new Error('Expected agent guidance to recommend checking safe batch preview args.');
   }
@@ -956,6 +967,11 @@ if (scenario === 'single') {
     recommendedNextActions: 'split_font_batch',
     safetySummary: 'split_font_batch',
     unsupportedFileSummary: 'organize_font_directory',
+    'unsupportedFileSummary.total': 'inspect_font_inputs',
+    'unsupportedFileSummary.byExtension': 'inspect_font_inputs',
+    'unsupportedFileSummary.byCategory': 'inspect_font_inputs',
+    'unsupportedFileSummary.examples': 'inspect_font_inputs',
+    'unsupportedFileSummary.examplesTruncated': 'inspect_font_inputs',
     structureSummary: 'inspect_split_output',
     auditStatus: 'inspect_split_output',
     auditPassed: 'inspect_split_output',
@@ -2596,7 +2612,10 @@ if (scenario === 'single') {
       'structureSummary',
       'maxFilesHit',
       'unsupportedFileSummary',
+      'unsupportedFileSummary.total',
+      'unsupportedFileSummary.byExtension',
       'unsupportedFileSummary.byCategory',
+      'unsupportedFileSummary.examples',
       'debugBatchDecisions',
     ]) {
       assertDocsContainAny(`important field ${fieldName}`, [`\`${fieldName}\``, `\`${fieldName}[]\``]);
@@ -2658,7 +2677,9 @@ if (scenario === 'single') {
     '`recommendedNextActions[]`',
     '`planActionSummary`',
     '`unsupportedFileSummary`',
+    '`unsupportedFileSummary.byExtension[]`',
     '`unsupportedFileSummary.byCategory[]`',
+    '`unsupportedFileSummary.examples[]`',
     '`auditStatus`',
     '`auditPassed`',
     '`auditBlockingReasons[]`',

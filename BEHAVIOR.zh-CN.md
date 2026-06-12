@@ -120,7 +120,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 避免把已生成的输出再次当作输入
 - 避免把 macOS 压缩包里的资源叉伪文件误当成字体
 
-未被这些规则跳过、但扩展名不是受支持字体格式的文件，会计入 `unsupportedFileSummary`。该摘要包含精确 `byExtension`、概览 `unsupportedFileSummary.byCategory[]`、无扩展文件的 `<none>` 计数和少量示例路径；它不是只统计 `.zip` 或 `.txt`。压缩包会归入 `archive` 分类，但仍然只是被忽略，不会被解压、复制或拆分。
+未被这些规则跳过、但扩展名不是受支持字体格式的文件，会计入 `unsupportedFileSummary`。该摘要包含 `unsupportedFileSummary.byExtension[]` 精确扩展名统计、`unsupportedFileSummary.byCategory[]` 概览分类、`unsupportedFileSummary.examples[]` 少量示例路径、无扩展文件的 `<none>` 计数，以及 `unsupportedFileSummary.examplesTruncated` 示例截断标记；它不是只统计 `.zip` 或 `.txt`。压缩包会归入 `archive` 分类，但仍然只是被忽略，不会被解压、复制或拆分。
 
 ---
 
@@ -318,7 +318,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `limit`：去重后最多处理多少个字体；默认 `20`，MCP 入口最大 `50000`。
 - `maxFiles`：递归扫描阶段最多读取多少个源文件；默认 `5000`，MCP 入口最大 `50000`。
 - `maxFilesHit`：批量响应中的机器可读截断信号；只有当 `maxFiles` 之外确实还存在更多源文件时才为 `true`。
-- `unsupportedFileSummary`：批量扫描中所有已扫描但被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、无扩展 `<none>` 计数和少量示例路径。
+- `unsupportedFileSummary`：批量扫描中所有已扫描但被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。
 - `includeResults`：是否在批量响应中返回每个字体的 `results[]` 详情；默认 `true`。设为 `false` 时仍返回汇总统计、错误列表和 `resultsIncluded: false`，适合全量字体库处理。
 - `dryRun`：只执行扫描、去重、命名和 skip 判断，不调用 `split_font`，也不写任何输出文件。`includeResults: true` 时返回 `planned[]` 计划清单。
 
@@ -496,7 +496,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 - `dryRun` 默认值与 `split_font_batch` 不同。`organize_font_directory` 默认 `true`，`split_font_batch` 默认 `false`。
 - `parseFonts: false` 会跳过坏字体检测和真实 identity 去重；不要把 `invalidFontCount: null` 解读为没有坏字体。
-- 非字体文件会被忽略，但会进入 `unsupportedFileSummary`。该字段统计所有非字体扩展名，包含 `unsupportedFileSummary.byCategory[]` 概览分类、无扩展文件的 `<none>` 计数和少量示例路径。
+- 非字体文件会被忽略，但会进入 `unsupportedFileSummary`。该字段统计所有非字体扩展名，包含 `unsupportedFileSummary.byExtension[]` 精确扩展名统计、`unsupportedFileSummary.byCategory[]` 概览分类、`unsupportedFileSummary.examples[]`、`unsupportedFileSummary.examplesTruncated` 和无扩展文件的 `<none>` 计数。
 - 扩展名像字体但解析失败的文件默认跳过；只有显式启用 `copyInvalidFonts`（例如 `copyInvalidFonts: true`）时才会纳入复制计划。
 - 如果 `outputDir` 位于 `inputDir` 里面，响应会给出 `output-inside-input` 警告和 `outputTreeInsideInputTree: true`；后续扫描应排除该目录，避免把整理后的副本再次当作源字体。
 - 如果显式启用 `overwriteExisting`（例如 `overwriteExisting: true`），可能替换 `outputDir` 里的目标文件，但仍不会影响源文件。

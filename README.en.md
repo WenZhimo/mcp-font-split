@@ -287,7 +287,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 `inspect_font_inputs` is a no-write preflight for source directories:
 
 - `supportedFontCount`, `validFontCount`, `invalidFontCount`
-- `unsupportedFileSummary`: summary of all ignored non-font files, including exact `byExtension`, overview `byCategory`, `<none>` counts for extensionless files, and a small set of example paths
+- `unsupportedFileSummary`: summary of all ignored non-font files, including exact `unsupportedFileSummary.byExtension[]`, overview `unsupportedFileSummary.byCategory[]`, `<none>` counts for extensionless files, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`
 - `missingIdentityCount`
 - `maxFilesHit`: true only when more files exist beyond `maxFiles`
 - `inspectionWarningCount`, `inspectionWarnings[]` with machine-readable `code` and `message`
@@ -298,7 +298,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 
 - `resultsIncluded`: whether per-font `results[]` objects are present
 - `scannedFileCount`, `maxFiles`, `maxFilesHit`
-- `unsupportedFileSummary`: summary of all scanned ignored non-font files, including exact `byExtension`, overview `byCategory`, `<none>` counts for extensionless files, and a small set of example paths; archives are categorized as `archive` and still ignored
+- `unsupportedFileSummary`: summary of all scanned ignored non-font files, including exact `unsupportedFileSummary.byExtension[]`, overview `unsupportedFileSummary.byCategory[]`, `<none>` counts for extensionless files, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`; archives are categorized as `archive` and still ignored
 - `dryRun`, `plannedCount`, `wouldProcessCount`, `planIncluded`
 - `batchWarningCount`, `batchWarnings[]` with machine-readable `code` and `message`
 - `batchErrorMode`, `errorCount`, `errors[]`
@@ -329,7 +329,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `sourceFilesPreserved`: always `true`
 - `parsedFontMetadata`: false when `parseFonts: false`; then `validFontCount` / `invalidFontCount` are `null`
 - `effectiveBatchDedupeMode`, `dedupeLimitedByParsing`: explain whether identity dedupe was available
-- `unsupportedFileSummary`: summary of all ignored non-font files, including exact `byExtension`, overview `byCategory`, `<none>` counts for extensionless files, and a small set of example paths; inspect it first when the source tree mixes fonts with archives, images, docs, or generated assets
+- `unsupportedFileSummary`: summary of all ignored non-font files, including exact `unsupportedFileSummary.byExtension[]`, overview `unsupportedFileSummary.byCategory[]`, `<none>` counts for extensionless files, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`; inspect it first when the source tree mixes fonts with archives, images, docs, or generated assets
 - `layout.layoutKind`: `empty`, `flat`, `nested`, or `mixed`
 - `recommendedBatchOptions`: a suggested follow-up `split_font_batch` policy fragment for the detected layout; not a complete safe invocation
 - `recommendedBatchPreviewArgs`: copyable no-write `split_font_batch` preview args containing `inputDir`, `workflowPreset: "safe-preview"`, and the necessary layout overrides

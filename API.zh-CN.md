@@ -150,7 +150,7 @@
 | `invalidFonts[]` | 解析失败字体的紧凑清单和错误信息。 |
 | `files[]` | 可选的逐字体详情，包含扩展名、容器、身份信息、identity key、glyph count 和解析状态。 |
 
-`unsupportedFileSummary.byCategory[]` 使用面向 agent 的粗分类：`archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other`。这不改变处理行为；不支持文件仍会被忽略。
+`unsupportedFileSummary` 暴露 `unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。其中 `byCategory[]` 使用面向 agent 的粗分类：`archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other`。这不改变处理行为；不支持文件仍会被忽略。
 
 ## `split_font_batch`
 
@@ -263,7 +263,7 @@
 | `plan[]` | 可选的逐字体复制/跳过计划。复制条目包含 `source`、`target`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`。 |
 | `organizationManifestPath` | 仅在 `dryRun: false` 时写入，指向 `outputDir` 中的 `font-organization-manifest.json`。 |
 
-`unsupportedFileSummary.byCategory[]` 使用与 `inspect_font_inputs` 相同的粗分类；`.zip` 等 `archive` 文件只会被报告，不会被解压、复制或拆分。
+`unsupportedFileSummary` 使用与 `inspect_font_inputs` 相同的子字段：`unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；`.zip` 等 `archive` 文件只会被报告，不会被解压、复制或拆分。
 
 需要特别注意的非直觉行为：
 

@@ -150,7 +150,7 @@ Important result fields:
 | `invalidFonts[]` | Compact list of invalid font-like files and parse errors. |
 | `files[]` | Optional per-font entries with extension, container, identity, identity key, glyph count, and parse status. |
 
-`unsupportedFileSummary.byCategory[]` uses coarse categories for agent triage: `archive`, `document`, `image`, `web`, `metadata`, `signature`, `unsupported-font`, `extensionless`, and `other`. This does not change behavior; unsupported files remain ignored.
+`unsupportedFileSummary` exposes `unsupportedFileSummary.total`, `unsupportedFileSummary.byExtension[]`, `unsupportedFileSummary.byCategory[]`, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`. `byCategory[]` uses coarse categories for agent triage: `archive`, `document`, `image`, `web`, `metadata`, `signature`, `unsupported-font`, `extensionless`, and `other`. This does not change behavior; unsupported files remain ignored.
 
 ## `split_font_batch`
 
@@ -263,7 +263,7 @@ Important result fields:
 | `plan[]` | Optional per-font copy/skip entries. Copy entries include `source`, `target`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`. |
 | `organizationManifestPath` | Written only when `dryRun: false`; points to `font-organization-manifest.json` in `outputDir`. |
 
-`unsupportedFileSummary.byCategory[]` uses the same coarse categories as `inspect_font_inputs`; `archive` files such as `.zip` are reported but not extracted, copied, or split.
+`unsupportedFileSummary` uses the same subfields as `inspect_font_inputs`: `unsupportedFileSummary.total`, `unsupportedFileSummary.byExtension[]`, `unsupportedFileSummary.byCategory[]`, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`. `archive` files such as `.zip` are reported but not extracted, copied, or split.
 
 Non-intuitive behavior to watch:
 

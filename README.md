@@ -287,7 +287,7 @@ fonts/
 `inspect_font_inputs` 是不写输出的输入预检：
 
 - `supportedFontCount`、`validFontCount`、`invalidFontCount`
-- `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、无扩展 `<none>` 计数和少量示例路径
+- `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`
 - `missingIdentityCount`
 - `maxFilesHit`：只有当 `maxFiles` 之外确实还有更多文件时才为 true
 - `inspectionWarningCount`、`inspectionWarnings[]`，每项包含机器可读的 `code` 和 `message`
@@ -298,7 +298,7 @@ fonts/
 
 - `resultsIncluded`：是否包含每个字体的 `results[]` 详情
 - `scannedFileCount`、`maxFiles`、`maxFilesHit`
-- `unsupportedFileSummary`：所有已扫描但被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、无扩展 `<none>` 计数和少量示例路径；压缩包会归入 `archive` 并保持忽略
+- `unsupportedFileSummary`：所有已扫描但被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；压缩包会归入 `archive` 并保持忽略
 - `dryRun`、`plannedCount`、`wouldProcessCount`、`planIncluded`
 - `batchWarningCount`、`batchWarnings[]`，每项包含机器可读的 `code` 和 `message`
 - `batchErrorMode`、`errorCount`、`errors[]`
@@ -329,7 +329,7 @@ fonts/
 - `sourceFilesPreserved`：恒为 `true`
 - `parsedFontMetadata`：`parseFonts: false` 时为 false；此时 `validFontCount` / `invalidFontCount` 是 `null`
 - `effectiveBatchDedupeMode`、`dedupeLimitedByParsing`：说明 identity 去重是否真正可用
-- `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、无扩展 `<none>` 计数和少量示例路径；源目录混有压缩包、图片、文档或生成产物时优先看它
+- `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；源目录混有压缩包、图片、文档或生成产物时优先看它
 - `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`
 - `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 策略片段，不是完整安全调用
 - `recommendedBatchPreviewArgs`：可直接复制的 `split_font_batch` 无写入预览参数，包含 `inputDir`、`workflowPreset: "safe-preview"` 和必要的目录形态覆盖项

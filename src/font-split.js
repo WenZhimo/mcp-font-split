@@ -605,8 +605,33 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   unsupportedFileSummary: {
     sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
-    meaning: 'Compact summary of all ignored non-font files, including extension counts, <none> for extensionless files, and a small set of example paths.',
-    agentAction: 'Use this when source directories include archives, docs, generated files, or other noise that will not be organized or split.',
+    meaning: 'Compact summary of all ignored non-font files, including precise extension counts, coarse categories, extensionless files, and example paths.',
+    agentAction: 'Use this when source directories include archives, docs, generated files, or other noise that will not be organized or split; inspect the subfields before judging corpus coverage.',
+  },
+  'unsupportedFileSummary.total': {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Total number of scanned files ignored because their extensions are not supported font formats.',
+    agentAction: 'Use with maxFilesHit before treating the ignored-file count as complete.',
+  },
+  'unsupportedFileSummary.byExtension': {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Exact ignored-file counts by normalized extension, with <none> for extensionless files.',
+    agentAction: 'Use this when deciding whether unexpected file types are present; do not infer that archives are processed just because they are counted.',
+  },
+  'unsupportedFileSummary.byCategory': {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Coarse ignored-file categories for agent triage, such as archive, document, image, web, metadata, signature, unsupported-font, extensionless, and other.',
+    agentAction: 'Use this for noisy real corpora where exact extensions are too fragmented; archive entries are reported but still ignored.',
+  },
+  'unsupportedFileSummary.examples': {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Small sample of ignored file paths, relative to the workspace when possible.',
+    agentAction: 'Use examples to explain what was ignored without expanding every non-font file in a large corpus.',
+  },
+  'unsupportedFileSummary.examplesTruncated': {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Whether more ignored-file examples existed than were returned.',
+    agentAction: 'If true and exact examples matter, inspect the source tree directly or rerun with a focused smaller input directory.',
   },
   validFontCount: {
     sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
@@ -2013,6 +2038,11 @@ export function getAgentGuidance(args = {}) {
       'configurationRecipes',
       'supportedFontCount',
       'unsupportedFileSummary',
+      'unsupportedFileSummary.total',
+      'unsupportedFileSummary.byExtension',
+      'unsupportedFileSummary.byCategory',
+      'unsupportedFileSummary.examples',
+      'unsupportedFileSummary.examplesTruncated',
       'validFontCount',
       'invalidFontCount',
       'missingIdentityCount',
