@@ -75,7 +75,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 该 suite 会先打印简短的 `real-corpus suite summary`，最终 JSON 也会返回 `humanSummary`、`testScope` 和 `coverageSummary.functionalCoverage[]`。`humanSummary` 用自然语言说明全库字体数量、固定/抽样目标数量和代表性写入审计状态，避免把 `4` 或 `10` 之类的小数字误读成全库字体数量。`testScope.corpusScan` 表示全库有界根扫描，`testScope.targetSampling` 表示固定回归点加自适应代表性抽样，`testScope.representativeWriteAudit` 表示一个真实写入和输出审计样本；其中的 `functionalCoverage[]` 用于说明真实语料运行实际覆盖了哪些功能路径，例如全根输入扫描、非字体噪声分类、目录整理预览、copy-only 写入、单字体拆分、批量写入和输出结构审计。
 `configurationRecipes[]` 是给 agent 用的配置配方表；它把“保留每个源字体”“按源目录分组”“按字体 metadata 分组”“快速结构优先扫描”“copy-only 暂存整理”“大库审查后写入”等用户意图映射到最小 preset-first 参数，并列出写入行为、源目录安全性、取舍、必须检查的 `inspectFields` 和继续前必须满足的 `successCriteria`。配方不是成功证明，不能替代实际工具响应检查。
 `batchPolicyGuide` 是给 agent 用的批量策略自定义指南；它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个可选值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前必须满足的 `successCriteria`。当用户想偏离默认 preset 行为时，应优先参考它选择最小显式覆盖，并先运行 safe-preview。
-`unsupportedFileCategoryCatalog` 是给 agent 解释非字体噪声分类的机器可读目录；它会说明 `archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other` 的代表扩展名与处理行为。尤其要注意，`archive` 只表示“被报告的压缩包”，不会触发解压、复制或拆分。
+`unsupportedFileCategoryCatalog` 是给 agent 解释非字体噪声分类的机器可读目录；它会说明 `archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other` 的代表扩展名与处理行为。每次工具响应中的 `unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 也会重复当前扫描实际出现分类的处理语义。尤其要注意，`archive` 只表示“被报告的压缩包”，不会触发解压、复制或拆分。
 `directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段、继续前必须满足的 `successCriteria` 和非直觉行为。推荐参数会优先使用 `workflowPreset`，只保留路径、规模或目录形态造成的差异覆盖。它不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
 `directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。示例调用也采用 preset-first 风格，并带有 `mustInspectFields` 和 `successCriteria`。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs` 和 warning 字段为准。
 `safeInvocationTemplates[]` 是可复制的安全起步调用模板；其中包括运行时诊断、输入预检、源目录结构不匹配时的 dry-run 整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和输出审计。每个模板都会声明 `writesFiles`、`sourceDestructive`、可自定义参数、必须检查的响应字段和继续前必须满足的 `successCriteria`。模板里的 `args` 会尽量保持最小；`workflowPreset` 已提供的默认项不会重复写入模板，需要完整展开时查看同一响应中的 `workflowPresets[]`。
@@ -125,7 +125,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 避免把已生成的输出再次当作输入
 - 避免把 macOS 压缩包里的资源叉伪文件误当成字体
 
-未被这些规则跳过、但扩展名不是受支持字体格式的文件，会计入 `unsupportedFileSummary`。该摘要包含 `unsupportedFileSummary.byExtension[]` 精确扩展名统计、`unsupportedFileSummary.byCategory[]` 概览分类、`unsupportedFileSummary.examples[]` 少量示例路径、无扩展文件的 `<none>` 计数，以及 `unsupportedFileSummary.examplesTruncated` 示例截断标记；它不是只统计 `.zip` 或 `.txt`。压缩包会归入 `archive` 分类，但仍然只是被忽略，不会被解压、复制或拆分。
+未被这些规则跳过、但扩展名不是受支持字体格式的文件，会计入 `unsupportedFileSummary`。该摘要包含 `unsupportedFileSummary.byExtension[]` 精确扩展名统计、`unsupportedFileSummary.byCategory[]` 概览分类、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 少量示例路径、无扩展文件的 `<none>` 计数，以及 `unsupportedFileSummary.examplesTruncated` 示例截断标记；它不是只统计 `.zip` 或 `.txt`。压缩包会归入 `archive` 分类，但仍然只是被忽略，不会被解压、复制或拆分，且 `unsupportedFileSummary.handlingSummary.archivesExtracted` 恒为 `false`。
 
 ---
 
@@ -323,7 +323,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `limit`：去重后最多处理多少个字体；默认 `20`，MCP 入口最大 `50000`。
 - `maxFiles`：递归扫描阶段最多读取多少个源文件；默认 `5000`，MCP 入口最大 `50000`。
 - `maxFilesHit`：批量响应中的机器可读截断信号；只有当 `maxFiles` 之外确实还存在更多源文件时才为 `true`。
-- `unsupportedFileSummary`：批量扫描中所有已扫描但被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。
+- `unsupportedFileSummary`：批量扫描中所有已扫描但被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。
 - `includeResults`：是否在批量响应中返回每个字体的 `results[]` 详情；默认 `true`。设为 `false` 时仍返回汇总统计、错误列表和 `resultsIncluded: false`，适合全量字体库处理。
 - `dryRun`：只执行扫描、去重、命名和 skip 判断，不调用 `split_font`，也不写任何输出文件。`includeResults: true` 时返回 `planned[]` 计划清单。
 
@@ -501,7 +501,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 - `dryRun` 默认值与 `split_font_batch` 不同。`organize_font_directory` 默认 `true`，`split_font_batch` 默认 `false`。
 - `parseFonts: false` 会跳过坏字体检测和真实 identity 去重；不要把 `invalidFontCount: null` 解读为没有坏字体。
-- 非字体文件会被忽略，但会进入 `unsupportedFileSummary`。该字段统计所有非字体扩展名，包含 `unsupportedFileSummary.byExtension[]` 精确扩展名统计、`unsupportedFileSummary.byCategory[]` 概览分类、`unsupportedFileSummary.examples[]`、`unsupportedFileSummary.examplesTruncated` 和无扩展文件的 `<none>` 计数。
+- 非字体文件会被忽略，但会进入 `unsupportedFileSummary`。该字段统计所有非字体扩展名，包含 `unsupportedFileSummary.byExtension[]` 精确扩展名统计、`unsupportedFileSummary.byCategory[]` 概览分类、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]`、`unsupportedFileSummary.examplesTruncated` 和无扩展文件的 `<none>` 计数。
 - 扩展名像字体但解析失败的文件默认跳过；只有显式启用 `copyInvalidFonts`（例如 `copyInvalidFonts: true`）时才会纳入复制计划。
 - 如果 `outputDir` 位于 `inputDir` 里面，响应会给出 `output-inside-input` 警告和 `outputTreeInsideInputTree: true`；后续扫描应排除该目录，避免把整理后的副本再次当作源字体。
 - 如果显式启用 `overwriteExisting`（例如 `overwriteExisting: true`），可能替换 `outputDir` 里的目标文件，但仍不会影响源文件。

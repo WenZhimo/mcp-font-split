@@ -73,6 +73,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
       corpusUnsupportedByCategory: result.corpus?.unsupportedFileSummary?.byCategory,
+      corpusUnsupportedHandlingSummary: result.corpus?.unsupportedFileSummary?.handlingSummary,
       corpusUnsupportedArchiveCount: getUnsupportedCategoryCount(result.corpus?.unsupportedFileSummary, 'archive'),
       corpusMaxFilesHit: result.corpus?.maxFilesHit,
       sampleInputDir: result.sample?.inputDir,
@@ -85,6 +86,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
       corpusUnsupportedByCategory: result.corpus?.unsupportedFileSummary?.byCategory,
+      corpusUnsupportedHandlingSummary: result.corpus?.unsupportedFileSummary?.handlingSummary,
       corpusUnsupportedArchiveCount: getUnsupportedCategoryCount(result.corpus?.unsupportedFileSummary, 'archive'),
       corpusMaxFilesHit: result.corpus?.maxFilesHit,
       selectionMode: result.selection?.mode,
@@ -99,6 +101,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
       corpusUnsupportedByCategory: result.corpus?.unsupportedFileSummary?.byCategory,
+      corpusUnsupportedHandlingSummary: result.corpus?.unsupportedFileSummary?.handlingSummary,
       corpusUnsupportedArchiveCount: getUnsupportedCategoryCount(result.corpus?.unsupportedFileSummary, 'archive'),
       corpusMaxFilesHit: result.corpus?.maxFilesHit,
       sampleInputDir: result.sample?.inputDir,
@@ -133,6 +136,7 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
   const corpusSupportedFontCount = readonly.corpusSupportedFontCount ?? targets.corpusSupportedFontCount ?? integration.corpusSupportedFontCount;
   const corpusUnsupportedFileCount = readonly.corpusUnsupportedFileCount ?? targets.corpusUnsupportedFileCount ?? integration.corpusUnsupportedFileCount;
   const corpusUnsupportedByCategory = readonly.corpusUnsupportedByCategory ?? targets.corpusUnsupportedByCategory ?? integration.corpusUnsupportedByCategory;
+  const corpusUnsupportedHandlingSummary = readonly.corpusUnsupportedHandlingSummary ?? targets.corpusUnsupportedHandlingSummary ?? integration.corpusUnsupportedHandlingSummary;
   const corpusUnsupportedArchiveCount = readonly.corpusUnsupportedArchiveCount ?? targets.corpusUnsupportedArchiveCount ?? integration.corpusUnsupportedArchiveCount;
   const corpusMaxFilesHit = readonly.corpusMaxFilesHit ?? targets.corpusMaxFilesHit ?? integration.corpusMaxFilesHit;
   const selectedTargets = targets.selectedTargets || [];
@@ -181,11 +185,18 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     },
     {
       id: 'unsupported-noise-classification',
-      covered: Boolean(readonlyRun.ok && Array.isArray(readonly.corpusUnsupportedByCategory) && readonly.corpusUnsupportedByCategory.length > 0),
+      covered: Boolean(
+        readonlyRun.ok
+        && Array.isArray(readonly.corpusUnsupportedByCategory)
+        && readonly.corpusUnsupportedByCategory.length > 0
+        && readonly.corpusUnsupportedHandlingSummary?.unsupportedFilesIgnored === true
+        && readonly.corpusUnsupportedHandlingSummary?.archivesExtracted === false
+      ),
       toolPaths: ['inspect_font_inputs', 'organize_font_directory', 'split_font_batch'],
       evidence: {
         byCategory: readonly.corpusUnsupportedByCategory,
         archiveCount: readonly.corpusUnsupportedArchiveCount,
+        handlingSummary: readonly.corpusUnsupportedHandlingSummary,
       },
     },
     {
@@ -273,6 +284,7 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     corpusSupportedFontCount,
     corpusUnsupportedFileCount,
     corpusUnsupportedByCategory,
+    corpusUnsupportedHandlingSummary,
     corpusUnsupportedArchiveCount,
     corpusMaxFilesHit,
     fixedRegressionTargets: DEFAULT_REAL_CORPUS_TARGETS,
@@ -1419,6 +1431,8 @@ if (scenario === 'single') {
     'unsupportedFileSummary.total': 'inspect_font_inputs',
     'unsupportedFileSummary.byExtension': 'inspect_font_inputs',
     'unsupportedFileSummary.byCategory': 'inspect_font_inputs',
+    'unsupportedFileSummary.categoryDetails': 'inspect_font_inputs',
+    'unsupportedFileSummary.handlingSummary': 'inspect_font_inputs',
     'unsupportedFileSummary.examples': 'inspect_font_inputs',
     'unsupportedFileSummary.examplesTruncated': 'inspect_font_inputs',
     structureSummary: 'inspect_split_output',
@@ -1718,6 +1732,7 @@ if (scenario === 'single') {
   }
   const unsupportedInputExtensions = new Set((result.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
   const unsupportedInputCategories = Object.fromEntries((result.unsupportedFileSummary?.byCategory || []).map((item) => [item.category, item.count]));
+  const unsupportedInputCategoryDetails = Object.fromEntries((result.unsupportedFileSummary?.categoryDetails || []).map((item) => [item.category, item]));
   if (
     result.unsupportedFileSummary?.total !== 4
     || !unsupportedInputExtensions.has('.txt')
@@ -1728,8 +1743,15 @@ if (scenario === 'single') {
     || unsupportedInputCategories.archive !== 1
     || unsupportedInputCategories.image !== 1
     || unsupportedInputCategories.extensionless !== 1
+    || unsupportedInputCategoryDetails.archive?.count !== 1
+    || !unsupportedInputCategoryDetails.archive?.handling?.includes('never extracted')
+    || result.unsupportedFileSummary?.handlingSummary?.unsupportedFilesIgnored !== true
+    || result.unsupportedFileSummary?.handlingSummary?.unsupportedFilesCopiedByOrganization !== false
+    || result.unsupportedFileSummary?.handlingSummary?.unsupportedFilesSplitByBatch !== false
+    || result.unsupportedFileSummary?.handlingSummary?.archivesExtracted !== false
+    || result.unsupportedFileSummary?.handlingSummary?.archiveCount !== 1
   ) {
-    throw new Error('Expected input inspection to summarize unsupported file extensions and categories.');
+    throw new Error('Expected input inspection to summarize unsupported file extensions, categories, and handling behavior.');
   }
   const truncated = await inspectFontInputs({
     inputDir,
@@ -1897,6 +1919,7 @@ if (scenario === 'single') {
   });
   const unsupportedOrganizationExtensions = new Set((result.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
   const unsupportedOrganizationCategories = Object.fromEntries((result.unsupportedFileSummary?.byCategory || []).map((item) => [item.category, item.count]));
+  const unsupportedOrganizationCategoryDetails = Object.fromEntries((result.unsupportedFileSummary?.categoryDetails || []).map((item) => [item.category, item]));
   if (
     result.unsupportedFileSummary?.total !== 4
     || !unsupportedOrganizationExtensions.has('.txt')
@@ -1907,8 +1930,15 @@ if (scenario === 'single') {
     || unsupportedOrganizationCategories.archive !== 1
     || unsupportedOrganizationCategories.image !== 1
     || unsupportedOrganizationCategories.extensionless !== 1
+    || unsupportedOrganizationCategoryDetails.archive?.count !== 1
+    || !unsupportedOrganizationCategoryDetails.archive?.handling?.includes('never extracted')
+    || result.unsupportedFileSummary?.handlingSummary?.unsupportedFilesIgnored !== true
+    || result.unsupportedFileSummary?.handlingSummary?.unsupportedFilesCopiedByOrganization !== false
+    || result.unsupportedFileSummary?.handlingSummary?.unsupportedFilesSplitByBatch !== false
+    || result.unsupportedFileSummary?.handlingSummary?.archivesExtracted !== false
+    || result.unsupportedFileSummary?.handlingSummary?.archiveCount !== 1
   ) {
-    throw new Error('Expected organization dry-run to summarize unsupported file extensions and categories.');
+    throw new Error('Expected organization dry-run to summarize unsupported file extensions, categories, and handling behavior.');
   }
   const dryRunNextActionIds = new Set((result.recommendedNextActions || []).map((action) => action.id));
   for (const expectedAction of ['review-plan-before-writing', 'decide-on-invalid-fonts']) {
@@ -3294,6 +3324,8 @@ if (scenario === 'single') {
       'unsupportedFileSummary.total',
       'unsupportedFileSummary.byExtension',
       'unsupportedFileSummary.byCategory',
+      'unsupportedFileSummary.categoryDetails',
+      'unsupportedFileSummary.handlingSummary',
       'unsupportedFileSummary.examples',
       'debugBatchDecisions',
       'humanSummary',
@@ -3373,6 +3405,8 @@ if (scenario === 'single') {
     '`unsupportedFileSummary`',
     '`unsupportedFileSummary.byExtension[]`',
     '`unsupportedFileSummary.byCategory[]`',
+    '`unsupportedFileSummary.categoryDetails[]`',
+    '`unsupportedFileSummary.handlingSummary`',
     '`unsupportedFileSummary.examples[]`',
     '`auditStatus`',
     '`auditPassed`',

@@ -662,6 +662,16 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Coarse ignored-file categories for agent triage, such as archive, document, image, web, metadata, signature, unsupported-font, extensionless, and other.',
     agentAction: 'Use this for noisy real corpora where exact extensions are too fragmented; archive entries are reported but still ignored.',
   },
+  'unsupportedFileSummary.categoryDetails': {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Category counts enriched with category meaning, representative extensions, and handling behavior.',
+    agentAction: 'Use this to explain ignored archives, docs, images, unsupported font-adjacent files, and extensionless files without separately calling get_agent_guidance.',
+  },
+  'unsupportedFileSummary.handlingSummary': {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Response-local handling policy for unsupported files in the current scan.',
+    agentAction: 'Use this to confirm unsupported files are reported for context only; archives are not extracted and unsupported files are not copied or split.',
+  },
   'unsupportedFileSummary.examples': {
     sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
     meaning: 'Small sample of ignored file paths, relative to the workspace when possible.',
@@ -2337,6 +2347,8 @@ export function getAgentGuidance(args = {}) {
       'unsupportedFileSummary.total',
       'unsupportedFileSummary.byExtension',
       'unsupportedFileSummary.byCategory',
+      'unsupportedFileSummary.categoryDetails',
+      'unsupportedFileSummary.handlingSummary',
       'unsupportedFileSummary.examples',
       'unsupportedFileSummary.examplesTruncated',
       'validFontCount',
@@ -2491,15 +2503,38 @@ function buildUnsupportedFileSummary(files, { maxExamples = 20 } = {}) {
     const category = categorizeUnsupportedFileExtension(extension);
     byCategory.set(category, (byCategory.get(category) || 0) + 1);
   }
+  const sortedCategoryEntries = [...byCategory.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const categoryDetails = sortedCategoryEntries.map(([category, count]) => {
+    const details = UNSUPPORTED_FILE_CATEGORY_DETAILS[category] || UNSUPPORTED_FILE_CATEGORY_DETAILS.other;
+    return {
+      category,
+      count,
+      meaning: details.meaning,
+      handling: details.handling,
+      extensions: details.extensions || [...(UNSUPPORTED_FILE_EXTENSION_CATEGORIES[category] || [])].sort(),
+    };
+  });
+  const archiveCount = byCategory.get('archive') || 0;
 
   return {
     total: unsupportedFiles.length,
     byExtension: [...byExtension.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([extension, count]) => ({ extension, count })),
-    byCategory: [...byCategory.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    byCategory: sortedCategoryEntries
       .map(([category, count]) => ({ category, count })),
+    categoryDetails,
+    handlingSummary: {
+      unsupportedFilesIgnored: true,
+      unsupportedFilesCopiedByOrganization: false,
+      unsupportedFilesSplitByBatch: false,
+      archivesExtracted: false,
+      archiveCount,
+      note: archiveCount > 0
+        ? 'Archive files are counted for awareness only; this tool does not extract archives, copy them during organization, or split them in batch processing.'
+        : 'Unsupported files are counted for awareness only; this tool does not copy them during organization or split them in batch processing.',
+    },
     examples: unsupportedFiles
       .slice(0, maxExamples)
       .map((file) => toRelativeWorkspacePath(file)),
