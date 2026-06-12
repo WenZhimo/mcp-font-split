@@ -53,6 +53,86 @@ const REAL_CORPUS_TARGET_EXPECTATIONS = {
   },
 };
 
+function parseSmokeJsonOutput(stdout) {
+  const trimmed = (stdout || '').trim();
+  let index = trimmed.indexOf('{');
+  while (index !== -1) {
+    try {
+      return JSON.parse(trimmed.slice(index));
+    } catch {
+      index = trimmed.indexOf('{', index + 1);
+    }
+  }
+  return null;
+}
+
+function summarizeRealCorpusSubprocess(scenario, result) {
+  if (!result || typeof result !== 'object') return null;
+  if (scenario === 'real-corpus-readonly') {
+    return {
+      corpusSupportedFontCount: result.corpus?.supportedFontCount,
+      corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
+      corpusMaxFilesHit: result.corpus?.maxFilesHit,
+      sampleInputDir: result.sample?.inputDir,
+      sampleSupportedFontCount: result.inspection?.supportedFontCount,
+      sampleUnsupportedFileCount: result.inspection?.unsupportedFileSummary?.total,
+    };
+  }
+  if (scenario === 'real-corpus-targets') {
+    return {
+      corpusSupportedFontCount: result.corpus?.supportedFontCount,
+      corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
+      corpusMaxFilesHit: result.corpus?.maxFilesHit,
+      selectionMode: result.selection?.mode,
+      availableTargetCount: result.selection?.availableTargetCount,
+      selectedTargetCount: result.selection?.selectedTargetCount,
+      sampleCount: result.selection?.sampleCount,
+      selectedTargets: (result.targets || []).map((target) => target.inputDir),
+    };
+  }
+  if (scenario === 'real-corpus-integration') {
+    return {
+      corpusSupportedFontCount: result.corpus?.supportedFontCount,
+      corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
+      corpusMaxFilesHit: result.corpus?.maxFilesHit,
+      sampleInputDir: result.sample?.inputDir,
+      sampleFontPath: result.sampleFontPath,
+      outputRoot: result.outputRoot,
+      singleAuditStatus: result.singleAudit?.auditStatus,
+      singleAuditPassed: result.singleAudit?.auditPassed,
+      singleStructureConforms: result.singleAudit?.structureSummary?.conforms,
+      batchAuditStatus: result.batchAudit?.auditStatus,
+      batchAuditPassed: result.batchAudit?.auditPassed,
+      batchStructureConforms: result.batchAudit?.structureSummary?.conforms,
+    };
+  }
+  return null;
+}
+
+function buildRealCorpusSuiteCoverageSummary(runs) {
+  const byScenario = Object.fromEntries((runs || []).map((run) => [run.scenario, run.summary || {}]));
+  const readonly = byScenario['real-corpus-readonly'] || {};
+  const targets = byScenario['real-corpus-targets'] || {};
+  const integration = byScenario['real-corpus-integration'] || {};
+  return {
+    testStrategy: 'full-root compact scan plus representative target sampling plus one bounded write/audit path',
+    perDirectoryAcceptanceAudit: false,
+    corpusSupportedFontCount: readonly.corpusSupportedFontCount ?? targets.corpusSupportedFontCount ?? integration.corpusSupportedFontCount,
+    corpusUnsupportedFileCount: readonly.corpusUnsupportedFileCount ?? targets.corpusUnsupportedFileCount ?? integration.corpusUnsupportedFileCount,
+    corpusMaxFilesHit: readonly.corpusMaxFilesHit ?? targets.corpusMaxFilesHit ?? integration.corpusMaxFilesHit,
+    fixedRegressionTargets: DEFAULT_REAL_CORPUS_TARGETS,
+    targetSelectionMode: targets.selectionMode,
+    availableTargetCount: targets.availableTargetCount,
+    selectedTargetCount: targets.selectedTargetCount,
+    targetSampleCount: targets.sampleCount,
+    selectedTargets: targets.selectedTargets,
+    representativeReadonlySample: readonly.sampleInputDir,
+    representativeWriteSample: integration.sampleInputDir,
+    singleAuditStatus: integration.singleAuditStatus,
+    batchAuditStatus: integration.batchAuditStatus,
+  };
+}
+
 async function runSmokeSubprocess(args, label, { verbose = false } = {}) {
   const startedAt = Date.now();
   console.log(`\n--- ${label} ---`);
@@ -69,6 +149,7 @@ async function runSmokeSubprocess(args, label, { verbose = false } = {}) {
     } else {
       console.log(`ok (${(elapsedMs / 1000).toFixed(1)}s)`);
     }
+    const parsedResult = parseSmokeJsonOutput(stdout);
     return {
       scenario: args[0],
       ok: true,
@@ -76,6 +157,7 @@ async function runSmokeSubprocess(args, label, { verbose = false } = {}) {
       stdoutBytes: Buffer.byteLength(stdout || ''),
       stderrBytes: Buffer.byteLength(stderr || ''),
       outputIncluded: verbose,
+      summary: summarizeRealCorpusSubprocess(args[0], parsedResult),
     };
   } catch (error) {
     if (error.stdout) process.stdout.write(error.stdout);
@@ -2786,6 +2868,16 @@ if (scenario === 'single') {
     String(integrationLimit),
   ], 'real-corpus representative write and output audit', { verbose }));
 
+  const coverageSummary = buildRealCorpusSuiteCoverageSummary(runs);
+  if (
+    coverageSummary.perDirectoryAcceptanceAudit !== false
+    || coverageSummary.corpusSupportedFontCount < 1
+    || coverageSummary.selectedTargetCount < 1
+    || coverageSummary.batchAuditStatus !== 'pass'
+  ) {
+    throw new Error('Expected real-corpus-suite compact coverage summary to expose root counts, selected targets, and passing output audits.');
+  }
+
   console.log(JSON.stringify({
     ok: true,
     purpose: 'Representative reliability gate over a local real font corpus; not a per-directory acceptance audit.',
@@ -2795,6 +2887,7 @@ if (scenario === 'single') {
     targetLimit,
     integrationLimit,
     sampleCount,
+    coverageSummary,
     runs,
   }, null, 2));
 } else if (scenario === 'real-corpus-readonly') {
