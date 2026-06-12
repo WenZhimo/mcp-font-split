@@ -601,6 +601,63 @@ function assertBatchPolicySummary(summary, { context, appliesToTool, expectedVal
   }
 }
 
+function assertDirectoryWorkflowSummary(summary, {
+  context,
+  expectedLayoutKind,
+  expectedRoute,
+  expectedCurrentStep,
+  expectedReviewReason = null,
+  expectedStepIds = [],
+}) {
+  if (
+    !summary
+    || summary.summaryType !== 'directory-layout-workflow'
+    || summary.appliesToTool !== 'organize_font_directory'
+    || summary.currentStep !== expectedCurrentStep
+  ) {
+    throw new Error(`${context}: expected directoryWorkflowSummary for organize_font_directory ${expectedCurrentStep}.`);
+  }
+  if (
+    summary.sourceLayout?.layoutKind !== expectedLayoutKind
+    || summary.route?.route !== expectedRoute
+    || summary.currentCallSafety?.sourceDestructive !== false
+    || summary.currentCallSafety?.sourceFilesPreserved !== true
+  ) {
+    throw new Error(`${context}: expected directoryWorkflowSummary layout, route, and source safety.`);
+  }
+  if (!summary.policySnapshot?.batchGroupBy || !summary.policySnapshot?.effectiveBatchDedupeMode) {
+    throw new Error(`${context}: expected directoryWorkflowSummary.policySnapshot.`);
+  }
+  if (!summary.directBatchPreviewArgs?.workflowPreset || summary.directBatchPreviewArgs.workflowPreset !== 'safe-preview') {
+    throw new Error(`${context}: expected directoryWorkflowSummary.directBatchPreviewArgs to be a safe-preview call.`);
+  }
+  if (!Array.isArray(summary.workflowSteps) || summary.workflowSteps.length < 3) {
+    throw new Error(`${context}: expected directoryWorkflowSummary.workflowSteps.`);
+  }
+  const stepIds = new Set(summary.workflowSteps.map((step) => step.id));
+  for (const expectedStepId of ['review-source-layout', 'reviewed-batch-write', 'audit-split-output', ...expectedStepIds]) {
+    if (!stepIds.has(expectedStepId)) {
+      throw new Error(`${context}: expected directoryWorkflowSummary.workflowSteps to include ${expectedStepId}.`);
+    }
+  }
+  for (const step of summary.workflowSteps) {
+    if (!step.tool || typeof step.writesFiles !== 'boolean' || step.sourceDestructive !== false || !step.successCriteria) {
+      throw new Error(`${context}: expected directoryWorkflowSummary step ${step.id} to include tool, writesFiles, sourceDestructive, and successCriteria.`);
+    }
+  }
+  if (expectedReviewReason && !(summary.sourceLayout?.reviewReasons || []).includes(expectedReviewReason)) {
+    throw new Error(`${context}: expected directoryWorkflowSummary review reason ${expectedReviewReason}.`);
+  }
+  if (
+    !Array.isArray(summary.successCriteria)
+    || summary.successCriteria.length < 3
+    || !Array.isArray(summary.nonIntuitiveBehavior)
+    || !summary.nonIntuitiveBehavior.some((item) => item.includes('never moves, deletes, or rewrites source font files'))
+  ) {
+    throw new Error(`${context}: expected directoryWorkflowSummary success criteria and non-intuitive behavior notes.`);
+  }
+}
+
 function assertTemplateOmitsArgs(template, omittedArgs, context) {
   const leaked = omittedArgs.filter((key) => Object.hasOwn(template?.args || {}, key));
   if (leaked.length > 0) {
@@ -1783,6 +1840,13 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected organization dry-run to summarize the invalid-font decision route.');
   }
+  assertDirectoryWorkflowSummary(result.directoryWorkflowSummary, {
+    context: 'organize-dry-run',
+    expectedLayoutKind: 'nested',
+    expectedRoute: 'decide-on-invalid-fonts',
+    expectedCurrentStep: 'layout-plan',
+    expectedReviewReason: 'invalid-fonts-skipped',
+  });
   const unsupportedOrganizationExtensions = new Set((result.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
   const unsupportedOrganizationCategories = Object.fromEntries((result.unsupportedFileSummary?.byCategory || []).map((item) => [item.category, item.count]));
   if (
@@ -1896,6 +1960,13 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected organization copy mode to recommend previewing the organized output.');
   }
+  assertDirectoryWorkflowSummary(copied.directoryWorkflowSummary, {
+    context: 'organize-copy',
+    expectedLayoutKind: 'nested',
+    expectedRoute: 'preview-organized-output',
+    expectedCurrentStep: 'copy-only-staging',
+    expectedStepIds: ['preview-batch-split-organized-output'],
+  });
   if (!copied.organizationWarnings?.some((warning) => warning.code === 'organization-writes-output')) {
     throw new Error('Expected organization copy warning.');
   }
@@ -2056,6 +2127,14 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected valid-font organization to recommend previewing the organized output.');
   }
+  assertDirectoryWorkflowSummary(result.directoryWorkflowSummary, {
+    context: 'organize-valid-font',
+    expectedLayoutKind: 'nested',
+    expectedRoute: 'preview-organized-output',
+    expectedCurrentStep: 'copy-only-staging',
+    expectedReviewReason: 'duplicates-skipped',
+    expectedStepIds: ['preview-batch-split-organized-output'],
+  });
   assertSafeRecommendedBatchPreviewArgs(result.recommendedBatchPreviewArgs, {
     inputDir,
     batchGroupBy: 'source-dir',
@@ -2145,6 +2224,14 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected structure-only organization to summarize the font-parsing rerun decision route.');
   }
+  assertDirectoryWorkflowSummary(result.directoryWorkflowSummary, {
+    context: 'organize-structure-only',
+    expectedLayoutKind: 'nested',
+    expectedRoute: 'rerun-with-font-parsing',
+    expectedCurrentStep: 'layout-plan',
+    expectedReviewReason: 'metadata-not-parsed',
+    expectedStepIds: ['rerun-with-font-parsing', 'preview-batch-split-original-layout'],
+  });
   const structureNextActionIds = new Set((result.recommendedNextActions || []).map((action) => action.id));
   if (!structureNextActionIds.has('rerun-with-font-parsing')) {
     throw new Error('Expected structure-only organization next actions to recommend rerunning with font parsing.');
@@ -2226,6 +2313,14 @@ if (scenario === 'single') {
   if (!result.organizationWarnings?.some((warning) => warning.code === 'output-inside-input')) {
     throw new Error('Expected organization warning when outputDir is inside inputDir.');
   }
+  assertDirectoryWorkflowSummary(result.directoryWorkflowSummary, {
+    context: 'organize-output-inside-input dry-run',
+    expectedLayoutKind: 'nested',
+    expectedRoute: 'preview-original-layout',
+    expectedCurrentStep: 'layout-plan',
+    expectedReviewReason: 'output-tree-inside-input-tree',
+    expectedStepIds: ['preview-batch-split-original-layout', 'copy-organized-staging-directory'],
+  });
   const avoidAction = (result.recommendedNextActions || []).find((action) => action.id === 'avoid-reprocessing-organized-copies');
   if (!avoidAction || avoidAction.tool !== 'split_font_batch' || avoidAction.suggestedArgs?.inputDir !== `${inputDir}/${outputDirName}`) {
     throw new Error('Expected next action to guide agents away from reprocessing organized copies.');
@@ -2276,6 +2371,14 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected real organization inside inputDir to disclose source-tree writes without source destruction.');
   }
+  assertDirectoryWorkflowSummary(copiedInside.directoryWorkflowSummary, {
+    context: 'organize-output-inside-input copy',
+    expectedLayoutKind: 'nested',
+    expectedRoute: 'preview-organized-output',
+    expectedCurrentStep: 'copy-only-staging',
+    expectedReviewReason: 'output-tree-inside-input-tree',
+    expectedStepIds: ['preview-batch-split-organized-output'],
+  });
 
   const batchInputDir = `${inputDir}-batch`;
   const batchOutputRoot = path.join(batchInputDir, 'split-output');
@@ -3041,7 +3144,7 @@ if (scenario === 'single') {
     expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings']);
-    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree']);
+    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'outputTreeInsideInputTree']);
     expectDescriptionIncludes('inspect_split_output', ['auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
@@ -3098,6 +3201,7 @@ if (scenario === 'single') {
       'configurationRecipes',
       'batchPolicyGuide',
       'batchPolicySummary',
+      'directoryWorkflowSummary',
       'unsupportedFileCategoryCatalog',
       'directoryWorkflowDecisionMatrix',
       'safeInvocationTemplates',
@@ -3170,6 +3274,7 @@ if (scenario === 'single') {
     '`configurationRecipes[]`',
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
+    '`directoryWorkflowSummary`',
     '`unsupportedFileCategoryCatalog`',
     '`verificationChecklist[]`',
     '`smoke:real-corpus-suite`',
@@ -3198,6 +3303,7 @@ if (scenario === 'single') {
     '`planActionSummary`',
     '`batchDecision`',
     '`organizationDecision`',
+    '`directoryWorkflowSummary`',
     '`unsupportedFileSummary`',
     '`unsupportedFileSummary.byExtension[]`',
     '`unsupportedFileSummary.byCategory[]`',

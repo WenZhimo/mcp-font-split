@@ -712,6 +712,7 @@ split-meta.json
 | `effectiveBatchDedupeMode` | 实际执行的整理去重策略 |
 | `dedupeLimitedByParsing` | 是否因跳过解析而无法执行真实 identity 去重 |
 | `batchPolicySummary` | 本次整理调用采用的分组、命名和去重策略摘要；若 `parseFonts: false` 导致 identity 去重降级，`effectiveValues.batchDedupeMode` 会显示实际回退值 |
+| `directoryWorkflowSummary` | 本次整理响应里的目录工作流导航摘要，覆盖布局复核、安全批量预览、可选 copy-only 暂存、reviewed 批量写入和输出审计步骤 |
 | `layout.layoutKind` | `empty` / `flat` / `nested` / `mixed` |
 | `recommendedBatchOptions` | 根据目录结构建议的后续批量策略片段，不是完整安全调用 |
 | `recommendedBatchPreviewArgs` | 可直接复制的后续 `split_font_batch` 无写入预览参数 |
@@ -734,7 +735,7 @@ split-meta.json
 - `output-inside-input`：批量或整理输出目录位于输入目录内，后续扫描需要排除它，或明确把该输出目录作为下一步输入。
 - `font-parsing-skipped`：`parseFonts: false`，本次只做结构优先计划，没有读取字体元数据。
 
-`organizationDecision` 会把复杂的整理响应压缩成主线路由，例如 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output`。它只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary` 和可用时的 `plan[]`。
+`organizationDecision` 会把复杂的整理响应压缩成主线路由，例如 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output`。`directoryWorkflowSummary` 则把当前安全状态、布局复核原因、`workflowSteps[]`、成功标准和非直觉行为提示放在一起。二者都只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary` 和可用时的 `plan[]`。
 
 `planActionSummary.byAction` 会统计 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists`、`would-skip-target-exists` 和 `error` 等动作。它服务于 agent 快速判断计划形态；真正写文件前仍应审查 `plan[]` 明细和 `organizationWarnings[]`。
 
