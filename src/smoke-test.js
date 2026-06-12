@@ -117,6 +117,20 @@ if (scenario === 'single') {
   if (stagingDecision?.sourceDestructive !== false || stagingDecision?.followUpOptions?.dryRun !== false) {
     throw new Error('Expected staging guidance to disclose source safety and copy-only follow-up.');
   }
+  const exampleIds = new Set((result.directoryWorkflowExamples || []).map((item) => item.id));
+  for (const requiredExample of ['flat-vendor-dump', 'archive-per-family-folders', 'mixed-root-and-nested-fonts', 'large-noisy-first-pass']) {
+    if (!exampleIds.has(requiredExample)) {
+      throw new Error(`Expected agent guidance examples to include ${requiredExample}.`);
+    }
+  }
+  const noisyExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'large-noisy-first-pass');
+  if (noisyExample?.firstCall?.parseFonts !== false || !noisyExample.mustInspectFields?.includes('dedupeLimitedByParsing')) {
+    throw new Error('Expected noisy-directory example to use parseFonts:false and require dedupe limitation checks.');
+  }
+  const mixedExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'mixed-root-and-nested-fonts');
+  if (mixedExample?.safety?.sourceDestructive !== false || !mixedExample.mustInspectFields?.includes('writesSourceTree')) {
+    throw new Error('Expected mixed-layout example to disclose source safety fields.');
+  }
   const checklistIds = new Set((result.verificationChecklist || []).map((item) => item.id));
   for (const requiredId of ['runtime-ready', 'layout-plan-reviewed', 'process-outcome-checked', 'fallback-disclosed', 'output-audited']) {
     if (!checklistIds.has(requiredId)) {

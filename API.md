@@ -10,9 +10,11 @@ Return machine-readable usage guidance for AI coding assistants.
 |-------|---------------|---------|-------------|
 | `workflow` | `overview`, `single`, `batch`, `inspect`, `organize` | `overview` | Guidance focus. |
 
-The response includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `directoryWorkflowExamples[]`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
 
 `directoryWorkflowDecisionMatrix[]` is a machine-readable decision table for common directory scenarios. Each entry includes `id`, `useWhen`, `firstTool`, default write/source-safety flags, `recommendedOptions`, optional follow-up tool/options, `mustInspectFields`, and `nonIntuitiveBehavior`.
+
+`directoryWorkflowExamples[]` gives concrete source-tree patterns such as flat vendor dumps, archive-per-family folders, mixed root+nested libraries, and large/noisy first-pass scans. Each example includes `sourceShape`, the likely layout kind, the recommended first tool and first call, follow-up guidance, safety flags, and response fields the agent must inspect.
 
 ## `get_runtime_status`
 
@@ -203,6 +205,8 @@ Non-intuitive behavior to watch:
 - `parseFonts: false` is structure-only. It avoids metadata parsing, but cannot detect invalid fonts, cannot provide glyph counts, and cannot do true identity dedupe or metadata-driven family grouping.
 - Non-font files are ignored. Invalid font-like files are skipped unless `copyInvalidFonts: true`.
 - If `outputDir` is inside `inputDir`, the response includes `output-inside-input`; future scans should exclude that output directory to avoid processing organized copies as new source fonts.
+
+Use `parseFonts: true` when you need trustworthy invalid-font counts, glyph counts, internal family names, or cross-format identity dedupe. Use `parseFonts: false` only for a quick structural first pass over a very large or noisy tree. In that mode, `font-parsing-skipped` should be treated as a warning that the plan is incomplete for metadata-sensitive decisions.
 
 ## `inspect_split_output`
 

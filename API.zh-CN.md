@@ -10,9 +10,11 @@
 |------|---------------|--------|------|
 | `workflow` | `overview`, `single`, `batch`, `inspect`, `organize` | `overview` | 指南侧重点。 |
 
-响应会包含工作区路径规则、支持扩展名、默认策略、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`directoryWorkflowDecisionMatrix[]`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应会包含工作区路径规则、支持扩展名、默认策略、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`directoryWorkflowDecisionMatrix[]`、`directoryWorkflowExamples[]`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
 `directoryWorkflowDecisionMatrix[]` 是面向常见目录场景的机器可读决策表。每个条目包含 `id`、`useWhen`、`firstTool`、默认写入/源目录安全标记、`recommendedOptions`、可选后续工具/参数、`mustInspectFields` 和 `nonIntuitiveBehavior`。
+
+`directoryWorkflowExamples[]` 提供具体源目录树模式，例如扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。每个示例包含 `sourceShape`、可能的 layout 类型、推荐首选工具和首次调用、后续处理建议、安全标记，以及 agent 必须检查的响应字段。
 
 ## `get_runtime_status`
 
@@ -203,6 +205,8 @@
 - `parseFonts: false` 是结构优先模式：它会跳过字体元数据解析，因此不能检测坏字体、不能提供 glyph count，也不能做真正的 identity 去重或完全基于 metadata 的 family 分组。
 - 非字体文件会被忽略；扩展名像字体但解析失败的文件默认跳过，除非 `copyInvalidFonts: true`。
 - 如果 `outputDir` 位于 `inputDir` 内，响应会包含 `output-inside-input`；后续扫描应排除该输出目录，避免把整理后的副本再次当作源字体处理。
+
+当你需要可信的坏字体数量、glyph count、内部 family 名或跨格式 identity 去重时，使用 `parseFonts: true`。只有在超大或嘈杂目录上先快速了解结构时，才使用 `parseFonts: false`。此时 `font-parsing-skipped` 应被视为警告：这个计划不适合直接支撑依赖字体元数据的判断。
 
 ## `inspect_split_output`
 

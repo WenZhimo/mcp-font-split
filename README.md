@@ -120,6 +120,71 @@ organized-fonts/
 
 This staging layout is not a split result and does not contain CSS. It is a copy-only helper for preparing a source directory before a later `split_font_batch` run.
 
+## Common Source Layouts
+
+Use `organize_font_directory` when the source layout is unclear, flat, mixed, or different from the family grouping you want. Start with its default `dryRun: true`; this only returns a plan and safety summary.
+
+Flat vendor dump:
+
+```text
+fonts/
+  BrandSans-Regular.ttf
+  BrandSans-Bold.otf
+  readme.txt
+```
+
+Recommended first call:
+
+```json
+{
+  "inputDir": "fonts",
+  "dryRun": true,
+  "parseFonts": true,
+  "includePlan": true
+}
+```
+
+This lets the tool read font metadata and recommend `batchGroupBy`. If the plan is good, either split the original directory with `recommendedBatchOptions`, or run copy-only organization into `organized-fonts` when the user wants a cleaner staging source.
+
+Archive-per-family folders:
+
+```text
+fonts/
+  BrandSans/
+    Regular.ttf
+    Bold.ttf
+  OtherSerif/
+    Regular.otf
+```
+
+This usually can go straight to `split_font_batch` dry-run with `batchGroupBy: "source-dir"`. Use the organizer only if the user explicitly wants a copied staging directory.
+
+Mixed root and nested fonts:
+
+```text
+fonts/
+  LooseDisplay.ttf
+  BrandSans/
+    Regular.ttf
+  OtherSerif/
+    Regular.otf
+```
+
+This is the easiest layout to misread. Call `organize_font_directory` with `dryRun: true` first and inspect `layout.layoutKind`, `recommendedBatchOptions`, `organizationWarnings`, `sourceDestructive`, and `writesSourceTree`.
+
+Large or noisy library first pass:
+
+```json
+{
+  "inputDir": "fonts",
+  "dryRun": true,
+  "parseFonts": false,
+  "includePlan": false
+}
+```
+
+Use this only to learn the directory shape quickly. Because font parsing is skipped, `validFontCount` and `invalidFontCount` are `null`, `glyphCount` is unavailable, and identity dedupe falls back to a path-based mode. Rerun with `parseFonts: true` before trusting invalid-font counts, metadata family grouping, or identity dedupe.
+
 ## Key options
 
 ### Single-font and batch processing options

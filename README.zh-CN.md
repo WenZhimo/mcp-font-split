@@ -118,6 +118,71 @@ organized-fonts/
 
 这个暂存目录不是拆分结果，也不包含 CSS。它只是一个 copy-only 的整理辅助输出，用于在后续 `split_font_batch` 前准备更稳定的源目录。
 
+## 常见源目录形态
+
+当源目录结构不明确、扁平、混合，或与期望的 family 分组不一致时，优先使用 `organize_font_directory`。保持默认 `dryRun: true`，它只返回整理计划和安全摘要。
+
+扁平 vendor dump：
+
+```text
+fonts/
+  BrandSans-Regular.ttf
+  BrandSans-Bold.otf
+  readme.txt
+```
+
+推荐首次调用：
+
+```json
+{
+  "inputDir": "fonts",
+  "dryRun": true,
+  "parseFonts": true,
+  "includePlan": true
+}
+```
+
+这会读取字体元数据并给出 `batchGroupBy` 建议。如果计划合理，可以直接把 `recommendedBatchOptions` 用到原目录的 `split_font_batch`；如果用户希望得到更干净的暂存源目录，再执行 copy-only 整理到 `organized-fonts`。
+
+每个压缩包/家族一个目录：
+
+```text
+fonts/
+  BrandSans/
+    Regular.ttf
+    Bold.ttf
+  OtherSerif/
+    Regular.otf
+```
+
+这类目录通常可以直接对 `split_font_batch` 做 dry-run，并设置 `batchGroupBy: "source-dir"`。只有当用户明确想要复制出暂存目录时，才需要整理工具。
+
+根目录和子目录混合：
+
+```text
+fonts/
+  LooseDisplay.ttf
+  BrandSans/
+    Regular.ttf
+  OtherSerif/
+    Regular.otf
+```
+
+这是最容易误判的结构。先调用 `organize_font_directory` 并保持 `dryRun: true`，重点检查 `layout.layoutKind`、`recommendedBatchOptions`、`organizationWarnings`、`sourceDestructive` 和 `writesSourceTree`。
+
+超大或嘈杂字体库的第一遍扫描：
+
+```json
+{
+  "inputDir": "fonts",
+  "dryRun": true,
+  "parseFonts": false,
+  "includePlan": false
+}
+```
+
+这只适合快速了解目录形态。由于跳过了字体解析，`validFontCount` 和 `invalidFontCount` 是 `null`，没有 `glyphCount`，identity 去重也会退化为基于路径的模式。依赖坏字体数量、metadata family 分组或 identity 去重前，应使用 `parseFonts: true` 再跑一次。
+
 ## 关键参数
 
 ### 单文件和批量通用参数

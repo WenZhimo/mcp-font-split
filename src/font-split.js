@@ -507,6 +507,124 @@ export function getAgentGuidance(args = {}) {
       nonIntuitiveBehavior: 'A real organize run is copy-only. overwriteExisting:true can replace files in outputDir but still does not modify source files.',
     },
   ];
+  const directoryWorkflowExamples = [
+    {
+      id: 'flat-vendor-dump',
+      sourceShape: [
+        'fonts/',
+        '  BrandSans-Regular.ttf',
+        '  BrandSans-Bold.otf',
+        '  readme.txt',
+      ],
+      likelyLayoutKind: 'flat',
+      concern: 'Root-level font files have no directory grouping, so family grouping depends on font metadata.',
+      firstTool: 'organize_font_directory',
+      firstCall: {
+        inputDir: 'fonts',
+        dryRun: true,
+        parseFonts: true,
+        includePlan: true,
+      },
+      ifPlanLooksGood: [
+        'If the user only wants split output, call split_font_batch on the original inputDir using recommendedBatchOptions.',
+        'If the user wants a cleaner source staging directory, call organize_font_directory again with dryRun:false, then split_font_batch with inputDir set to outputDir.',
+      ],
+      safety: {
+        sourceDestructive: false,
+        defaultWritesFiles: false,
+        realOrganizerMode: 'copy-only',
+      },
+      mustInspectFields: ['layout.layoutKind', 'recommendedBatchOptions', 'organizationWarnings', 'plan'],
+    },
+    {
+      id: 'archive-per-family-folders',
+      sourceShape: [
+        'fonts/',
+        '  BrandSans/',
+        '    Regular.ttf',
+        '    Bold.ttf',
+        '  OtherSerif/',
+        '    Regular.otf',
+      ],
+      likelyLayoutKind: 'nested',
+      concern: 'Each top-level source folder already looks like a family grouping.',
+      firstTool: 'split_font_batch',
+      firstCall: {
+        inputDir: 'fonts',
+        dryRun: true,
+        includeResults: true,
+        batchGroupBy: 'source-dir',
+        strictMode: true,
+      },
+      ifPlanLooksGood: [
+        'Run split_font_batch again with dryRun:false, usually includeResults:false for large libraries.',
+        'Use organize_font_directory only if the user explicitly wants a copied staging directory.',
+      ],
+      safety: {
+        sourceDestructive: false,
+        defaultWritesFiles: false,
+        realOrganizerMode: 'not-needed-unless-staging',
+      },
+      mustInspectFields: ['planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errors'],
+    },
+    {
+      id: 'mixed-root-and-nested-fonts',
+      sourceShape: [
+        'fonts/',
+        '  LooseDisplay.ttf',
+        '  BrandSans/',
+        '    Regular.ttf',
+        '  OtherSerif/',
+        '    Regular.otf',
+      ],
+      likelyLayoutKind: 'mixed',
+      concern: 'Root-level and nested fonts are mixed, so direct batch grouping can surprise users.',
+      firstTool: 'organize_font_directory',
+      firstCall: {
+        inputDir: 'fonts',
+        dryRun: true,
+        parseFonts: true,
+        includePlan: true,
+      },
+      ifPlanLooksGood: [
+        'Prefer reviewing or applying recommendedBatchOptions before splitting.',
+        'Use copy-only organization when the user wants a stable staging source that separates loose and nested inputs.',
+      ],
+      safety: {
+        sourceDestructive: false,
+        defaultWritesFiles: false,
+        realOrganizerMode: 'copy-only',
+      },
+      mustInspectFields: ['layout.layoutKind', 'organizationWarnings', 'recommendedBatchOptions', 'sourceDestructive', 'writesSourceTree'],
+    },
+    {
+      id: 'large-noisy-first-pass',
+      sourceShape: [
+        'fonts/',
+        '  many folders and files',
+        '  archives, docs, screenshots, and font-like files',
+      ],
+      likelyLayoutKind: 'unknown',
+      concern: 'Metadata parsing may be slow or noisy, and the first question is only how the directory is shaped.',
+      firstTool: 'organize_font_directory',
+      firstCall: {
+        inputDir: 'fonts',
+        dryRun: true,
+        parseFonts: false,
+        includePlan: false,
+      },
+      ifPlanLooksGood: [
+        'Use this only as a structure-first scan.',
+        'Rerun with parseFonts:true before relying on invalid-font counts, glyph counts, font-family grouping, or identity dedupe.',
+      ],
+      safety: {
+        sourceDestructive: false,
+        defaultWritesFiles: false,
+        realOrganizerMode: 'copy-only-when-dryRun-false',
+      },
+      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationWarnings'],
+    },
+  ];
 
   return {
     ok: true,
@@ -565,6 +683,7 @@ export function getAgentGuidance(args = {}) {
       overwriteExisting: false,
     },
     directoryWorkflowDecisionMatrix,
+    directoryWorkflowExamples,
     verificationChecklist,
     responseFieldsToCheck: [
       'ok',
@@ -600,6 +719,8 @@ export function getAgentGuidance(args = {}) {
       'effectiveBatchDedupeMode',
       'dedupeLimitedByParsing',
       'recommendedBatchOptions',
+      'directoryWorkflowDecisionMatrix',
+      'directoryWorkflowExamples',
       'resultsIncluded',
       'planIncluded',
       'manifestCount',
