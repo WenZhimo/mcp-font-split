@@ -466,7 +466,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 4. 根据 `batchDedupeMode` 对等价字体去重，默认仍是 `font-identity`。
 5. 根据 `batchGroupBy` 计算整理后的分组目录。
 6. 根据 `batchNamingMode` 计算整理后的目标文件名。
-7. 返回 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary` 和可选 `plan[]`。
+7. 返回 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`recommendedNextActions[]`、`organizationDecision`、`organizationWarnings[]`、`planActionSummary` 和可选 `plan[]`。
 
 `parseFonts` 控制是否读取字体元数据：
 
@@ -707,6 +707,7 @@ split-meta.json
 | `recommendedBatchOptions` | 根据目录结构建议的后续批量策略片段，不是完整安全调用 |
 | `recommendedBatchPreviewArgs` | 可直接复制的后续 `split_font_batch` 无写入预览参数 |
 | `recommendedNextActions[]` | 面向 agent 的后续动作建议，包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields`；`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对该 preset 的差异覆盖 |
+| `organizationDecision` | 当前整理响应的紧凑主线路由建议 |
 | `organizationWarnings[]` | 摘要级风险和状态提示 |
 | `planActionSummary` | 计划动作汇总；即使 `includePlan: false` 也会返回 |
 | `plan[]` | 可选的逐字体复制/跳过计划 |
@@ -723,6 +724,8 @@ split-meta.json
 - `mixed-layout-detected`：根目录和子目录中都发现了字体。
 - `output-inside-input`：批量或整理输出目录位于输入目录内，后续扫描需要排除它，或明确把该输出目录作为下一步输入。
 - `font-parsing-skipped`：`parseFonts: false`，本次只做结构优先计划，没有读取字体元数据。
+
+`organizationDecision` 会把复杂的整理响应压缩成主线路由，例如 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output`。它只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary` 和可用时的 `plan[]`。
 
 `planActionSummary.byAction` 会统计 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists`、`would-skip-target-exists` 和 `error` 等动作。它服务于 agent 快速判断计划形态；真正写文件前仍应审查 `plan[]` 明细和 `organizationWarnings[]`。
 

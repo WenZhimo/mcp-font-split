@@ -870,6 +870,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('planActionSummary')) {
     throw new Error('Expected agent guidance to recommend checking organization plan action summaries.');
   }
+  if (!result.responseFieldsToCheck?.includes('organizationDecision')) {
+    throw new Error('Expected agent guidance to recommend checking organization decision summaries.');
+  }
   if (!result.responseFieldsToCheck?.includes('warningCodeCatalog')) {
     throw new Error('Expected agent guidance to recommend checking the warning code catalog.');
   }
@@ -1473,6 +1476,14 @@ if (scenario === 'single') {
   if (result.planActionSummary?.total !== 1 || result.planActionSummary?.byAction?.['skipped-invalid'] !== 1) {
     throw new Error('Expected organization dry-run to summarize skipped-invalid plan actions.');
   }
+  if (
+    result.organizationDecision?.route !== 'decide-on-invalid-fonts'
+    || result.organizationDecision?.preferredNextActionId !== 'decide-on-invalid-fonts'
+    || result.organizationDecision?.sourceDestructive !== false
+    || result.organizationDecision?.writesBeforeReview !== false
+  ) {
+    throw new Error('Expected organization dry-run to summarize the invalid-font decision route.');
+  }
   const unsupportedOrganizationExtensions = new Set((result.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
   const unsupportedOrganizationCategories = Object.fromEntries((result.unsupportedFileSummary?.byCategory || []).map((item) => [item.category, item.count]));
   if (
@@ -1528,6 +1539,9 @@ if (scenario === 'single') {
   if (compact.planActionSummary?.total !== 1 || compact.planActionSummary?.byAction?.['skipped-invalid'] !== 1) {
     throw new Error('Expected compact organization dry-run to keep plan action summary.');
   }
+  if (compact.organizationDecision?.route !== 'decide-on-invalid-fonts') {
+    throw new Error('Expected compact organization dry-run to keep organizationDecision.');
+  }
   console.log(JSON.stringify(result, null, 2));
   console.log(JSON.stringify({ compact }, null, 2));
 } else if (scenario === 'organize-copy') {
@@ -1572,6 +1586,16 @@ if (scenario === 'single') {
   }
   if (copied.planActionSummary?.total !== 1 || copied.planActionSummary?.byAction?.copied !== 1) {
     throw new Error('Expected organization copy mode to summarize copied plan actions.');
+  }
+  if (
+    copied.organizationDecision?.route !== 'preview-organized-output'
+    || copied.organizationDecision?.preferredNextActionId !== 'preview-batch-split-organized-output'
+    || copied.organizationDecision?.nextInputDir !== outputDir
+    || copied.organizationDecision?.safeBatchPreviewArgs?.inputDir !== outputDir
+    || copied.organizationDecision?.sourceDestructive !== false
+    || copied.organizationDecision?.writesBeforeReview !== false
+  ) {
+    throw new Error('Expected organization copy mode to recommend previewing the organized output.');
   }
   if (!copied.organizationWarnings?.some((warning) => warning.code === 'organization-writes-output')) {
     throw new Error('Expected organization copy warning.');
@@ -1650,6 +1674,9 @@ if (scenario === 'single') {
   if (overwritten.planActionSummary?.total !== 1 || overwritten.planActionSummary?.byAction?.copied !== 1) {
     throw new Error('Expected overwrite-enabled organization copy to summarize copied plan actions.');
   }
+  if (overwritten.organizationDecision?.route !== 'preview-organized-output') {
+    throw new Error('Expected overwrite-enabled organization copy to keep the organized-output preview route.');
+  }
   if (!overwritten.organizationWarnings?.some((warning) => warning.code === 'output-overwrite-enabled')) {
     throw new Error('Expected organization overwrite warning.');
   }
@@ -1710,6 +1737,13 @@ if (scenario === 'single') {
   }
   if (result.layout?.layoutKind !== 'nested' || result.recommendedBatchOptions?.batchGroupBy !== 'source-dir') {
     throw new Error('Expected valid-font organization to still summarize the source directory layout.');
+  }
+  if (
+    result.organizationDecision?.route !== 'preview-organized-output'
+    || result.organizationDecision?.nextInputDir !== outputDir
+    || result.organizationDecision?.safeBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+  ) {
+    throw new Error('Expected valid-font organization to recommend previewing the organized output.');
   }
   assertSafeRecommendedBatchPreviewArgs(result.recommendedBatchPreviewArgs, {
     inputDir,
@@ -1780,6 +1814,13 @@ if (scenario === 'single') {
   }
   if (result.planActionSummary?.total !== 1 || result.planActionSummary?.byAction?.['would-copy'] !== 1) {
     throw new Error('Expected structure-only organization to summarize would-copy plan actions.');
+  }
+  if (
+    result.organizationDecision?.route !== 'rerun-with-font-parsing'
+    || result.organizationDecision?.preferredNextActionId !== 'rerun-with-font-parsing'
+    || result.organizationDecision?.sourceDestructive !== false
+  ) {
+    throw new Error('Expected structure-only organization to summarize the font-parsing rerun decision route.');
   }
   const structureNextActionIds = new Set((result.recommendedNextActions || []).map((action) => action.id));
   if (!structureNextActionIds.has('rerun-with-font-parsing')) {
@@ -2709,6 +2750,7 @@ if (scenario === 'single') {
       'recommendedBatchPreviewArgs',
       'recommendedNextActions',
       'safetySummary',
+      'organizationDecision',
       'sourceDestructive',
       'writesSourceTree',
       'writesOutputTree',
@@ -2786,6 +2828,7 @@ if (scenario === 'single') {
     '`recommendedBatchPreviewArgs`',
     '`recommendedNextActions[]`',
     '`planActionSummary`',
+    '`organizationDecision`',
     '`unsupportedFileSummary`',
     '`unsupportedFileSummary.byExtension[]`',
     '`unsupportedFileSummary.byCategory[]`',

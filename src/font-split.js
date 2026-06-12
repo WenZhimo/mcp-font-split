@@ -837,6 +837,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Compact counts of planned or executed organization actions.',
     agentAction: 'Use it when plan[] is omitted or too large, but do not treat it as a substitute for detailed review when copying.',
   },
+  organizationDecision: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Compact machine-readable route recommendation after directory layout analysis, such as rerun with parsing, decide on invalid fonts, preview the original layout, or preview the organized staging output.',
+    agentAction: 'Use this to choose the next workflow branch, then inspect recommendedNextActions, organizationWarnings, and planActionSummary before writing or reporting success.',
+  },
   plan: {
     sourceTools: ['organize_font_directory'],
     meaning: 'Per-font copy or skip plan entries for directory organization.',
@@ -2097,6 +2102,7 @@ export function getAgentGuidance(args = {}) {
       'copiedCount',
       'organizationManifestPath',
       'planActionSummary',
+      'organizationDecision',
       'plan',
       'sourceDestructive',
       'sourceFilesPreserved',
@@ -2955,6 +2961,119 @@ function buildOrganizationNextActions({
   }
 
   return actions;
+}
+
+function buildOrganizationDecision({
+  options,
+  inputDirRelative,
+  outputDirRelative,
+  maxFilesHit,
+  layout,
+  invalidFontCount,
+  selectedFontCount,
+  copiedCount,
+  errorCount,
+  recommendedBatchPreviewArgs,
+}) {
+  const base = {
+    sourceDestructive: false,
+    writesBeforeReview: false,
+    copyOnlyStagingRequired: false,
+  };
+  const make = (decision) => ({ ...base, ...decision });
+
+  if (maxFilesHit) {
+    return make({
+      route: 'rerun-with-higher-maxFiles',
+      preferredNextActionId: 'rerun-with-higher-maxFiles',
+      nextTool: 'organize_font_directory',
+      reason: 'The source scan was truncated, so layout and copy decisions may be incomplete.',
+    });
+  }
+
+  if (!options.parseFonts) {
+    return make({
+      route: 'rerun-with-font-parsing',
+      preferredNextActionId: 'rerun-with-font-parsing',
+      nextTool: 'organize_font_directory',
+      reason: 'This was a structure-only pass; rerun with font parsing before relying on invalid-font counts, identity dedupe, or metadata family grouping.',
+    });
+  }
+
+  if (errorCount > 0) {
+    return make({
+      route: 'inspect-organization-errors',
+      preferredNextActionId: 'inspect-organization-errors',
+      nextTool: 'organize_font_directory',
+      reason: 'The organization run recorded per-file errors that need inspection before continuing.',
+    });
+  }
+
+  if (selectedFontCount === 0) {
+    if (invalidFontCount > 0 && !options.copyInvalidFonts) {
+      return make({
+        route: 'decide-on-invalid-fonts',
+        preferredNextActionId: 'decide-on-invalid-fonts',
+        nextTool: 'organize_font_directory',
+        reason: 'Only invalid supported-extension files were available for the current policy; decide whether preserving broken font-like files is intentional.',
+      });
+    }
+    return make({
+      route: 'no-copyable-fonts',
+      preferredNextActionId: null,
+      nextTool: null,
+      reason: layout.layoutKind === 'empty'
+        ? 'No supported font files were found in the scanned input.'
+        : 'No fonts were selected for the current organization policy.',
+    });
+  }
+
+  if (!options.dryRun) {
+    if (copiedCount > 0) {
+      return make({
+        route: 'preview-organized-output',
+        preferredNextActionId: 'preview-batch-split-organized-output',
+        nextTool: 'split_font_batch',
+        nextInputDir: outputDirRelative,
+        safeBatchPreviewArgs: buildSuggestedBatchPreviewArgs({
+          inputDir: outputDirRelative,
+          recommendedBatchOptions: layout.recommendedBatchOptions,
+        }),
+        reason: 'A copy-only staging directory was written; inspect or preview that organized output before splitting.',
+      });
+    }
+    return make({
+      route: 'review-existing-targets',
+      preferredNextActionId: 'inspect-organized-output',
+      nextTool: 'inspect_font_inputs',
+      nextInputDir: outputDirRelative,
+      reason: 'No files were copied by this write run, likely because output targets already existed or the plan selected no copy actions.',
+    });
+  }
+
+  if (layout.layoutKind === 'mixed') {
+    return make({
+      route: 'review-mixed-layout',
+      preferredNextActionId: 'review-mixed-layout-grouping',
+      nextTool: 'split_font_batch',
+      nextInputDir: inputDirRelative,
+      safeBatchPreviewArgs: recommendedBatchPreviewArgs,
+      copyOnlyStagingRequired: 'optional',
+      optionalStagingActionId: 'copy-organized-staging-directory',
+      reason: 'Fonts exist both at the input root and inside subdirectories; review grouping before direct splitting or staging.',
+    });
+  }
+
+  return make({
+    route: 'preview-original-layout',
+    preferredNextActionId: 'preview-batch-split-original-layout',
+    nextTool: 'split_font_batch',
+    nextInputDir: inputDirRelative,
+    safeBatchPreviewArgs: recommendedBatchPreviewArgs,
+    copyOnlyStagingRequired: 'optional',
+    optionalStagingActionId: 'copy-organized-staging-directory',
+    reason: 'The current layout has copyable fonts; preview split_font_batch on the original input before any real batch write, and only copy a staging directory if the user wants one.',
+  });
 }
 
 function buildPlanActionSummary(plan) {
@@ -5022,6 +5141,18 @@ export async function organizeFontDirectory(args = {}) {
     selectedFontCount: selectedEntries.length,
     copiedCount,
   });
+  const organizationDecision = buildOrganizationDecision({
+    options,
+    inputDirRelative,
+    outputDirRelative,
+    maxFilesHit: scan.truncated,
+    layout,
+    invalidFontCount: invalidEntries.length,
+    selectedFontCount: selectedEntries.length,
+    copiedCount,
+    errorCount: errors.length,
+    recommendedBatchPreviewArgs,
+  });
 
   const result = {
     ok: errors.length === 0,
@@ -5069,6 +5200,7 @@ export async function organizeFontDirectory(args = {}) {
     recommendedBatchPreviewArgs,
     recommendedNextActionCount: recommendedNextActions.length,
     recommendedNextActions,
+    organizationDecision,
     organizationWarningCount: warnings.length,
     organizationWarnings: warnings,
     planActionSummary,
