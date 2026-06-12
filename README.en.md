@@ -572,7 +572,7 @@ npm run smoke:mcp-error
 npm run smoke:api-docs
 npm run smoke:behavior-docs
 npm run smoke:inspect
-npm run smoke:small-skip
+npm run smoke:small-copy-original
 ```
 
 `npm run check` is the recommended agent/CI entry point. It runs syntax checks plus smoke scenarios that create their own tiny inputs and do not require a real font library.
@@ -589,7 +589,7 @@ npm run smoke:small-skip
 
 `smoke:behavior-docs` checks that `BEHAVIOR.zh-CN.md` covers the current tool inventory, `workflowPreset` values, key safety/audit fields, batch debug events, and high-risk warning codes. It is included in `npm run check` to prevent the behavior notes from missing counterintuitive or agent-risky behavior.
 
-`smoke:small-skip` currently exercises the `copy-original` small-font policy; the script name is kept for compatibility. `smoke:incremental` also prints a sample `splitDir` so you can verify the collision-safe batch naming stays stable across reruns.
+`smoke:small-copy-original` exercises the `copy-original` small-font policy. `smoke:incremental` also prints a sample `splitDir` so you can verify the collision-safe batch naming stays stable across reruns.
 
 ### Environment variables
 

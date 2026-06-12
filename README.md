@@ -572,7 +572,7 @@ npm run smoke:mcp-error
 npm run smoke:api-docs
 npm run smoke:behavior-docs
 npm run smoke:inspect
-npm run smoke:small-skip
+npm run smoke:small-copy-original
 ```
 
 `npm run check` 是推荐给 AI agent / CI 的入口。它会运行语法检查和一组能自造最小输入的 smoke 场景，不依赖真实字体库。
@@ -589,7 +589,7 @@ npm run smoke:small-skip
 
 `smoke:behavior-docs` 会检查 `BEHAVIOR.zh-CN.md` 是否覆盖当前工具清单、`workflowPreset`、关键安全/审计字段、批量调试事件和高风险 warning code。它包含在 `npm run check` 中，用来防止行为说明漏掉反直觉或 agent 容易误判的行为。
 
-`smoke:small-skip` 当前验证的是 `copy-original` 小字体策略；脚本名保留是为了兼容。`smoke:incremental` 也会额外打印一个示例 `splitDir`，用于确认新的批量命名在重复运行时仍然稳定。
+`smoke:small-copy-original` 验证的是 `copy-original` 小字体策略。`smoke:incremental` 也会额外打印一个示例 `splitDir`，用于确认新的批量命名在重复运行时仍然稳定。
 
 ### 环境变量
 

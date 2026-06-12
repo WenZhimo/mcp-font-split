@@ -1752,11 +1752,10 @@ function buildWorkflowPresetCatalog() {
 }
 
 function normalizeProcessingOptions(args) {
-  const smallGlyphAction = args.smallGlyphAction === 'skip' ? 'copy-original' : args.smallGlyphAction;
   const smallGlyphActions = ['subset', 'single-woff2', 'copy-original'];
   return {
     oversizedKernAction: args.oversizedKernAction === 'strip' ? 'strip' : 'preserve',
-    smallGlyphAction: smallGlyphActions.includes(smallGlyphAction) ? smallGlyphAction : 'subset',
+    smallGlyphAction: smallGlyphActions.includes(args.smallGlyphAction) ? args.smallGlyphAction : 'subset',
     smallGlyphThreshold: Number.isFinite(args.smallGlyphThreshold) && args.smallGlyphThreshold > 0
       ? Math.floor(args.smallGlyphThreshold)
       : 50,

@@ -3028,19 +3028,34 @@ if (scenario === 'single') {
       structureSummary: audit.structureSummary,
     },
   }, null, 2));
-} else if (scenario === 'small-skip') {
-  console.log('Small glyph copy-original smoke:', fontPath, '->', outDir);
+} else if (scenario === 'small-copy-original') {
+  const usesGeneratedInput = !process.argv[3];
+  const smallInputDir = '.font-split-small-copy-original-input';
+  const smallFontPath = process.argv[3] || path.join(smallInputDir, 'SmallCopyOriginal-Regular.ttf');
+  const smallOutDir = process.argv[4] || '.font-split-small-copy-original-output';
+
+  console.log('Small glyph copy-original smoke:', smallFontPath, '->', smallOutDir);
+  if (usesGeneratedInput) {
+    await fs.rm(smallInputDir, { recursive: true, force: true });
+    await fs.rm(smallOutDir, { recursive: true, force: true });
+    await fs.mkdir(smallInputDir, { recursive: true });
+    await fs.writeFile(smallFontPath, buildMinimalTtf({
+      familyName: 'Small Copy Original Smoke',
+      subfamilyName: 'Regular',
+      glyphCount: 3,
+    }));
+  }
   const result = await splitFont({
-    fontPath,
-    outDir,
+    fontPath: smallFontPath,
+    outDir: smallOutDir,
     smallGlyphAction: 'copy-original',
     smallGlyphThreshold: 1000000,
-    fontFamily: 'SmallSkipSmokeFont',
+    fontFamily: 'SmallCopyOriginalSmokeFont',
     silent: true,
   });
   console.log(JSON.stringify(result, null, 2));
   console.log('\nInspecting output:');
-  console.log(JSON.stringify(await inspectSplitOutput({ outDir }), null, 2));
+  console.log(JSON.stringify(await inspectSplitOutput({ outDir: smallOutDir }), null, 2));
 } else {
   throw new Error(`Unknown smoke scenario: ${scenario}`);
 }

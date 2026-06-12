@@ -191,7 +191,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `copy-original`：不调用分割器，不生成 web-font，只复制原字体并写 `split-meta.json`
 
 > [!NOTE]
-> 代码内部仍接受旧别名 `skip`，并映射为 `copy-original`。公开 schema 和文档使用 `copy-original`。
+> `smallGlyphAction` 只接受上面的公开取值；需要保留小字形原文件时，请显式使用 `copy-original`。
 
 ### 4.3 `smallGlyphThreshold`
 
