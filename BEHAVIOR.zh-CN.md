@@ -393,7 +393,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 6. 按 `batchNamingMode` 解析批量输出目录名
 7. 根据 `skipMode` 判断是否跳过已有输出
 8. 未跳过时调用 `split_font`
-9. 汇总成功、错误、跳过和处理模式统计
+9. 汇总成功、错误、跳过、处理模式统计和 `batchDecision`
 10. 如果 `includeResults: false`，响应中省略每个字体的 `results[]` 详情，只保留汇总和错误
 11. 如果 `dryRun: true`，第 8 步不会真正执行，而是返回 `planned[]`、`plannedCount` 和 `wouldProcessCount`
 12. 如果 `batchErrorMode` 是 `fail-fast` 或 `fail-after`，按对应策略把单字体错误升级为批量工具错误
@@ -656,6 +656,7 @@ split-meta.json
 - `mayOverwriteOutputTree`：当前非 dry-run 调用是否可能覆盖 `outputRoot` 中的文件
 - `batchWarningCount`
 - `batchWarnings[]`：批量摘要级提示，每项包含 `code` 和 `message`
+- `batchDecision`：当前批量响应的紧凑主线路由建议
 - `recommendedNextActionCount`
 - `recommendedNextActions[]`：面向 agent 的批量后续动作建议；dry-run 可能给出 `run-reviewed-batch-write`，真实写入可能给出 `audit-split-output`，要求继续用 `inspect_split_output` 审计输出结构
 - `errorCount`
@@ -672,6 +673,8 @@ split-meta.json
 - `decompressedInputs`
 - `oversizedKernDetected`
 - `oversizedKernStripped`
+
+`batchDecision` 会把复杂的批量响应压缩成主线路由，例如 `review-dry-run-plan`、`rerun-batch-with-higher-maxFiles`、`inspect-batch-errors`、`audit-written-output`、`review-existing-output-skips`、`no-supported-fonts` 或 `no-selected-fonts`。它只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `batchWarnings[]`、`errors[]`、`recommendedNextActions[]`，以及真实写入后的输出审计字段。
 
 `recommendedNextActions[]` 是检查清单，不会自动执行。真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
 

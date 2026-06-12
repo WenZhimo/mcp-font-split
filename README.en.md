@@ -302,6 +302,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `unsupportedFileSummary`: summary of all scanned ignored non-font files, including exact `unsupportedFileSummary.byExtension[]`, overview `unsupportedFileSummary.byCategory[]`, `<none>` counts for extensionless files, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`; archives are categorized as `archive` and still ignored
 - `dryRun`, `plannedCount`, `wouldProcessCount`, `planIncluded`
 - `batchWarningCount`, `batchWarnings[]` with machine-readable `code` and `message`
+- `batchDecision`: compact main-route recommendation for the batch response, distinguishing dry-run review, maxFiles rerun, error inspection, output audit, existing-output skips, and empty-batch branches
 - `batchErrorMode`, `errorCount`, `errors[]`
 - `safetySummary`: source/output safety summary for the batch call. Prefer it when deciding whether the call writes files or affects the source tree; source font files are preserved, and writes are limited to `outputRoot`.
 - `sourceDestructive`: should always be `false` for batch mode
@@ -317,6 +318,8 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `processingSummary.smallGlyphDowngrades`
 - `processingSummary.smallGlyphCopyOriginals`
 - `processingSummary.failureFallbacks`
+
+Treat `batchDecision` as a route hint, not proof of success. It helps agents choose the next branch; before continuing, still inspect `batchWarnings[]`, `errors[]`, `recommendedNextActions[]`, and output audit fields when output was written.
 
 `organize_font_directory` returns a source-safety summary plus an optional copy plan:
 

@@ -752,6 +752,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Number of batchWarnings entries.',
     agentAction: 'Use as a compact signal that batchWarnings needs attention.',
   },
+  batchDecision: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Compact machine-readable route recommendation after a batch run, such as review a dry-run plan, rerun with a higher maxFiles, inspect errors, audit written output, or handle an empty batch.',
+    agentAction: 'Use this to choose the next batch workflow branch, then inspect batchWarnings, recommendedNextActions, errors, and output audit fields before reporting success.',
+  },
   errorCount: {
     sourceTools: ['split_font_batch'],
     meaning: 'Number of per-font processing errors collected by the batch run.',
@@ -2085,6 +2090,7 @@ export function getAgentGuidance(args = {}) {
       'recommendedWorkflowPlan',
       'batchWarnings',
       'batchWarningCount',
+      'batchDecision',
       'errorCount',
       'errors',
       'maxFilesHit',
@@ -2790,6 +2796,127 @@ function buildBatchNextActions({
   }
 
   return actions;
+}
+
+function buildBatchDecision({
+  dryRun,
+  inputDirRelative,
+  outputRoot,
+  effectiveArgs,
+  batchOptions,
+  maxFilesHit,
+  discoveredFontCount,
+  selectedFontCount,
+  processedFontCount,
+  skippedExisting,
+  errorCount,
+  safetySummary,
+}) {
+  const base = {
+    sourceDestructive: false,
+    sourceFilesPreserved: true,
+    writesSourceTree: safetySummary.writesSourceTree,
+    writesOutputTree: safetySummary.writesOutputTree,
+    outputTreeInsideInputTree: safetySummary.outputTreeInsideInputTree,
+    requiresOutputAudit: false,
+  };
+  const make = (decision) => ({ ...base, ...decision });
+
+  if (maxFilesHit) {
+    return make({
+      route: 'rerun-batch-with-higher-maxFiles',
+      preferredNextActionId: 'rerun-batch-with-higher-maxFiles',
+      nextTool: 'split_font_batch',
+      nextInputDir: inputDirRelative,
+      rerunArgs: buildSuggestedBatchRerunArgs({
+        inputDir: inputDirRelative,
+        outputRoot,
+        workflowPreset: dryRun ? 'safe-preview' : 'reviewed-write',
+        effectiveArgs,
+        batchOptions,
+      }),
+      reason: 'The batch scan was truncated, so counts, plans, and output decisions may be incomplete.',
+    });
+  }
+
+  if (errorCount > 0) {
+    return make({
+      route: 'inspect-batch-errors',
+      preferredNextActionId: 'inspect-batch-errors',
+      nextTool: 'split_font_batch',
+      nextInputDir: inputDirRelative,
+      requiresOutputAudit: safetySummary.writesOutputTree,
+      reason: 'The batch response contains per-font errors that need inspection before reporting success.',
+    });
+  }
+
+  if (discoveredFontCount === 0) {
+    return make({
+      route: 'no-supported-fonts',
+      preferredNextActionId: null,
+      nextTool: null,
+      nextInputDir: inputDirRelative,
+      reason: 'No supported font files were found in the scanned input.',
+    });
+  }
+
+  if (selectedFontCount === 0) {
+    return make({
+      route: 'no-selected-fonts',
+      preferredNextActionId: null,
+      nextTool: null,
+      nextInputDir: inputDirRelative,
+      reason: 'Supported fonts were discovered, but none were selected for this batch policy and limit.',
+    });
+  }
+
+  if (dryRun) {
+    return make({
+      route: 'review-dry-run-plan',
+      preferredNextActionId: 'run-reviewed-batch-write',
+      nextTool: 'split_font_batch',
+      nextInputDir: inputDirRelative,
+      reviewedWriteArgs: buildSuggestedBatchWriteArgs({
+        inputDir: inputDirRelative,
+        outputRoot,
+        effectiveArgs,
+        batchOptions,
+      }),
+      reason: 'This batch dry-run wrote no files; review planned paths, warnings, and skips before running a reviewed write.',
+    });
+  }
+
+  if (safetySummary.writesOutputTree && processedFontCount > 0) {
+    return make({
+      route: 'audit-written-output',
+      preferredNextActionId: 'audit-split-output',
+      nextTool: 'inspect_split_output',
+      nextInputDir: outputRoot,
+      auditArgs: buildBatchAuditArgs({ outputRoot }),
+      requiresOutputAudit: true,
+      reason: 'The batch wrote output files; audit the output directory before reporting structural success.',
+    });
+  }
+
+  if (safetySummary.writesOutputTree && skippedExisting > 0) {
+    return make({
+      route: 'review-existing-output-skips',
+      preferredNextActionId: 'audit-split-output',
+      nextTool: 'inspect_split_output',
+      nextInputDir: outputRoot,
+      auditArgs: buildBatchAuditArgs({ outputRoot }),
+      requiresOutputAudit: true,
+      reason: 'The batch wrote no new files because selected outputs were skipped; audit existing output if relying on it.',
+    });
+  }
+
+  return make({
+    route: 'review-batch-summary',
+    preferredNextActionId: null,
+    nextTool: null,
+    nextInputDir: inputDirRelative,
+    reason: 'Review batch counts, warnings, and recommendedNextActions before deciding whether more work is needed.',
+  });
 }
 
 function buildOrganizationNextActions({
@@ -4817,6 +4944,20 @@ export async function splitFontBatch(args = {}) {
     errorCount: errors.length,
     writesOutputTree: safetySummary.writesOutputTree,
   });
+  const batchDecision = buildBatchDecision({
+    dryRun,
+    inputDirRelative,
+    outputRoot,
+    effectiveArgs,
+    batchOptions,
+    maxFilesHit: inputScan.truncated,
+    discoveredFontCount: fontFiles.length,
+    selectedFontCount: selected.length,
+    processedFontCount: results.length,
+    skippedExisting,
+    errorCount: errors.length,
+    safetySummary,
+  });
 
   const response = {
     ok: true,
@@ -4853,6 +4994,7 @@ export async function splitFontBatch(args = {}) {
     errors,
     batchWarningCount: batchWarnings.length,
     batchWarnings,
+    batchDecision,
     recommendedNextActionCount: recommendedNextActions.length,
     recommendedNextActions,
     resultsIncluded: includeResults,

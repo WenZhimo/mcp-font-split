@@ -851,6 +851,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('batchWarnings')) {
     throw new Error('Expected agent guidance to recommend checking batch warnings.');
   }
+  if (!result.responseFieldsToCheck?.includes('batchDecision')) {
+    throw new Error('Expected agent guidance to recommend checking batch decision summaries.');
+  }
   if (!result.responseFieldsToCheck?.includes('inspectionWarnings')) {
     throw new Error('Expected agent guidance to recommend checking inspection warnings.');
   }
@@ -2200,6 +2203,16 @@ if (scenario === 'single') {
   if (identityDedupe.discoveredFontCount !== 2 || identityDedupe.deduplicatedCount !== 1 || identityDedupe.skippedDuplicates !== 1 || identityDedupe.planned?.length !== 1) {
     throw new Error('Expected font-identity batch dedupe to collapse same-identity fonts despite glyph count differences.');
   }
+  if (
+    identityDedupe.batchDecision?.route !== 'review-dry-run-plan'
+    || identityDedupe.batchDecision?.preferredNextActionId !== 'run-reviewed-batch-write'
+    || identityDedupe.batchDecision?.reviewedWriteArgs?.workflowPreset !== 'reviewed-write'
+    || identityDedupe.batchDecision?.reviewedWriteArgs?.inputDir !== inputDir
+    || identityDedupe.batchDecision?.sourceDestructive !== false
+    || identityDedupe.batchDecision?.requiresOutputAudit !== false
+  ) {
+    throw new Error('Expected font-identity dry-run to recommend reviewing the dry-run plan before a reviewed write.');
+  }
   if (identityDedupe.planned[0].input !== `${inputDir}/Otf/FixtureSans-Regular.otf`) {
     throw new Error('Expected .otf representative to win over .ttf for same-identity batch inputs.');
   }
@@ -2244,6 +2257,10 @@ if (scenario === 'single') {
     || rerunAction?.suggestedArgs?.batchGroupBy !== 'font-family'
     || rerunAction?.suggestedArgs?.batchDedupeMode !== 'none'
     || rerunAction?.suggestedArgs?.skipMode !== 'force'
+    || truncatedPreview.batchDecision?.route !== 'rerun-batch-with-higher-maxFiles'
+    || truncatedPreview.batchDecision?.preferredNextActionId !== 'rerun-batch-with-higher-maxFiles'
+    || truncatedPreview.batchDecision?.rerunArgs?.maxFiles !== '<higher-than-current>'
+    || truncatedPreview.batchDecision?.rerunArgs?.workflowPreset !== 'safe-preview'
   ) {
     throw new Error('Expected truncated batch preview to recommend rerun args that preserve explicit batch policy overrides.');
   }
@@ -2602,6 +2619,11 @@ if (scenario === 'single') {
     || batchInspect.copyOriginalOutputCount !== 1
     || batchInspect.structureSummary?.outputModeCounts?.['copy-original'] !== 1
     || batchWrite.recommendedNextActionCount !== (batchWrite.recommendedNextActions || []).length
+    || batchWrite.batchDecision?.route !== 'audit-written-output'
+    || batchWrite.batchDecision?.preferredNextActionId !== 'audit-split-output'
+    || batchWrite.batchDecision?.nextTool !== 'inspect_split_output'
+    || batchWrite.batchDecision?.auditArgs?.outDir !== batchOutputRoot
+    || batchWrite.batchDecision?.requiresOutputAudit !== true
     || auditAction?.tool !== 'inspect_split_output'
     || auditAction?.suggestedArgs?.outDir !== batchOutputRoot
     || auditAction?.suggestedArgs?.includeFiles !== false
@@ -2685,7 +2707,7 @@ if (scenario === 'single') {
     }
     expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
-    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'outputTreeInsideInputTree', 'batchWarnings']);
+    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'outputTreeInsideInputTree']);
     expectDescriptionIncludes('inspect_split_output', ['auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
@@ -2750,6 +2772,7 @@ if (scenario === 'single') {
       'recommendedBatchPreviewArgs',
       'recommendedNextActions',
       'safetySummary',
+      'batchDecision',
       'organizationDecision',
       'sourceDestructive',
       'writesSourceTree',
@@ -2828,6 +2851,7 @@ if (scenario === 'single') {
     '`recommendedBatchPreviewArgs`',
     '`recommendedNextActions[]`',
     '`planActionSummary`',
+    '`batchDecision`',
     '`organizationDecision`',
     '`unsupportedFileSummary`',
     '`unsupportedFileSummary.byExtension[]`',
@@ -2881,7 +2905,7 @@ if (scenario === 'single') {
     ok: true,
     toolCount: guidance.tools?.length || 0,
     documentedWorkflowPresetCount: guidance.workflowPresets?.length || 0,
-    checkedHighRiskTokenCount: 45,
+    checkedHighRiskTokenCount: 46,
     checkedWarningCodeCount: 10,
     checkedDebugEventCount: 5,
   }, null, 2));
@@ -2954,6 +2978,18 @@ if (scenario === 'single') {
   if (batchWriteAction.suggestedArgs?.skipMode !== 'force') {
     throw new Error('Expected reviewed-write follow-up to preserve the explicit skipMode override.');
   }
+  if (
+    result.batchDecision?.route !== 'review-dry-run-plan'
+    || result.batchDecision?.preferredNextActionId !== 'run-reviewed-batch-write'
+    || result.batchDecision?.nextTool !== 'split_font_batch'
+    || result.batchDecision?.reviewedWriteArgs?.inputDir !== inputDir
+    || result.batchDecision?.reviewedWriteArgs?.outputRoot !== outputRoot
+    || result.batchDecision?.reviewedWriteArgs?.workflowPreset !== 'reviewed-write'
+    || result.batchDecision?.sourceDestructive !== false
+    || result.batchDecision?.writesOutputTree !== false
+  ) {
+    throw new Error('Expected batch dry-run to expose a compact reviewed-write decision route.');
+  }
   assertActionSuggestedArgsOmit(batchWriteAction, ['dryRun', 'includeResults', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'], 'run-reviewed-batch-write suggestedArgs');
   assertInspectFieldsExist(batchWriteAction, {
     split_font_batch: result,
@@ -2982,6 +3018,13 @@ if (scenario === 'single') {
   });
   if (collect.ok !== true || collect.errorCount !== 1 || collect.batchErrorMode !== 'collect') {
     throw new Error('Expected collect mode to return one collected error.');
+  }
+  if (
+    collect.batchDecision?.route !== 'inspect-batch-errors'
+    || collect.batchDecision?.preferredNextActionId !== 'inspect-batch-errors'
+    || collect.batchDecision?.sourceDestructive !== false
+  ) {
+    throw new Error('Expected collect mode to expose an inspect-batch-errors decision route.');
   }
 
   let threw = false;

@@ -302,6 +302,7 @@ fonts/
 - `unsupportedFileSummary`：所有已扫描但被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；压缩包会归入 `archive` 并保持忽略
 - `dryRun`、`plannedCount`、`wouldProcessCount`、`planIncluded`
 - `batchWarningCount`、`batchWarnings[]`，每项包含机器可读的 `code` 和 `message`
+- `batchDecision`：批量响应的紧凑主线路由建议，用于区分 dry-run 计划审查、提高 `maxFiles` 重跑、错误检查、输出审计、已有输出跳过和空批量等分支
 - `batchErrorMode`、`errorCount`、`errors[]`
 - `safetySummary`：批量源目录/输出目录安全摘要。判断批量调用是否写文件、是否影响源目录树时优先看它；源字体文件应始终保留，写入范围只限 `outputRoot`。
 - `sourceDestructive`：批量工具应始终返回 `false`
@@ -317,6 +318,8 @@ fonts/
 - `processingSummary.smallGlyphDowngrades`
 - `processingSummary.smallGlyphCopyOriginals`
 - `processingSummary.failureFallbacks`
+
+应把 `batchDecision` 当作路由提示，而不是成功证明。它帮助 agent 选择下一步分支；真正继续前仍要检查 `batchWarnings[]`、`errors[]`、`recommendedNextActions[]`，以及写入输出后的审计字段。
 
 `organize_font_directory` 会返回源目录安全性摘要和可选整理计划：
 

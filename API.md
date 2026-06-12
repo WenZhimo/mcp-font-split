@@ -187,7 +187,7 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 
 Presets are expanded first; any explicit argument in the same call overrides the preset value.
 
-Batch responses include `safetySummary`, `sourceDestructive`, `writesSourceTree`, `writesOutputTree`, `outputTreeInsideInputTree`, `mayOverwriteOutputTree`, `scannedFileCount`, `maxFiles`, `maxFilesHit`, and `unsupportedFileSummary`. `sourceDestructive` should always be `false`: batch processing does not move, delete, or rewrite source fonts. With `dryRun: false`, `writesOutputTree: true` means the tool writes generated files, original-font copies, and manifests under `outputRoot`, and may replace existing output files. `writesSourceTree` is true only when that real output tree is inside `inputDir`; in that case source font files are still preserved, but the input tree receives generated output. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileSummary` summarizes all scanned non-font files that were ignored by extension.
+Batch responses include `safetySummary`, `sourceDestructive`, `writesSourceTree`, `writesOutputTree`, `outputTreeInsideInputTree`, `mayOverwriteOutputTree`, `scannedFileCount`, `maxFiles`, `maxFilesHit`, `unsupportedFileSummary`, and `batchDecision`. `sourceDestructive` should always be `false`: batch processing does not move, delete, or rewrite source fonts. With `dryRun: false`, `writesOutputTree: true` means the tool writes generated files, original-font copies, and manifests under `outputRoot`, and may replace existing output files. `writesSourceTree` is true only when that real output tree is inside `inputDir`; in that case source font files are still preserved, but the input tree receives generated output. `maxFilesHit: true` means the source scan was truncated and the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileSummary` summarizes all scanned non-font files that were ignored by extension.
 
 Batch dedupe priority is `.otf`, `.ttf`, `.woff2`, `.ttc`, `.otc`, `.woff`.
 
@@ -216,6 +216,8 @@ Compact full-library example:
 Dry-run responses use `planned[]` instead of `results[]` when `includeResults` is true. Each planned item includes `input`, `groupName`, `splitDir`, `copiedOriginalPath`, `wouldProcess`, and `skipReason`.
 
 Batch responses include `batchWarningCount` and `batchWarnings[]` for summary-level notices such as dry-run no-write mode, scan truncation, limit truncation, omitted per-font details, existing-output skips, and collected per-font errors. Each warning has a machine-readable `code` and a human-readable `message`.
+
+`batchDecision` is the compact main route for a batch response. It can recommend `review-dry-run-plan`, `rerun-batch-with-higher-maxFiles`, `inspect-batch-errors`, `audit-written-output`, `review-existing-output-skips`, `no-supported-fonts`, or `no-selected-fonts`, and may include `reviewedWriteArgs`, `rerunArgs`, or `auditArgs`. Treat it as a route hint, not proof of success; still inspect `batchWarnings[]`, `errors[]`, `recommendedNextActions[]`, and output audit fields.
 
 ## `organize_font_directory`
 
