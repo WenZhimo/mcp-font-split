@@ -20,9 +20,9 @@
 
 `unsupportedFileCategoryCatalog` 会解释 `unsupportedFileSummary.byCategory[]` 使用的分类，包括代表性扩展名、分类含义和处理行为。尤其是 `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
 
-`directoryWorkflowDecisionMatrix[]` 是面向常见目录场景的机器可读决策表。每个条目包含 `id`、`useWhen`、`firstTool`、默认写入/源目录安全标记、`recommendedOptions`、可选后续工具/参数、`mustInspectFields` 和 `nonIntuitiveBehavior`。其中的参数会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖项。
+`directoryWorkflowDecisionMatrix[]` 是面向常见目录场景的机器可读决策表。每个条目包含 `id`、`useWhen`、`firstTool`、默认写入/源目录安全标记、`recommendedOptions`、可选后续工具/参数、`mustInspectFields`、`successCriteria` 和 `nonIntuitiveBehavior`。其中的参数会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖项。
 
-`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，提供具体源目录树模式，例如扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。示例调用也遵循 preset-first 风格。
+`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，提供具体源目录树模式，例如扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。示例调用也遵循 preset-first 风格，并包含 `mustInspectFields` 和 `successCriteria`。
 
 `safeInvocationTemplates[]` 提供常见 agent 工作流的可复制起步调用，包括运行时诊断、紧凑输入预检、源目录结构不匹配时的整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理，以及紧凑输出审计。每个模板都会声明是否写文件、是否可能修改源文件、哪些参数应该由调用方自定义、必须检查哪些响应字段，以及继续前必须满足哪些 `successCriteria`。模板会刻意保持 `args` 精简：`workflowPreset` 已提供的默认项不会在每个模板中重复展开，需要查看完整展开值时使用 `workflowPresets[]`。
 

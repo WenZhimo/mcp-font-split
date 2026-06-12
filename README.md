@@ -55,7 +55,7 @@
 - 对维护本包的 agent，`get_agent_guidance.verificationChecklist[]` 包含 `local-real-corpus-suite-passed`，会指向 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，作为影响功能行为的改动完成前的本机真实语料可靠性门禁。
 - `get_agent_guidance` 会返回 `configurationRecipes[]`，把常见意图映射成 preset-first 参数，例如保留全部源字体、按源目录分组、按字体 metadata 分组、快速结构扫描、copy-only 暂存整理或大库审查后写入。配方只是安全起点，仍必须运行预览/写入工具，检查列出的 `inspectFields`，并满足 `successCriteria`。
 - `get_agent_guidance` 还会返回 `unsupportedFileCategoryCatalog`，解释 `unsupportedFileSummary.byCategory[]` 中 `archive`、`document`、`unsupported-font` 等分类的代表扩展名和处理行为；压缩包只会被报告，不会被解压、复制或拆分。
-- `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。决策表和示例也会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖参数。
+- `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。决策表和示例也会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖参数，并提供必须检查的字段和 `successCriteria`。
 - `get_agent_guidance` 包含 `safeInvocationTemplates[]`，提供运行时检查、输入预检、目录不匹配整理计划、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和紧凑输出审计等可复制起步调用。每个模板都会声明是否写文件、是否可能修改源文件、必须检查的 `inspectFields` 和继续前要满足的 `successCriteria`；模板会尽量保持最小参数，`workflowPreset` 已提供的默认项可从 `workflowPresets[]` 查看。
 - `get_agent_guidance` 包含 `recommendedWorkflowPlan`，这是当前 `workflow` 的有序路线图。它会引用安全模板 ID，把输入预检、目录形态决策、预览、审查后写入和输出审计串起来；它不替代对步骤中列出的响应字段的检查。
 - 需要 warning code 或响应字段的完整机器可读目录时，调用 `get_agent_guidance` 并设置 `detailLevel: "full"`，或只请求 `sections: ["warning-catalog", "field-catalog"]`。

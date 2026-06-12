@@ -934,13 +934,13 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   directoryWorkflowDecisionMatrix: {
     sourceTools: ['get_agent_guidance'],
-    meaning: 'Machine-readable table mapping common directory scenarios to first tool, options, follow-up, safety flags, and fields to inspect.',
-    agentAction: 'Use it to choose a safe workflow instead of guessing from path shape.',
+    meaning: 'Machine-readable table mapping common directory scenarios to first tool, options, follow-up, safety flags, fields to inspect, and successCriteria.',
+    agentAction: 'Use it to choose a safe workflow instead of guessing from path shape, then inspect mustInspectFields and satisfy successCriteria before advancing.',
   },
   directoryWorkflowExamples: {
     sourceTools: ['get_agent_guidance'],
-    meaning: 'Concrete directory-shape examples and corresponding safe first calls.',
-    agentAction: 'Match user-described layouts to examples, then verify against actual tool responses.',
+    meaning: 'Concrete directory-shape examples, safe first calls, fields to inspect, and successCriteria.',
+    agentAction: 'Match user-described layouts to examples, then verify mustInspectFields and successCriteria against actual tool responses.',
   },
   resultsIncluded: {
     sourceTools: ['split_font_batch'],
@@ -1662,6 +1662,7 @@ export function getAgentGuidance(args = {}) {
         fontPath: '<path-to-font>',
       },
       mustInspectFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'manifestPath'],
+      successCriteria: 'Treat the single-font operation as complete only after manifestPath exists and any fallback, copy-original, or non-subset resultType/outputMode is disclosed.',
       nonIntuitiveBehavior: 'ok:true may still mean single-woff2 fallback or copy-original instead of normal multi-subset output.',
     },
     {
@@ -1678,6 +1679,7 @@ export function getAgentGuidance(args = {}) {
         workflowPreset: 'reviewed-write',
       },
       mustInspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
+      successCriteria: 'Start with safe-preview dryRun true and sourceDestructive false; proceed to reviewed-write only after planned paths, warnings, maxFilesHit, and errors are acceptable, then audit output.',
       nonIntuitiveBehavior: 'split_font_batch dryRun defaults to false, so agents should set dryRun:true explicitly for planning.',
     },
     {
@@ -1695,6 +1697,7 @@ export function getAgentGuidance(args = {}) {
         workflowPreset: 'safe-preview',
       },
       mustInspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+      successCriteria: 'The organization pass must remain no-write and sourceDestructive false; choose original input or organized output only after reviewing layout, warnings, plan summary, and recommendedBatchPreviewArgs.',
       nonIntuitiveBehavior: 'organize_font_directory defaults to dryRun:true and never moves or deletes source files; dryRun:false copies into outputDir only.',
     },
     {
@@ -1707,6 +1710,7 @@ export function getAgentGuidance(args = {}) {
         workflowPreset: 'structure-first',
       },
       mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs'],
+      successCriteria: 'Use the result only for structure-level routing; rerun with parseFonts true before relying on invalid-font counts, glyph counts, identity dedupe, or metadata grouping.',
       nonIntuitiveBehavior: 'parseFonts:false means validFontCount and invalidFontCount are null, not zero; identity dedupe and metadata family grouping are limited.',
     },
     {
@@ -1723,6 +1727,7 @@ export function getAgentGuidance(args = {}) {
         workflowPreset: 'reviewed-write',
       },
       mustInspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
+      successCriteria: 'Review the dry-run plan before copying; real organization must remain copy-only and sourceDestructive false, with copiedCount/manifest and warnings matching the reviewed plan.',
       nonIntuitiveBehavior: 'A real organize run is copy-only. overwriteExisting:true can replace files in outputDir but still does not modify source files.',
     },
   ];
@@ -1752,6 +1757,7 @@ export function getAgentGuidance(args = {}) {
         realOrganizerMode: 'copy-only',
       },
       mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
+      successCriteria: 'Use the example only if actual layout is flat or equivalent; continue after organization preview is no-write, source-safe, and recommendedBatchPreviewArgs/grouping have been reviewed.',
     },
     {
       id: 'archive-per-family-folders',
@@ -1781,6 +1787,7 @@ export function getAgentGuidance(args = {}) {
         realOrganizerMode: 'not-needed-unless-staging',
       },
       mustInspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      successCriteria: 'Use direct source-dir batch only after safe-preview confirms dryRun true, sourceDestructive false, maxFilesHit false, acceptable planned paths/warnings, and no blocking errors.',
     },
     {
       id: 'mixed-root-and-nested-fonts',
@@ -1809,6 +1816,7 @@ export function getAgentGuidance(args = {}) {
         realOrganizerMode: 'copy-only',
       },
       mustInspectFields: ['safetySummary', 'layout.layoutKind', 'organizationDecision', 'organizationWarnings', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
+      successCriteria: 'Use organization preview first; proceed only after mixed-layout warnings, planActionSummary, and recommendedBatchPreviewArgs are reviewed and sourceDestructive remains false.',
     },
     {
       id: 'large-noisy-first-pass',
@@ -1834,6 +1842,7 @@ export function getAgentGuidance(args = {}) {
         realOrganizerMode: 'copy-only-when-dryRun-false',
       },
       mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'recommendedBatchPreviewArgs'],
+      successCriteria: 'Treat this as a no-write structure-first pass only; rerun with parseFonts true before metadata-sensitive grouping, invalid-font decisions, or identity dedupe.',
     },
   ];
   const configurationRecipes = [

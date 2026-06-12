@@ -1181,6 +1181,11 @@ if (scenario === 'single') {
       throw new Error(`Expected agent guidance decision matrix to include ${requiredDecision}.`);
     }
   }
+  for (const decision of result.directoryWorkflowDecisionMatrix || []) {
+    if (typeof decision.successCriteria !== 'string' || decision.successCriteria.trim() === '') {
+      throw new Error(`Expected directoryWorkflowDecisionMatrix.${decision.id} to include successCriteria.`);
+    }
+  }
   const structureDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'large-or-noisy-directory-first-pass');
   if (
     structureDecision?.recommendedOptions?.workflowPreset !== 'structure-first'
@@ -1189,6 +1194,7 @@ if (scenario === 'single') {
     || !structureDecision.mustInspectFields?.includes('unsupportedFileSummary')
     || !structureDecision.mustInspectFields?.includes('planActionSummary')
     || !structureDecision.mustInspectFields?.includes('recommendedBatchPreviewArgs')
+    || !structureDecision.successCriteria?.includes('parseFonts true')
   ) {
     throw new Error('Expected structure-first guidance to use the structure-first preset and require dedupe checks.');
   }
@@ -1201,6 +1207,7 @@ if (scenario === 'single') {
     || !knownBatchDecision?.mustInspectFields?.includes('safetySummary')
     || !knownBatchDecision?.mustInspectFields?.includes('batchDecision')
     || !knownBatchDecision?.mustInspectFields?.includes('outputTreeInsideInputTree')
+    || !knownBatchDecision?.successCriteria?.includes('safe-preview')
   ) {
     throw new Error('Expected direct batch guidance to use workflow presets while requiring unsupportedFileSummary and full safety inspection.');
   }
@@ -1213,6 +1220,7 @@ if (scenario === 'single') {
     || !mixedDecision?.mustInspectFields?.includes('organizationDecision')
     || !mixedDecision?.mustInspectFields?.includes('planActionSummary')
     || !mixedDecision?.mustInspectFields?.includes('recommendedBatchPreviewArgs')
+    || !mixedDecision?.successCriteria?.includes('sourceDestructive false')
   ) {
     throw new Error('Expected mixed-layout guidance to use safe-preview and require planActionSummary inspection.');
   }
@@ -1227,6 +1235,7 @@ if (scenario === 'single') {
     || !stagingDecision.mustInspectFields?.includes('unsupportedFileSummary')
     || !stagingDecision.mustInspectFields?.includes('planActionSummary')
     || !stagingDecision.mustInspectFields?.includes('outputTreeInsideInputTree')
+    || !stagingDecision.successCriteria?.includes('copy-only')
   ) {
     throw new Error('Expected staging guidance to disclose source safety and preset-based copy-only follow-up.');
   }
@@ -1238,6 +1247,11 @@ if (scenario === 'single') {
       throw new Error(`Expected agent guidance examples to include ${requiredExample}.`);
     }
   }
+  for (const example of result.directoryWorkflowExamples || []) {
+    if (typeof example.successCriteria !== 'string' || example.successCriteria.trim() === '') {
+      throw new Error(`Expected directoryWorkflowExamples.${example.id} to include successCriteria.`);
+    }
+  }
   const noisyExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'large-noisy-first-pass');
   if (
     noisyExample?.firstCall?.workflowPreset !== 'structure-first'
@@ -1246,6 +1260,7 @@ if (scenario === 'single') {
     || !noisyExample.mustInspectFields?.includes('unsupportedFileSummary')
     || !noisyExample.mustInspectFields?.includes('planActionSummary')
     || !noisyExample.mustInspectFields?.includes('recommendedBatchPreviewArgs')
+    || !noisyExample.successCriteria?.includes('parseFonts true')
   ) {
     throw new Error('Expected noisy-directory example to use structure-first and require dedupe limitation checks.');
   }
@@ -1256,6 +1271,7 @@ if (scenario === 'single') {
     || archiveExample?.firstCall?.batchGroupBy !== 'source-dir'
     || !archiveExample?.mustInspectFields?.includes('batchDecision')
     || !archiveExample?.mustInspectFields?.includes('unsupportedFileSummary')
+    || !archiveExample?.successCriteria?.includes('source-dir')
   ) {
     throw new Error('Expected archive-per-family example to use safe-preview with source-dir grouping and require unsupportedFileSummary inspection.');
   }
@@ -1269,6 +1285,7 @@ if (scenario === 'single') {
     || !mixedExample.mustInspectFields?.includes('outputTreeInsideInputTree')
     || !mixedExample.mustInspectFields?.includes('planActionSummary')
     || !mixedExample.mustInspectFields?.includes('recommendedBatchPreviewArgs')
+    || !mixedExample.successCriteria?.includes('sourceDestructive')
   ) {
     throw new Error('Expected mixed-layout example to disclose source safety fields.');
   }
@@ -1278,6 +1295,7 @@ if (scenario === 'single') {
     flatExample?.firstCall?.workflowPreset !== 'safe-preview'
     || !flatExample.mustInspectFields?.includes('organizationDecision')
     || !flatExample.mustInspectFields?.includes('recommendedBatchPreviewArgs')
+    || !flatExample.successCriteria?.includes('flat')
   ) {
     throw new Error('Expected flat vendor example to use the safe-preview organization preset.');
   }
