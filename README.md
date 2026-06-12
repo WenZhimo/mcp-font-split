@@ -562,6 +562,7 @@ npm run smoke:organize-structure
 npm run smoke:organize-output-inside
 npm run smoke:batch-run
 npm run smoke:batch-defaults
+npm run smoke:real-corpus -- <字体语料目录>
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
 npm run smoke:inspect
@@ -569,6 +570,8 @@ npm run smoke:small-skip
 ```
 
 `npm run check` 是推荐给 AI agent / CI 的入口。它会运行语法检查和一组能自造最小输入的 smoke 场景，不依赖真实字体库。
+
+`smoke:real-corpus` 是显式的本机真实语料只读检查，不包含在 `npm run check` 中。它会把传入目录作为 `FONT_SPLIT_ROOT`，自动选择一个含字体的样本目录，运行 `inspect_font_inputs` 和 `organize_font_directory` 的 `structure-first` dry-run，验证 `unsupportedFileSummary`、`recommendedBatchPreviewArgs` 和安全字段，不会创建输出目录。
 
 `smoke:small-skip` 当前验证的是 `copy-original` 小字体策略；脚本名保留是为了兼容。`smoke:incremental` 也会额外打印一个示例 `splitDir`，用于确认新的批量命名在重复运行时仍然稳定。
 

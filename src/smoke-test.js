@@ -11,6 +11,7 @@ const execFileAsync = promisify(execFile);
 const scenario = process.argv[2] || 'single';
 const fontPath = process.argv[3] || '0xA000/0xA000-Regular.ttf';
 const outDir = process.argv[4] || 'font-split-mcp/.font-split-smoke-output';
+const REAL_CORPUS_FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.ttc', '.otc', '.woff', '.woff2']);
 
 function pad4(buffer) {
   const remainder = buffer.length % 4;
@@ -163,6 +164,11 @@ function assertActionSuggestedArgsOmit(action, omittedKeys, context) {
   assertObjectOmitsKeys(action?.suggestedArgs, omittedKeys, context);
 }
 
+function isInsidePath(parent, candidate) {
+  const relative = path.relative(parent, candidate);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
 function assertSafeRecommendedBatchPreviewArgs(previewArgs, expected, context) {
   if (
     previewArgs?.inputDir !== expected.inputDir
@@ -180,6 +186,99 @@ function assertSafeRecommendedBatchPreviewArgs(previewArgs, expected, context) {
     'batchErrorMode',
     'splitFailureAction',
   ], `${context} recommendedBatchPreviewArgs`);
+}
+
+async function collectProbeFiles(dir, { maxFiles = 120 } = {}) {
+  const files = [];
+  const excludedDirs = new Set(['.git', 'node_modules', 'font-split-mcp', '__MACOSX']);
+  const shouldExclude = (name) => name.startsWith('._')
+    || excludedDirs.has(name)
+    || name === 'split-output'
+    || name.startsWith('split-output-');
+
+  async function walk(currentDir) {
+    if (files.length >= maxFiles) return;
+    const entries = (await fs.readdir(currentDir, { withFileTypes: true }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    for (const entry of entries) {
+      if (shouldExclude(entry.name)) continue;
+      const fullPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+      } else if (entry.isFile()) {
+        files.push(fullPath);
+      }
+      if (files.length >= maxFiles) return;
+    }
+  }
+
+  await walk(dir);
+  return files;
+}
+
+function summarizeProbeFiles(files) {
+  const unsupportedExtensions = new Set();
+  let supportedCount = 0;
+  let unsupportedCount = 0;
+  for (const file of files) {
+    const extension = path.extname(file).toLowerCase() || '<none>';
+    if (REAL_CORPUS_FONT_EXTENSIONS.has(extension)) {
+      supportedCount++;
+    } else {
+      unsupportedCount++;
+      unsupportedExtensions.add(extension);
+    }
+  }
+  return {
+    supportedCount,
+    unsupportedCount,
+    unsupportedExtensions: [...unsupportedExtensions].sort(),
+  };
+}
+
+async function findRealCorpusSample({ corpusRoot, requestedInputDir, maxFiles }) {
+  if (requestedInputDir) {
+    const requestedAbsolute = path.resolve(corpusRoot, requestedInputDir);
+    if (!isInsidePath(corpusRoot, requestedAbsolute)) {
+      throw new Error(`Requested sample dir is outside corpus root: ${requestedInputDir}`);
+    }
+    const files = await collectProbeFiles(requestedAbsolute, { maxFiles });
+    const summary = summarizeProbeFiles(files);
+    if (summary.supportedCount === 0) {
+      throw new Error(`Requested sample dir contains no supported font files within ${maxFiles} files: ${requestedInputDir}`);
+    }
+    return {
+      inputDir: path.relative(corpusRoot, requestedAbsolute).replaceAll(path.sep, '/') || '.',
+      summary,
+    };
+  }
+
+  const preferred = path.join(corpusRoot, 'aexpective');
+  if (await fsExists(preferred)) {
+    const files = await collectProbeFiles(preferred, { maxFiles });
+    const summary = summarizeProbeFiles(files);
+    if (summary.supportedCount > 0) {
+      return { inputDir: 'aexpective', summary };
+    }
+  }
+
+  const entries = (await fs.readdir(corpusRoot, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  let fallback = null;
+  for (const entry of entries) {
+    if (entry.name.startsWith('.') || entry.name === 'font-split-mcp' || entry.name === 'node_modules') continue;
+    const candidateDir = path.join(corpusRoot, entry.name);
+    const files = await collectProbeFiles(candidateDir, { maxFiles });
+    const summary = summarizeProbeFiles(files);
+    if (summary.supportedCount === 0) continue;
+    const candidate = { inputDir: entry.name, summary };
+    if (summary.unsupportedCount > 0) return candidate;
+    fallback ??= candidate;
+  }
+
+  if (fallback) return fallback;
+  throw new Error(`No supported font sample directory found under real corpus root: ${corpusRoot}`);
 }
 
 if (scenario === 'single') {
@@ -1970,6 +2069,99 @@ if (scenario === 'single') {
       skipMode: overridden.skipMode,
       batchErrorMode: overridden.batchErrorMode,
       errorCount: overridden.errorCount,
+    },
+  }, null, 2));
+} else if (scenario === 'real-corpus-readonly') {
+  const corpusRoot = path.resolve(process.argv[3] || process.env.FONT_SPLIT_REAL_CORPUS_DIR || path.join(process.cwd(), '..'));
+  const requestedInputDir = process.argv[4] || null;
+  const maxFiles = Number.parseInt(process.argv[5] || process.env.FONT_SPLIT_REAL_CORPUS_MAX_FILES || '200', 10);
+  if (!Number.isFinite(maxFiles) || maxFiles < 1) {
+    throw new Error('Expected maxFiles to be a positive integer for real-corpus-readonly smoke.');
+  }
+  process.env.FONT_SPLIT_ROOT = corpusRoot;
+
+  const sample = await findRealCorpusSample({ corpusRoot, requestedInputDir, maxFiles });
+  const outputDir = '.font-split-real-corpus-readonly-output';
+  const resolvedOutputDir = path.resolve(corpusRoot, outputDir);
+  const outputDirExistedBefore = await fsExists(resolvedOutputDir);
+  console.log('Real corpus read-only smoke:', corpusRoot, 'sample:', sample.inputDir, 'maxFiles:', maxFiles);
+
+  const runtime = await getRuntimeStatus();
+  if (runtime.ok !== true || path.resolve(runtime.workspace?.root || '') !== corpusRoot) {
+    throw new Error('Expected runtime status to use the real corpus as FONT_SPLIT_ROOT.');
+  }
+
+  const inspection = await inspectFontInputs({
+    inputDir: sample.inputDir,
+    maxFiles,
+    includeFiles: false,
+  });
+  if (
+    inspection.supportedFontCount < 1
+    || inspection.filesIncluded !== false
+    || inspection.unsupportedFileSummary?.total !== sample.summary.unsupportedCount
+  ) {
+    throw new Error('Expected real corpus input inspection to summarize the bounded sample without file details.');
+  }
+  const unsupportedExtensions = new Set((inspection.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
+  for (const extension of sample.summary.unsupportedExtensions) {
+    if (!unsupportedExtensions.has(extension)) {
+      throw new Error(`Expected real corpus unsupported summary to include ${extension}.`);
+    }
+  }
+  if (
+    sample.summary.unsupportedExtensions.some((extension) => extension !== '.zip' && extension !== '.txt')
+    && !(inspection.unsupportedFileSummary?.byExtension || []).some((item) => item.extension !== '.zip' && item.extension !== '.txt')
+  ) {
+    throw new Error('Expected real corpus unsupported summary to include extensions beyond .zip and .txt when present.');
+  }
+
+  const organization = await organizeFontDirectory({
+    inputDir: sample.inputDir,
+    outputDir,
+    workflowPreset: 'structure-first',
+    maxFiles,
+  });
+  if (
+    organization.workflowPreset !== 'structure-first'
+    || organization.dryRun !== true
+    || organization.parsedFontMetadata !== false
+    || organization.writesOutputTree !== false
+    || organization.sourceDestructive !== false
+    || organization.recommendedBatchPreviewArgs?.inputDir !== sample.inputDir
+    || organization.recommendedBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+  ) {
+    throw new Error('Expected real corpus organization smoke to stay structure-first, no-write, and return safe batch preview args.');
+  }
+  assertObjectOmitsKeys(organization.recommendedBatchPreviewArgs, [
+    'dryRun',
+    'includeResults',
+    'skipMode',
+    'batchNamingMode',
+    'batchDedupeMode',
+    'batchErrorMode',
+    'splitFailureAction',
+  ], 'real-corpus-readonly recommendedBatchPreviewArgs');
+  if ((await fsExists(resolvedOutputDir)) !== outputDirExistedBefore) {
+    throw new Error('Expected real-corpus-readonly smoke not to create or remove the output directory.');
+  }
+
+  console.log(JSON.stringify({
+    corpusRoot,
+    sample,
+    inspection: {
+      supportedFontCount: inspection.supportedFontCount,
+      unsupportedFileSummary: inspection.unsupportedFileSummary,
+      maxFilesHit: inspection.maxFilesHit,
+      filesIncluded: inspection.filesIncluded,
+    },
+    organization: {
+      layout: organization.layout,
+      recommendedBatchPreviewArgs: organization.recommendedBatchPreviewArgs,
+      safetySummary: organization.safetySummary,
+      parsedFontMetadata: organization.parsedFontMetadata,
+      dedupeLimitedByParsing: organization.dedupeLimitedByParsing,
+      organizationWarnings: organization.organizationWarnings,
     },
   }, null, 2));
 } else if (scenario === 'small-skip') {

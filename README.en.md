@@ -562,6 +562,7 @@ npm run smoke:organize-structure
 npm run smoke:organize-output-inside
 npm run smoke:batch-run
 npm run smoke:batch-defaults
+npm run smoke:real-corpus -- <font-corpus-dir>
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
 npm run smoke:inspect
@@ -569,6 +570,8 @@ npm run smoke:small-skip
 ```
 
 `npm run check` is the recommended agent/CI entry point. It runs syntax checks plus smoke scenarios that create their own tiny inputs and do not require a real font library.
+
+`smoke:real-corpus` is an explicit read-only check for a local real font corpus, and is not included in `npm run check`. It treats the supplied directory as `FONT_SPLIT_ROOT`, auto-selects a sample directory containing fonts, runs `inspect_font_inputs` plus a `structure-first` dry-run `organize_font_directory`, and verifies `unsupportedFileSummary`, `recommendedBatchPreviewArgs`, and safety fields without creating an output directory.
 
 `smoke:small-skip` currently exercises the `copy-original` small-font policy; the script name is kept for compatibility. `smoke:incremental` also prints a sample `splitDir` so you can verify the collision-safe batch naming stays stable across reruns.
 
