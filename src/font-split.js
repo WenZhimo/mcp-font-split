@@ -739,8 +739,8 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   recommendedWorkflowPlan: {
     sourceTools: ['get_agent_guidance'],
-    meaning: 'Ordered workflow plan that composes safeInvocationTemplates into phases for the selected guidance workflow.',
-    agentAction: 'Follow the ordered steps, inspect each listed field, and only advance from preview to write after the reviewed conditions are satisfied.',
+    meaning: 'Ordered workflow plan that composes safeInvocationTemplates into phases for the selected guidance workflow. Each step and decision point includes inspectFields and successCriteria.',
+    agentAction: 'Follow the ordered steps, inspect each listed field, and satisfy successCriteria before advancing from preview to write or reporting completion.',
   },
   batchWarnings: {
     sourceTools: ['split_font_batch'],
@@ -957,6 +957,16 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Named configuration preset applied before explicit arguments. Explicit tool arguments override preset values.',
     agentAction: 'Use this to explain why effective defaults such as dryRun, parseFonts, skip mode, or dedupe mode were selected.',
   },
+  batchNamingMode: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Resolved batch output naming policy: plain, numeric-suffix, or source-suffix.',
+    agentAction: 'Confirm numeric suffixes only appear when the selected naming mode and real output-name conflicts require them.',
+  },
+  batchDedupeMode: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Resolved batch pre-processing dedupe policy: none, same-path, or font-identity.',
+    agentAction: 'Confirm the mode matches user intent, especially when preserving every source font or deduping equivalent cross-format fonts matters.',
+  },
   workflowPresets: {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Catalog of named workflow presets, their intended use, write behavior, and expanded batch/organization defaults.',
@@ -1157,7 +1167,7 @@ function buildRecommendedWorkflowPlan(workflow) {
     sourceDestructive: false,
     goal: 'Audit the generated output directory before reporting completion.',
     inspectFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'manifestCount', 'legacyOutputCount'],
-    completeWhen: 'auditStatus is pass, auditPassed is true, structureSummary.conforms is true, maxFilesHit is false, and inspectionWarnings contain no action-required structure or truncation issues.',
+    successCriteria: 'auditStatus is pass, auditPassed is true, structureSummary.conforms is true, maxFilesHit is false, and inspectionWarnings contain no action-required structure or truncation issues.',
   };
   const plans = {
     overview: {
@@ -1172,7 +1182,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Confirm the workspace, Node runtime, package versions, and WASM runtime are usable when setup is uncertain.',
           inspectFields: ['ok', 'recommendedActions', 'workspace', 'wasm', 'cnFontSplit'],
-          completeWhen: 'ok is true, or every recommendedActions item has been handled.',
+          successCriteria: 'ok is true, or every recommendedActions item has been handled.',
         },
         {
           id: 'source-preflight',
@@ -1182,7 +1192,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Count supported fonts and ignored non-font files without writing output.',
           inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount'],
-          completeWhen: 'maxFilesHit is false, or the caller intentionally accepts a bounded summary.',
+          successCriteria: 'maxFilesHit is false, or the caller intentionally accepts a bounded summary.',
         },
         {
           id: 'layout-decision',
@@ -1192,7 +1202,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Use the organizer dry-run to decide whether direct batch splitting is safe or whether a copy-only staging directory is useful.',
           inspectFields: ['safetySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'organizationWarnings', 'planActionSummary'],
-          completeWhen: 'The desired grouping is clear and any organizationWarnings have been reviewed.',
+          successCriteria: 'The desired grouping is clear and any organizationWarnings have been reviewed.',
         },
         {
           id: 'batch-preview',
@@ -1202,7 +1212,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Preview dedupe, naming, skip checks, warnings, and planned output paths before writing.',
           inspectFields: ['safetySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
-          completeWhen: 'dryRun is true, sourceDestructive is false, maxFilesHit is false, and planned paths/warnings are acceptable.',
+          successCriteria: 'dryRun is true, sourceDestructive is false, maxFilesHit is false, and planned paths/warnings are acceptable.',
         },
         {
           id: 'reviewed-write',
@@ -1212,7 +1222,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Write split output only after the preview has been reviewed.',
           inspectFields: ['safetySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
-          completeWhen: 'errorCount is zero and the response recommends or allows output audit.',
+          successCriteria: 'errorCount is zero and the response recommends or allows output audit.',
         },
         auditStep,
       ],
@@ -1223,6 +1233,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           useTemplateId: 'copy-organized-staging',
           inspectFields: ['safetySummary', 'copiedCount', 'organizationDecision', 'organizationWarnings', 'organizationManifestPath'],
           nextInput: 'Use the organizer outputDir as split_font_batch inputDir only after reviewing warnings.',
+          successCriteria: 'The copy plan remains sourceDestructive false and copy-only, with copiedCount and organizationWarnings matching the reviewed plan.',
         },
         {
           id: 'direct-batch-ok',
@@ -1230,6 +1241,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           useTemplateId: 'batch-dry-run-preview',
           inspectFields: ['safetySummary', 'batchDecision', 'planned', 'batchWarnings', 'unsupportedFileSummary'],
           nextInput: 'Use the original inputDir for split_font_batch.',
+          successCriteria: 'The direct batch preview remains dryRun true and sourceDestructive false, with planned grouping and warnings acceptable for the original inputDir.',
         },
       ],
     },
@@ -1245,7 +1257,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Check setup when the workspace or runtime is uncertain.',
           inspectFields: ['ok', 'recommendedActions', 'workspace', 'wasm'],
-          completeWhen: 'ok is true, or every recommendedActions item has been handled.',
+          successCriteria: 'ok is true, or every recommendedActions item has been handled.',
         },
         {
           id: 'split-known-font',
@@ -1255,7 +1267,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Process the named font file.',
           inspectFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'manifestPath'],
-          completeWhen: 'manifestPath exists and any fallback/copy-original result has been disclosed.',
+          successCriteria: 'manifestPath exists and any fallback/copy-original result has been disclosed.',
         },
         {
           id: 'audit-single-output',
@@ -1265,7 +1277,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Audit the single-font output directory when reporting generated files.',
           inspectFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'manifestCount', 'inspectionWarnings'],
-          completeWhen: 'auditStatus is pass and structureSummary.conforms is true, or any structure limitation is disclosed.',
+          successCriteria: 'auditStatus is pass and structureSummary.conforms is true, or any structure limitation is disclosed.',
         },
       ],
       decisionPoints: [
@@ -1274,6 +1286,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           when: 'resultType is single-woff2-* or copy-original-small-glyph.',
           action: 'Tell the user this was not a normal multi-subset split.',
           inspectFields: ['resultType', 'outputMode', 'usedFallback', 'warnings'],
+          successCriteria: 'Fallback or copy-original behavior has been explicitly disclosed before treating the single-font run as complete.',
         },
       ],
     },
@@ -1289,7 +1302,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Understand source size, ignored files, invalid fonts, and scan truncation before batch processing.',
           inspectFields: ['maxFilesHit', 'supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
-          completeWhen: 'The source scan is complete enough for the requested batch scope.',
+          successCriteria: 'The source scan is complete enough for the requested batch scope.',
         },
         {
           id: 'layout-decision',
@@ -1299,7 +1312,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Check whether source directory layout matches desired family grouping.',
           inspectFields: ['layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'organizationWarnings', 'planActionSummary'],
-          completeWhen: 'The grouping strategy is chosen and any layout warnings are reviewed.',
+          successCriteria: 'The grouping strategy is chosen and any layout warnings are reviewed.',
         },
         {
           id: 'batch-preview',
@@ -1309,7 +1322,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Preview selected fonts, dedupe, naming, skip decisions, and warnings.',
           inspectFields: ['safetySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'skippedDuplicates', 'errorCount', 'errors'],
-          completeWhen: 'The preview paths, warnings, and dedupe policy match the user intent.',
+          successCriteria: 'The preview paths, warnings, and dedupe policy match the user intent.',
         },
         {
           id: 'reviewed-write',
@@ -1319,7 +1332,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Run the reviewed batch write.',
           inspectFields: ['safetySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
-          completeWhen: 'errorCount is zero and output audit is available.',
+          successCriteria: 'errorCount is zero and output audit is available.',
         },
         auditStep,
       ],
@@ -1329,6 +1342,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           when: 'The user requires every supported source font file to be preserved even if duplicates appear equivalent.',
           action: 'Use workflowPreset preserve-all or explicitly set batchDedupeMode none before previewing.',
           inspectFields: ['batchDedupeMode', 'batchDecision', 'planned', 'skippedDuplicates'],
+          successCriteria: 'The following preview/write intentionally uses batchDedupeMode none or preserve-all, and skippedDuplicates reflects the preserve-all intent.',
         },
       ],
     },
@@ -1344,7 +1358,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Inspect source font inputs without writing output.',
           inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary'],
-          completeWhen: 'maxFilesHit is false, or truncation is disclosed.',
+          successCriteria: 'maxFilesHit is false, or truncation is disclosed.',
         },
         auditStep,
       ],
@@ -1354,6 +1368,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           when: 'A compact scan shows warnings, missing manifests, invalid fonts, or structure issues.',
           action: 'Rerun with includeFiles:true or includeFamilies:true only for the narrowed area that needs detail.',
           inspectFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'inspectionWarnings', 'structureSummary', 'filesIncluded', 'familiesIncluded'],
+          successCriteria: 'Detailed rerun is limited to the narrowed area and resolves or discloses the warnings, missing manifests, invalid fonts, or structure issues that prompted it.',
         },
       ],
     },
@@ -1369,7 +1384,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Plan source grouping and copy actions without writing.',
           inspectFields: ['safetySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'organizationWarnings', 'planActionSummary', 'plan'],
-          completeWhen: 'The copy plan and grouping policy are acceptable.',
+          successCriteria: 'The copy plan and grouping policy are acceptable.',
         },
         {
           id: 'copy-staging',
@@ -1379,7 +1394,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Copy selected fonts into outputDir without moving or deleting source files.',
           inspectFields: ['safetySummary', 'copiedCount', 'organizationDecision', 'organizationWarnings', 'organizationManifestPath'],
-          completeWhen: 'sourceDestructive is false and copiedCount/organizationWarnings match the reviewed plan.',
+          successCriteria: 'sourceDestructive is false and copiedCount/organizationWarnings match the reviewed plan.',
         },
         {
           id: 'inspect-staging',
@@ -1389,7 +1404,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Inspect the staging output as the next source directory.',
           inspectFields: ['supportedFontCount', 'unsupportedFileSummary', 'maxFilesHit', 'inspectionWarnings'],
-          completeWhen: 'The staging directory contains the expected supported fonts.',
+          successCriteria: 'The staging directory contains the expected supported fonts.',
         },
         {
           id: 'preview-next-batch',
@@ -1399,7 +1414,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           sourceDestructive: false,
           goal: 'Preview split output using either recommendedBatchPreviewArgs or the staged outputDir.',
           inspectFields: ['safetySummary', 'batchDecision', 'planned', 'batchWarnings', 'skippedDuplicates'],
-          completeWhen: 'The batch preview matches the selected grouping and dedupe policy.',
+          successCriteria: 'The batch preview matches the selected grouping and dedupe policy.',
         },
       ],
       decisionPoints: [
@@ -1408,6 +1423,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           when: 'The user only wants split output and recommendedBatchPreviewArgs are acceptable.',
           action: 'Skip copy-organized-staging and run split_font_batch safe-preview on the original inputDir.',
           inspectFields: ['recommendedBatchPreviewArgs', 'layout', 'organizationDecision', 'organizationWarnings'],
+          successCriteria: 'Skipping staging is intentional, and recommendedBatchPreviewArgs plus layout/organization warnings support direct original-input preview.',
         },
       ],
     },
@@ -2089,6 +2105,8 @@ export function getAgentGuidance(args = {}) {
       'recommendedActions',
       'workflowPresets',
       'workflowPreset',
+      'batchNamingMode',
+      'batchDedupeMode',
       'configurationRecipes',
       'unsupportedFileCategoryCatalog',
       'supportedFontCount',

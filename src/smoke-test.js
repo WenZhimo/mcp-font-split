@@ -418,6 +418,68 @@ function assertRecommendedNextActionInspectFields(actions, responsesByTool, cont
   }
 }
 
+function assertNonEmptyString(value, context, fieldName) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${context}: expected non-empty ${fieldName}.`);
+  }
+}
+
+function assertNonEmptyStringArray(value, context, fieldName) {
+  if (!Array.isArray(value) || value.length === 0 || value.some((item) => typeof item !== 'string' || item.trim() === '')) {
+    throw new Error(`${context}: expected non-empty string array ${fieldName}.`);
+  }
+}
+
+function assertNonEmptyArray(value, context, fieldName) {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`${context}: expected non-empty array ${fieldName}.`);
+  }
+}
+
+function assertGuidanceItemsHaveCompletionProof(items, { collectionName, inspectFieldName = 'inspectFields' }) {
+  if (!Array.isArray(items)) {
+    throw new Error(`Expected ${collectionName} to be an array.`);
+  }
+  for (const item of items) {
+    const id = item?.id || item?.templateId;
+    assertNonEmptyString(id, collectionName, 'id');
+    assertNonEmptyStringArray(item?.[inspectFieldName], `${collectionName}.${id}`, inspectFieldName);
+    assertNonEmptyString(item?.successCriteria, `${collectionName}.${id}`, 'successCriteria');
+  }
+}
+
+function assertRecommendedWorkflowPlanHasCompletionProof(plan, templateIds, context) {
+  if (!plan || typeof plan !== 'object') {
+    throw new Error(`${context}: expected recommendedWorkflowPlan object.`);
+  }
+  assertNonEmptyString(plan.id, context, 'id');
+  assertNonEmptyArray(plan.orderedSteps, context, 'orderedSteps');
+  assertGuidanceItemsHaveCompletionProof(plan.orderedSteps, {
+    collectionName: `${context}.orderedSteps`,
+  });
+  for (const step of plan.orderedSteps || []) {
+    if (Object.hasOwn(step, 'completeWhen')) {
+      throw new Error(`${context}.orderedSteps.${step.id}: completeWhen is obsolete; use successCriteria.`);
+    }
+    if (step.templateId && !templateIds.has(step.templateId)) {
+      throw new Error(`${context}.orderedSteps.${step.id}: references missing safe template ${step.templateId}.`);
+    }
+  }
+  if (Array.isArray(plan.decisionPoints)) {
+    assertGuidanceItemsHaveCompletionProof(plan.decisionPoints, {
+      collectionName: `${context}.decisionPoints`,
+    });
+    for (const decision of plan.decisionPoints || []) {
+      if (Object.hasOwn(decision, 'completeWhen')) {
+        throw new Error(`${context}.decisionPoints.${decision.id}: completeWhen is obsolete; use successCriteria.`);
+      }
+      if (decision.useTemplateId && !templateIds.has(decision.useTemplateId)) {
+        throw new Error(`${context}.decisionPoints.${decision.id}: references missing safe template ${decision.useTemplateId}.`);
+      }
+    }
+  }
+}
+
 function assertTemplateOmitsArgs(template, omittedArgs, context) {
   const leaked = omittedArgs.filter((key) => Object.hasOwn(template?.args || {}, key));
   if (leaked.length > 0) {
@@ -952,11 +1014,9 @@ if (scenario === 'single') {
       throw new Error(`Expected safeInvocationTemplates to include ${requiredTemplate}.`);
     }
   }
-  for (const template of result.safeInvocationTemplates || []) {
-    if (typeof template.successCriteria !== 'string' || template.successCriteria.trim() === '') {
-      throw new Error(`Expected safeInvocationTemplates.${template.id} to include successCriteria.`);
-    }
-  }
+  assertGuidanceItemsHaveCompletionProof(result.safeInvocationTemplates || [], {
+    collectionName: 'safeInvocationTemplates',
+  });
   const mismatchTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'directory-mismatch-plan');
   if (
     mismatchTemplate?.tool !== 'organize_font_directory'
@@ -1035,6 +1095,18 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected output audit template to require compact audit status and structureSummary inspection.');
   }
+  const workflowGuidances = {};
+  for (const workflowName of ['overview', 'single', 'batch', 'inspect', 'organize']) {
+    workflowGuidances[workflowName] = workflowName === 'batch'
+      ? result
+      : getAgentGuidance({ workflow: workflowName, detailLevel: 'full' });
+    const workflowTemplateIds = new Set((workflowGuidances[workflowName].safeInvocationTemplates || []).map((item) => item.id));
+    assertRecommendedWorkflowPlanHasCompletionProof(
+      workflowGuidances[workflowName].recommendedWorkflowPlan,
+      workflowTemplateIds,
+      `recommendedWorkflowPlan.${workflowName}`,
+    );
+  }
   const workflowPlan = result.recommendedWorkflowPlan;
   if (
     workflowPlan?.id !== 'batch-workflow'
@@ -1080,6 +1152,14 @@ if (scenario === 'single') {
   for (const item of result.safeInvocationTemplates || []) {
     for (const fieldName of item.inspectFields || []) referencedFieldNames.add(fieldName);
   }
+  for (const workflowGuidance of Object.values(workflowGuidances)) {
+    for (const step of workflowGuidance.recommendedWorkflowPlan?.orderedSteps || []) {
+      for (const fieldName of step.inspectFields || []) referencedFieldNames.add(fieldName);
+    }
+    for (const decision of workflowGuidance.recommendedWorkflowPlan?.decisionPoints || []) {
+      for (const fieldName of decision.inspectFields || []) referencedFieldNames.add(fieldName);
+    }
+  }
   for (const fieldName of referencedFieldNames) {
     if (!result.toolResponseFieldCatalog?.[fieldName]) {
       throw new Error(`Expected toolResponseFieldCatalog to describe referenced inspect field ${fieldName}.`);
@@ -1122,11 +1202,9 @@ if (scenario === 'single') {
       throw new Error(`Expected configurationRecipes to include ${requiredRecipe}.`);
     }
   }
-  for (const recipe of result.configurationRecipes || []) {
-    if (typeof recipe.successCriteria !== 'string' || recipe.successCriteria.trim() === '') {
-      throw new Error(`Expected configurationRecipes.${recipe.id} to include successCriteria.`);
-    }
-  }
+  assertGuidanceItemsHaveCompletionProof(result.configurationRecipes || [], {
+    collectionName: 'configurationRecipes',
+  });
   const safeDefaultRecipe = (result.configurationRecipes || []).find((item) => item.id === 'safe-default-batch');
   if (!safeDefaultRecipe?.inspectFields?.includes('batchDecision') || !safeDefaultRecipe?.successCriteria?.includes('audit')) {
     throw new Error('Expected safe-default-batch recipe to include route-decision inspection and output audit success criteria.');
@@ -1181,11 +1259,10 @@ if (scenario === 'single') {
       throw new Error(`Expected agent guidance decision matrix to include ${requiredDecision}.`);
     }
   }
-  for (const decision of result.directoryWorkflowDecisionMatrix || []) {
-    if (typeof decision.successCriteria !== 'string' || decision.successCriteria.trim() === '') {
-      throw new Error(`Expected directoryWorkflowDecisionMatrix.${decision.id} to include successCriteria.`);
-    }
-  }
+  assertGuidanceItemsHaveCompletionProof(result.directoryWorkflowDecisionMatrix || [], {
+    collectionName: 'directoryWorkflowDecisionMatrix',
+    inspectFieldName: 'mustInspectFields',
+  });
   const structureDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'large-or-noisy-directory-first-pass');
   if (
     structureDecision?.recommendedOptions?.workflowPreset !== 'structure-first'
@@ -1247,11 +1324,10 @@ if (scenario === 'single') {
       throw new Error(`Expected agent guidance examples to include ${requiredExample}.`);
     }
   }
-  for (const example of result.directoryWorkflowExamples || []) {
-    if (typeof example.successCriteria !== 'string' || example.successCriteria.trim() === '') {
-      throw new Error(`Expected directoryWorkflowExamples.${example.id} to include successCriteria.`);
-    }
-  }
+  assertGuidanceItemsHaveCompletionProof(result.directoryWorkflowExamples || [], {
+    collectionName: 'directoryWorkflowExamples',
+    inspectFieldName: 'mustInspectFields',
+  });
   const noisyExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'large-noisy-first-pass');
   if (
     noisyExample?.firstCall?.workflowPreset !== 'structure-first'
@@ -2791,7 +2867,7 @@ if (scenario === 'single') {
     if (!Object.hasOwn(batchProps, 'workflowPreset') || !Object.hasOwn(organizeProps, 'workflowPreset')) {
       throw new Error('Expected batch and organization tools to expose workflowPreset.');
     }
-    expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'outputTreeInsideInputTree']);
