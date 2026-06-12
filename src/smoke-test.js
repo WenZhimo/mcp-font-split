@@ -66,6 +66,45 @@ function parseSmokeJsonOutput(stdout) {
   return null;
 }
 
+function summarizeSourceLayoutMismatch(summary) {
+  if (!summary || typeof summary !== 'object') return null;
+  return {
+    summaryType: summary.summaryType,
+    appliesToTool: summary.appliesToTool,
+    currentLayoutKind: summary.currentLayoutKind,
+    requestedBatchGroupBy: summary.requestedBatchGroupBy,
+    recommendedBatchGroupBy: summary.recommendedBatchGroupBy,
+    sourceLayoutMatchesRecommendedGrouping: summary.sourceLayoutMatchesRecommendedGrouping,
+    mismatchDetected: summary.mismatchDetected,
+    reviewRecommended: summary.reviewRecommended,
+    confidence: summary.confidence,
+    directOriginalInputStatus: summary.directOriginalInput?.status,
+    directPreviewRequiredBeforeWrite: summary.directOriginalInput?.previewRequiredBeforeWrite,
+    copyOnlyStagingNeed: summary.copyOnlyStaging?.need,
+    copyOnlyStagingSourceDestructive: summary.copyOnlyStaging?.sourceDestructive,
+    copyOnlyStagingSourceFilesPreserved: summary.copyOnlyStaging?.sourceFilesPreserved,
+    sourceFilesMovedDeletedOrRewritten: summary.copyOnlyStaging?.sourceFilesMovedDeletedOrRewritten,
+  };
+}
+
+function sourceLayoutMismatchSummaryCovered(summary) {
+  return Boolean(
+    summary
+    && summary.summaryType === 'source-layout-mismatch'
+    && summary.appliesToTool === 'organize_font_directory'
+    && summary.copyOnlyStagingSourceDestructive === false
+    && summary.copyOnlyStagingSourceFilesPreserved === true
+    && summary.sourceFilesMovedDeletedOrRewritten === false
+    && summary.directPreviewRequiredBeforeWrite === true
+  );
+}
+
+function assertRealCorpusSourceLayoutMismatchSummary(summary, context) {
+  if (!sourceLayoutMismatchSummaryCovered(summarizeSourceLayoutMismatch(summary))) {
+    throw new Error(`${context}: expected sourceLayoutMismatchSummary to expose layout guidance, direct-preview requirements, and source-safe copy-only staging.`);
+  }
+}
+
 function summarizeRealCorpusSubprocess(scenario, result) {
   if (!result || typeof result !== 'object') return null;
   if (scenario === 'real-corpus-readonly') {
@@ -79,9 +118,14 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       sampleInputDir: result.sample?.inputDir,
       sampleSupportedFontCount: result.inspection?.supportedFontCount,
       sampleUnsupportedFileCount: result.inspection?.unsupportedFileSummary?.total,
+      sourceLayoutMismatchSummary: result.organization?.sourceLayoutMismatchSummary,
     };
   }
   if (scenario === 'real-corpus-targets') {
+    const targetSourceLayoutMismatchSummaries = (result.targets || []).map((target) => ({
+      inputDir: target.inputDir,
+      summary: target.sourceLayoutMismatchSummary,
+    }));
     return {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
@@ -94,6 +138,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       selectedTargetCount: result.selection?.selectedTargetCount,
       sampleCount: result.selection?.sampleCount,
       selectedTargets: (result.targets || []).map((target) => target.inputDir),
+      targetSourceLayoutMismatchSummaries,
     };
   }
   if (scenario === 'real-corpus-integration') {
@@ -113,6 +158,8 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       batchAuditStatus: result.batchAudit?.auditStatus,
       batchAuditPassed: result.batchAudit?.auditPassed,
       batchStructureConforms: result.batchAudit?.structureSummary?.conforms,
+      organizationPreviewSourceLayoutMismatchSummary: result.organization?.preview?.sourceLayoutMismatchSummary,
+      organizationWriteSourceLayoutMismatchSummary: result.organization?.write?.sourceLayoutMismatchSummary,
     };
   }
   return null;
@@ -140,6 +187,18 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
   const corpusUnsupportedArchiveCount = readonly.corpusUnsupportedArchiveCount ?? targets.corpusUnsupportedArchiveCount ?? integration.corpusUnsupportedArchiveCount;
   const corpusMaxFilesHit = readonly.corpusMaxFilesHit ?? targets.corpusMaxFilesHit ?? integration.corpusMaxFilesHit;
   const selectedTargets = targets.selectedTargets || [];
+  const targetSourceLayoutMismatchSummaries = targets.targetSourceLayoutMismatchSummaries || [];
+  const targetSourceLayoutMismatchSummaryCount = targetSourceLayoutMismatchSummaries
+    .filter((item) => sourceLayoutMismatchSummaryCovered(item.summary))
+    .length;
+  const sourceLayoutMismatchSummaryEvidence = {
+    readonly: readonly.sourceLayoutMismatchSummary,
+    targetSummaryCount: targetSourceLayoutMismatchSummaryCount,
+    targetSelectedCount: targets.selectedTargetCount,
+    targetSamples: targetSourceLayoutMismatchSummaries.slice(0, 3),
+    integrationPreview: integration.organizationPreviewSourceLayoutMismatchSummary,
+    integrationWrite: integration.organizationWriteSourceLayoutMismatchSummary,
+  };
   const testScope = {
     corpusScan: {
       scopeKind: 'full-root-bounded-scan',
@@ -207,6 +266,21 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
         sampleInputDir: readonly.sampleInputDir,
         writesFiles: false,
       },
+    },
+    {
+      id: 'source-layout-mismatch-summary',
+      covered: Boolean(
+        readonlyRun.ok
+        && targetsRun.ok
+        && integrationRun.ok
+        && sourceLayoutMismatchSummaryCovered(readonly.sourceLayoutMismatchSummary)
+        && targetSourceLayoutMismatchSummaryCount === targets.selectedTargetCount
+        && targets.selectedTargetCount > 0
+        && sourceLayoutMismatchSummaryCovered(integration.organizationPreviewSourceLayoutMismatchSummary)
+        && sourceLayoutMismatchSummaryCovered(integration.organizationWriteSourceLayoutMismatchSummary)
+      ),
+      toolPaths: ['organize_font_directory'],
+      evidence: sourceLayoutMismatchSummaryEvidence,
     },
     {
       id: 'batch-preview-and-next-action',
@@ -3764,6 +3838,7 @@ if (scenario === 'single') {
     || coverageSummary.testScope?.representativeWriteAudit?.scopeKind !== 'single-representative-write-and-audit'
     || coverageSummary.testScope?.representativeWriteAudit?.batchAuditStatus !== coverageSummary.batchAuditStatus
     || !Array.isArray(coverageSummary.functionalCoverage)
+    || !coverageSummary.functionalCoverage.some((item) => item.id === 'source-layout-mismatch-summary')
     || coverageSummary.functionalCoverage.some((item) => item.covered !== true)
     || coverageSummary.corpusSupportedFontCount < 1
     || !Array.isArray(coverageSummary.corpusUnsupportedByCategory)
@@ -3877,6 +3952,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected real corpus organization smoke to stay structure-first, no-write, and return safe batch preview args.');
   }
+  assertRealCorpusSourceLayoutMismatchSummary(organization.sourceLayoutMismatchSummary, 'real-corpus-readonly organization');
   assertObjectOmitsKeys(organization.recommendedBatchPreviewArgs, [
     'dryRun',
     'includeResults',
@@ -3941,6 +4017,7 @@ if (scenario === 'single') {
       parsedFontMetadata: organization.parsedFontMetadata,
       dedupeLimitedByParsing: organization.dedupeLimitedByParsing,
       organizationWarnings: organization.organizationWarnings,
+      sourceLayoutMismatchSummary: summarizeSourceLayoutMismatch(organization.sourceLayoutMismatchSummary),
     },
     batchPreview: {
       dryRun: batchPreview.dryRun,
@@ -4043,6 +4120,7 @@ if (scenario === 'single') {
     ) {
       throw new Error(`Expected targeted real corpus dry-run to stay safe and stable for ${target}.`);
     }
+    assertRealCorpusSourceLayoutMismatchSummary(organization.sourceLayoutMismatchSummary, `real-corpus-targets ${target} organization`);
     assertInspectFieldsExist(batchWriteAction, {
       split_font_batch: batchPreview,
     }, `real-corpus-targets ${target} batch action`);
@@ -4068,6 +4146,7 @@ if (scenario === 'single') {
       unsupportedFileSummary: inspection.unsupportedFileSummary,
       layout: organization.layout,
       recommendedBatchPreviewArgs: organization.recommendedBatchPreviewArgs,
+      sourceLayoutMismatchSummary: summarizeSourceLayoutMismatch(organization.sourceLayoutMismatchSummary),
       discoveredFontCount: batchPreview.discoveredFontCount,
       deduplicatedCount: batchPreview.deduplicatedCount,
       selectedFontCount: batchPreview.selectedFontCount,
@@ -4181,6 +4260,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected real-corpus-integration organization preview to be source-safe and no-write.');
   }
+  assertRealCorpusSourceLayoutMismatchSummary(organizationPreview.sourceLayoutMismatchSummary, 'real-corpus-integration organization preview');
 
   const organizationWrite = await organizeFontDirectory({
     inputDir: sample.inputDir,
@@ -4199,6 +4279,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected real-corpus-integration organization write to copy into output only and preserve source files.');
   }
+  assertRealCorpusSourceLayoutMismatchSummary(organizationWrite.sourceLayoutMismatchSummary, 'real-corpus-integration organization write');
 
   const organizedInspection = await inspectFontInputs({
     inputDir: organizationOutputDir,
@@ -4322,6 +4403,7 @@ if (scenario === 'single') {
         layout: organizationPreview.layout,
         recommendedBatchPreviewArgs: organizationPreview.recommendedBatchPreviewArgs,
         safetySummary: organizationPreview.safetySummary,
+        sourceLayoutMismatchSummary: summarizeSourceLayoutMismatch(organizationPreview.sourceLayoutMismatchSummary),
       },
       write: {
         outputDir: organizationWrite.outputDir,
@@ -4330,6 +4412,7 @@ if (scenario === 'single') {
         skippedDuplicates: organizationWrite.skippedDuplicates,
         safetySummary: organizationWrite.safetySummary,
         organizationManifestPath: organizationWrite.organizationManifestPath,
+        sourceLayoutMismatchSummary: summarizeSourceLayoutMismatch(organizationWrite.sourceLayoutMismatchSummary),
       },
       organizedInspection: {
         supportedFontCount: organizedInspection.supportedFontCount,
