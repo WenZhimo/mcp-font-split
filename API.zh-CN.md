@@ -188,12 +188,14 @@
 
 | 字段 | 含义 |
 |------|------|
+| `safetySummary` | 紧凑的源目录/输出目录安全摘要。它会重复 operation mode，确认源文件会被保留，声明写入范围，并把覆盖风险限定到输出目录。解释下面这些兼容布尔字段前，优先看这个字段。 |
 | `operationMode` | `dryRun` 为 true 时是 `plan-only`，否则是 `copy-only`。 |
 | `destructive` | 只有当前调用为 `dryRun: false` 且 `overwriteExisting: true`、可能替换 `outputDir` 文件时才为 `true`；它不表示源文件会被修改。 |
 | `sourceDestructive` | 恒为 `false`；源文件不会被移动、删除或重写。 |
 | `writesSourceTree` | 恒为 `false`；源文件会被保留。 |
 | `writesOutputTree` | 只有 `dryRun: false` 时才为 `true`。 |
 | `mayOverwriteOutputTree` | 只有当前非 dry-run 调用可能替换 `outputDir` 中的文件时才为 `true`。 |
+| `sourceFilesPreserved` | 恒为 `true`；给需要直接判断源文件是否保留的 agent 使用。 |
 | `parsedFontMetadata` | `parseFonts: false` 时为 `false`；此时 `validFontCount` 和 `invalidFontCount` 是 `null`，不是 0。 |
 | `unparsedFontCount` | 因 `parseFonts: false` 而被有意跳过元数据解析的受支持扩展名文件数。 |
 | `effectiveBatchDedupeMode` | 实际使用的去重策略。当 `parseFonts: false` 且请求 `batchDedupeMode: "font-identity"` 时，会回退到 `same-path`。 |

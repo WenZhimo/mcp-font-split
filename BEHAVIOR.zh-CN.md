@@ -425,6 +425,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 只有显式设置 `dryRun: false` 才会写入文件。
 - 写入模式是 `copy-only`：只把选中的字体复制到 `outputDir`。
 - 不会移动、删除或重写源目录中的任何文件。
+- `safetySummary` 会用一个对象集中说明 operation mode、写入范围、覆盖范围和源目录保留状态。判断整理工具是否破坏源目录时，应优先看这个字段。
 - `sourceDestructive` 恒为 `false`。
 - `destructive` 只有在当前调用为 `dryRun: false` 且 `overwriteExisting: true`、可能覆盖 `outputDir` 文件时才为 `true`。
 - `writesSourceTree` 恒为 `false`。
@@ -444,7 +445,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 推荐 agent 工作流：
 
 1. 先调用 `organize_font_directory`，保持默认 `dryRun: true`。
-2. 检查 `layout.layoutKind`、`recommendedBatchOptions`、`recommendedNextActions[]`、`organizationWarnings[]`、`sourceDestructive`、`destructive`、`writesSourceTree`、`writesOutputTree` 和 `mayOverwriteOutputTree`。
+2. 检查 `safetySummary`、`layout.layoutKind`、`recommendedBatchOptions`、`recommendedNextActions[]`、`organizationWarnings[]`、`sourceDestructive`、`destructive`、`writesSourceTree`、`writesOutputTree` 和 `mayOverwriteOutputTree`。
 3. 如果用户只是想调整批量参数，不一定需要真的整理目录；可直接把 `recommendedBatchOptions` 应用到 `split_font_batch`。
 4. 如果用户明确希望得到更规整的暂存目录，再用 `dryRun: false` 执行 copy-only 整理。
 5. 整理完成后，对 `outputDir` 调用 `inspect_font_inputs` 或把它作为后续 `split_font_batch.inputDir`。
@@ -608,9 +609,11 @@ split-meta.json
 
 | 字段 | 含义 |
 |------|------|
+| `safetySummary` | 集中的源目录/输出目录安全摘要；优先用于判断整理工具是否会写文件、是否会影响源目录、覆盖风险是否只限输出目录 |
 | `operationMode` | `plan-only` 或 `copy-only` |
 | `destructive` | 当前调用是否可能覆盖 `outputDir` 中的文件 |
 | `sourceDestructive` | 恒为 `false` |
+| `sourceFilesPreserved` | 恒为 `true` |
 | `writesSourceTree` | 恒为 `false` |
 | `writesOutputTree` | `dryRun: false` 时为 `true` |
 | `mayOverwriteOutputTree` | 当前非 dry-run 调用是否可能覆盖目标目录文件 |

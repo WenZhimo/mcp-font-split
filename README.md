@@ -171,7 +171,7 @@ fonts/
     Regular.otf
 ```
 
-这是最容易误判的结构。先调用 `organize_font_directory` 并保持 `dryRun: true`，重点检查 `layout.layoutKind`、`recommendedBatchOptions`、`organizationWarnings`、`sourceDestructive` 和 `writesSourceTree`。
+这是最容易误判的结构。先调用 `organize_font_directory` 并保持 `dryRun: true`，重点检查 `safetySummary`、`layout.layoutKind`、`recommendedBatchOptions`、`organizationWarnings`、`sourceDestructive` 和 `writesSourceTree`。
 
 超大或嘈杂字体库的第一遍扫描：
 
@@ -293,12 +293,14 @@ fonts/
 
 `organize_font_directory` 会返回源目录安全性摘要和可选整理计划：
 
+- `safetySummary`：紧凑的源目录/输出目录安全摘要。判断整理工具是否破坏性时优先看它；它会确认源文件会被保留，并把任何覆盖风险限定到 `outputDir`。
 - `operationMode`：默认 dry-run 时为 `plan-only`，`dryRun: false` 时为 `copy-only`
 - `destructive`：只有当前非 dry-run 调用可能覆盖 `outputDir` 中的文件时才为 true
 - `sourceDestructive`：恒为 `false`
 - `writesSourceTree`：恒为 `false`
 - `writesOutputTree`：只有 `dryRun: false` 时为 true
 - `mayOverwriteOutputTree`：只有 `dryRun: false` 且 `overwriteExisting: true` 时为 true
+- `sourceFilesPreserved`：恒为 `true`
 - `parsedFontMetadata`：`parseFonts: false` 时为 false；此时 `validFontCount` / `invalidFontCount` 是 `null`
 - `effectiveBatchDedupeMode`、`dedupeLimitedByParsing`：说明 identity 去重是否真正可用
 - `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`

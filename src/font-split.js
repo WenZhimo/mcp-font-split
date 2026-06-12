@@ -471,6 +471,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Version of warningCodeCatalog.',
     agentAction: 'Use this for compatibility checks in automated agents.',
   },
+  safetySummary: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Compact source/output safety summary for directory organization calls.',
+    agentAction: 'Inspect this before treating organize_font_directory as non-destructive or before running copy-only mode.',
+  },
   toolResponseFieldCatalog: {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Catalog of important response fields, their source tools, meanings, and suggested agent actions.',
@@ -600,6 +605,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['organize_font_directory'],
     meaning: 'Whether source files can be moved, deleted, or rewritten. This tool should always report false.',
     agentAction: 'Verify this remains false before calling the organizer source-safe.',
+  },
+  sourceFilesPreserved: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Whether the source tree is preserved by the organization call. This tool should always report true.',
+    agentAction: 'Use with sourceDestructive and writesSourceTree to verify source non-destructiveness.',
   },
   writesSourceTree: {
     sourceTools: ['organize_font_directory'],
@@ -753,7 +763,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       overwriteExisting: false,
     },
     customizableFields: ['inputDir', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
-    inspectFields: ['layout', 'recommendedBatchOptions', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+    inspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
     nextStep: 'Use recommendedBatchOptions for a batch dry-run, or copy to a staging directory only after reviewing the plan.',
   },
   {
@@ -790,7 +800,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       overwriteExisting: false,
     },
     customizableFields: ['inputDir', 'outputDir', 'parseFonts', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'],
-    inspectFields: ['operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
+    inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
     nextStep: 'Use outputDir as the next split_font_batch input only after checking organizationWarnings.',
   },
   {
@@ -967,8 +977,8 @@ export function getAgentGuidance(args = {}) {
     {
       id: 'layout-plan-reviewed',
       appliesTo: ['overview', 'batch', 'organize'],
-      check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect layout, recommendedBatchOptions, sourceDestructive, writesSourceTree, writesOutputTree, mayOverwriteOutputTree, organizationWarnings, and planActionSummary before applying any copy plan.',
-      responseFields: ['layout', 'recommendedBatchOptions', 'recommendedNextActions', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
+      check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect safetySummary, layout, recommendedBatchOptions, sourceDestructive, writesSourceTree, writesOutputTree, mayOverwriteOutputTree, organizationWarnings, and planActionSummary before applying any copy plan.',
+      responseFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedNextActions', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'batch-plan-reviewed',
@@ -1087,7 +1097,7 @@ export function getAgentGuidance(args = {}) {
         dryRun: true,
         strictMode: true,
       },
-      mustInspectFields: ['layout', 'recommendedBatchOptions', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+      mustInspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
       nonIntuitiveBehavior: 'organize_font_directory defaults to dryRun:true and never moves or deletes source files; dryRun:false copies into outputDir only.',
     },
     {
@@ -1121,7 +1131,7 @@ export function getAgentGuidance(args = {}) {
         dryRun: false,
         overwriteExisting: false,
       },
-      mustInspectFields: ['operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
+      mustInspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
       nonIntuitiveBehavior: 'A real organize run is copy-only. overwriteExisting:true can replace files in outputDir but still does not modify source files.',
     },
   ];
@@ -1152,7 +1162,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['layout.layoutKind', 'recommendedBatchOptions', 'organizationWarnings', 'planActionSummary', 'plan'],
+      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'archive-per-family-folders',
@@ -1213,7 +1223,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['layout.layoutKind', 'organizationWarnings', 'recommendedBatchOptions', 'sourceDestructive', 'writesSourceTree', 'planActionSummary'],
+      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'organizationWarnings', 'recommendedBatchOptions', 'sourceDestructive', 'writesSourceTree', 'planActionSummary'],
     },
     {
       id: 'large-noisy-first-pass',
@@ -1330,6 +1340,7 @@ export function getAgentGuidance(args = {}) {
       'warnings',
       'manifestPath',
       'warningCodeCatalog',
+      'safetySummary',
       'toolResponseFieldCatalog',
       'safeInvocationTemplates',
       'batchWarnings',
@@ -1357,6 +1368,7 @@ export function getAgentGuidance(args = {}) {
       'plan',
       'destructive',
       'sourceDestructive',
+      'sourceFilesPreserved',
       'writesSourceTree',
       'writesOutputTree',
       'mayOverwriteOutputTree',
@@ -1826,7 +1838,7 @@ function buildOrganizationNextActions({
       priority: 'high',
       tool: 'organize_font_directory',
       reason: 'dryRun:true wrote no files; review the plan and warnings before choosing a write step.',
-      inspectFields: ['planActionSummary', 'plan', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree'],
+      inspectFields: ['safetySummary', 'planActionSummary', 'plan', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree'],
     });
 
     if (selectedFontCount > 0) {
@@ -1858,7 +1870,7 @@ function buildOrganizationNextActions({
           batchDedupeMode: options.batchDedupeMode,
           overwriteExisting: false,
         },
-        inspectFields: ['operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
+        inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary'],
       });
     }
   } else if (copiedCount > 0) {
@@ -2689,6 +2701,7 @@ function buildOrganizationManifest({ inputDirRelative, outputDirRelative, option
       copiedCount: result.copiedCount,
       skippedCount: result.skippedCount,
       errorCount: result.errorCount,
+      safetySummary: result.safetySummary,
     },
     entries: result.plan
       .filter((item) => item.action === 'copied' || item.action === 'would-copy' || item.action === 'skipped-target-exists')
@@ -3710,6 +3723,23 @@ export async function organizeFontDirectory(args) {
   const writesOutputTree = !options.dryRun;
   const mayOverwriteOutputTree = !options.dryRun && options.overwriteExisting;
   const destructive = mayOverwriteOutputTree;
+  const operationMode = options.dryRun ? 'plan-only' : 'copy-only';
+  const safetySummary = {
+    operationMode,
+    sourceDestructive,
+    sourceFilesPreserved: true,
+    writesSourceTree,
+    writesOutputTree,
+    mayOverwriteOutputTree,
+    writeScope: options.dryRun ? 'none' : 'output-tree-only',
+    overwriteScope: mayOverwriteOutputTree ? 'output-tree-only' : 'none',
+    destructiveMeaning: destructive ? 'may-overwrite-output-tree-only' : 'none',
+    summary: options.dryRun
+      ? 'Plan-only dry run; no files are written and source files are only scanned.'
+      : mayOverwriteOutputTree
+        ? 'Copy-only organization; selected fonts are copied into outputDir and existing output files may be replaced, but source files are never moved, deleted, or rewritten.'
+        : 'Copy-only organization; selected fonts are copied into outputDir without replacing existing output files, and source files are never moved, deleted, or rewritten.',
+  };
   const warnings = buildOrganizationWarnings({
     dryRun: options.dryRun,
     overwriteExisting: options.overwriteExisting,
@@ -3758,13 +3788,14 @@ export async function organizeFontDirectory(args) {
     skippedCount,
     errorCount: errors.length,
     errors,
+    safetySummary,
     destructive,
     sourceDestructive,
     writesSourceTree,
     writesOutputTree,
     mayOverwriteOutputTree,
     sourceFilesPreserved: true,
-    operationMode: options.dryRun ? 'plan-only' : 'copy-only',
+    operationMode,
     parseFonts: options.parseFonts,
     requestedBatchDedupeMode: options.batchDedupeMode,
     effectiveBatchDedupeMode: effectiveDedupeMode,

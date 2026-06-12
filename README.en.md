@@ -171,7 +171,7 @@ fonts/
     Regular.otf
 ```
 
-This is the easiest layout to misread. Call `organize_font_directory` with `dryRun: true` first and inspect `layout.layoutKind`, `recommendedBatchOptions`, `organizationWarnings`, `sourceDestructive`, and `writesSourceTree`.
+This is the easiest layout to misread. Call `organize_font_directory` with `dryRun: true` first and inspect `safetySummary`, `layout.layoutKind`, `recommendedBatchOptions`, `organizationWarnings`, `sourceDestructive`, and `writesSourceTree`.
 
 Large or noisy library first pass:
 
@@ -293,12 +293,14 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 
 `organize_font_directory` returns a source-safety summary plus an optional copy plan:
 
+- `safetySummary`: compact source/output safety summary. Prefer it when deciding whether the organizer is destructive; it confirms source preservation and scopes any overwrite risk to `outputDir`.
 - `operationMode`: `plan-only` for default dry-run, or `copy-only` when `dryRun: false`
 - `destructive`: true only when the current non-dry-run call may overwrite files in `outputDir`
 - `sourceDestructive`: always `false`
 - `writesSourceTree`: always `false`
 - `writesOutputTree`: true only when `dryRun: false`
 - `mayOverwriteOutputTree`: true only when `dryRun: false` and `overwriteExisting: true`
+- `sourceFilesPreserved`: always `true`
 - `parsedFontMetadata`: false when `parseFonts: false`; then `validFontCount` / `invalidFontCount` are `null`
 - `effectiveBatchDedupeMode`, `dedupeLimitedByParsing`: explain whether identity dedupe was available
 - `layout.layoutKind`: `empty`, `flat`, `nested`, or `mixed`

@@ -188,12 +188,14 @@ Important result fields:
 
 | Field | Meaning |
 |-------|---------|
+| `safetySummary` | Compact source/output safety summary. It repeats the operation mode, confirms source files are preserved, declares the write scope, and scopes overwrite risk to the output tree only. Prefer this field before interpreting the legacy boolean fields below. |
 | `operationMode` | `plan-only` when `dryRun` is true, otherwise `copy-only`. |
 | `destructive` | `true` only when `dryRun: false` and `overwriteExisting: true` allow replacing files in `outputDir`. It never means source files are modified. |
 | `sourceDestructive` | Always `false`; source files are never moved, deleted, or rewritten. |
 | `writesSourceTree` | Always `false`; source files are preserved. |
 | `writesOutputTree` | `true` only when `dryRun` is false. |
 | `mayOverwriteOutputTree` | `true` only when the current non-dry-run call may replace files in `outputDir`. |
+| `sourceFilesPreserved` | Always `true`; included for agents that need a direct source-preservation signal. |
 | `parsedFontMetadata` | `false` when `parseFonts: false`; in that mode `validFontCount` and `invalidFontCount` are `null`, not zero. |
 | `unparsedFontCount` | Number of supported-extension files intentionally not parsed because `parseFonts` was false. |
 | `effectiveBatchDedupeMode` | Actual dedupe mode used. When `parseFonts: false` and `batchDedupeMode: "font-identity"`, this falls back to `same-path`. |

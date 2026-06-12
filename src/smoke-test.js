@@ -369,6 +369,7 @@ if (scenario === 'single') {
   }
   const expectedFieldCatalogEntries = {
     recommendedBatchOptions: 'organize_font_directory',
+    safetySummary: 'organize_font_directory',
     sourceDestructive: 'organize_font_directory',
     batchWarnings: 'split_font_batch',
     inspectionWarnings: 'inspect_split_output',
@@ -434,6 +435,9 @@ if (scenario === 'single') {
     }
   }
   const layoutChecklist = (result.verificationChecklist || []).find((item) => item.id === 'layout-plan-reviewed');
+  if (!layoutChecklist?.responseFields?.includes('safetySummary')) {
+    throw new Error('Expected layout verification checklist to include safetySummary.');
+  }
   if (!layoutChecklist?.responseFields?.includes('recommendedNextActions')) {
     throw new Error('Expected layout verification checklist to include recommendedNextActions.');
   }
@@ -564,6 +568,17 @@ if (scenario === 'single') {
   if (result.dryRun !== true || result.operationMode !== 'plan-only' || result.destructive !== false || result.sourceDestructive !== false || result.writesSourceTree !== false || result.writesOutputTree !== false || result.mayOverwriteOutputTree !== false) {
     throw new Error('Expected organizeFontDirectory dry-run to be source-non-destructive and plan-only.');
   }
+  if (
+    result.safetySummary?.operationMode !== 'plan-only'
+    || result.safetySummary?.sourceDestructive !== false
+    || result.safetySummary?.sourceFilesPreserved !== true
+    || result.safetySummary?.writesSourceTree !== false
+    || result.safetySummary?.writesOutputTree !== false
+    || result.safetySummary?.writeScope !== 'none'
+    || result.safetySummary?.overwriteScope !== 'none'
+  ) {
+    throw new Error('Expected organizeFontDirectory dry-run safetySummary to emphasize no writes and source preservation.');
+  }
   if (result.layout?.layoutKind !== 'nested' || result.recommendedBatchOptions?.batchGroupBy !== 'source-dir') {
     throw new Error('Expected organization layout analysis to recommend source-dir grouping for nested input.');
   }
@@ -634,6 +649,18 @@ if (scenario === 'single') {
   if (copied.operationMode !== 'copy-only' || copied.sourceDestructive !== false || copied.writesSourceTree !== false || copied.writesOutputTree !== true || copied.mayOverwriteOutputTree !== false || copied.destructive !== false) {
     throw new Error('Expected organizeFontDirectory copy mode to write only the output tree without overwrite risk.');
   }
+  if (
+    copied.safetySummary?.operationMode !== 'copy-only'
+    || copied.safetySummary?.sourceDestructive !== false
+    || copied.safetySummary?.sourceFilesPreserved !== true
+    || copied.safetySummary?.writesSourceTree !== false
+    || copied.safetySummary?.writesOutputTree !== true
+    || copied.safetySummary?.mayOverwriteOutputTree !== false
+    || copied.safetySummary?.writeScope !== 'output-tree-only'
+    || copied.safetySummary?.overwriteScope !== 'none'
+  ) {
+    throw new Error('Expected organizeFontDirectory copy safetySummary to limit writes to the output tree.');
+  }
   if (copied.copiedCount !== 1 || copied.organizationManifestWritten !== true || copied.organizationManifestPath !== `${outputDir}/font-organization-manifest.json`) {
     throw new Error('Expected organizeFontDirectory copy mode to copy one file and write a manifest.');
   }
@@ -658,6 +685,9 @@ if (scenario === 'single') {
   const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
   if (manifest.summary?.copiedCount !== 1 || manifest.entries?.[0]?.source !== `${inputDir}/FamilyA/not-a-font.ttf`) {
     throw new Error('Expected organization manifest to record the copied source.');
+  }
+  if (manifest.summary?.safetySummary?.sourceDestructive !== false || manifest.summary?.safetySummary?.writeScope !== 'output-tree-only') {
+    throw new Error('Expected organization manifest summary to record source-safe output-only writes.');
   }
   const copiedInspect = await inspectFontInputs({
     inputDir: outputDir,
@@ -690,6 +720,16 @@ if (scenario === 'single') {
   });
   if (overwritten.sourceDestructive !== false || overwritten.writesSourceTree !== false || overwritten.writesOutputTree !== true || overwritten.mayOverwriteOutputTree !== true || overwritten.destructive !== true) {
     throw new Error('Expected overwrite mode to flag output-tree overwrite risk while preserving source safety.');
+  }
+  if (
+    overwritten.safetySummary?.sourceDestructive !== false
+    || overwritten.safetySummary?.writesSourceTree !== false
+    || overwritten.safetySummary?.writesOutputTree !== true
+    || overwritten.safetySummary?.mayOverwriteOutputTree !== true
+    || overwritten.safetySummary?.overwriteScope !== 'output-tree-only'
+    || overwritten.safetySummary?.destructiveMeaning !== 'may-overwrite-output-tree-only'
+  ) {
+    throw new Error('Expected overwrite safetySummary to scope destructive risk to the output tree only.');
   }
   if (overwritten.planActionSummary?.total !== 1 || overwritten.planActionSummary?.byAction?.copied !== 1) {
     throw new Error('Expected overwrite-enabled organization copy to summarize copied plan actions.');
