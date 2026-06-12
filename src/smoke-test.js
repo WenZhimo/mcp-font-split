@@ -12,6 +12,45 @@ const scenario = process.argv[2] || 'single';
 const fontPath = process.argv[3] || '0xA000/0xA000-Regular.ttf';
 const outDir = process.argv[4] || 'font-split-mcp/.font-split-smoke-output';
 const REAL_CORPUS_FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.ttc', '.otc', '.woff', '.woff2']);
+const DEFAULT_REAL_CORPUS_TARGETS = ['aexpective', 'tiny5', 'agu_display', 'architectural'];
+const REAL_CORPUS_TARGET_EXPECTATIONS = {
+  aexpective: {
+    supportedFontCount: 4,
+    unsupportedTotal: 2,
+    layoutKind: 'nested',
+    batchGroupBy: 'source-dir',
+    discoveredFontCount: 4,
+    deduplicatedCount: 1,
+    skippedDuplicates: 3,
+  },
+  tiny5: {
+    supportedFontCount: 28,
+    unsupportedTotal: 2,
+    layoutKind: 'nested',
+    batchGroupBy: 'source-dir',
+    discoveredFontCount: 28,
+    deduplicatedCount: 10,
+    skippedDuplicates: 18,
+  },
+  agu_display: {
+    supportedFontCount: 11,
+    unsupportedTotal: 3,
+    layoutKind: 'nested',
+    batchGroupBy: 'source-dir',
+    discoveredFontCount: 11,
+    deduplicatedCount: 3,
+    skippedDuplicates: 8,
+  },
+  architectural: {
+    supportedFontCount: 37,
+    unsupportedTotal: 38,
+    layoutKind: 'nested',
+    batchGroupBy: 'source-dir',
+    discoveredFontCount: 37,
+    deduplicatedCount: 12,
+    skippedDuplicates: 25,
+  },
+};
 
 function pad4(buffer) {
   const remainder = buffer.length % 4;
@@ -222,7 +261,7 @@ function summarizeProbeFiles(files) {
   let unsupportedCount = 0;
   for (const file of files) {
     const extension = path.extname(file).toLowerCase() || '<none>';
-    if (REAL_CORPUS_FONT_EXTENSIONS.has(extension)) {
+    if (isRealCorpusSupportedFont(file)) {
       supportedCount++;
     } else {
       unsupportedCount++;
@@ -234,6 +273,18 @@ function summarizeProbeFiles(files) {
     unsupportedCount,
     unsupportedExtensions: [...unsupportedExtensions].sort(),
   };
+}
+
+function isRealCorpusSupportedFont(file) {
+  return REAL_CORPUS_FONT_EXTENSIONS.has(path.extname(file).toLowerCase());
+}
+
+function parseRealCorpusTargetList(value) {
+  if (!value) return DEFAULT_REAL_CORPUS_TARGETS;
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 async function findRealCorpusSample({ corpusRoot, requestedInputDir, maxFiles }) {
@@ -279,6 +330,16 @@ async function findRealCorpusSample({ corpusRoot, requestedInputDir, maxFiles })
 
   if (fallback) return fallback;
   throw new Error(`No supported font sample directory found under real corpus root: ${corpusRoot}`);
+}
+
+async function findRealCorpusSampleFont({ corpusRoot, inputDir, maxFiles }) {
+  const sampleRoot = path.resolve(corpusRoot, inputDir);
+  const files = await collectProbeFiles(sampleRoot, { maxFiles });
+  const fontFile = files.find((file) => isRealCorpusSupportedFont(file));
+  if (!fontFile) {
+    throw new Error(`No supported font file found under real corpus sample: ${inputDir}`);
+  }
+  return path.relative(corpusRoot, fontFile).replaceAll(path.sep, '/');
 }
 
 if (scenario === 'single') {
@@ -2294,6 +2355,407 @@ if (scenario === 'single') {
       selectedFontCount: batchPreview.selectedFontCount,
       skippedDuplicates: batchPreview.skippedDuplicates,
       recommendedNextActions: batchPreview.recommendedNextActions,
+    },
+  }, null, 2));
+} else if (scenario === 'real-corpus-targets') {
+  const corpusRoot = path.resolve(process.argv[3] || process.env.FONT_SPLIT_REAL_CORPUS_DIR || path.join(process.cwd(), '..'));
+  const targets = parseRealCorpusTargetList(process.argv[4] || process.env.FONT_SPLIT_REAL_CORPUS_TARGETS);
+  const maxFiles = Number.parseInt(process.argv[5] || process.env.FONT_SPLIT_REAL_CORPUS_MAX_FILES || '50000', 10);
+  const limit = Number.parseInt(process.argv[6] || process.env.FONT_SPLIT_REAL_CORPUS_TARGET_LIMIT || '100', 10);
+  if (targets.length === 0 || !Number.isFinite(maxFiles) || maxFiles < 1 || !Number.isFinite(limit) || limit < 1) {
+    throw new Error('Expected targets plus positive maxFiles and limit for real-corpus-targets smoke.');
+  }
+  process.env.FONT_SPLIT_ROOT = corpusRoot;
+
+  const outputDir = 'font-split-mcp/.font-split-real-corpus-targets-organized-preview';
+  const outputRoot = 'font-split-mcp/.font-split-real-corpus-targets-output';
+  const resolvedOutputDir = path.resolve(corpusRoot, outputDir);
+  const resolvedOutputRoot = path.resolve(corpusRoot, outputRoot);
+  const outputDirExistedBefore = await fsExists(resolvedOutputDir);
+  const outputRootExistedBefore = await fsExists(resolvedOutputRoot);
+
+  const corpusInspection = await inspectFontInputs({
+    inputDir: '.',
+    maxFiles,
+    includeFiles: false,
+  });
+  if (corpusInspection.supportedFontCount < 1 || corpusInspection.filesIncluded !== false || corpusInspection.maxFilesHit !== false) {
+    throw new Error('Expected targeted real corpus smoke to inspect the full bounded corpus root without truncation.');
+  }
+
+  console.log('Real corpus targeted dry-run smoke:', corpusRoot, 'targets:', targets.join(','), 'limit:', limit, 'maxFiles:', maxFiles);
+  const targetSummaries = [];
+  for (const target of targets) {
+    const sample = await findRealCorpusSample({ corpusRoot, requestedInputDir: target, maxFiles });
+    const inspection = await inspectFontInputs({
+      inputDir: sample.inputDir,
+      maxFiles,
+      includeFiles: false,
+    });
+    const organization = await organizeFontDirectory({
+      inputDir: sample.inputDir,
+      outputDir,
+      workflowPreset: 'structure-first',
+      maxFiles,
+    });
+    const batchPreview = await splitFontBatch({
+      inputDir: sample.inputDir,
+      outputRoot,
+      workflowPreset: 'safe-preview',
+      batchGroupBy: organization.recommendedBatchPreviewArgs?.batchGroupBy,
+      limit: Math.min(limit, maxFiles),
+      maxFiles,
+      silent: true,
+    });
+    const batchWriteAction = (batchPreview.recommendedNextActions || []).find((action) => action.id === 'run-reviewed-batch-write');
+    const planned = batchPreview.planned || [];
+    const numericSuffixCount = planned.filter((item) => /-\d+$/.test(item.splitDirName || '')).length;
+    const sourceSuffixCount = planned.filter((item) => (item.splitDirName || '').includes('--')).length;
+    if (
+      inspection.supportedFontCount < 1
+      || organization.dryRun !== true
+      || organization.writesOutputTree !== false
+      || organization.sourceDestructive !== false
+      || organization.recommendedBatchPreviewArgs?.inputDir !== sample.inputDir
+      || organization.recommendedBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+      || batchPreview.dryRun !== true
+      || batchPreview.writesOutputTree !== false
+      || batchPreview.sourceDestructive !== false
+      || batchPreview.maxFilesHit !== false
+      || batchPreview.selectedFontCount < 1
+      || batchWriteAction?.tool !== 'split_font_batch'
+      || batchWriteAction?.suggestedArgs?.workflowPreset !== 'reviewed-write'
+      || batchWriteAction?.suggestedArgs?.batchGroupBy !== organization.recommendedBatchPreviewArgs?.batchGroupBy
+      || numericSuffixCount !== 0
+      || sourceSuffixCount !== 0
+    ) {
+      throw new Error(`Expected targeted real corpus dry-run to stay safe and stable for ${target}.`);
+    }
+    assertInspectFieldsExist(batchWriteAction, {
+      split_font_batch: batchPreview,
+    }, `real-corpus-targets ${target} batch action`);
+
+    const expected = REAL_CORPUS_TARGET_EXPECTATIONS[sample.inputDir];
+    if (
+      expected
+      && (
+        inspection.supportedFontCount !== expected.supportedFontCount
+        || inspection.unsupportedFileSummary?.total !== expected.unsupportedTotal
+        || organization.layout?.layoutKind !== expected.layoutKind
+        || organization.recommendedBatchPreviewArgs?.batchGroupBy !== expected.batchGroupBy
+        || batchPreview.discoveredFontCount !== expected.discoveredFontCount
+        || batchPreview.deduplicatedCount !== expected.deduplicatedCount
+        || batchPreview.skippedDuplicates !== expected.skippedDuplicates
+      )
+    ) {
+      throw new Error(`Real corpus target ${sample.inputDir} drifted from the expected naming/dedupe baseline.`);
+    }
+
+    targetSummaries.push({
+      inputDir: sample.inputDir,
+      supportedFontCount: inspection.supportedFontCount,
+      unsupportedFileSummary: inspection.unsupportedFileSummary,
+      layout: organization.layout,
+      recommendedBatchPreviewArgs: organization.recommendedBatchPreviewArgs,
+      discoveredFontCount: batchPreview.discoveredFontCount,
+      deduplicatedCount: batchPreview.deduplicatedCount,
+      selectedFontCount: batchPreview.selectedFontCount,
+      skippedDuplicates: batchPreview.skippedDuplicates,
+      numericSuffixCount,
+      sourceSuffixCount,
+      planned: planned.map((item) => ({
+        input: item.input,
+        groupName: item.groupName,
+        splitDirName: item.splitDirName,
+        copiedOriginalFileName: item.copiedOriginalFileName,
+      })),
+      recommendedNextActions: batchPreview.recommendedNextActions,
+    });
+  }
+
+  if ((await fsExists(resolvedOutputDir)) !== outputDirExistedBefore || (await fsExists(resolvedOutputRoot)) !== outputRootExistedBefore) {
+    throw new Error('Expected targeted real corpus dry-run smoke not to create or remove output directories.');
+  }
+
+  console.log(JSON.stringify({
+    corpusRoot,
+    corpus: {
+      supportedFontCount: corpusInspection.supportedFontCount,
+      unsupportedFileSummary: corpusInspection.unsupportedFileSummary,
+      maxFilesHit: corpusInspection.maxFilesHit,
+    },
+    targets: targetSummaries,
+  }, null, 2));
+} else if (scenario === 'real-corpus-integration') {
+  const corpusRoot = path.resolve(process.argv[3] || process.env.FONT_SPLIT_REAL_CORPUS_DIR || path.join(process.cwd(), '..'));
+  const requestedInputDir = process.argv[4] || null;
+  const outputRoot = process.argv[5] || 'font-split-mcp/.font-split-real-corpus-integration-output';
+  const maxFiles = Number.parseInt(process.argv[6] || process.env.FONT_SPLIT_REAL_CORPUS_MAX_FILES || '50000', 10);
+  const limit = Number.parseInt(process.argv[7] || process.env.FONT_SPLIT_REAL_CORPUS_INTEGRATION_LIMIT || '20', 10);
+  if (!Number.isFinite(maxFiles) || maxFiles < 1 || !Number.isFinite(limit) || limit < 1) {
+    throw new Error('Expected maxFiles and limit to be positive integers for real-corpus-integration smoke.');
+  }
+  process.env.FONT_SPLIT_ROOT = corpusRoot;
+
+  const resolvedOutputRoot = path.resolve(corpusRoot, outputRoot);
+  if (!isInsidePath(corpusRoot, resolvedOutputRoot) || !path.basename(resolvedOutputRoot).startsWith('.font-split-')) {
+    throw new Error('real-corpus-integration only clears and writes a generated .font-split-* output directory inside the corpus root.');
+  }
+  await fs.rm(resolvedOutputRoot, { recursive: true, force: true });
+
+  const sample = await findRealCorpusSample({ corpusRoot, requestedInputDir, maxFiles });
+  const sampleFontPath = await findRealCorpusSampleFont({ corpusRoot, inputDir: sample.inputDir, maxFiles });
+  const organizationOutputDir = `${outputRoot}/organized`;
+  const singleOutputDir = `${outputRoot}/single`;
+  const batchOutputRoot = `${outputRoot}/batch`;
+
+  console.log('Real corpus integration smoke:', corpusRoot, 'sample:', sample.inputDir, 'font:', sampleFontPath, '->', outputRoot, 'limit:', limit, 'maxFiles:', maxFiles);
+
+  const runtime = await getRuntimeStatus();
+  if (runtime.ok !== true || path.resolve(runtime.workspace?.root || '') !== corpusRoot) {
+    throw new Error('Expected real-corpus-integration runtime status to use the real corpus as FONT_SPLIT_ROOT.');
+  }
+
+  const guidance = getAgentGuidance({ workflow: 'batch' });
+  if (
+    guidance.agentOptimized !== true
+    || guidance.workflow !== 'batch'
+    || !guidance.safeInvocationTemplates?.some((template) => template.tool === 'split_font_batch')
+    || !guidance.directoryWorkflowDecisionMatrix?.length
+  ) {
+    throw new Error('Expected real-corpus-integration guidance to expose agent-safe batch workflow hints.');
+  }
+
+  const corpusInspection = await inspectFontInputs({
+    inputDir: '.',
+    maxFiles,
+    includeFiles: false,
+  });
+  if (corpusInspection.supportedFontCount < 1 || corpusInspection.filesIncluded !== false || corpusInspection.maxFilesHit !== false) {
+    throw new Error('Expected real-corpus-integration to inspect the full bounded corpus root without truncation.');
+  }
+
+  const sampleInspection = await inspectFontInputs({
+    inputDir: sample.inputDir,
+    maxFiles,
+    includeFiles: false,
+  });
+  if (
+    sampleInspection.supportedFontCount < 1
+    || sampleInspection.filesIncluded !== false
+    || sampleInspection.unsupportedFileSummary?.total !== sample.summary.unsupportedCount
+  ) {
+    throw new Error('Expected real-corpus-integration sample inspection to summarize the selected real sample.');
+  }
+
+  const organizationPreview = await organizeFontDirectory({
+    inputDir: sample.inputDir,
+    outputDir: organizationOutputDir,
+    workflowPreset: 'safe-preview',
+    maxFiles,
+  });
+  if (
+    organizationPreview.dryRun !== true
+    || organizationPreview.writesOutputTree !== false
+    || organizationPreview.sourceDestructive !== false
+    || organizationPreview.recommendedBatchPreviewArgs?.inputDir !== sample.inputDir
+  ) {
+    throw new Error('Expected real-corpus-integration organization preview to be source-safe and no-write.');
+  }
+
+  const organizationWrite = await organizeFontDirectory({
+    inputDir: sample.inputDir,
+    outputDir: organizationOutputDir,
+    workflowPreset: 'reviewed-write',
+    batchGroupBy: organizationPreview.recommendedBatchPreviewArgs?.batchGroupBy,
+    maxFiles,
+  });
+  if (
+    organizationWrite.dryRun !== false
+    || organizationWrite.writesOutputTree !== true
+    || organizationWrite.sourceDestructive !== false
+    || organizationWrite.organizationManifestWritten !== true
+    || organizationWrite.copiedCount < 1
+    || organizationWrite.errorCount !== 0
+  ) {
+    throw new Error('Expected real-corpus-integration organization write to copy into output only and preserve source files.');
+  }
+
+  const organizedInspection = await inspectFontInputs({
+    inputDir: organizationOutputDir,
+    maxFiles,
+    includeFiles: false,
+  });
+  if (organizedInspection.supportedFontCount < 1 || organizedInspection.filesIncluded !== false) {
+    throw new Error('Expected real-corpus-integration to inspect organized copied fonts.');
+  }
+
+  const singleSplit = await splitFont({
+    fontPath: sampleFontPath,
+    outDir: singleOutputDir,
+    testHtml: true,
+    reporter: true,
+    splitFailureAction: 'single-woff2',
+    silent: true,
+  });
+  if (
+    singleSplit.ok !== true
+    || singleSplit.manifestWritten !== true
+    || !singleSplit.manifestPath
+    || !['subset', 'single-woff2-small-glyph', 'single-woff2-split-failure', 'single-woff2', 'copy-original-small-glyph'].includes(singleSplit.resultType)
+  ) {
+    throw new Error('Expected real-corpus-integration single font split to write an auditable result.');
+  }
+
+  const singleAudit = await inspectSplitOutput({
+    outDir: singleOutputDir,
+    includeFiles: false,
+    includeFamilies: false,
+  });
+  const singleActionWarnings = (singleAudit.inspectionWarnings || [])
+    .filter((warning) => !['output-files-omitted', 'output-families-omitted'].includes(warning.code));
+  if (
+    singleAudit.fontEntryCount < 1
+    || singleAudit.manifestCount < 1
+    || singleAudit.structureSummary?.conforms !== true
+    || singleActionWarnings.length > 0
+  ) {
+    throw new Error('Expected real-corpus-integration single output audit to conform.');
+  }
+
+  const batchPreview = await splitFontBatch({
+    inputDir: sample.inputDir,
+    outputRoot: batchOutputRoot,
+    workflowPreset: 'safe-preview',
+    batchGroupBy: organizationPreview.recommendedBatchPreviewArgs?.batchGroupBy,
+    limit: Math.min(limit, maxFiles),
+    maxFiles,
+    silent: true,
+  });
+  const batchWriteAction = (batchPreview.recommendedNextActions || []).find((action) => action.id === 'run-reviewed-batch-write');
+  if (
+    batchPreview.dryRun !== true
+    || batchPreview.writesOutputTree !== false
+    || batchPreview.sourceDestructive !== false
+    || batchPreview.selectedFontCount < 1
+    || batchWriteAction?.tool !== 'split_font_batch'
+    || batchWriteAction?.suggestedArgs?.workflowPreset !== 'reviewed-write'
+  ) {
+    throw new Error('Expected real-corpus-integration batch preview to be no-write and suggest reviewed-write.');
+  }
+  assertInspectFieldsExist(batchWriteAction, {
+    split_font_batch: batchPreview,
+  }, 'real-corpus-integration batch preview action');
+
+  const batchWrite = await splitFontBatch({
+    inputDir: sample.inputDir,
+    outputRoot: batchOutputRoot,
+    workflowPreset: 'reviewed-write',
+    batchGroupBy: organizationPreview.recommendedBatchPreviewArgs?.batchGroupBy,
+    limit: Math.min(limit, maxFiles),
+    maxFiles,
+    silent: true,
+  });
+  const auditAction = (batchWrite.recommendedNextActions || []).find((action) => action.id === 'audit-split-output');
+  if (
+    batchWrite.dryRun !== false
+    || batchWrite.writesOutputTree !== true
+    || batchWrite.sourceDestructive !== false
+    || batchWrite.processedFontCount < 1
+    || batchWrite.errorCount !== 0
+    || auditAction?.tool !== 'inspect_split_output'
+    || auditAction?.suggestedArgs?.outDir !== batchOutputRoot
+  ) {
+    throw new Error('Expected real-corpus-integration batch write to write output and recommend audit.');
+  }
+
+  const batchAudit = await inspectSplitOutput(auditAction.suggestedArgs);
+  const batchActionWarnings = (batchAudit.inspectionWarnings || [])
+    .filter((warning) => !['output-files-omitted', 'output-families-omitted'].includes(warning.code));
+  if (
+    batchAudit.maxFilesHit !== false
+    || batchAudit.structureSummary?.conforms !== true
+    || batchActionWarnings.length > 0
+    || batchAudit.fontEntryCount < 1
+  ) {
+    throw new Error('Expected real-corpus-integration batch output audit to conform.');
+  }
+  assertInspectFieldsExist(auditAction, {
+    inspect_split_output: batchAudit,
+  }, 'real-corpus-integration batch audit action');
+
+  console.log(JSON.stringify({
+    corpusRoot,
+    outputRoot,
+    corpus: {
+      supportedFontCount: corpusInspection.supportedFontCount,
+      unsupportedFileSummary: corpusInspection.unsupportedFileSummary,
+      maxFilesHit: corpusInspection.maxFilesHit,
+    },
+    sample,
+    sampleFontPath,
+    organization: {
+      preview: {
+        layout: organizationPreview.layout,
+        recommendedBatchPreviewArgs: organizationPreview.recommendedBatchPreviewArgs,
+        safetySummary: organizationPreview.safetySummary,
+      },
+      write: {
+        outputDir: organizationWrite.outputDir,
+        copiedCount: organizationWrite.copiedCount,
+        deduplicatedCount: organizationWrite.deduplicatedCount,
+        skippedDuplicates: organizationWrite.skippedDuplicates,
+        safetySummary: organizationWrite.safetySummary,
+        organizationManifestPath: organizationWrite.organizationManifestPath,
+      },
+      organizedInspection: {
+        supportedFontCount: organizedInspection.supportedFontCount,
+        unsupportedFileSummary: organizedInspection.unsupportedFileSummary,
+      },
+    },
+    singleSplit: {
+      input: singleSplit.input,
+      outDir: singleSplit.outDir,
+      splitDir: singleSplit.splitDir,
+      resultType: singleSplit.resultType,
+      outputMode: singleSplit.outputMode,
+      performedSplit: singleSplit.performedSplit,
+      usedFallback: singleSplit.usedFallback,
+      manifestPath: singleSplit.manifestPath,
+    },
+    singleAudit: {
+      outDir: singleAudit.outDir,
+      fontEntryCount: singleAudit.fontEntryCount,
+      manifestCount: singleAudit.manifestCount,
+      structureSummary: singleAudit.structureSummary,
+      inspectionWarnings: singleAudit.inspectionWarnings,
+    },
+    batchPreview: {
+      dryRun: batchPreview.dryRun,
+      discoveredFontCount: batchPreview.discoveredFontCount,
+      deduplicatedCount: batchPreview.deduplicatedCount,
+      selectedFontCount: batchPreview.selectedFontCount,
+      skippedDuplicates: batchPreview.skippedDuplicates,
+      recommendedNextActions: batchPreview.recommendedNextActions,
+    },
+    batchWrite: {
+      outputRoot: batchWrite.outputRoot,
+      processedFontCount: batchWrite.processedFontCount,
+      errorCount: batchWrite.errorCount,
+      processingSummary: batchWrite.processingSummary,
+      recommendedNextActions: batchWrite.recommendedNextActions,
+    },
+    batchAudit: {
+      outDir: batchAudit.outDir,
+      fileCount: batchAudit.fileCount,
+      familyCount: batchAudit.familyCount,
+      fontEntryCount: batchAudit.fontEntryCount,
+      manifestCount: batchAudit.manifestCount,
+      subsetOutputCount: batchAudit.subsetOutputCount,
+      singleWoff2OutputCount: batchAudit.singleWoff2OutputCount,
+      copyOriginalOutputCount: batchAudit.copyOriginalOutputCount,
+      inspectionWarnings: batchAudit.inspectionWarnings,
+      structureSummary: batchAudit.structureSummary,
     },
   }, null, 2));
 } else if (scenario === 'real-corpus-write') {

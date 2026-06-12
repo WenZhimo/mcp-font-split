@@ -564,6 +564,8 @@ npm run smoke:batch-run
 npm run smoke:batch-dry-run
 npm run smoke:batch-defaults
 npm run smoke:real-corpus -- <font-corpus-dir>
+npm run smoke:real-corpus-targets -- <font-corpus-dir>
+npm run smoke:real-corpus-integration -- <font-corpus-dir>
 npm run smoke:real-corpus-write -- <font-corpus-dir>
 npm run smoke:inspect-compact
 npm run smoke:mcp-error
@@ -573,7 +575,11 @@ npm run smoke:small-skip
 
 `npm run check` is the recommended agent/CI entry point. It runs syntax checks plus smoke scenarios that create their own tiny inputs and do not require a real font library.
 
-`smoke:real-corpus` is an explicit read-only check for a local real font corpus, and is not included in `npm run check`. It treats the supplied directory as `FONT_SPLIT_ROOT`, first runs `inspect_font_inputs` against the corpus root with `includeFiles:false`, then auto-selects a sample directory containing fonts for `structure-first` `organize_font_directory` and no-write `split_font_batch` preview checks. It verifies broad `unsupportedFileSummary`, `recommendedBatchPreviewArgs`, batch `recommendedNextActions`, and safety fields without creating an output directory. The optional second argument selects the sample directory; the optional third argument overrides `maxFiles` (default `50000`).
+`smoke:real-corpus` is an explicit read-only check for a local real font corpus, and is not included in `npm run check`. It treats the supplied directory as `FONT_SPLIT_ROOT`, first runs `inspect_font_inputs` against the corpus root with `includeFiles:false`, then auto-selects a sample directory containing fonts for `structure-first` `organize_font_directory` and no-write `split_font_batch` preview checks. It verifies broad `unsupportedFileSummary`, `recommendedBatchPreviewArgs`, batch `recommendedNextActions`, and safety fields without creating an output directory. The optional second argument selects the sample directory; the optional third argument overrides `maxFiles` (default `50000`). This check uses a noisy real corpus to cover discovery, counting, and preview behavior; it is not a per-directory acceptance audit.
+
+`smoke:real-corpus-targets` is a read-only targeted regression check for representative known problem families. By default it audits `aexpective`, `tiny5`, `agu_display`, and `architectural`, verifying directory-layout recommendations, `font-identity` dedupe counts, no unexpected numeric/source suffixes, and `run-reviewed-batch-write` follow-up actions without creating output directories. It covers known complex shapes; it does not mean the tool audits every corpus directory one by one. Optional arguments are `<font-corpus-dir> [comma-separated-targets] [maxFiles] [limit]`.
+
+`smoke:real-corpus-integration` is an explicit representative integration check for a local real font corpus, and is not included in `npm run check`. It checks runtime status and agent guidance, scans the corpus root compactly, selects one real sample directory, then runs directory-organization dry-run, directory-organization copy-only write, single-font `split_font` write, batch dry-run, batch reviewed-write, and `inspect_split_output` output audits. It only clears and recreates a generated `.font-split-*` output root under the supplied corpus directory; it never moves, deletes, or rewrites source fonts. Optional arguments are `<font-corpus-dir> [sample-input-dir] [output-root] [maxFiles] [limit]`; the default output root is `font-split-mcp/.font-split-real-corpus-integration-output`.
 
 `smoke:real-corpus-write` is an explicit write/audit check for the same kind of local corpus, and is also not included in `npm run check`. It inspects the corpus root, selects a real sample directory, removes and recreates only a generated `.font-split-*` output root, runs `split_font_batch` with `workflowPreset: "reviewed-write"`, then calls `inspect_split_output` through the returned `audit-split-output` action and requires `structureSummary.conforms: true`. Optional arguments are `<font-corpus-dir> [sample-input-dir] [output-root] [maxFiles] [limit]`; the default output root is `font-split-mcp/.font-split-real-corpus-write-output`.
 
