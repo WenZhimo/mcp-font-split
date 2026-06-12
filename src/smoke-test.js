@@ -53,7 +53,8 @@ const REAL_CORPUS_TARGET_EXPECTATIONS = {
   },
 };
 
-async function runSmokeSubprocess(args, label) {
+async function runSmokeSubprocess(args, label, { verbose = false } = {}) {
+  const startedAt = Date.now();
   console.log(`\n--- ${label} ---`);
   try {
     const { stdout, stderr } = await execFileAsync(process.execPath, [process.argv[1], ...args], {
@@ -61,11 +62,20 @@ async function runSmokeSubprocess(args, label) {
       env: process.env,
       maxBuffer: 50 * 1024 * 1024,
     });
-    if (stdout) process.stdout.write(stdout);
-    if (stderr) process.stderr.write(stderr);
+    const elapsedMs = Date.now() - startedAt;
+    if (verbose) {
+      if (stdout) process.stdout.write(stdout);
+      if (stderr) process.stderr.write(stderr);
+    } else {
+      console.log(`ok (${(elapsedMs / 1000).toFixed(1)}s)`);
+    }
     return {
       scenario: args[0],
       ok: true,
+      elapsedMs,
+      stdoutBytes: Buffer.byteLength(stdout || ''),
+      stderrBytes: Buffer.byteLength(stderr || ''),
+      outputIncluded: verbose,
     };
   } catch (error) {
     if (error.stdout) process.stdout.write(error.stdout);
@@ -2642,11 +2652,14 @@ if (scenario === 'single') {
     },
   }, null, 2));
 } else if (scenario === 'real-corpus-suite') {
-  const corpusRoot = path.resolve(process.argv[3] || process.env.FONT_SPLIT_REAL_CORPUS_DIR || path.join(process.cwd(), '..'));
-  const maxFiles = Number.parseInt(process.argv[4] || process.env.FONT_SPLIT_REAL_CORPUS_MAX_FILES || '50000', 10);
-  const targetLimit = Number.parseInt(process.argv[5] || process.env.FONT_SPLIT_REAL_CORPUS_TARGET_LIMIT || '100', 10);
-  const integrationLimit = Number.parseInt(process.argv[6] || process.env.FONT_SPLIT_REAL_CORPUS_INTEGRATION_LIMIT || '20', 10);
-  const sampleCount = Number.parseInt(process.argv[7] || process.env.FONT_SPLIT_REAL_CORPUS_TARGET_SAMPLE_COUNT || String(DEFAULT_REAL_CORPUS_TARGET_SAMPLE_COUNT), 10);
+  const rawSuiteArgs = process.argv.slice(3);
+  const verbose = rawSuiteArgs.includes('--verbose') || process.env.FONT_SPLIT_REAL_CORPUS_SUITE_VERBOSE === 'true';
+  const suiteArgs = rawSuiteArgs.filter((arg) => arg !== '--verbose');
+  const corpusRoot = path.resolve(suiteArgs[0] || process.env.FONT_SPLIT_REAL_CORPUS_DIR || path.join(process.cwd(), '..'));
+  const maxFiles = Number.parseInt(suiteArgs[1] || process.env.FONT_SPLIT_REAL_CORPUS_MAX_FILES || '50000', 10);
+  const targetLimit = Number.parseInt(suiteArgs[2] || process.env.FONT_SPLIT_REAL_CORPUS_TARGET_LIMIT || '100', 10);
+  const integrationLimit = Number.parseInt(suiteArgs[3] || process.env.FONT_SPLIT_REAL_CORPUS_INTEGRATION_LIMIT || '20', 10);
+  const sampleCount = Number.parseInt(suiteArgs[4] || process.env.FONT_SPLIT_REAL_CORPUS_TARGET_SAMPLE_COUNT || String(DEFAULT_REAL_CORPUS_TARGET_SAMPLE_COUNT), 10);
   if (
     !Number.isFinite(maxFiles)
     || maxFiles < 1
@@ -2660,14 +2673,14 @@ if (scenario === 'single') {
     throw new Error('Expected positive maxFiles, targetLimit, integrationLimit, and sampleCount for real-corpus-suite smoke.');
   }
 
-  console.log('Real corpus reliability suite:', corpusRoot, 'maxFiles:', maxFiles, 'targetLimit:', targetLimit, 'integrationLimit:', integrationLimit, 'sampleCount:', sampleCount);
+  console.log('Real corpus reliability suite:', corpusRoot, 'output:', verbose ? 'verbose' : 'compact', 'maxFiles:', maxFiles, 'targetLimit:', targetLimit, 'integrationLimit:', integrationLimit, 'sampleCount:', sampleCount);
   const runs = [];
   runs.push(await runSmokeSubprocess([
     'real-corpus-readonly',
     corpusRoot,
     '',
     String(maxFiles),
-  ], 'real-corpus read-only discovery and preview'));
+  ], 'real-corpus read-only discovery and preview', { verbose }));
   runs.push(await runSmokeSubprocess([
     'real-corpus-targets',
     corpusRoot,
@@ -2675,7 +2688,7 @@ if (scenario === 'single') {
     String(maxFiles),
     String(targetLimit),
     String(sampleCount),
-  ], 'real-corpus targeted regression and adaptive sampling'));
+  ], 'real-corpus targeted regression and adaptive sampling', { verbose }));
   runs.push(await runSmokeSubprocess([
     'real-corpus-integration',
     corpusRoot,
@@ -2683,11 +2696,12 @@ if (scenario === 'single') {
     '',
     String(maxFiles),
     String(integrationLimit),
-  ], 'real-corpus representative write and output audit'));
+  ], 'real-corpus representative write and output audit', { verbose }));
 
   console.log(JSON.stringify({
     ok: true,
     purpose: 'Representative reliability gate over a local real font corpus; not a per-directory acceptance audit.',
+    outputMode: verbose ? 'verbose' : 'compact',
     corpusRoot,
     maxFiles,
     targetLimit,
