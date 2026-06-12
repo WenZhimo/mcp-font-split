@@ -24,6 +24,8 @@
 
 `recommendedWorkflowPlan` 是当前 `workflow` 对应的有序执行计划。它把安全模板 ID 编排成输入预检、目录形态决策、批量预览、审查后写入和输出审计等阶段。它是路线图，不替代工具响应检查；agent 从预览进入写入、或向用户宣称完成前，仍然必须检查每个步骤列出的字段。
 
+`verificationChecklist[]` 也包含面向本包维护者的 `local-real-corpus-suite-passed`。当 agent 修改了会影响功能行为的代码后，应在本机真实语料库上运行 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，再宣称本阶段完成。这是代表性可靠性门禁，不是逐个目录验收，也不是运行时 MCP 工具调用。
+
 `warningCodeCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["warning-catalog"]` 时返回，会把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的机器可读 warning code 映射到响应来源、严重度和建议 agent 动作。
 
 `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，会把重要响应字段路径映射到产生这些字段的工具、字段含义，以及 AI agent 在宣称成功前应该采取的动作。它是本文档的运行时补充，尤其用于避免误读 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit` 和 `recommendedNextActions` 这类容易违反直觉的字段。

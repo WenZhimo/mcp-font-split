@@ -929,7 +929,7 @@ if (scenario === 'single') {
   }
   assertObjectOmitsKeys(flatExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'flat-vendor-dump firstCall');
   const checklistIds = new Set((result.verificationChecklist || []).map((item) => item.id));
-  for (const requiredId of ['runtime-ready', 'layout-plan-reviewed', 'process-outcome-checked', 'fallback-disclosed', 'output-audited']) {
+  for (const requiredId of ['runtime-ready', 'layout-plan-reviewed', 'process-outcome-checked', 'fallback-disclosed', 'output-audited', 'local-real-corpus-suite-passed']) {
     if (!checklistIds.has(requiredId)) {
       throw new Error(`Expected agent guidance verification checklist to include ${requiredId}.`);
     }
@@ -953,6 +953,14 @@ if (scenario === 'single') {
   const outputChecklist = (result.verificationChecklist || []).find((item) => item.id === 'output-audited');
   if (!outputChecklist?.responseFields?.includes('structureSummary')) {
     throw new Error('Expected output verification checklist to include structureSummary.');
+  }
+  const corpusSuiteChecklist = (result.verificationChecklist || []).find((item) => item.id === 'local-real-corpus-suite-passed');
+  if (
+    corpusSuiteChecklist?.command !== 'npm run smoke:real-corpus-suite -- <font-corpus-dir>'
+    || corpusSuiteChecklist?.verboseCommand !== 'npm run smoke:real-corpus-suite -- <font-corpus-dir> --verbose'
+    || !corpusSuiteChecklist?.check?.includes('representative reliability gate')
+  ) {
+    throw new Error('Expected verification checklist to include the local real-corpus suite reliability gate.');
   }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'runtime-status') {
@@ -2371,6 +2379,8 @@ if (scenario === 'single') {
     ]) {
       assertDocsContainAny(`important field ${fieldName}`, [`\`${fieldName}\``, `\`${fieldName}[]\``]);
     }
+    assertDocsContain('real corpus suite checklist id', '`local-real-corpus-suite-passed`');
+    assertDocsContain('real corpus suite command', '`npm run smoke:real-corpus-suite -- <font-corpus-dir>`');
 
     console.log(JSON.stringify({
       ok: true,
@@ -2403,6 +2413,7 @@ if (scenario === 'single') {
     '`guidanceView`',
     '`recommendedWorkflowPlan`',
     '`verificationChecklist[]`',
+    '`smoke:real-corpus-suite`',
     '`directoryWorkflowDecisionMatrix[]`',
     '`directoryWorkflowExamples[]`',
     '`safeInvocationTemplates[]`',

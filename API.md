@@ -24,6 +24,8 @@ Use `detailLevel: "full"` when the agent needs every catalog and example in one 
 
 `recommendedWorkflowPlan` is an ordered plan for the selected `workflow`. It composes the safe template IDs into phases such as preflight, layout decision, batch preview, reviewed write, and output audit. It is a route map, not a replacement for checking each tool response: agents should still inspect every field listed in each step before moving from preview to write or claiming completion.
 
+`verificationChecklist[]` also includes `local-real-corpus-suite-passed` for agents maintaining this package. After functionality-affecting code changes, run `npm run smoke:real-corpus-suite -- <font-corpus-dir>` against a local real corpus before calling the change complete. This is a representative reliability gate; it is not a per-directory acceptance audit and is not a runtime MCP tool call.
+
 `warningCodeCatalog` is returned with `detailLevel: "full"` or `sections: ["warning-catalog"]`. It maps machine-readable warning codes from `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]` to their response sources, severity, and suggested agent action.
 
 `toolResponseFieldCatalog` is returned with `detailLevel: "full"` or `sections: ["field-catalog"]`. It maps important response field paths to the tools that emit them, their meaning, and the action an AI agent should take before reporting success. It is intended as a runtime companion to this API document, especially for fields whose meaning is easy to misread such as `ok`, `performedSplit`, `usedFallback`, `sourceDestructive`, `writesOutputTree`, `maxFilesHit`, and `recommendedNextActions`.

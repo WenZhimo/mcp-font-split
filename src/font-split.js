@@ -1515,6 +1515,14 @@ export function getAgentGuidance(args = {}) {
       check: 'After batch processing, inspect the output directory and require structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating the audit as complete.',
       responseFields: ['maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
     },
+    {
+      id: 'local-real-corpus-suite-passed',
+      appliesTo: ['overview', 'batch', 'organize'],
+      check: 'When maintaining this package or changing functionality-affecting behavior, run npm run smoke:real-corpus-suite -- <font-corpus-dir> against a local real corpus before calling the change complete. This is a representative reliability gate, not a per-directory acceptance audit.',
+      command: 'npm run smoke:real-corpus-suite -- <font-corpus-dir>',
+      verboseCommand: 'npm run smoke:real-corpus-suite -- <font-corpus-dir> --verbose',
+      responseFields: [],
+    },
   ];
 
   const workflows = {

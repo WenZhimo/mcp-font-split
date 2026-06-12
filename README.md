@@ -52,6 +52,7 @@
 
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。工具响应和 `recommendedNextActions[].suggestedArgs` 中会用 `.` 表示工作区根目录，不会用空字符串表示根目录。
 - 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、必须检查的响应字段和完成验证清单。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
+- 对维护本包的 agent，`get_agent_guidance.verificationChecklist[]` 包含 `local-real-corpus-suite-passed`，会指向 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，作为影响功能行为的改动完成前的本机真实语料可靠性门禁。
 - `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。决策表和示例也会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖参数。
 - `get_agent_guidance` 包含 `safeInvocationTemplates[]`，提供运行时检查、输入预检、目录不匹配整理计划、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和紧凑输出审计等可复制起步调用。每个模板都会声明是否写文件、是否可能修改源文件；模板会尽量保持最小参数，`workflowPreset` 已提供的默认项可从 `workflowPresets[]` 查看。
 - `get_agent_guidance` 包含 `recommendedWorkflowPlan`，这是当前 `workflow` 的有序路线图。它会引用安全模板 ID，把输入预检、目录形态决策、预览、审查后写入和输出审计串起来；它不替代对步骤中列出的响应字段的检查。
