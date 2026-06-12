@@ -53,6 +53,27 @@ const REAL_CORPUS_TARGET_EXPECTATIONS = {
   },
 };
 
+async function runSmokeSubprocess(args, label) {
+  console.log(`\n--- ${label} ---`);
+  try {
+    const { stdout, stderr } = await execFileAsync(process.execPath, [process.argv[1], ...args], {
+      cwd: process.cwd(),
+      env: process.env,
+      maxBuffer: 50 * 1024 * 1024,
+    });
+    if (stdout) process.stdout.write(stdout);
+    if (stderr) process.stderr.write(stderr);
+    return {
+      scenario: args[0],
+      ok: true,
+    };
+  } catch (error) {
+    if (error.stdout) process.stdout.write(error.stdout);
+    if (error.stderr) process.stderr.write(error.stderr);
+    throw new Error(`${label} failed with exit code ${error.code ?? 'unknown'}: ${error.message}`);
+  }
+}
+
 function pad4(buffer) {
   const remainder = buffer.length % 4;
   if (remainder === 0) return buffer;
@@ -2619,6 +2640,60 @@ if (scenario === 'single') {
       batchErrorMode: overridden.batchErrorMode,
       errorCount: overridden.errorCount,
     },
+  }, null, 2));
+} else if (scenario === 'real-corpus-suite') {
+  const corpusRoot = path.resolve(process.argv[3] || process.env.FONT_SPLIT_REAL_CORPUS_DIR || path.join(process.cwd(), '..'));
+  const maxFiles = Number.parseInt(process.argv[4] || process.env.FONT_SPLIT_REAL_CORPUS_MAX_FILES || '50000', 10);
+  const targetLimit = Number.parseInt(process.argv[5] || process.env.FONT_SPLIT_REAL_CORPUS_TARGET_LIMIT || '100', 10);
+  const integrationLimit = Number.parseInt(process.argv[6] || process.env.FONT_SPLIT_REAL_CORPUS_INTEGRATION_LIMIT || '20', 10);
+  const sampleCount = Number.parseInt(process.argv[7] || process.env.FONT_SPLIT_REAL_CORPUS_TARGET_SAMPLE_COUNT || String(DEFAULT_REAL_CORPUS_TARGET_SAMPLE_COUNT), 10);
+  if (
+    !Number.isFinite(maxFiles)
+    || maxFiles < 1
+    || !Number.isFinite(targetLimit)
+    || targetLimit < 1
+    || !Number.isFinite(integrationLimit)
+    || integrationLimit < 1
+    || !Number.isFinite(sampleCount)
+    || sampleCount < 1
+  ) {
+    throw new Error('Expected positive maxFiles, targetLimit, integrationLimit, and sampleCount for real-corpus-suite smoke.');
+  }
+
+  console.log('Real corpus reliability suite:', corpusRoot, 'maxFiles:', maxFiles, 'targetLimit:', targetLimit, 'integrationLimit:', integrationLimit, 'sampleCount:', sampleCount);
+  const runs = [];
+  runs.push(await runSmokeSubprocess([
+    'real-corpus-readonly',
+    corpusRoot,
+    '',
+    String(maxFiles),
+  ], 'real-corpus read-only discovery and preview'));
+  runs.push(await runSmokeSubprocess([
+    'real-corpus-targets',
+    corpusRoot,
+    'auto',
+    String(maxFiles),
+    String(targetLimit),
+    String(sampleCount),
+  ], 'real-corpus targeted regression and adaptive sampling'));
+  runs.push(await runSmokeSubprocess([
+    'real-corpus-integration',
+    corpusRoot,
+    '',
+    '',
+    String(maxFiles),
+    String(integrationLimit),
+  ], 'real-corpus representative write and output audit'));
+
+  console.log(JSON.stringify({
+    ok: true,
+    purpose: 'Representative reliability gate over a local real font corpus; not a per-directory acceptance audit.',
+    corpusRoot,
+    maxFiles,
+    targetLimit,
+    integrationLimit,
+    sampleCount,
+    runs,
   }, null, 2));
 } else if (scenario === 'real-corpus-readonly') {
   const corpusRoot = path.resolve(process.argv[3] || process.env.FONT_SPLIT_REAL_CORPUS_DIR || path.join(process.cwd(), '..'));

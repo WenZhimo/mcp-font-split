@@ -51,6 +51,7 @@
     "smoke:batch-identity": "node src/smoke-test.js batch-identity-dedupe",
     "smoke:workflow-presets": "node src/smoke-test.js workflow-presets",
     "smoke:real-corpus": "node src/smoke-test.js real-corpus-readonly",
+    "smoke:real-corpus-suite": "node src/smoke-test.js real-corpus-suite",
     "smoke:real-corpus-targets": "node src/smoke-test.js real-corpus-targets",
     "smoke:real-corpus-integration": "node src/smoke-test.js real-corpus-integration",
     "smoke:incremental": "node src/smoke-test.js batch-incremental",
