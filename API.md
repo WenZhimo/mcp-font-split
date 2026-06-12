@@ -163,7 +163,7 @@ Scan a directory, deduplicate equivalent fonts, group outputs, and process selec
 | `includeResults` | boolean | `true` | Include per-font `results[]`; set `false` for compact large-batch responses. |
 | `dryRun` | boolean | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
 | `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | Named preset applied before explicit options. Explicit options override preset values. |
-| `skipMode` | `legacy-css`, `manifest`, `force` | `manifest` | Existing-output skip policy. |
+| `skipMode` | `manifest`, `force` | `manifest` | Existing-output skip policy. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | First-level family directory strategy. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Per-font output directory naming strategy. |
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Pre-processing dedupe strategy. |

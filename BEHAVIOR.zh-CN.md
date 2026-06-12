@@ -229,20 +229,18 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 - 批量模式默认已经使用 `skipMode: "manifest"`
 - 批量模式默认已经使用 `batchErrorMode: "fail-after"`
-- 如果需要旧版跳过或收集错误，必须显式传 `skipMode: "legacy-css"` 或 `batchErrorMode: "collect"`
+- 只有明确需要重跑时才显式传 `skipMode: "force"`；只有调用方会检查 `errors[]` 和 `errorCount` 时才显式传 `batchErrorMode: "collect"`
 - 单文件模式下，当前默认已经偏严格：`splitFailureAction` 默认 `error`，`smallGlyphAction` 默认 `subset`
 
 ### 4.6 `skipMode`（批量专用）
 
 可选值：
 
-- `legacy-css`
 - `manifest`（默认）
 - `force`
 
 行为：
 
-- `legacy-css`：只要当前批量输出目录里的 `result.css` 存在就跳过
 - `manifest`：读取 `split-meta.json`，比较源文件和有效参数，只有一致才跳过
 - `force`：永远不跳过，始终重跑
 
@@ -250,8 +248,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 风险：
 
-- `legacy-css` 兼容旧行为，但不感知参数变化、源文件变化、工具版本变化
-- `manifest` 更安全，但旧输出目录第一次使用时通常会重跑以生成 manifest
+- `manifest` 比只看旧输出文件更安全，但旧输出目录第一次使用时通常会重跑以生成 manifest
 
 ### 4.7 `batchGroupBy`（批量专用）
 
@@ -644,7 +641,6 @@ split-meta.json
 - `deduplicatedCount`
 - `skippedDuplicates`
 - `skippedExisting`
-- `skippedLegacy`
 - `skippedByManifest`
 - `reprocessedBecauseSourceChanged`
 - `reprocessedBecauseOptionsChanged`
@@ -790,18 +786,10 @@ split-meta.json
 每个处理过的字体都会把原文件复制到输出 family 根目录。
 这不是软链接，是实体副本。
 
-### 10.3 旧版批量跳过需要显式选择
+### 10.3 强制重跑需要显式选择
 
 默认 `skipMode = manifest` 会读取 `split-meta.json` 并比较源文件和有效参数。
-如果你明确需要旧版只看 `result.css` 的行为，请显式使用：
-
-```json
-{
-  "skipMode": "legacy-css"
-}
-```
-
-如果你希望忽略任何已有输出并强制重跑，请使用：
+如果你明确需要忽略已有 manifest 并重跑，请显式使用：
 
 ```json
 {

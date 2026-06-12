@@ -68,7 +68,7 @@
 - 当 OTF / TTF 仅容器不同但字体身份相同时，批量模式会去重并只保留一个代表。
 - 批量处理不会移动、删除或重写源字体文件：`sourceDestructive` 应始终为 `false`。如果 `outputRoot` 位于 `inputDir` 内，真实写入仍会落在输入目录树里，因此描述“源目录树无写入”前必须检查 `writesSourceTree` 和 `outputTreeInsideInputTree`。
 - 批量增量跳过默认是 `skipMode: "manifest"`，会用 `split-meta.json` 比较源文件和有效配置。
-- 旧版只看 `result.css` 的跳过行为需要显式选择 `skipMode: "legacy-css"`；需要强制重跑时使用 `skipMode: "force"`。
+- 只有明确需要重跑时才使用 `skipMode: "force"`；默认 manifest 跳过是安全的增量路径。
 - 批量错误处理默认是 `batchErrorMode: "fail-after"`，会处理完选中的字体后把任何单字体错误升级为批量错误。
 - 删除超大 `kern` 表必须显式设置 `oversizedKernAction: "strip"`。
 - 分割失败后回退为单 WOFF2 必须显式设置 `splitFailureAction: "single-woff2"`。
@@ -216,7 +216,7 @@ fonts/
 | 参数 | 可选值 | 默认值 | 含义 |
 |------|--------|--------|------|
 | `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | 命名配置预设，会先展开为一组批量/整理参数；显式传入的具体参数仍会覆盖预设。 |
-| `skipMode` | `legacy-css`, `manifest`, `force` | `manifest` | 批量模式如何判断已有输出是否可跳过。 |
+| `skipMode` | `manifest`, `force` | `manifest` | 批量模式如何判断已有输出是否可跳过。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 批量模式如何决定家族目录名。 |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 批量模式如何决定每个字体输出目录的命名冲突策略。 |
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 批量模式如何在处理前对等价字体做去重。 |
@@ -228,7 +228,6 @@ fonts/
 
 `skipMode` 说明：
 
-- `legacy-css`：只要当前批量输出目录里的 `result.css` 存在就跳过。仅在明确需要旧行为时使用；它不感知参数变化。
 - `manifest`：读取 `split-meta.json`，比较源文件路径、大小、mtime、有效参数、manifest 版本和工具版本。
 - `force`：永远不跳过，始终重跑。
 
@@ -309,7 +308,7 @@ fonts/
 - `writesOutputTree`：`dryRun: false` 时为 `true`
 - `outputTreeInsideInputTree`：`outputRoot` 是否位于或等于 `inputDir`；为 `true` 时，后续宽泛扫描可能再次处理生成输出
 - `mayOverwriteOutputTree`：非 dry-run 且有选中字体时为 `true`，表示可能替换 `outputRoot` 中已有输出
-- `skippedExisting`、`skippedLegacy`、`skippedByManifest`
+- `skippedExisting`、`skippedByManifest`
 - `reprocessedBecauseSourceChanged`、`reprocessedBecauseOptionsChanged`
 - `processingSummary.subsetOutputs`
 - `processingSummary.singleWoff2Outputs`

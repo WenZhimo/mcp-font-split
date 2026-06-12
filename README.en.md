@@ -68,7 +68,7 @@ Key defaults and policy choices:
 - Equivalent OTF/TTF pairs are deduplicated in batch mode when they resolve to the same font identity, keeping only one representative.
 - Batch processing never moves, deletes, or rewrites source font files: `sourceDestructive` should stay `false`. If `outputRoot` is inside `inputDir`, real writes still land inside the input tree, so inspect `writesSourceTree` and `outputTreeInsideInputTree` before describing the run as source-tree no-write.
 - Batch incremental skipping defaults to `skipMode: "manifest"`, which compares source files and effective options through `split-meta.json`.
-- The old `result.css` marker behavior requires explicit `skipMode: "legacy-css"`; use `skipMode: "force"` when reprocessing is intentional.
+- Use `skipMode: "force"` only when reprocessing is intentional; default manifest skipping is the safe incremental path.
 - Batch error handling defaults to `batchErrorMode: "fail-after"`, which finishes selected fonts and then upgrades any per-font error to a batch error.
 - Oversized `kern` stripping is opt-in via `oversizedKernAction: "strip"`.
 - Split-failure single-WOFF2 fallback is opt-in via `splitFailureAction: "single-woff2"`.
@@ -216,7 +216,7 @@ Use this only to learn the directory shape quickly. Because font parsing is skip
 | Option | Values | Default | Meaning |
 |--------|--------|---------|---------|
 | `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | Named configuration preset expanded before batch/organization options; explicit options still override preset values. |
-| `skipMode` | `legacy-css`, `manifest`, `force` | `manifest` | Choose how batch mode decides whether output is already current. |
+| `skipMode` | `manifest`, `force` | `manifest` | Choose how batch mode decides whether output is already current. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | Choose the family directory naming strategy for batch mode. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Choose how batch mode names per-font output directories when collisions exist. |
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Choose how batch mode deduplicates equivalent fonts before processing. |
@@ -228,7 +228,6 @@ Use this only to learn the directory shape quickly. Because font parsing is skip
 
 `skipMode` details:
 
-- `legacy-css`: skip if the current batch output directory's `result.css` exists. Use only when the old behavior is intentional; it does not detect option changes.
 - `manifest`: skip only when `split-meta.json` matches source path, source size, source mtime, effective options, manifest version, and tool version.
 - `force`: never skip existing output.
 
@@ -309,7 +308,7 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `writesOutputTree`: true when `dryRun: false`
 - `outputTreeInsideInputTree`: whether `outputRoot` is inside or equal to `inputDir`; future broad scans can reprocess generated output when this is true
 - `mayOverwriteOutputTree`: true for non-dry-run calls with selected fonts, meaning existing files under `outputRoot` may be replaced
-- `skippedExisting`, `skippedLegacy`, `skippedByManifest`
+- `skippedExisting`, `skippedByManifest`
 - `reprocessedBecauseSourceChanged`, `reprocessedBecauseOptionsChanged`
 - `processingSummary.subsetOutputs`
 - `processingSummary.singleWoff2Outputs`

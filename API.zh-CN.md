@@ -163,7 +163,7 @@
 | `includeResults` | boolean | `true` | 是否返回每个字体的 `results[]` 详情；全量跑建议设为 `false`。 |
 | `dryRun` | boolean | `false` | 只预览扫描、去重、命名和 skip 决策，不写任何输出文件。 |
 | `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | 命名预设，会先展开为一组常用配置；显式参数仍会覆盖预设值。 |
-| `skipMode` | `legacy-css`, `manifest`, `force` | `manifest` | 已有输出的跳过策略。 |
+| `skipMode` | `manifest`, `force` | `manifest` | 已有输出的跳过策略。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 第一层 family 目录策略。 |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 每个字体输出目录的命名策略。 |
 | `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 处理前的去重策略。 |

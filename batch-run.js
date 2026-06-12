@@ -70,7 +70,6 @@ function buildCompactBatchResult(result) {
     skippedDuplicates: result.skippedDuplicates,
     selectedFontCount: result.selectedFontCount,
     skippedExisting: result.skippedExisting,
-    skippedLegacy: result.skippedLegacy,
     skippedByManifest: result.skippedByManifest,
     reprocessedBecauseSourceChanged: result.reprocessedBecauseSourceChanged,
     reprocessedBecauseOptionsChanged: result.reprocessedBecauseOptionsChanged,
@@ -136,7 +135,7 @@ const jsonOutput = jsonSummaryOutput || process.argv.includes('--json') || boole
 const includeResults = booleanOption(process.env.FONT_SPLIT_INCLUDE_RESULTS, undefined);
 const chunkSize = numberOption(process.env.FONT_SPLIT_CHUNK_SIZE, 70 * 1024);
 const workflowPreset = enumOption(process.env.FONT_SPLIT_WORKFLOW_PRESET, WORKFLOW_PRESETS, dryRun ? 'safe-preview' : 'reviewed-write');
-const skipMode = enumOption(process.env.FONT_SPLIT_SKIP_MODE, ['legacy-css', 'manifest', 'force'], undefined);
+const skipMode = enumOption(process.env.FONT_SPLIT_SKIP_MODE, ['manifest', 'force'], undefined);
 const batchGroupBy = enumOption(process.env.FONT_SPLIT_BATCH_GROUP_BY, ['auto', 'source-dir', 'font-family'], undefined);
 const batchNamingMode = enumOption(process.env.FONT_SPLIT_BATCH_NAMING_MODE, ['plain', 'numeric-suffix', 'source-suffix'], undefined);
 const batchDedupeMode = enumOption(process.env.FONT_SPLIT_BATCH_DEDUPE_MODE, ['none', 'same-path', 'font-identity'], undefined);

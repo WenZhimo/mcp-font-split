@@ -1490,7 +1490,7 @@ export function getAgentGuidance(args = {}) {
     'Use inspect_font_inputs before large or unfamiliar font libraries.',
     'Use organize_font_directory with dryRun true when the source directory layout does not match the desired batch grouping; it is source-non-destructive and defaults to plan-only.',
     'Use dryRun with includeResults true to preview batch naming, dedupe, and skip decisions without writing output.',
-    'Batch defaults already use skipMode manifest and batchErrorMode fail-after; pass legacy-css or collect only when that tradeoff is intentional.',
+    'Batch defaults already use skipMode manifest and batchErrorMode fail-after; pass force only when reprocessing is intentional, and pass collect only when the caller checks errors[] and errorCount.',
   ];
   const verificationChecklist = [
     {
@@ -2238,7 +2238,7 @@ function normalizeProcessingOptions(args) {
 function normalizeBatchOptions(args) {
   return {
     workflowPreset: getWorkflowPresetName(args.workflowPreset),
-    skipMode: ['legacy-css', 'manifest', 'force'].includes(args.skipMode) ? args.skipMode : 'manifest',
+    skipMode: ['manifest', 'force'].includes(args.skipMode) ? args.skipMode : 'manifest',
     batchGroupBy: ['auto', 'source-dir', 'font-family'].includes(args.batchGroupBy) ? args.batchGroupBy : 'auto',
     batchNamingMode: ['plain', 'numeric-suffix', 'source-suffix'].includes(args.batchNamingMode) ? args.batchNamingMode : 'numeric-suffix',
     batchDedupeMode: ['none', 'same-path', 'font-identity'].includes(args.batchDedupeMode) ? args.batchDedupeMode : 'font-identity',
@@ -2987,13 +2987,8 @@ async function resolveBatchFamilyDirName({ file, inputDir, groupingMode }) {
 
 async function shouldSkipExistingOutput({ skipMode, resolvedOutDir, splitDirName, inputRelativePath, inputStat, effectiveConfig }) {
   const splitDir = path.join(resolvedOutDir, splitDirName);
-  const marker = path.join(splitDir, 'result.css');
   if (skipMode === 'force') {
     return { shouldSkip: false, reason: 'force' };
-  }
-
-  if (skipMode === 'legacy-css') {
-    return { shouldSkip: await fileExists(marker), reason: 'legacy-css' };
   }
 
   const manifest = await readSplitManifest(splitDir);
@@ -4421,7 +4416,6 @@ export async function splitFontBatch(args = {}) {
     copyOriginalOutputs: 0,
   };
   let skippedExisting = 0;
-  let skippedLegacy = 0;
   let skippedByManifest = 0;
   let reprocessedBecauseSourceChanged = 0;
   let reprocessedBecauseOptionsChanged = 0;
@@ -4493,7 +4487,6 @@ export async function splitFontBatch(args = {}) {
 
       if (skipDecision.shouldSkip) {
         skippedExisting++;
-        if (skipDecision.reason === 'legacy-css') skippedLegacy++;
         if (skipDecision.reason === 'manifest') skippedByManifest++;
         if (dryRun) {
           planned.push({
@@ -4661,7 +4654,6 @@ export async function splitFontBatch(args = {}) {
     skippedDuplicates: skippedCount,
     selectedFontCount: selected.length,
     skippedExisting,
-    skippedLegacy,
     skippedByManifest,
     reprocessedBecauseSourceChanged,
     reprocessedBecauseOptionsChanged,
