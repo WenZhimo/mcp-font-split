@@ -26,6 +26,46 @@ const UNSUPPORTED_FILE_EXTENSION_CATEGORIES = {
   signature: new Set(['.asc', '.sig']),
   'unsupported-font': new Set(['.eot', '.svg', '.dfont', '.suit', '.fon', '.bdf', '.pcf', '.pfa', '.pfb', '.pfm', '.afm', '.cff', '.cid', '.ttx', '.ufo', '.glyphs']),
 };
+const UNSUPPORTED_FILE_CATEGORY_DETAILS = {
+  archive: {
+    meaning: 'Compressed archives that may contain fonts but are outside this tool layer.',
+    handling: 'Reported in summaries only; never extracted, copied, or split.',
+  },
+  document: {
+    meaning: 'Licenses, readme files, and other human-readable package documents.',
+    handling: 'Reported and ignored; not copied by directory organization.',
+  },
+  image: {
+    meaning: 'Preview images, screenshots, icons, or other raster assets shipped beside fonts.',
+    handling: 'Reported and ignored; not copied by directory organization.',
+  },
+  web: {
+    meaning: 'Web or generated frontend assets such as HTML, CSS, and JavaScript.',
+    handling: 'Reported and ignored as source noise; generated split output is audited separately by inspect_split_output.',
+  },
+  metadata: {
+    meaning: 'Package metadata, manifests, config files, links, and tabular sidecar files.',
+    handling: 'Reported and ignored unless produced later as tool manifests in an output tree.',
+  },
+  signature: {
+    meaning: 'Detached signature or checksum-adjacent files shipped with downloads.',
+    handling: 'Reported and ignored; cryptographic verification is outside this tool.',
+  },
+  'unsupported-font': {
+    meaning: 'Font-adjacent formats that are not supported input formats for this tool.',
+    handling: 'Reported and ignored; only .ttf, .otf, .ttc, .otc, .woff, and .woff2 are supported inputs.',
+  },
+  extensionless: {
+    meaning: 'Files with no extension.',
+    handling: 'Reported with extension <none> and ignored unless they are renamed to a supported font extension and parse successfully.',
+    extensions: ['<none>'],
+  },
+  other: {
+    meaning: 'Unsupported files that do not match a known coarse category.',
+    handling: 'Reported and ignored; inspect byExtension and examples before assuming intent.',
+    extensions: [],
+  },
+};
 const FORMAT_PRIORITY = { '.otf': 0, '.ttf': 1, '.woff2': 2, '.ttc': 3, '.otc': 4, '.woff': 5 };
 const MANIFEST_FILE_NAME = 'split-meta.json';
 const MANIFEST_VERSION = 1;
@@ -188,7 +228,7 @@ const GUIDANCE_SECTION_FIELDS = {
   workspace: ['workspace'],
   tools: ['tools', 'supportedExtensions'],
   defaults: ['defaultPolicies'],
-  recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets', 'configurationRecipes'],
+  recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets', 'configurationRecipes', 'unsupportedFileCategoryCatalog'],
   'directory-workflows': ['directoryWorkflowDecisionMatrix'],
   examples: ['directoryWorkflowExamples'],
   verification: ['verificationChecklist'],
@@ -882,6 +922,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Machine-readable mapping from common user intent to preset-first tool calls and explicit tradeoffs.',
     agentAction: 'Use these recipes to choose workflowPreset and the smallest necessary overrides before previewing or writing output.',
+  },
+  unsupportedFileCategoryCatalog: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Machine-readable catalog explaining unsupportedFileSummary.byCategory categories, representative extensions, and handling behavior.',
+    agentAction: 'Use it to interpret noisy real corpus summaries without assuming ignored archives, images, docs, or unsupported font-adjacent files are processed.',
   },
   recommendedBatchPreviewArgs: {
     sourceTools: ['organize_font_directory'],
@@ -2014,6 +2059,7 @@ export function getAgentGuidance(args = {}) {
     },
     workflowPresets: buildWorkflowPresetCatalog(),
     configurationRecipes,
+    unsupportedFileCategoryCatalog: buildUnsupportedFileCategoryCatalog(),
     directoryWorkflowDecisionMatrix,
     directoryWorkflowExamples,
     verificationChecklist,
@@ -2036,6 +2082,7 @@ export function getAgentGuidance(args = {}) {
       'workflowPresets',
       'workflowPreset',
       'configurationRecipes',
+      'unsupportedFileCategoryCatalog',
       'supportedFontCount',
       'unsupportedFileSummary',
       'unsupportedFileSummary.total',
@@ -2268,6 +2315,20 @@ function buildWorkflowPresetCatalog() {
       explicitOptionsOverridePreset: true,
     };
   });
+}
+
+function buildUnsupportedFileCategoryCatalog() {
+  return Object.fromEntries(
+    Object.entries(UNSUPPORTED_FILE_CATEGORY_DETAILS).map(([category, details]) => [
+      category,
+      {
+        category,
+        extensions: details.extensions || [...(UNSUPPORTED_FILE_EXTENSION_CATEGORIES[category] || [])].sort(),
+        meaning: details.meaning,
+        handling: details.handling,
+      },
+    ]),
+  );
 }
 
 function normalizeProcessingOptions(args) {

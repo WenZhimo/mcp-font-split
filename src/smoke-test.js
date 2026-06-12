@@ -645,6 +645,7 @@ if (scenario === 'single') {
     || !defaultGuidance.safeInvocationTemplates?.length
     || !defaultGuidance.directoryWorkflowDecisionMatrix?.length
     || !defaultGuidance.configurationRecipes?.length
+    || !defaultGuidance.unsupportedFileCategoryCatalog?.archive
     || !defaultGuidance.recommendedWorkflowPlan?.orderedSteps?.length
   ) {
     throw new Error('Expected default agent guidance to be compact and omit bulky catalogs/examples.');
@@ -672,6 +673,7 @@ if (scenario === 'single') {
     || !compactGuidance.safeInvocationTemplates?.length
     || !compactGuidance.directoryWorkflowDecisionMatrix?.length
     || !compactGuidance.configurationRecipes?.length
+    || !compactGuidance.unsupportedFileCategoryCatalog?.archive
   ) {
     throw new Error('Expected compact agent guidance to keep workflow essentials and omit bulky catalogs/examples.');
   }
@@ -708,6 +710,16 @@ if (scenario === 'single') {
   }
   if (!result.responseFieldsToCheck?.includes('configurationRecipes')) {
     throw new Error('Expected agent guidance to recommend checking configuration recipes.');
+  }
+  if (!result.responseFieldsToCheck?.includes('unsupportedFileCategoryCatalog')) {
+    throw new Error('Expected agent guidance to recommend checking unsupportedFileCategoryCatalog.');
+  }
+  if (
+    !result.unsupportedFileCategoryCatalog?.archive?.handling?.includes('never extracted')
+    || !result.unsupportedFileCategoryCatalog?.['unsupported-font']?.extensions?.includes('.eot')
+    || !result.unsupportedFileCategoryCatalog?.extensionless?.extensions?.includes('<none>')
+  ) {
+    throw new Error('Expected unsupportedFileCategoryCatalog to explain archive, unsupported-font, and extensionless handling.');
   }
   for (const fieldName of [
     'unsupportedFileSummary.total',
@@ -962,6 +974,7 @@ if (scenario === 'single') {
     workflowPresets: 'get_agent_guidance',
     workflowPreset: 'split_font_batch',
     configurationRecipes: 'get_agent_guidance',
+    unsupportedFileCategoryCatalog: 'get_agent_guidance',
     recommendedBatchOptions: 'organize_font_directory',
     recommendedBatchPreviewArgs: 'organize_font_directory',
     recommendedNextActions: 'split_font_batch',
@@ -2535,7 +2548,7 @@ if (scenario === 'single') {
     if (!Object.hasOwn(batchProps, 'workflowPreset') || !Object.hasOwn(organizeProps, 'workflowPreset')) {
       throw new Error('Expected batch and organization tools to expose workflowPreset.');
     }
-    expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'outputTreeInsideInputTree', 'batchWarnings']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'outputTreeInsideInputTree']);
@@ -2593,6 +2606,7 @@ if (scenario === 'single') {
       'guidanceView',
       'recommendedWorkflowPlan',
       'configurationRecipes',
+      'unsupportedFileCategoryCatalog',
       'directoryWorkflowDecisionMatrix',
       'safeInvocationTemplates',
       'warningCodeCatalog',
@@ -2654,6 +2668,7 @@ if (scenario === 'single') {
     '`guidanceView`',
     '`recommendedWorkflowPlan`',
     '`configurationRecipes[]`',
+    '`unsupportedFileCategoryCatalog`',
     '`verificationChecklist[]`',
     '`smoke:real-corpus-suite`',
     '`directoryWorkflowDecisionMatrix[]`',
