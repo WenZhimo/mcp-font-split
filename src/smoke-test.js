@@ -248,6 +248,12 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('warningCodeCatalogVersion')) {
     throw new Error('Expected agent guidance to recommend checking the warning code catalog version.');
   }
+  if (!result.responseFieldsToCheck?.includes('toolResponseFieldCatalog')) {
+    throw new Error('Expected agent guidance to recommend checking the tool response field catalog.');
+  }
+  if (!result.responseFieldsToCheck?.includes('toolResponseFieldCatalogVersion')) {
+    throw new Error('Expected agent guidance to recommend checking the tool response field catalog version.');
+  }
   const expectedWarningCodes = [
     'dry-run-no-write',
     'input-scan-truncated',
@@ -287,6 +293,42 @@ if (scenario === 'single') {
   for (const code of sourceWarningCodes) {
     if (!result.warningCodeCatalog?.[code]) {
       throw new Error(`Expected warningCodeCatalog to cover source warning code ${code}.`);
+    }
+  }
+  if (result.toolResponseFieldCatalogVersion !== 1) {
+    throw new Error('Expected agent guidance to version the tool response field catalog.');
+  }
+  for (const fieldName of result.responseFieldsToCheck || []) {
+    const entry = result.toolResponseFieldCatalog?.[fieldName];
+    if (!entry || !Array.isArray(entry.sourceTools) || entry.sourceTools.length === 0 || !entry.meaning || !entry.agentAction) {
+      throw new Error(`Expected toolResponseFieldCatalog to describe ${fieldName}.`);
+    }
+  }
+  const referencedFieldNames = new Set();
+  for (const item of result.verificationChecklist || []) {
+    for (const fieldName of item.responseFields || []) referencedFieldNames.add(fieldName);
+  }
+  for (const item of result.directoryWorkflowDecisionMatrix || []) {
+    for (const fieldName of item.mustInspectFields || []) referencedFieldNames.add(fieldName);
+  }
+  for (const item of result.directoryWorkflowExamples || []) {
+    for (const fieldName of item.mustInspectFields || []) referencedFieldNames.add(fieldName);
+  }
+  for (const fieldName of referencedFieldNames) {
+    if (!result.toolResponseFieldCatalog?.[fieldName]) {
+      throw new Error(`Expected toolResponseFieldCatalog to describe referenced inspect field ${fieldName}.`);
+    }
+  }
+  const expectedFieldCatalogEntries = {
+    recommendedBatchOptions: 'organize_font_directory',
+    sourceDestructive: 'organize_font_directory',
+    batchWarnings: 'split_font_batch',
+    inspectionWarnings: 'inspect_split_output',
+    warningCodeCatalog: 'get_agent_guidance',
+  };
+  for (const [fieldName, toolName] of Object.entries(expectedFieldCatalogEntries)) {
+    if (!result.toolResponseFieldCatalog?.[fieldName]?.sourceTools?.includes(toolName)) {
+      throw new Error(`Expected toolResponseFieldCatalog.${fieldName} to include ${toolName}.`);
     }
   }
   const decisionIds = new Set((result.directoryWorkflowDecisionMatrix || []).map((item) => item.id));
@@ -987,7 +1029,7 @@ if (scenario === 'single') {
         throw new Error(`organize_font_directory is missing ${requiredOrganizeProp}`);
       }
     }
-    expectDescriptionIncludes('get_agent_guidance', ['directoryWorkflowDecisionMatrix', 'warningCodeCatalog', 'response fields to inspect']);
+    expectDescriptionIncludes('get_agent_guidance', ['directoryWorkflowDecisionMatrix', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'batchWarnings']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files']);

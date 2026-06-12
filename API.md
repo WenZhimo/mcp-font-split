@@ -10,13 +10,15 @@ Return machine-readable usage guidance for AI coding assistants.
 |-------|---------------|---------|-------------|
 | `workflow` | `overview`, `single`, `batch`, `inspect`, `organize` | `overview` | Guidance focus. |
 
-The response includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `directoryWorkflowExamples[]`, `warningCodeCatalog`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response includes workspace path rules, supported extensions, default policies, recommended batch and organization options, response fields to inspect, a verification checklist, `directoryWorkflowDecisionMatrix[]`, `directoryWorkflowExamples[]`, `warningCodeCatalog`, `toolResponseFieldCatalog`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
 
 `directoryWorkflowDecisionMatrix[]` is a machine-readable decision table for common directory scenarios. Each entry includes `id`, `useWhen`, `firstTool`, default write/source-safety flags, `recommendedOptions`, optional follow-up tool/options, `mustInspectFields`, and `nonIntuitiveBehavior`.
 
 `directoryWorkflowExamples[]` gives concrete source-tree patterns such as flat vendor dumps, archive-per-family folders, mixed root+nested libraries, and large/noisy first-pass scans. Each example includes `sourceShape`, the likely layout kind, the recommended first tool and first call, follow-up guidance, safety flags, and response fields the agent must inspect.
 
 `warningCodeCatalog` maps machine-readable warning codes from `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]` to their response sources, severity, and suggested agent action.
+
+`toolResponseFieldCatalog` maps important response field paths to the tools that emit them, their meaning, and the action an AI agent should take before reporting success. It is intended as a runtime companion to this API document, especially for fields whose meaning is easy to misread such as `ok`, `performedSplit`, `usedFallback`, `sourceDestructive`, `writesOutputTree`, `maxFilesHit`, and `recommendedNextActions`.
 
 ## `get_runtime_status`
 

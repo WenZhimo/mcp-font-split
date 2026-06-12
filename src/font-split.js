@@ -354,6 +354,350 @@ const WARNING_CODE_CATALOG = {
   },
 };
 
+const ALL_TOOL_NAMES = [
+  'get_agent_guidance',
+  'get_runtime_status',
+  'inspect_font_inputs',
+  'organize_font_directory',
+  'split_font',
+  'split_font_batch',
+  'inspect_split_output',
+];
+
+const TOOL_RESPONSE_FIELD_CATALOG_VERSION = 1;
+const TOOL_RESPONSE_FIELD_CATALOG = {
+  ok: {
+    sourceTools: ALL_TOOL_NAMES,
+    meaning: 'Tool-level success flag. It means the selected policy completed, not necessarily that a normal multi-subset split happened.',
+    agentAction: 'Inspect tool-specific outcome, warning, truncation, and error fields before claiming success.',
+  },
+  node: {
+    sourceTools: ['get_runtime_status'],
+    meaning: 'Node.js runtime details, including whether the current version satisfies package.json engines.',
+    agentAction: 'If node.ok is false, handle recommendedActions before processing fonts.',
+  },
+  workspace: {
+    sourceTools: ['get_agent_guidance', 'get_runtime_status'],
+    meaning: 'Resolved FONT_SPLIT_ROOT workspace and configuration status.',
+    agentAction: 'Confirm paths are inside the intended workspace before reading or writing local fonts.',
+  },
+  wasm: {
+    sourceTools: ['get_runtime_status'],
+    meaning: 'Resolved cn-font-split WASM runtime path and filesystem status.',
+    agentAction: 'If missing or not a file, follow recommendedActions before splitting.',
+  },
+  'wasm.fontSplitWasmPathConfigured': {
+    sourceTools: ['get_runtime_status'],
+    meaning: 'Whether FONT_SPLIT_WASM_PATH overrides the packaged cn-font-split WASM runtime.',
+    agentAction: 'Disclose custom-runtime use when debugging compatibility or reproducibility.',
+  },
+  cnFontSplit: {
+    sourceTools: ['get_runtime_status'],
+    meaning: 'cn-font-split package and WASM runtime version metadata.',
+    agentAction: 'Use this to diagnose version drift between the wrapper, package, and WASM runtime.',
+  },
+  'cnFontSplit.packageVersion': {
+    sourceTools: ['get_runtime_status'],
+    meaning: 'Installed cn-font-split package version.',
+    agentAction: 'Compare with expected dependency versions when reproducing behavior.',
+  },
+  'cnFontSplit.runtimeVersion': {
+    sourceTools: ['get_runtime_status'],
+    meaning: 'Recorded cn-font-split WASM runtime release, when available.',
+    agentAction: 'Record or repair the runtime when runtimeVersion is missing unexpectedly.',
+  },
+  recommendedActions: {
+    sourceTools: ['get_runtime_status'],
+    meaning: 'Machine-readable setup remediation actions.',
+    agentAction: 'Handle action-required items before calling writing tools.',
+  },
+  supportedFontCount: {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Number of scanned files with supported font extensions.',
+    agentAction: 'Use with maxFilesHit and warning fields before trusting source coverage.',
+  },
+  validFontCount: {
+    sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
+    meaning: 'Number of supported-extension files whose basic font metadata was parsed successfully.',
+    agentAction: 'Treat null as unknown when metadata parsing was intentionally skipped.',
+  },
+  invalidFontCount: {
+    sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
+    meaning: 'Number of supported-extension files that failed font metadata parsing.',
+    agentAction: 'Inspect invalidFonts[] or organization warnings before deciding whether broken font-like files should be preserved.',
+  },
+  missingIdentityCount: {
+    sourceTools: ['inspect_font_inputs'],
+    meaning: 'Number of parseable fonts without a usable batch identity key.',
+    agentAction: 'Expect identity dedupe to fall back for these fonts when precision matters.',
+  },
+  resultType: {
+    sourceTools: ['split_font', 'split_font_batch'],
+    meaning: 'Specific processing result classification, including subset, fallback, and copy-original cases.',
+    agentAction: 'Use this instead of ok alone when reporting what was produced.',
+  },
+  outputMode: {
+    sourceTools: ['split_font', 'split_font_batch', 'inspect_split_output'],
+    meaning: 'Broad output category: subset, single-woff2, or copy-original.',
+    agentAction: 'Disclose non-subset modes because they are not normal multi-subset output.',
+  },
+  performedSplit: {
+    sourceTools: ['split_font', 'split_font_batch'],
+    meaning: 'True only when normal cn-font-split multi-subset processing actually ran.',
+    agentAction: 'Do not claim multi-subset splitting when this is false.',
+  },
+  usedFallback: {
+    sourceTools: ['split_font', 'split_font_batch'],
+    meaning: 'True when the result used a fallback path such as single-WOFF2 output.',
+    agentAction: 'Tell the user fallback output was used and inspect warnings.',
+  },
+  warnings: {
+    sourceTools: ['split_font', 'split_font_batch'],
+    meaning: 'Per-font warnings from processing one selected font.',
+    agentAction: 'Review before treating a font as cleanly processed.',
+  },
+  manifestPath: {
+    sourceTools: ['split_font', 'split_font_batch'],
+    meaning: 'Path to the split-meta.json manifest for a processed font entry.',
+    agentAction: 'Use this as the strongest per-font evidence of what options and source file produced the output.',
+  },
+  warningCodeCatalog: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Catalog of machine-readable warning codes emitted by batch, inspection, and organization tools.',
+    agentAction: 'Use it to interpret warning severity and choose follow-up actions.',
+  },
+  warningCodeCatalogVersion: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Version of warningCodeCatalog.',
+    agentAction: 'Use this for compatibility checks in automated agents.',
+  },
+  toolResponseFieldCatalog: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Catalog of important response fields, their source tools, meanings, and suggested agent actions.',
+    agentAction: 'Use it as the runtime API map before interpreting tool responses.',
+  },
+  toolResponseFieldCatalogVersion: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Version of toolResponseFieldCatalog.',
+    agentAction: 'Use this for compatibility checks in automated agents.',
+  },
+  batchWarnings: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Summary-level batch notices with machine-readable codes.',
+    agentAction: 'Inspect every action-required or warning item before claiming the batch fully succeeded.',
+  },
+  batchWarningCount: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Number of batchWarnings entries.',
+    agentAction: 'Use as a compact signal that batchWarnings needs attention.',
+  },
+  errorCount: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Number of per-font processing errors collected by the batch run.',
+    agentAction: 'If nonzero, inspect errors[] and do not report full success.',
+  },
+  errors: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Collected per-font processing errors when batchErrorMode allows collection.',
+    agentAction: 'Summarize failed inputs and consider rerunning with fail-after for stricter automation.',
+  },
+  maxFilesHit: {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory', 'inspect_split_output'],
+    meaning: 'True when a scan stopped at maxFiles before covering all files.',
+    agentAction: 'Rerun with a higher maxFiles before trusting counts, plans, or audits.',
+  },
+  dryRun: {
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
+    meaning: 'Whether the call only planned work instead of writing output.',
+    agentAction: 'Confirm this explicitly because split_font_batch defaults to false while organize_font_directory defaults to true.',
+  },
+  planned: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Per-font dry-run plan entries for batch output paths and skip decisions.',
+    agentAction: 'Review before rerunning a batch with dryRun:false.',
+  },
+  plannedCount: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Number of planned batch entries returned for a dry-run.',
+    agentAction: 'Use with planIncluded and batchWarnings to decide whether per-font planning was visible.',
+  },
+  wouldProcessCount: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Number of selected fonts that would be processed in a dry-run.',
+    agentAction: 'Check before writing to avoid surprising no-op or oversized runs.',
+  },
+  skippedDuplicates: {
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
+    meaning: 'Number of equivalent fonts skipped by the selected dedupe policy.',
+    agentAction: 'Inspect dedupe mode and plans when representative choice matters.',
+  },
+  inspectionWarnings: {
+    sourceTools: ['inspect_font_inputs', 'inspect_split_output'],
+    meaning: 'Summary-level inspection notices with machine-readable codes.',
+    agentAction: 'Inspect before trusting source or output audit results.',
+  },
+  inspectionWarningCount: {
+    sourceTools: ['inspect_font_inputs', 'inspect_split_output'],
+    meaning: 'Number of inspectionWarnings entries.',
+    agentAction: 'Use as a compact signal that inspectionWarnings needs attention.',
+  },
+  organizationWarnings: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Summary-level organization notices with machine-readable codes.',
+    agentAction: 'Review before using recommendedBatchOptions or running a real copy.',
+  },
+  organizationWarningCount: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Number of organizationWarnings entries.',
+    agentAction: 'Use as a compact signal that organizationWarnings needs attention.',
+  },
+  recommendedNextActions: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Machine-readable follow-up checklist for directory organization workflows.',
+    agentAction: 'Treat as guidance and inspect each action inspectFields before proceeding.',
+  },
+  operationMode: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Organization mode: plan-only for dry runs, copy-only for real organization runs.',
+    agentAction: 'Use it to confirm the organizer did not split fonts and did not modify source files.',
+  },
+  copiedCount: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Number of font files copied into the organization output directory.',
+    agentAction: 'Use with planActionSummary and organizationManifestPath to verify copy-only work.',
+  },
+  organizationManifestPath: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Path to the font-organization-manifest.json written by a non-dry-run organization call.',
+    agentAction: 'Use this as evidence of the copied staging layout when dryRun is false.',
+  },
+  planActionSummary: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Compact counts of planned or executed organization actions.',
+    agentAction: 'Use it when plan[] is omitted or too large, but do not treat it as a substitute for detailed review when copying.',
+  },
+  plan: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Per-font copy or skip plan entries for directory organization.',
+    agentAction: 'Review before running with dryRun:false, especially when overwriteExisting or duplicate skipping is involved.',
+  },
+  destructive: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Whether the current organization call may replace files in the output tree.',
+    agentAction: 'Distinguish output overwrites from source modifications before reporting risk.',
+  },
+  sourceDestructive: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Whether source files can be moved, deleted, or rewritten. This tool should always report false.',
+    agentAction: 'Verify this remains false before calling the organizer source-safe.',
+  },
+  writesSourceTree: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Whether the source tree is written by the organization call. This should always be false.',
+    agentAction: 'Verify this remains false before claiming source non-destructiveness.',
+  },
+  writesOutputTree: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Whether the organization call writes copies or manifests into outputDir.',
+    agentAction: 'Confirm this before telling the user a call was dry-run only.',
+  },
+  mayOverwriteOutputTree: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Whether the organization call may replace existing destination files.',
+    agentAction: 'Warn or verify intent when true.',
+  },
+  parsedFontMetadata: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Whether the organizer parsed font metadata during planning.',
+    agentAction: 'If false, do not rely on invalid-font counts, glyph counts, identity dedupe, or metadata family grouping.',
+  },
+  unparsedFontCount: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Number of supported-extension files intentionally not parsed because parseFonts was false.',
+    agentAction: 'Rerun with parseFonts:true when metadata-sensitive decisions matter.',
+  },
+  effectiveBatchDedupeMode: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Actual dedupe mode used after accounting for parseFonts limitations.',
+    agentAction: 'Check for same-path fallback when font-identity was requested but parsing was skipped.',
+  },
+  dedupeLimitedByParsing: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'True when identity dedupe could not run because font parsing was skipped.',
+    agentAction: 'Rerun with parseFonts:true before trusting identity dedupe.',
+  },
+  recommendedBatchOptions: {
+    sourceTools: ['organize_font_directory', 'get_agent_guidance'],
+    meaning: 'Suggested split_font_batch options based on detected or recommended workflow.',
+    agentAction: 'Apply only after reviewing layout and warning fields.',
+  },
+  layout: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Detected source directory shape and recommended batch grouping.',
+    agentAction: 'Use it when the source directory may not match the desired family grouping.',
+  },
+  'layout.layoutKind': {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Detected source layout kind: empty, flat, nested, or mixed.',
+    agentAction: 'Use flat or mixed as a signal to dry-run organization before direct batch splitting.',
+  },
+  directoryWorkflowDecisionMatrix: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Machine-readable table mapping common directory scenarios to first tool, options, follow-up, safety flags, and fields to inspect.',
+    agentAction: 'Use it to choose a safe workflow instead of guessing from path shape.',
+  },
+  directoryWorkflowExamples: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Concrete directory-shape examples and corresponding safe first calls.',
+    agentAction: 'Match user-described layouts to examples, then verify against actual tool responses.',
+  },
+  resultsIncluded: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Whether per-font batch results[] are included.',
+    agentAction: 'If false, rely on summary counters or rerun with includeResults:true when per-font details are needed.',
+  },
+  planIncluded: {
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
+    meaning: 'Whether per-item planned actions are included.',
+    agentAction: 'If false, use summary fields or rerun with includeResults/includePlan true before detailed review.',
+  },
+  manifestCount: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Number of output entries backed by split-meta.json manifests.',
+    agentAction: 'Prefer manifest-backed counts for strict output audits.',
+  },
+  legacyOutputCount: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Number of output entries inferred without manifests.',
+    agentAction: 'Treat these as less certain and consider rerunning processing with manifest output.',
+  },
+  subsetOutputCount: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Number of inspected output entries that look like normal subset output.',
+    agentAction: 'Use with singleWoff2OutputCount and copyOriginalOutputCount when summarizing output modes.',
+  },
+  singleWoff2OutputCount: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Number of inspected output entries that look like single-WOFF2 fallback output.',
+    agentAction: 'Disclose these separately from normal multi-subset output.',
+  },
+  copyOriginalOutputCount: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Number of inspected output entries that only recorded copy-original handling.',
+    agentAction: 'Disclose that these entries do not contain generated WOFF2/CSS output.',
+  },
+  filesIncluded: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Whether flat output files[] details are included.',
+    agentAction: 'Rerun with includeFiles:true when file-level audit details are required.',
+  },
+  familiesIncluded: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Whether structured families[] details are included.',
+    agentAction: 'Rerun with includeFamilies:true when family-level audit details are required.',
+  },
+};
+
 export async function getRuntimeStatus() {
   const configuredRoot = process.env.FONT_SPLIT_ROOT || null;
   const configuredWasmPath = process.env.FONT_SPLIT_WASM_PATH || null;
@@ -805,6 +1149,8 @@ export function getAgentGuidance(args = {}) {
     verificationChecklist,
     warningCodeCatalogVersion: 1,
     warningCodeCatalog: WARNING_CODE_CATALOG,
+    toolResponseFieldCatalogVersion: TOOL_RESPONSE_FIELD_CATALOG_VERSION,
+    toolResponseFieldCatalog: TOOL_RESPONSE_FIELD_CATALOG,
     responseFieldsToCheck: [
       'ok',
       'node',
@@ -815,24 +1161,40 @@ export function getAgentGuidance(args = {}) {
       'cnFontSplit.packageVersion',
       'cnFontSplit.runtimeVersion',
       'recommendedActions',
+      'supportedFontCount',
+      'validFontCount',
+      'invalidFontCount',
+      'missingIdentityCount',
       'resultType',
       'outputMode',
       'performedSplit',
       'usedFallback',
       'warnings',
+      'manifestPath',
       'warningCodeCatalog',
+      'toolResponseFieldCatalog',
       'batchWarnings',
       'batchWarningCount',
       'errorCount',
       'errors',
       'maxFilesHit',
+      'dryRun',
+      'planned',
+      'plannedCount',
+      'wouldProcessCount',
+      'skippedDuplicates',
       'inspectionWarnings',
       'inspectionWarningCount',
       'organizationWarnings',
       'organizationWarningCount',
       'recommendedNextActions',
       'warningCodeCatalogVersion',
+      'toolResponseFieldCatalogVersion',
+      'operationMode',
+      'copiedCount',
+      'organizationManifestPath',
       'planActionSummary',
+      'plan',
       'destructive',
       'sourceDestructive',
       'writesSourceTree',
@@ -843,12 +1205,17 @@ export function getAgentGuidance(args = {}) {
       'effectiveBatchDedupeMode',
       'dedupeLimitedByParsing',
       'recommendedBatchOptions',
+      'layout',
+      'layout.layoutKind',
       'directoryWorkflowDecisionMatrix',
       'directoryWorkflowExamples',
       'resultsIncluded',
       'planIncluded',
       'manifestCount',
       'legacyOutputCount',
+      'subsetOutputCount',
+      'singleWoff2OutputCount',
+      'copyOriginalOutputCount',
       'filesIncluded',
       'familiesIncluded',
     ],

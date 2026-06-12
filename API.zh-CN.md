@@ -10,13 +10,15 @@
 |------|---------------|--------|------|
 | `workflow` | `overview`, `single`, `batch`, `inspect`, `organize` | `overview` | 指南侧重点。 |
 
-响应会包含工作区路径规则、支持扩展名、默认策略、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`directoryWorkflowDecisionMatrix[]`、`directoryWorkflowExamples[]`、`warningCodeCatalog`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应会包含工作区路径规则、支持扩展名、默认策略、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`directoryWorkflowDecisionMatrix[]`、`directoryWorkflowExamples[]`、`warningCodeCatalog`、`toolResponseFieldCatalog`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
 `directoryWorkflowDecisionMatrix[]` 是面向常见目录场景的机器可读决策表。每个条目包含 `id`、`useWhen`、`firstTool`、默认写入/源目录安全标记、`recommendedOptions`、可选后续工具/参数、`mustInspectFields` 和 `nonIntuitiveBehavior`。
 
 `directoryWorkflowExamples[]` 提供具体源目录树模式，例如扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描。每个示例包含 `sourceShape`、可能的 layout 类型、推荐首选工具和首次调用、后续处理建议、安全标记，以及 agent 必须检查的响应字段。
 
 `warningCodeCatalog` 会把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的机器可读 warning code 映射到响应来源、严重度和建议 agent 动作。
+
+`toolResponseFieldCatalog` 会把重要响应字段路径映射到产生这些字段的工具、字段含义，以及 AI agent 在宣称成功前应该采取的动作。它是本文档的运行时补充，尤其用于避免误读 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit` 和 `recommendedNextActions` 这类容易违反直觉的字段。
 
 ## `get_runtime_status`
 
