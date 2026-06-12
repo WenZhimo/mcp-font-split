@@ -217,6 +217,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('recommendedNextActions')) {
     throw new Error('Expected agent guidance to recommend checking organization next actions.');
   }
+  if (!result.responseFieldsToCheck?.includes('planActionSummary')) {
+    throw new Error('Expected agent guidance to recommend checking organization plan action summaries.');
+  }
   const decisionIds = new Set((result.directoryWorkflowDecisionMatrix || []).map((item) => item.id));
   for (const requiredDecision of ['known-good-batch-layout', 'unknown-or-mixed-directory-layout', 'large-or-noisy-directory-first-pass', 'user-wants-clean-staging-directory']) {
     if (!decisionIds.has(requiredDecision)) {
@@ -254,6 +257,9 @@ if (scenario === 'single') {
   const layoutChecklist = (result.verificationChecklist || []).find((item) => item.id === 'layout-plan-reviewed');
   if (!layoutChecklist?.responseFields?.includes('recommendedNextActions')) {
     throw new Error('Expected layout verification checklist to include recommendedNextActions.');
+  }
+  if (!layoutChecklist?.responseFields?.includes('planActionSummary')) {
+    throw new Error('Expected layout verification checklist to include planActionSummary.');
   }
   console.log(JSON.stringify(result, null, 2));
 } else if (scenario === 'runtime-status') {
@@ -388,6 +394,9 @@ if (scenario === 'single') {
   if (!result.organizationWarnings?.some((warning) => warning.code === 'invalid-fonts-skipped')) {
     throw new Error('Expected organization warning about skipped invalid fonts.');
   }
+  if (result.planActionSummary?.total !== 1 || result.planActionSummary?.byAction?.['skipped-invalid'] !== 1) {
+    throw new Error('Expected organization dry-run to summarize skipped-invalid plan actions.');
+  }
   const dryRunNextActionIds = new Set((result.recommendedNextActions || []).map((action) => action.id));
   for (const expectedAction of ['review-plan-before-writing', 'decide-on-invalid-fonts']) {
     if (!dryRunNextActionIds.has(expectedAction)) {
@@ -397,7 +406,22 @@ if (scenario === 'single') {
   if (await fsExists(outputDir)) {
     throw new Error('Expected organization dry-run not to create outputDir.');
   }
+
+  const compact = await organizeFontDirectory({
+    inputDir,
+    outputDir,
+    dryRun: true,
+    includePlan: false,
+    maxFiles: 10,
+  });
+  if (compact.planIncluded !== false || Object.hasOwn(compact, 'plan')) {
+    throw new Error('Expected compact organization dry-run to omit plan details.');
+  }
+  if (compact.planActionSummary?.total !== 1 || compact.planActionSummary?.byAction?.['skipped-invalid'] !== 1) {
+    throw new Error('Expected compact organization dry-run to keep plan action summary.');
+  }
   console.log(JSON.stringify(result, null, 2));
+  console.log(JSON.stringify({ compact }, null, 2));
 } else if (scenario === 'organize-copy') {
   const inputDir = process.argv[3] || '.font-split-organize-copy-input';
   const outputDir = process.argv[4] || '.font-split-organize-copy-output';
@@ -424,6 +448,9 @@ if (scenario === 'single') {
   }
   if (copied.copiedCount !== 1 || copied.organizationManifestWritten !== true || copied.organizationManifestPath !== `${outputDir}/font-organization-manifest.json`) {
     throw new Error('Expected organizeFontDirectory copy mode to copy one file and write a manifest.');
+  }
+  if (copied.planActionSummary?.total !== 1 || copied.planActionSummary?.byAction?.copied !== 1) {
+    throw new Error('Expected organization copy mode to summarize copied plan actions.');
   }
   if (!copied.organizationWarnings?.some((warning) => warning.code === 'organization-writes-output')) {
     throw new Error('Expected organization copy warning.');
@@ -458,6 +485,9 @@ if (scenario === 'single') {
   });
   if (overwritten.sourceDestructive !== false || overwritten.writesSourceTree !== false || overwritten.writesOutputTree !== true || overwritten.mayOverwriteOutputTree !== true || overwritten.destructive !== true) {
     throw new Error('Expected overwrite mode to flag output-tree overwrite risk while preserving source safety.');
+  }
+  if (overwritten.planActionSummary?.total !== 1 || overwritten.planActionSummary?.byAction?.copied !== 1) {
+    throw new Error('Expected overwrite-enabled organization copy to summarize copied plan actions.');
   }
   if (!overwritten.organizationWarnings?.some((warning) => warning.code === 'output-overwrite-enabled')) {
     throw new Error('Expected organization overwrite warning.');
@@ -514,6 +544,9 @@ if (scenario === 'single') {
   if (result.operationMode !== 'copy-only' || result.validFontCount !== 2 || result.invalidFontCount !== 0 || result.deduplicatedCount !== 1 || result.skippedDuplicates !== 1 || result.copiedCount !== 1) {
     throw new Error('Expected valid-font organization to parse, identity-dedupe, and copy one representative.');
   }
+  if (result.planActionSummary?.total !== 2 || result.planActionSummary?.byAction?.copied !== 1 || result.planActionSummary?.byAction?.['skipped-duplicate'] !== 1) {
+    throw new Error('Expected valid-font organization to summarize copied and skipped-duplicate actions.');
+  }
   if (result.layout?.layoutKind !== 'nested' || result.recommendedBatchOptions?.batchGroupBy !== 'source-dir') {
     throw new Error('Expected valid-font organization to still summarize the source directory layout.');
   }
@@ -562,6 +595,9 @@ if (scenario === 'single') {
   }
   if (!result.organizationWarnings?.some((warning) => warning.code === 'font-parsing-skipped')) {
     throw new Error('Expected structure-only organization warning about skipped font parsing.');
+  }
+  if (result.planActionSummary?.total !== 1 || result.planActionSummary?.byAction?.['would-copy'] !== 1) {
+    throw new Error('Expected structure-only organization to summarize would-copy plan actions.');
   }
   const structureNextActionIds = new Set((result.recommendedNextActions || []).map((action) => action.id));
   if (!structureNextActionIds.has('rerun-with-font-parsing')) {

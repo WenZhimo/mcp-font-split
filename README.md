@@ -304,9 +304,11 @@ When `fail-fast` or `fail-after` throws through MCP, the error text is JSON cont
 - `recommendedBatchOptions`: a suggested follow-up `split_font_batch` configuration for the detected layout
 - `recommendedNextActionCount`, `recommendedNextActions[]`: machine-readable follow-up actions for agents, each with an `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, and `inspectFields`
 - `organizationWarningCount`, `organizationWarnings[]` with machine-readable `code` and `message`
+- `planActionSummary`: always returned; counts plan actions such as `would-copy`, `copied`, `skipped-duplicate`, `skipped-invalid`, `skipped-target-exists`, and `error`, even when `includePlan: false`
 - optional `plan[]` entries with `source`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`
 
 Treat `recommendedNextActions[]` as a checklist, not automation. Agents should still inspect the action's `inspectFields`, especially when an action recommends writing files or rerunning with different parsing options.
+Treat `planActionSummary` as a compact overview, not approval to write files without reviewing the detailed plan when it is included.
 
 `inspect_split_output` keeps flat file stats and adds structured output inventory:
 

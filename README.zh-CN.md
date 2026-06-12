@@ -302,9 +302,11 @@ fonts/
 - `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 建议配置
 - `recommendedNextActionCount`、`recommendedNextActions[]`：面向 agent 的机器可读后续动作，每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields`
 - `organizationWarningCount`、`organizationWarnings[]`，每项包含机器可读的 `code` 和 `message`
+- `planActionSummary`：始终返回；按动作统计 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists` 和 `error` 等数量，即使 `includePlan: false` 省略明细也会保留
 - 可选 `plan[]` 条目，包含 `source`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`
 
 应把 `recommendedNextActions[]` 当作检查清单，而不是自动执行结果。Agent 仍然要检查每项里的 `inspectFields`，尤其是当某个动作建议写文件或用不同解析参数重跑时。
+应把 `planActionSummary` 当作压缩概览，而不是无需审查详细计划就可以写文件的许可。
 
 `inspect_split_output` 保留基础文件统计，并增加结构化输出清单：
 

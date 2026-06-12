@@ -196,6 +196,7 @@ Important result fields:
 | `recommendedBatchOptions` | Suggested `split_font_batch` options for the detected layout. Nested or mixed inputs usually recommend `batchGroupBy: "source-dir"`; flat inputs usually recommend `font-family`. |
 | `recommendedNextActionCount` / `recommendedNextActions[]` | Machine-readable follow-up actions for agents. Entries include `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, and `inspectFields`. |
 | `organizationWarningCount` / `organizationWarnings[]` | Machine-readable notices such as `organization-dry-run`, `organization-writes-output`, `output-overwrite-enabled`, `mixed-layout-detected`, `invalid-fonts-skipped`, and `output-inside-input`. |
+| `planActionSummary` | Always returned. Counts planned actions by `action`, including `would-copy`, `copied`, `skipped-duplicate`, `skipped-invalid`, `skipped-target-exists`, `would-skip-target-exists`, and `error`. Use this when `includePlan: false` omits detailed entries. |
 | `plan[]` | Optional per-font copy/skip entries. Copy entries include `source`, `target`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`. |
 | `organizationManifestPath` | Written only when `dryRun: false`; points to `font-organization-manifest.json` in `outputDir`. |
 
@@ -210,6 +211,8 @@ Non-intuitive behavior to watch:
 Use `parseFonts: true` when you need trustworthy invalid-font counts, glyph counts, internal family names, or cross-format identity dedupe. Use `parseFonts: false` only for a quick structural first pass over a very large or noisy tree. In that mode, `font-parsing-skipped` should be treated as a warning that the plan is incomplete for metadata-sensitive decisions.
 
 Common `recommendedNextActions[].id` values include `review-plan-before-writing`, `preview-batch-split-original-layout`, `copy-organized-staging-directory`, `inspect-organized-output`, `preview-batch-split-organized-output`, `rerun-with-font-parsing`, `rerun-with-higher-maxFiles`, `decide-on-invalid-fonts`, `review-mixed-layout-grouping`, and `avoid-reprocessing-organized-copies`. These are guidance, not proof of success; agents must still inspect the listed `inspectFields`.
+
+`planActionSummary` is a compact overview, not a substitute for reviewing detailed `plan[]` entries before copying files. It is mainly for automation and large responses where `includePlan: false` is used.
 
 ## `inspect_split_output`
 

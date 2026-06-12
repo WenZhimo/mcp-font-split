@@ -618,6 +618,7 @@ split-meta.json
 | `recommendedBatchOptions` | 根据目录结构建议的后续批量参数 |
 | `recommendedNextActions[]` | 面向 agent 的后续动作建议，包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs` 和 `inspectFields` |
 | `organizationWarnings[]` | 摘要级风险和状态提示 |
+| `planActionSummary` | 计划动作汇总；即使 `includePlan: false` 也会返回 |
 | `plan[]` | 可选的逐字体复制/跳过计划 |
 | `organizationManifestPath` | 执行 copy-only 后的 manifest 路径 |
 
@@ -632,6 +633,8 @@ split-meta.json
 - `mixed-layout-detected`：根目录和子目录中都发现了字体。
 - `output-inside-input`：整理输出目录位于输入目录内，后续扫描需要排除它。
 - `font-parsing-skipped`：`parseFonts: false`，本次只做结构优先计划，没有读取字体元数据。
+
+`planActionSummary.byAction` 会统计 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists`、`would-skip-target-exists` 和 `error` 等动作。它服务于 agent 快速判断计划形态；真正写文件前仍应审查 `plan[]` 明细和 `organizationWarnings[]`。
 
 ### 9.4 `inspect_split_output`
 

@@ -349,8 +349,8 @@ export function getAgentGuidance(args = {}) {
     {
       id: 'layout-plan-reviewed',
       appliesTo: ['overview', 'batch', 'organize'],
-      check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect layout, recommendedBatchOptions, sourceDestructive, writesSourceTree, writesOutputTree, mayOverwriteOutputTree, and organizationWarnings before applying any copy plan.',
-      responseFields: ['layout', 'recommendedBatchOptions', 'recommendedNextActions', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'plan'],
+      check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect layout, recommendedBatchOptions, sourceDestructive, writesSourceTree, writesOutputTree, mayOverwriteOutputTree, organizationWarnings, and planActionSummary before applying any copy plan.',
+      responseFields: ['layout', 'recommendedBatchOptions', 'recommendedNextActions', 'destructive', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'batch-plan-reviewed',
@@ -710,6 +710,7 @@ export function getAgentGuidance(args = {}) {
       'organizationWarnings',
       'organizationWarningCount',
       'recommendedNextActions',
+      'planActionSummary',
       'destructive',
       'sourceDestructive',
       'writesSourceTree',
@@ -1239,6 +1240,27 @@ function buildOrganizationNextActions({
   }
 
   return actions;
+}
+
+function buildPlanActionSummary(plan) {
+  const byAction = {
+    'would-copy': 0,
+    copied: 0,
+    'would-skip-target-exists': 0,
+    'skipped-target-exists': 0,
+    'skipped-duplicate': 0,
+    'skipped-invalid': 0,
+    error: 0,
+  };
+
+  for (const item of plan) {
+    byAction[item.action] = (byAction[item.action] || 0) + 1;
+  }
+
+  return {
+    total: plan.length,
+    byAction,
+  };
 }
 
 function logBatchDecision(enabled, event, details) {
@@ -2953,12 +2975,12 @@ export async function organizeFontDirectory(args) {
 
   for (const duplicate of dedupe.duplicates) {
     plan.push({
-    source: duplicate.path,
-    action: 'skipped-duplicate',
-    reason: 'deduped by effective batchDedupeMode',
-    duplicateOf: duplicate.duplicateOf,
-    identityKey: duplicate.identityKey,
-  });
+      source: duplicate.path,
+      action: 'skipped-duplicate',
+      reason: 'deduped by effective batchDedupeMode',
+      duplicateOf: duplicate.duplicateOf,
+      identityKey: duplicate.identityKey,
+    });
   }
 
   if (!options.copyInvalidFonts) {
@@ -3025,6 +3047,7 @@ export async function organizeFontDirectory(args) {
 
   const inputDirRelative = toRelativeWorkspacePath(inputDir);
   const outputDirRelative = toRelativeWorkspacePath(outputDir);
+  const planActionSummary = buildPlanActionSummary(plan);
   const skippedCount = plan.filter((item) => item.action.startsWith('skipped') || item.action === 'would-skip-target-exists').length;
   const outputDirInsideInput = isInside(inputDir, outputDir);
   const sourceDestructive = false;
@@ -3102,6 +3125,7 @@ export async function organizeFontDirectory(args) {
     recommendedNextActions,
     organizationWarningCount: warnings.length,
     organizationWarnings: warnings,
+    planActionSummary,
     planIncluded: options.includePlan,
     ...(options.includePlan ? { plan } : {}),
   };
