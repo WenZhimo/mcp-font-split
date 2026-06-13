@@ -55,7 +55,7 @@
 - 对维护本包的 agent，`get_agent_guidance.verificationChecklist[]` 包含 `local-real-corpus-suite-passed`，会指向 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，作为影响功能行为的改动完成前的本机真实语料可靠性门禁。
 - `get_agent_guidance` 会返回 `configurationRecipes[]`，把常见意图映射成 preset-first 参数，例如保留全部源字体、按源目录分组、按字体 metadata 分组、快速结构扫描、copy-only 暂存整理或大库审查后写入。配方只是安全起点，仍必须运行预览/写入工具，检查列出的 `inspectFields`，并满足 `successCriteria`。
 - `get_agent_guidance` 会返回 `batchPolicyGuide`，这是批量策略自定义指南，覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个选项值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前的 `successCriteria`。
-- `get_agent_guidance` 还会返回 `unsupportedFileCategoryCatalog`，解释 `unsupportedFileSummary.byCategory[]` 中 `archive`、`document`、`unsupported-font` 等分类的代表扩展名和处理行为；每个工具响应里的 `unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 也会重复当前扫描的处理语义，压缩包只会被报告，不会被解压、复制或拆分。
+- `get_agent_guidance` 还会返回 `unsupportedFileCategoryCatalog`，解释 `unsupportedFileSummary.byCategory[]` 中 `archive`、`document`、`unsupported-font` 等分类的代表扩展名和处理行为；每个工具响应里的 `unsupportedFileDecision` 会给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则提供证据，压缩包只会被报告，不会被解压、复制或拆分。
 - `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。决策表和 `directoryWorkflowExamples[]` 示例也会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖参数，并提供必须检查的字段和 `successCriteria`；完整示例里还包含 flat/nested/mixed/output-inside-input 的 `sourceLayoutMismatchSummary` 对照。
 - `get_agent_guidance` 包含 `safeInvocationTemplates[]`，提供运行时检查、输入预检、目录不匹配整理计划、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和紧凑输出审计等可复制起步调用。每个模板都会声明是否写文件、是否可能修改源文件、必须检查的 `inspectFields` 和继续前要满足的 `successCriteria`；模板会尽量保持最小参数，`workflowPreset` 已提供的默认项可从 `workflowPresets[]` 查看。
 - `get_agent_guidance` 包含 `recommendedWorkflowPlan`，这是当前 `workflow` 的有序路线图。它会引用安全模板 ID，把输入预检、目录形态决策、预览、审查后写入和输出审计串起来；每个步骤和决策点都会列出 `inspectFields` 与 `successCriteria`，但仍不替代实际工具响应检查。
@@ -289,6 +289,7 @@ fonts/
 `inspect_font_inputs` 是不写输出的输入预检：
 
 - `supportedFontCount`、`validFontCount`、`invalidFontCount`
+- `unsupportedFileDecision`：从 `unsupportedFileSummary` 派生的快速判断，直接说明是否有忽略文件、是否包含压缩包、是否存在 `.zip` / `.txt` 之外的噪声，以及这些文件是否会被解压、复制或拆分
 - `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`
 - `missingIdentityCount`
 - `maxFilesHit`：只有当 `maxFiles` 之外确实还有更多文件时才为 true
@@ -300,6 +301,7 @@ fonts/
 
 - `resultsIncluded`：是否包含每个字体的 `results[]` 详情
 - `scannedFileCount`、`maxFiles`、`maxFilesHit`
+- `unsupportedFileDecision`：快速判断忽略文件是否存在、是否包含压缩包或更复杂的非字体噪声，以及“不解压、不复制、不拆分”的处理结论
 - `unsupportedFileSummary`：所有已扫描但被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；压缩包会归入 `archive` 并保持忽略
 - `dryRun`、`plannedCount`、`wouldProcessCount`、`planIncluded`
 - `batchWarningCount`、`batchWarnings[]`，每项包含机器可读的 `code` 和 `message`
@@ -339,6 +341,7 @@ fonts/
 - `directoryWorkflowSummary`：本次响应里的目录工作流导航摘要，用来串起布局复核、安全批量预览、可选 copy-only 暂存、reviewed 批量写入和必须执行的输出审计。它会重复源目录安全信号、路线选择、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示。
 - `sourceLayoutMismatchSummary`：直接回答“当前源目录结构和推荐批量分组是否匹配、能否直接对原目录做安全预览、copy-only 暂存是不需要/可选/已经写出、为什么暂存不会破坏源文件”等常见判断。
 - `directoryWorkflowSummary.planVisibility`：说明本次响应是否包含详细 `plan[]`。当 `includePlan: false` 时，`plan[]` 会被省略，但 `planActionSummary`、`organizationDecision`、`sourceLayoutMismatchSummary`、`recommendedNextActions[]`、`organizationWarnings[]`、`layout`、`safetySummary` 和 `batchPolicySummary` 仍可用于大目录 triage；如果写入前需要确认每个文件的目标路径，应按其中的 `rerunWithPlanArgs` 重新 dry-run。
+- `unsupportedFileDecision`：快速判断忽略文件是否存在、是否包含压缩包或更复杂的非字体噪声，以及这些文件是否会被解压、复制或拆分
 - `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；源目录混有压缩包、图片、文档或生成产物时优先看它
 - `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`
 - `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 策略片段，不是完整安全调用

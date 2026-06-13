@@ -20,7 +20,7 @@
 
 `batchPolicyGuide` 是批量策略选项的机器可读自定义指南。它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`；每个策略值都会包含 `useWhen`、`avoidWhen`、`inspectFields` 和 `successCriteria`。当用户要求偏离默认 preset 的行为时，先参考它选择最小显式覆盖，然后先预览再写入。
 
-`unsupportedFileCategoryCatalog` 会解释 `unsupportedFileSummary.byCategory[]` 使用的分类，包括代表性扩展名、分类含义和处理行为。工具响应也会在 `unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 中重复当前扫描的处理语义，agent 不必再次查 guidance 也能解释它们。尤其是 `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
+`unsupportedFileCategoryCatalog` 会解释 `unsupportedFileSummary.byCategory[]` 使用的分类，包括代表性扩展名、分类含义和处理行为。工具响应也会提供用于快速判断的 `unsupportedFileDecision`，以及作为证据的 `unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary`，agent 不必再次查 guidance 也能解释它们。尤其是 `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
 
 `directoryWorkflowDecisionMatrix[]` 是面向常见目录场景的机器可读决策表。每个条目包含 `id`、`useWhen`、`firstTool`、默认写入/源目录安全标记、`recommendedOptions`、可选后续工具/参数、`mustInspectFields`、`successCriteria` 和 `nonIntuitiveBehavior`。其中的参数会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖项。
 
@@ -147,6 +147,7 @@
 | 字段 | 含义 |
 |------|------|
 | `supportedFontCount` | 扩展名属于受支持字体格式的文件数。 |
+| `unsupportedFileDecision` | 从 `unsupportedFileSummary` 派生的快速机器可读判断：忽略文件状态、类别/扩展名数量、是否有压缩包、是否存在 `.zip` / `.txt` 之外的噪声，以及“不解压、不复制、不拆分”的处理标志。 |
 | `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、带处理语义的 `categoryDetails`、总体 `handlingSummary`、无扩展文件的 `<none>` 计数，以及少量示例路径。源目录混有压缩包、说明文档、截图或生成产物时优先看它。 |
 | `validFontCount` | 基础字体元数据可解析的文件数。 |
 | `invalidFontCount` | 扩展名像字体、但解析失败的文件数。 |
@@ -156,7 +157,7 @@
 | `invalidFonts[]` | 解析失败字体的紧凑清单和错误信息。 |
 | `files[]` | 可选的逐字体详情，包含扩展名、容器、身份信息、identity key、glyph count 和解析状态。 |
 
-`unsupportedFileSummary` 暴露 `unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.categoryDetails[]`、`unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。其中 `byCategory[]` 使用面向 agent 的粗分类：`archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other`。`categoryDetails[]` 会为本次扫描中出现的分类重复含义、代表扩展名和处理行为；`handlingSummary.archivesExtracted` 恒为 `false`。这不改变处理行为；不支持文件仍会被忽略。
+`unsupportedFileDecision` 是给 agent 的最短判断路线：先看 `status`、`totalUnsupportedFileCount`、`hasArchives`、`extensionsBeyondZipTxtCount`、`reviewRecommended`、`recommendedAction` 和 `handlingSummary`。`unsupportedFileSummary` 暴露 `unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.categoryDetails[]`、`unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。其中 `byCategory[]` 使用面向 agent 的粗分类：`archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other`。`categoryDetails[]` 会为本次扫描中出现的分类重复含义、代表扩展名和处理行为；`handlingSummary.archivesExtracted` 恒为 `false`。这不改变处理行为；不支持文件仍会被忽略。
 
 ## `split_font_batch`
 
@@ -193,7 +194,7 @@
 
 预设会先展开；同一次调用里显式传入的参数会覆盖预设值。
 
-批量响应会包含 `safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree`、`mayOverwriteOutputTree`、`batchPolicySummary`、`scannedFileCount`、`maxFiles`、`maxFilesHit`、`unsupportedFileSummary` 和 `batchDecision`。`sourceDestructive` 应始终为 `false`：批量处理不会移动、删除或重写源字体。`dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。只有当真实输出树位于 `inputDir` 内时，`writesSourceTree` 才为 `true`；此时源字体文件仍会保留，但输入目录树会新增生成输出。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileSummary` 会按扩展名汇总所有已扫描但被忽略的非字体文件。
+批量响应会包含 `safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree`、`mayOverwriteOutputTree`、`batchPolicySummary`、`scannedFileCount`、`maxFiles`、`maxFilesHit`、`unsupportedFileDecision`、`unsupportedFileSummary` 和 `batchDecision`。`sourceDestructive` 应始终为 `false`：批量处理不会移动、删除或重写源字体。`dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。只有当真实输出树位于 `inputDir` 内时，`writesSourceTree` 才为 `true`；此时源字体文件仍会保留，但输入目录树会新增生成输出。`maxFilesHit: true` 表示源文件扫描被截断，调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileDecision` 给出忽略文件的压缩判断路线；`unsupportedFileSummary` 则提供精确证据。
 
 批量格式代表优先级为：`.otf`、`.ttf`、`.woff2`、`.ttc`、`.otc`、`.woff`。
 
@@ -297,6 +298,7 @@
 | `directoryWorkflowSummary` | 本次响应里的目录工作流导航摘要，用来串起源布局复核、安全批量预览、可选 copy-only 暂存、reviewed 批量写入和必须执行的输出审计。它包含 `planVisibility`、`workflowSteps[]`、路线、安全信号、成功标准和非直觉行为提示。 |
 | `sourceLayoutMismatchSummary` | 源目录结构判断摘要：当前布局与推荐分组是否匹配、能否直接对原目录做安全预览、copy-only 暂存是不需要/可选/已经写出，以及暂存为什么不破坏源文件。 |
 | `directoryWorkflowSummary.planVisibility` | 说明本次响应是否包含详细 `plan[]`。当 `includePlan: false` 时，`plan[]` 会被省略；可用 `availableSummaryFields` 做压缩 triage，但如果写入前需要确认逐文件目标路径，应按 `rerunWithPlanArgs` 重跑。 |
+| `unsupportedFileDecision` | 从 `unsupportedFileSummary` 派生的快速机器可读判断：忽略文件状态、类别/扩展名数量、是否有压缩包、是否存在 `.zip` / `.txt` 之外的噪声，以及“不解压、不复制、不拆分”的处理标志。 |
 | `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、带处理语义的 `categoryDetails`、总体 `handlingSummary`、无扩展文件的 `<none>` 计数，以及少量示例路径。它用于解释为什么嘈杂源目录里有很多压缩包、文档、图片、生成产物或无扩展文件，但不会被复制或拆分。 |
 | `layout.layoutKind` | `empty`、`flat`、`nested` 或 `mixed`。`mixed` 表示输入根目录和子目录里都发现了字体。 |
 | `recommendedBatchOptions` | 根据目录形态建议的 `split_font_batch` 策略片段；嵌套或混合目录通常建议 `batchGroupBy: "source-dir"`，扁平目录通常建议 `font-family`。它本身不是完整安全调用。 |
@@ -308,7 +310,7 @@
 | `plan[]` | 可选的逐字体复制/跳过计划。复制条目包含 `source`、`target`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`。 |
 | `organizationManifestPath` | 仅在 `dryRun: false` 时写入，指向 `outputDir` 中的 `font-organization-manifest.json`。 |
 
-`unsupportedFileSummary` 使用与 `inspect_font_inputs` 相同的子字段：`unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.categoryDetails[]`、`unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；`.zip` 等 `archive` 文件只会被报告，不会被解压、复制或拆分，这一点也会体现为 `unsupportedFileSummary.handlingSummary.archivesExtracted: false`。
+`unsupportedFileDecision` 是快速路线，`unsupportedFileSummary` 是证据路线。`unsupportedFileSummary` 使用与 `inspect_font_inputs` 相同的子字段：`unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.categoryDetails[]`、`unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；`.zip` 等 `archive` 文件只会被报告，不会被解压、复制或拆分，这一点也会体现为 `unsupportedFileDecision.handlingSummary.archivesExtracted: false` 和 `unsupportedFileSummary.handlingSummary.archivesExtracted: false`。
 
 需要特别注意的非直觉行为：
 

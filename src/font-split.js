@@ -647,6 +647,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Compact summary of all ignored non-font files, including precise extension counts, coarse categories, extensionless files, and example paths.',
     agentAction: 'Use this when source directories include archives, docs, generated files, or other noise that will not be organized or split; inspect the subfields before judging corpus coverage.',
   },
+  unsupportedFileDecision: {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Compact machine-readable triage of ignored non-font files derived from unsupportedFileSummary.',
+    agentAction: 'Use this first to see whether ignored files exist, whether archive files or non-.zip/.txt noise are present, and whether the tool will extract, copy, or split those files; use unsupportedFileSummary for exact evidence.',
+  },
   'unsupportedFileSummary.total': {
     sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
     meaning: 'Total number of scanned files ignored because their extensions are not supported font formats.',
@@ -955,7 +960,7 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   recommendedBatchPreviewArgs: {
     sourceTools: ['organize_font_directory'],
     meaning: 'Copyable no-write split_font_batch preview arguments for the detected layout. It includes inputDir, workflowPreset safe-preview, and only layout-specific overrides.',
-    agentAction: 'Use this before writing batch output, then inspect safetySummary, batchWarnings, maxFilesHit, unsupportedFileSummary, skippedDuplicates, and errors.',
+    agentAction: 'Use this before writing batch output, then inspect safetySummary, batchWarnings, maxFilesHit, unsupportedFileDecision, unsupportedFileSummary, skippedDuplicates, and errors.',
   },
   layout: {
     sourceTools: ['organize_font_directory'],
@@ -1099,7 +1104,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       includeFiles: false,
     },
     customizableFields: ['inputDir', 'maxFiles', 'includeFiles'],
-    inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
+    inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
     nextStep: 'If maxFilesHit is true or invalid fonts are found, resolve that before relying on batch counts.',
     successCriteria: 'Require maxFilesHit false before trusting counts, and resolve or disclose invalid fonts, missing identities, and relevant inspectionWarnings.',
   },
@@ -1114,7 +1119,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       workflowPreset: 'safe-preview',
     },
     customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
-    inspectFields: ['safetySummary', 'batchPolicySummary', 'dryRun', 'operationMode', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+    inspectFields: ['safetySummary', 'batchPolicySummary', 'dryRun', 'operationMode', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
     nextStep: 'Use recommendedBatchPreviewArgs for a batch dry-run, or copy to a staging directory only after reviewing the plan.',
     successCriteria: 'The organization preview must remain no-write and sourceDestructive false, with layout, route decision, plan summary, warnings, and recommendedBatchPreviewArgs reviewed before any write.',
   },
@@ -1129,7 +1134,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       workflowPreset: 'structure-first',
     },
     customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'includePlan'],
-    inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileSummary', 'organizationWarnings', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'planActionSummary'],
+    inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'planActionSummary'],
     nextStep: 'Rerun with parseFonts:true before trusting invalid-font counts, glyph counts, identity dedupe, or font-family grouping.',
     successCriteria: 'Use this result only for structure-level decisions; rerun with parseFonts true before relying on invalid-font counts, glyph counts, identity dedupe, or metadata grouping.',
   },
@@ -1145,7 +1150,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       workflowPreset: 'reviewed-write',
     },
     customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'],
-    inspectFields: ['safetySummary', 'batchPolicySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'errorCount', 'errors'],
+    inspectFields: ['safetySummary', 'batchPolicySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'errorCount', 'errors'],
     nextStep: 'Use outputDir as the next split_font_batch input only after checking organizationWarnings.',
     successCriteria: 'The copy run must be sourceDestructive false, operationMode copy-only, errorCount zero, and copiedCount or planActionSummary must match the reviewed plan.',
   },
@@ -1163,7 +1168,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       maxFiles: 50000,
     },
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'includeResults', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'splitFailureAction'],
-    inspectFields: ['safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
+    inspectFields: ['safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
     nextStep: 'If the plan is acceptable, rerun with dryRun:false; use includeResults:false for large real runs.',
     successCriteria: 'The preview must have dryRun true, sourceDestructive false, maxFilesHit false, errorCount zero, and acceptable planned paths, warnings, naming, and dedupe decisions before writing.',
   },
@@ -1181,7 +1186,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       maxFiles: 50000,
     },
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'],
-    inspectFields: ['safetySummary', 'batchPolicySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileSummary'],
+    inspectFields: ['safetySummary', 'batchPolicySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
     nextStep: 'Run inspect_split_output on outputRoot before reporting completion.',
     successCriteria: 'The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up output audit before reporting completion.',
   },
@@ -1424,7 +1429,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Count supported fonts and ignored non-font files without writing output.',
-          inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount'],
+          inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
           successCriteria: 'maxFilesHit is false, or the caller intentionally accepts a bounded summary.',
         },
         {
@@ -1472,7 +1477,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           id: 'direct-batch-ok',
           when: 'The source layout already matches the desired grouping.',
           useTemplateId: 'batch-dry-run-preview',
-          inspectFields: ['safetySummary', 'batchDecision', 'planned', 'batchWarnings', 'unsupportedFileSummary'],
+          inspectFields: ['safetySummary', 'batchDecision', 'planned', 'batchWarnings', 'unsupportedFileDecision', 'unsupportedFileSummary'],
           nextInput: 'Use the original inputDir for split_font_batch.',
           successCriteria: 'The direct batch preview remains dryRun true and sourceDestructive false, with planned grouping and warnings acceptable for the original inputDir.',
         },
@@ -1534,7 +1539,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Understand source size, ignored files, invalid fonts, and scan truncation before batch processing.',
-          inspectFields: ['maxFilesHit', 'supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
+          inspectFields: ['maxFilesHit', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
           successCriteria: 'The source scan is complete enough for the requested batch scope.',
         },
         {
@@ -1590,7 +1595,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Inspect source font inputs without writing output.',
-          inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary'],
+          inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary'],
           successCriteria: 'maxFilesHit is false, or truncation is disclosed.',
         },
         auditStep,
@@ -1636,7 +1641,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Inspect the staging output as the next source directory.',
-          inspectFields: ['supportedFontCount', 'unsupportedFileSummary', 'maxFilesHit', 'inspectionWarnings'],
+          inspectFields: ['supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'maxFilesHit', 'inspectionWarnings'],
           successCriteria: 'The staging directory contains the expected supported fonts.',
         },
         {
@@ -1820,13 +1825,13 @@ export function getAgentGuidance(args = {}) {
       id: 'input-scan-complete',
       appliesTo: ['overview', 'batch', 'inspect', 'organize'],
       check: 'Before trusting a source scan, inspect maxFilesHit and inspectionWarnings; rerun with a higher maxFiles when truncated.',
-      responseFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
+      responseFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
     },
     {
       id: 'layout-plan-reviewed',
       appliesTo: ['overview', 'batch', 'organize'],
       check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect safetySummary, layout, recommendedBatchOptions, recommendedBatchPreviewArgs, organizationDecision, directoryWorkflowSummary, sourceLayoutMismatchSummary, sourceDestructive, writesSourceTree, writesOutputTree, outputTreeInsideInputTree, mayOverwriteOutputTree, organizationWarnings, and planActionSummary before applying any copy plan.',
-      responseFields: ['safetySummary', 'batchPolicySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedNextActions', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
+      responseFields: ['safetySummary', 'batchPolicySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedNextActions', 'unsupportedFileDecision', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'batch-plan-reviewed',
@@ -1927,7 +1932,7 @@ export function getAgentGuidance(args = {}) {
       followUpOptions: {
         workflowPreset: 'reviewed-write',
       },
-      mustInspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
+      mustInspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
       successCriteria: 'Start with safe-preview dryRun true and sourceDestructive false; proceed to reviewed-write only after planned paths, warnings, maxFilesHit, and errors are acceptable, then audit output.',
       nonIntuitiveBehavior: 'split_font_batch dryRun defaults to false, so agents should set dryRun:true explicitly for planning.',
     },
@@ -1945,7 +1950,7 @@ export function getAgentGuidance(args = {}) {
         inputDir: '<original-inputDir-or-organized-outputDir>',
         workflowPreset: 'safe-preview',
       },
-      mustInspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+      mustInspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
       successCriteria: 'The organization pass must remain no-write and sourceDestructive false; choose original input or organized output only after reviewing layout, warnings, plan summary, and recommendedBatchPreviewArgs.',
       nonIntuitiveBehavior: 'organize_font_directory defaults to dryRun:true and never moves or deletes source files; dryRun:false copies into outputDir only.',
     },
@@ -1958,7 +1963,7 @@ export function getAgentGuidance(args = {}) {
       recommendedOptions: {
         workflowPreset: 'structure-first',
       },
-      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs'],
+      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs'],
       successCriteria: 'Use the result only for structure-level routing; rerun with parseFonts true before relying on invalid-font counts, glyph counts, identity dedupe, or metadata grouping.',
       nonIntuitiveBehavior: 'parseFonts:false means validFontCount and invalidFontCount are null, not zero; identity dedupe and metadata family grouping are limited.',
     },
@@ -1975,7 +1980,7 @@ export function getAgentGuidance(args = {}) {
       followUpOptions: {
         workflowPreset: 'reviewed-write',
       },
-      mustInspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
+      mustInspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
       successCriteria: 'Review the dry-run plan before copying; real organization must remain copy-only and sourceDestructive false, with copiedCount/manifest and warnings matching the reviewed plan.',
       nonIntuitiveBehavior: 'A real organize run is copy-only. overwriteExisting:true can replace files in outputDir but still does not modify source files.',
     },
@@ -2005,7 +2010,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
+      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
       successCriteria: 'Use the example only if actual layout is flat or equivalent; continue after organization preview is no-write, source-safe, and recommendedBatchPreviewArgs/grouping have been reviewed.',
     },
     {
@@ -2035,7 +2040,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'not-needed-unless-staging',
       },
-      mustInspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      mustInspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'Use direct source-dir batch only after safe-preview confirms dryRun true, sourceDestructive false, maxFilesHit false, acceptable planned paths/warnings, and no blocking errors.',
     },
     {
@@ -2064,7 +2069,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
+      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileDecision', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
       successCriteria: 'Use organization preview first; proceed only after mixed-layout warnings, planActionSummary, and recommendedBatchPreviewArgs are reviewed and sourceDestructive remains false.',
     },
     {
@@ -2138,7 +2143,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only-when-dryRun-false',
       },
-      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'recommendedBatchPreviewArgs'],
+      mustInspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'recommendedBatchPreviewArgs'],
       successCriteria: 'Treat this as a no-write structure-first pass only; rerun with parseFonts true before metadata-sensitive grouping, invalid-font decisions, or identity dedupe.',
     },
   ];
@@ -2218,7 +2223,7 @@ export function getAgentGuidance(args = {}) {
         'Best for archive-per-family or vendor folders where source paths already express grouping.',
         'If root-level and nested fonts are mixed, dry-run organize_font_directory first to avoid surprising grouping.',
       ],
-      inspectFields: ['batchPolicySummary', 'batchDecision', 'layout', 'recommendedBatchPreviewArgs', 'planned', 'batchWarnings', 'unsupportedFileSummary'],
+      inspectFields: ['batchPolicySummary', 'batchDecision', 'layout', 'recommendedBatchPreviewArgs', 'planned', 'batchWarnings', 'unsupportedFileDecision', 'unsupportedFileSummary'],
       successCriteria: 'Preview must show the intended source-dir grouping with acceptable planned paths and warnings; reviewed write should only follow after that preview and must be audited afterward.',
     },
     {
@@ -2259,7 +2264,7 @@ export function getAgentGuidance(args = {}) {
         'parseFonts is false, so validFontCount and invalidFontCount are null rather than zero.',
         'Identity dedupe and font-family grouping are limited until rerun with parseFonts:true or safe-preview.',
       ],
-      inspectFields: ['batchPolicySummary', 'parsedFontMetadata', 'unparsedFontCount', 'dedupeLimitedByParsing', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileSummary', 'recommendedBatchPreviewArgs'],
+      inspectFields: ['batchPolicySummary', 'parsedFontMetadata', 'unparsedFontCount', 'dedupeLimitedByParsing', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'recommendedBatchPreviewArgs'],
       successCriteria: 'Use this only as a no-write structural scan; do not rely on invalid-font counts, glyph counts, metadata grouping, or identity dedupe until rerun with parseFonts true.',
     },
     {
@@ -2396,6 +2401,7 @@ export function getAgentGuidance(args = {}) {
       'configurationRecipes',
       'unsupportedFileCategoryCatalog',
       'supportedFontCount',
+      'unsupportedFileDecision',
       'unsupportedFileSummary',
       'unsupportedFileSummary.total',
       'unsupportedFileSummary.byExtension',
@@ -2593,6 +2599,54 @@ function buildUnsupportedFileSummary(files, { maxExamples = 20 } = {}) {
       .slice(0, maxExamples)
       .map((file) => toRelativeWorkspacePath(file)),
     examplesTruncated: unsupportedFiles.length > maxExamples,
+  };
+}
+
+function buildUnsupportedFileDecision(summary = {}) {
+  const total = summary.total || 0;
+  const byCategory = Array.isArray(summary.byCategory) ? summary.byCategory : [];
+  const byExtension = Array.isArray(summary.byExtension) ? summary.byExtension : [];
+  const categoryCounts = Object.fromEntries(byCategory.map((item) => [item.category, item.count]));
+  const extensions = byExtension.map((item) => item.extension).filter(Boolean);
+  const categories = byCategory.map((item) => item.category).filter(Boolean);
+  const extensionsBeyondZipTxt = extensions.filter((extension) => extension !== '.zip' && extension !== '.txt');
+  const archiveCount = categoryCounts.archive || 0;
+  const unsupportedFontAdjacentCount = categoryCounts['unsupported-font'] || 0;
+  const otherFileCount = categoryCounts.other || 0;
+  const handlingSummary = summary.handlingSummary || {};
+
+  return {
+    summaryType: 'unsupported-file-decision',
+    status: total > 0 ? 'ignored-files-present' : 'no-ignored-files',
+    totalUnsupportedFileCount: total,
+    categoryCount: categories.length,
+    categories,
+    extensionCount: extensions.length,
+    extensions,
+    extensionsBeyondZipTxt,
+    extensionsBeyondZipTxtCount: extensionsBeyondZipTxt.length,
+    hasArchives: archiveCount > 0,
+    archiveCount,
+    hasUnsupportedFontAdjacentFiles: unsupportedFontAdjacentCount > 0,
+    unsupportedFontAdjacentCount,
+    hasOtherFiles: otherFileCount > 0,
+    otherFileCount,
+    hasMultipleCategories: categories.length > 1,
+    hasExtensionsBeyondZipTxt: extensionsBeyondZipTxt.length > 0,
+    ignoredByDesign: total > 0,
+    reviewRecommended: total > 0,
+    recommendedAction: total > 0
+      ? 'inspect-unsupportedFileSummary-before-writing'
+      : 'continue',
+    handlingSummary: {
+      unsupportedFilesIgnored: handlingSummary.unsupportedFilesIgnored !== false,
+      unsupportedFilesCopiedByOrganization: handlingSummary.unsupportedFilesCopiedByOrganization === true,
+      unsupportedFilesSplitByBatch: handlingSummary.unsupportedFilesSplitByBatch === true,
+      archivesExtracted: handlingSummary.archivesExtracted === true,
+    },
+    nonIntuitiveBehavior: archiveCount > 0
+      ? 'Archive files are counted for awareness only; this tool does not extract archives, copy them during organization, or split them in batch processing.'
+      : 'Unsupported files are counted for awareness only; this tool does not copy them during organization or split them in batch processing.',
   };
 }
 
@@ -3107,7 +3161,7 @@ function buildBatchNextActions({
         effectiveArgs,
         batchOptions,
       }),
-      inspectFields: ['batchDecision', 'maxFilesHit', 'unsupportedFileSummary', 'batchWarnings', 'discoveredFontCount', 'deduplicatedCount', 'selectedFontCount'],
+      inspectFields: ['batchDecision', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'batchWarnings', 'discoveredFontCount', 'deduplicatedCount', 'selectedFontCount'],
       successCriteria: 'Rerun with a higher maxFiles value and require maxFilesHit false before trusting batch counts, dedupe results, or planned output paths.',
     });
   }
@@ -3136,7 +3190,7 @@ function buildBatchNextActions({
           effectiveArgs,
           batchOptions,
         }),
-        inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileSummary'],
+        inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
         successCriteria: 'The reviewed write should return dryRun false, sourceDestructive false, errorCount zero, and an audit-split-output next action whenever output was written.',
       });
     }
@@ -3309,7 +3363,7 @@ function buildOrganizationNextActions({
         optionOverrides: { includePlan: true },
         extraArgs: { maxFiles: '<higher-than-current>' },
       }),
-      inspectFields: ['organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'maxFilesHit', 'layout', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
+      inspectFields: ['organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'maxFilesHit', 'layout', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
       successCriteria: 'Rerun with a higher maxFiles value and require maxFilesHit false before trusting layout, warning, or copy-plan counts.',
     });
   }
@@ -3327,7 +3381,7 @@ function buildOrganizationNextActions({
         options,
         optionOverrides: { dryRun: true, parseFonts: true },
       }),
-      inspectFields: ['organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'parsedFontMetadata', 'validFontCount', 'invalidFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
+      inspectFields: ['organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'parsedFontMetadata', 'validFontCount', 'invalidFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
       successCriteria: 'The rerun should parse font metadata before relying on invalid-font counts, identity dedupe, glyph counts, or metadata family grouping.',
     });
   }
@@ -3361,7 +3415,7 @@ function buildOrganizationNextActions({
         inputDir: inputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
-      inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'The batch preview should remain dryRun true and sourceDestructive false, with planned grouping and warnings reviewed before any real write.',
     });
   }
@@ -3376,7 +3430,7 @@ function buildOrganizationNextActions({
         inputDir: outputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
-      inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'inputDir', 'maxFilesHit', 'unsupportedFileSummary', 'batchWarnings', 'planned'],
+      inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'inputDir', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'batchWarnings', 'planned'],
       note: 'Use the organized outputDir intentionally as the next inputDir, or keep future scans scoped so they do not reprocess organized copies.',
       successCriteria: 'The follow-up batch preview should intentionally target the organized outputDir, remain no-write, and be reviewed before any real batch write.',
     });
@@ -3399,7 +3453,7 @@ function buildOrganizationNextActions({
       priority: 'high',
       tool: 'organize_font_directory',
       reason: 'dryRun:true wrote no files; review the plan and warnings before choosing a write step.',
-      inspectFields: ['safetySummary', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'planActionSummary', 'plan', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree'],
+      inspectFields: ['safetySummary', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'planActionSummary', 'plan', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree'],
       successCriteria: 'Proceed to copy only after safetySummary confirms sourceDestructive false and the plan, planActionSummary, and organizationWarnings are acceptable.',
     });
 
@@ -3413,7 +3467,7 @@ function buildOrganizationNextActions({
           inputDir: inputDirRelative,
           recommendedBatchOptions: layout.recommendedBatchOptions,
         }),
-        inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+        inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
         successCriteria: 'The original-layout batch preview should remain dryRun true and sourceDestructive false, with planned paths and grouping reviewed before a real write.',
       });
       push({
@@ -3428,7 +3482,7 @@ function buildOrganizationNextActions({
           options,
           optionOverrides: { dryRun: false, overwriteExisting: false },
         }),
-        inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
+        inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
         successCriteria: 'The reviewed organization copy should be sourceDestructive false and copy-only, with copiedCount or planActionSummary matching the reviewed plan.',
       });
     }
@@ -3442,7 +3496,7 @@ function buildOrganizationNextActions({
         inputDir: outputDirRelative,
         includeFiles: false,
       },
-      inspectFields: ['supportedFontCount', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
+      inspectFields: ['supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
       successCriteria: 'The staging inspection should complete without scan truncation and show the expected supported fonts before using the staging directory for splitting.',
     });
     push({
@@ -3454,7 +3508,7 @@ function buildOrganizationNextActions({
         inputDir: outputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
-      inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'The organized-output batch preview should remain dryRun true and sourceDestructive false, with planned paths and warnings reviewed before a real write.',
     });
   }
@@ -5422,6 +5476,7 @@ export async function splitFontBatch(args = {}) {
   const allFiles = inputScan.files;
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
   const unsupportedFileSummary = buildUnsupportedFileSummary(allFiles);
+  const unsupportedFileDecision = buildUnsupportedFileDecision(unsupportedFileSummary);
 
   let deduplicated;
   if (batchOptions.batchDedupeMode === 'none') {
@@ -5773,6 +5828,7 @@ export async function splitFontBatch(args = {}) {
     scannedFileCount: allFiles.length,
     maxFiles,
     maxFilesHit: inputScan.truncated,
+    unsupportedFileDecision,
     unsupportedFileSummary,
     discoveredFontCount: fontFiles.length,
     deduplicatedCount,
@@ -5823,6 +5879,7 @@ export async function inspectFontInputs(args) {
   const allFiles = inputScan.files;
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
   const unsupportedFileSummary = buildUnsupportedFileSummary(allFiles);
+  const unsupportedFileDecision = buildUnsupportedFileDecision(unsupportedFileSummary);
   const entries = [];
   const byExtension = {};
   const byStatus = {};
@@ -5854,6 +5911,7 @@ export async function inspectFontInputs(args) {
     scannedFileCount: allFiles.length,
     supportedFontCount: fontFiles.length,
     unsupportedFileCount: allFiles.length - fontFiles.length,
+    unsupportedFileDecision,
     unsupportedFileSummary,
     validFontCount: entries.length - invalidFonts.length,
     invalidFontCount: invalidFonts.length,
@@ -5897,6 +5955,7 @@ export async function organizeFontDirectory(args = {}) {
   const allFiles = scan.files;
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
   const unsupportedFileSummary = buildUnsupportedFileSummary(allFiles);
+  const unsupportedFileDecision = buildUnsupportedFileDecision(unsupportedFileSummary);
   const layout = buildDirectoryLayoutSummary({ inputDir, allFiles, fontFiles });
   const entries = [];
 
@@ -6146,6 +6205,7 @@ export async function organizeFontDirectory(args = {}) {
     validFontCount: options.parseFonts ? validEntries.length : null,
     invalidFontCount: options.parseFonts ? invalidEntries.length : null,
     unsupportedFileCount: layout.unsupportedFileCount,
+    unsupportedFileDecision,
     unsupportedFileSummary,
     deduplicatedCount: dedupe.selected.length,
     skippedDuplicates: dedupe.duplicates.length,
