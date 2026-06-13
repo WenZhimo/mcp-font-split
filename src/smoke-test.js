@@ -3201,11 +3201,13 @@ if (scenario === 'single') {
     !readmeText.includes('`default` 不是有效值')
     || !readmeText.includes('无效 preset 拒绝')
     || !readmeText.includes('BatchRunConfigurationError')
+    || !readmeText.includes('枚举型、布尔型或数字型')
     || !readmeEnText.includes('`default` is not valid')
     || !readmeEnText.includes('invalid preset rejection')
     || !readmeEnText.includes('BatchRunConfigurationError')
+    || !readmeEnText.includes('enum-like, boolean, or numeric')
   ) {
-    throw new Error('Expected README docs to describe batch:run invalid workflow preset rejection.');
+    throw new Error('Expected README docs to describe batch:run invalid configuration rejection.');
   }
 
   const { stdout: safePreviewStdout } = await execFileAsync(process.execPath, ['batch-run.js', inputDir, outputRoot, '1', '1', '--dry-run'], {
@@ -3317,6 +3319,96 @@ if (scenario === 'single') {
     throw new Error('invalid dedupe env run: expected invalid enum-like env var to be rejected with machine-readable allowed values.');
   }
 
+  let invalidBooleanStdout = '';
+  let invalidBooleanStderr = '';
+  try {
+    await execFileAsync(process.execPath, ['batch-run.js', '--json-summary', inputDir, outputRoot, '1', '1'], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        FONT_SPLIT_INCLUDE_RESULTS: 'maybe',
+      },
+    });
+  } catch (error) {
+    invalidBooleanStdout = error.stdout || '';
+    invalidBooleanStderr = error.stderr || '';
+  }
+  if (invalidBooleanStderr.trim() !== '') {
+    throw new Error('invalid boolean env run: expected json-summary configuration errors to keep stderr empty.');
+  }
+  const invalidBoolean = parseCliJson(invalidBooleanStdout, 'invalid boolean env run');
+  if (
+    invalidBoolean.ok !== false
+    || invalidBoolean.name !== 'BatchRunConfigurationError'
+    || invalidBoolean.options?.requestedIncludeResults !== 'maybe'
+    || Object.hasOwn(invalidBoolean.options || {}, 'includeResults')
+    || invalidBoolean.details?.option !== 'FONT_SPLIT_INCLUDE_RESULTS'
+    || invalidBoolean.details?.source !== 'env'
+    || invalidBoolean.details?.expectedType !== 'boolean'
+    || !invalidBoolean.details?.allowedValues?.includes('true')
+    || !invalidBoolean.details?.allowedValues?.includes('false')
+  ) {
+    throw new Error('invalid boolean env run: expected invalid boolean env var to be rejected with machine-readable allowed values.');
+  }
+
+  let invalidLimitEnvStdout = '';
+  let invalidLimitEnvStderr = '';
+  try {
+    await execFileAsync(process.execPath, ['batch-run.js', '--json-summary', inputDir, outputRoot, '1', '1'], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        FONT_SPLIT_LIMIT: 'zero',
+      },
+    });
+  } catch (error) {
+    invalidLimitEnvStdout = error.stdout || '';
+    invalidLimitEnvStderr = error.stderr || '';
+  }
+  if (invalidLimitEnvStderr.trim() !== '') {
+    throw new Error('invalid limit env run: expected json-summary configuration errors to keep stderr empty.');
+  }
+  const invalidLimitEnv = parseCliJson(invalidLimitEnvStdout, 'invalid limit env run');
+  if (
+    invalidLimitEnv.ok !== false
+    || invalidLimitEnv.name !== 'BatchRunConfigurationError'
+    || invalidLimitEnv.options?.limit !== null
+    || invalidLimitEnv.options?.requestedLimit !== 'zero'
+    || invalidLimitEnv.details?.option !== 'FONT_SPLIT_LIMIT'
+    || invalidLimitEnv.details?.source !== 'env'
+    || invalidLimitEnv.details?.targetField !== 'limit'
+    || invalidLimitEnv.details?.expectedType !== 'positive-integer'
+  ) {
+    throw new Error('invalid limit env run: expected invalid numeric env var to be rejected with machine-readable numeric details.');
+  }
+
+  let invalidPositionalLimitStdout = '';
+  let invalidPositionalLimitStderr = '';
+  try {
+    await execFileAsync(process.execPath, ['batch-run.js', '--json-summary', inputDir, outputRoot, 'zero', '1'], {
+      cwd: process.cwd(),
+    });
+  } catch (error) {
+    invalidPositionalLimitStdout = error.stdout || '';
+    invalidPositionalLimitStderr = error.stderr || '';
+  }
+  if (invalidPositionalLimitStderr.trim() !== '') {
+    throw new Error('invalid positional limit run: expected json-summary configuration errors to keep stderr empty.');
+  }
+  const invalidPositionalLimit = parseCliJson(invalidPositionalLimitStdout, 'invalid positional limit run');
+  if (
+    invalidPositionalLimit.ok !== false
+    || invalidPositionalLimit.name !== 'BatchRunConfigurationError'
+    || invalidPositionalLimit.options?.limit !== null
+    || invalidPositionalLimit.options?.requestedLimit !== 'zero'
+    || invalidPositionalLimit.details?.option !== 'limit'
+    || invalidPositionalLimit.details?.source !== 'positional'
+    || invalidPositionalLimit.details?.targetField !== 'limit'
+    || invalidPositionalLimit.details?.expectedType !== 'positive-integer'
+  ) {
+    throw new Error('invalid positional limit run: expected invalid numeric positional arg to be rejected with machine-readable numeric details.');
+  }
+
   const { stdout: jsonSuccessStdout, stderr: jsonSuccessStderr } = await execFileAsync(process.execPath, ['batch-run.js', '--json', inputDir, outputRoot, '1', '1', '--dry-run'], {
     cwd: process.cwd(),
   });
@@ -3406,6 +3498,9 @@ if (scenario === 'single') {
     includeResultsOverride: includeResultsOverrideStdout,
     invalidPreset,
     invalidDedupe,
+    invalidBoolean,
+    invalidLimitEnv,
+    invalidPositionalLimit,
     jsonSuccess,
     jsonFailure,
     jsonSummarySuccess,

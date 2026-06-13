@@ -1,6 +1,8 @@
 import { splitFontBatch } from './src/font-split.js';
 
 const WORKFLOW_PRESETS = ['safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all'];
+const BOOLEAN_TRUE_VALUES = ['1', 'true', 'yes', 'on'];
+const BOOLEAN_FALSE_VALUES = ['0', 'false', 'no', 'off'];
 const BATCH_RUN_ENUM_ENV_OPTIONS = {
   FONT_SPLIT_SKIP_MODE: {
     allowedValues: ['manifest', 'force'],
@@ -29,25 +31,8 @@ const BATCH_RUN_ENUM_ENV_OPTIONS = {
 };
 const COMPACT_ERROR_LIMIT = 20;
 
-function numberOption(value, fallback) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
-}
-
 function hasEnv(name) {
   return process.env[name] !== undefined && process.env[name] !== '';
-}
-
-function booleanEnv(value) {
-  return ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase());
-}
-
-function booleanOption(value, fallback) {
-  if (value === undefined || value === null || value === '') return fallback;
-  const normalized = String(value).toLowerCase();
-  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
-  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
-  return fallback;
 }
 
 function buildInvalidWorkflowPresetError(value, fallback) {
@@ -61,6 +46,41 @@ function buildInvalidWorkflowPresetError(value, fallback) {
     defaultWhenOmitted: fallback,
     omitForDefaultBehavior: true,
     nonIntuitiveBehavior: 'default is not a named workflow preset; omit FONT_SPLIT_WORKFLOW_PRESET to use batch-run defaults.',
+  };
+  return error;
+}
+
+function buildInvalidBooleanEnvError(name, value, requestedField) {
+  const allowedValues = [...BOOLEAN_TRUE_VALUES, ...BOOLEAN_FALSE_VALUES];
+  const error = new Error(`${name} must be one of: ${allowedValues.join(', ')}. Omit it to leave the option unset and use CLI/preset defaults.`);
+  error.name = 'BatchRunConfigurationError';
+  error.details = {
+    option: name,
+    source: 'env',
+    received: value,
+    allowedValues,
+    requestedField,
+    expectedType: 'boolean',
+    omitForDefaultBehavior: true,
+    nonIntuitiveBehavior: 'Invalid boolean batch-run environment variables are rejected instead of silently falling back.',
+  };
+  return error;
+}
+
+function buildInvalidPositiveIntegerError({ name, value, requestedField, targetField, source, defaultWhenOmitted }) {
+  const error = new Error(`${name} must be a positive integer. Omit it to use ${defaultWhenOmitted}.`);
+  error.name = 'BatchRunConfigurationError';
+  error.details = {
+    option: name,
+    source,
+    received: value,
+    requestedField,
+    targetField,
+    expectedType: 'positive-integer',
+    min: 1,
+    defaultWhenOmitted,
+    omitForDefaultBehavior: true,
+    nonIntuitiveBehavior: 'Invalid numeric batch-run configuration is rejected instead of silently falling back.',
   };
   return error;
 }
@@ -79,6 +99,18 @@ function buildInvalidEnumEnvError(name, value, allowedValues, requestedField) {
   return error;
 }
 
+function booleanEnvOption(name, requestedField) {
+  if (!hasEnv(name)) return { value: undefined, error: null };
+  const value = process.env[name];
+  const normalized = String(value).toLowerCase();
+  if (BOOLEAN_TRUE_VALUES.includes(normalized)) return { value: true, error: null };
+  if (BOOLEAN_FALSE_VALUES.includes(normalized)) return { value: false, error: null };
+  return {
+    value: undefined,
+    error: buildInvalidBooleanEnvError(name, value, requestedField),
+  };
+}
+
 function enumEnvOption(name) {
   const config = BATCH_RUN_ENUM_ENV_OPTIONS[name];
   if (!config || !hasEnv(name)) return { value: undefined, error: null };
@@ -89,6 +121,27 @@ function enumEnvOption(name) {
       value: undefined,
       error: buildInvalidEnumEnvError(name, value, config.allowedValues, config.requestedField),
     };
+}
+
+function positiveIntegerOption({ name, value, fallback, requestedField, targetField, source }) {
+  if (value === undefined || value === null || value === '') {
+    return { value: fallback, error: null };
+  }
+  const parsed = Number(value);
+  if (Number.isInteger(parsed) && parsed > 0) {
+    return { value: parsed, error: null };
+  }
+  return {
+    value: fallback,
+    error: buildInvalidPositiveIntegerError({
+      name,
+      value,
+      requestedField,
+      targetField,
+      source,
+      defaultWhenOmitted: String(fallback),
+    }),
+  };
 }
 
 function limitArray(items, limit) {
@@ -189,15 +242,45 @@ const flagArgs = new Set(['--dry-run', '--json', '--json-summary']);
 const positionalArgs = process.argv.slice(2).filter((arg) => !flagArgs.has(arg));
 const inputDir = process.env.FONT_SPLIT_INPUT_DIR || positionalArgs[0] || '.';
 const outputRoot = process.env.FONT_SPLIT_OUTPUT_ROOT || positionalArgs[1] || 'split-output';
-const limit = numberOption(process.env.FONT_SPLIT_LIMIT || positionalArgs[2], 50000);
-const maxFiles = numberOption(process.env.FONT_SPLIT_MAX_FILES || positionalArgs[3], 50000);
 const dryRunFlag = process.argv.includes('--dry-run');
-const dryRunEnvProvided = hasEnv('FONT_SPLIT_DRY_RUN');
-const dryRun = dryRunFlag || booleanEnv(process.env.FONT_SPLIT_DRY_RUN);
-const jsonSummaryOutput = process.argv.includes('--json-summary') || booleanEnv(process.env.FONT_SPLIT_JSON_SUMMARY);
-const jsonOutput = jsonSummaryOutput || process.argv.includes('--json') || booleanEnv(process.env.FONT_SPLIT_JSON);
-const includeResults = booleanOption(process.env.FONT_SPLIT_INCLUDE_RESULTS, undefined);
-const chunkSize = numberOption(process.env.FONT_SPLIT_CHUNK_SIZE, 70 * 1024);
+const jsonSummaryFlag = process.argv.includes('--json-summary');
+const jsonFlag = process.argv.includes('--json');
+const limitOption = positiveIntegerOption({
+  name: hasEnv('FONT_SPLIT_LIMIT') ? 'FONT_SPLIT_LIMIT' : 'limit',
+  value: hasEnv('FONT_SPLIT_LIMIT') ? process.env.FONT_SPLIT_LIMIT : positionalArgs[2],
+  fallback: 50000,
+  requestedField: 'requestedLimit',
+  targetField: 'limit',
+  source: hasEnv('FONT_SPLIT_LIMIT') ? 'env' : 'positional',
+});
+const maxFilesOption = positiveIntegerOption({
+  name: hasEnv('FONT_SPLIT_MAX_FILES') ? 'FONT_SPLIT_MAX_FILES' : 'maxFiles',
+  value: hasEnv('FONT_SPLIT_MAX_FILES') ? process.env.FONT_SPLIT_MAX_FILES : positionalArgs[3],
+  fallback: 50000,
+  requestedField: 'requestedMaxFiles',
+  targetField: 'maxFiles',
+  source: hasEnv('FONT_SPLIT_MAX_FILES') ? 'env' : 'positional',
+});
+const chunkSizeOption = positiveIntegerOption({
+  name: 'FONT_SPLIT_CHUNK_SIZE',
+  value: hasEnv('FONT_SPLIT_CHUNK_SIZE') ? process.env.FONT_SPLIT_CHUNK_SIZE : undefined,
+  fallback: 70 * 1024,
+  requestedField: 'requestedChunkSize',
+  targetField: 'chunkSize',
+  source: 'env',
+});
+const dryRunOption = booleanEnvOption('FONT_SPLIT_DRY_RUN', 'requestedDryRun');
+const jsonSummaryOption = booleanEnvOption('FONT_SPLIT_JSON_SUMMARY', 'requestedJsonSummary');
+const jsonOption = booleanEnvOption('FONT_SPLIT_JSON', 'requestedJson');
+const includeResultsOption = booleanEnvOption('FONT_SPLIT_INCLUDE_RESULTS', 'requestedIncludeResults');
+const limit = limitOption.value;
+const maxFiles = maxFilesOption.value;
+const dryRunEnvProvided = hasEnv('FONT_SPLIT_DRY_RUN') && !dryRunOption.error;
+const dryRun = dryRunFlag || dryRunOption.value === true;
+const jsonSummaryOutput = jsonSummaryFlag || jsonSummaryOption.value === true || Boolean(jsonSummaryOption.error);
+const jsonOutput = jsonSummaryOutput || jsonFlag || jsonOption.value === true || Boolean(jsonOption.error);
+const includeResults = includeResultsOption.value;
+const chunkSize = chunkSizeOption.value;
 const defaultWorkflowPreset = dryRun ? 'safe-preview' : 'reviewed-write';
 const requestedWorkflowPreset = hasEnv('FONT_SPLIT_WORKFLOW_PRESET') ? process.env.FONT_SPLIT_WORKFLOW_PRESET : undefined;
 const workflowPresetConfigurationError = requestedWorkflowPreset && !WORKFLOW_PRESETS.includes(requestedWorkflowPreset)
@@ -211,6 +294,13 @@ const batchDedupeModeOption = enumEnvOption('FONT_SPLIT_BATCH_DEDUPE_MODE');
 const batchErrorModeOption = enumEnvOption('FONT_SPLIT_BATCH_ERROR_MODE');
 const splitFailureActionOption = enumEnvOption('FONT_SPLIT_SPLIT_FAILURE_ACTION');
 const configurationError = workflowPresetConfigurationError
+  || dryRunOption.error
+  || jsonSummaryOption.error
+  || jsonOption.error
+  || includeResultsOption.error
+  || limitOption.error
+  || maxFilesOption.error
+  || chunkSizeOption.error
   || skipModeOption.error
   || batchGroupByOption.error
   || batchNamingModeOption.error
@@ -227,16 +317,16 @@ const startedAt = Date.now();
 const batchOptions = {
   inputDir,
   outputRoot,
-  limit,
-  maxFiles,
+  limit: configurationError?.details?.targetField === 'limit' ? null : limit,
+  maxFiles: configurationError?.details?.targetField === 'maxFiles' ? null : maxFiles,
   ...(workflowPresetConfigurationError ? { workflowPreset: null, requestedWorkflowPreset } : { workflowPreset }),
   ...(!workflowPresetConfigurationError && configurationError?.details?.requestedField
     ? { [configurationError.details.requestedField]: configurationError.details.received }
     : {}),
   silent: true,
-  chunkSize,
+  chunkSize: configurationError?.details?.targetField === 'chunkSize' ? null : chunkSize,
   ...(dryRunFlag || dryRunEnvProvided ? { dryRun } : {}),
-  ...(includeResults !== undefined ? { includeResults } : {}),
+  ...(includeResults !== undefined && !includeResultsOption.error ? { includeResults } : {}),
   ...(skipMode ? { skipMode } : {}),
   ...(batchGroupBy ? { batchGroupBy } : {}),
   ...(batchNamingMode ? { batchNamingMode } : {}),
