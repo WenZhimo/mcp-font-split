@@ -181,7 +181,7 @@ If the source directory shape is uncertain, first request `get_agent_guidance` w
 | `skipMode` | `manifest`, `force` | `manifest` | Existing-output skip policy. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | First-level family directory strategy. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Per-font output directory naming strategy. |
-| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Pre-processing dedupe strategy. |
+| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Pre-processing dedupe strategy. `same-path` is path/stem-level only; `font-identity` is semantic cross-format identity. |
 | `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `fail-after` | Per-font error handling strategy. |
 | `debugBatchDecisions` | boolean | `false` | Emit structured decision logs for dedupe, naming, skip, and errors. |
 
@@ -278,7 +278,7 @@ Do not treat `recommendedBatchOptions` as a complete safe call. Use copy-only or
 | `parseFonts` | boolean | `true` | Read font metadata for identity dedupe, glyph counts, invalid-font detection, and font-family grouping. Set `false` for a faster structure-only plan. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | Folder grouping strategy for organized copies, using the same meanings as `split_font_batch`. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Copied filename collision strategy. |
-| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Equivalent-font dedupe strategy before copy planning. |
+| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Dedupe strategy before copy planning. `same-path` is path/stem-level only; `font-identity` is semantic cross-format identity. |
 | `copyInvalidFonts` | boolean | `false` | Copy supported-extension files even when font metadata parsing fails. Keep this `false` unless preserving broken font-like files is intentional. |
 | `overwriteExisting` | boolean | `false` | Allow replacing matching files in `outputDir`. Source files are still never modified. |
 

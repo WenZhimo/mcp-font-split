@@ -223,7 +223,7 @@ Use this only to learn the directory shape quickly. Because font parsing is skip
 | `skipMode` | `manifest`, `force` | `manifest` | Choose how batch mode decides whether output is already current. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | Choose the family directory naming strategy for batch mode. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Choose how batch mode names per-font output directories when collisions exist. |
-| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Choose how batch mode deduplicates equivalent fonts before processing. |
+| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Choose pre-processing dedupe; `same-path` is path/stem-level, while `font-identity` is semantic identity across formats. |
 | `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `fail-after` | Choose whether per-font errors are collected in the response or thrown for automation. |
 | `limit` | positive integer, MCP max `50000` | `20` | Maximum fonts to process after dedupe. Raise it explicitly for full-library runs. |
 | `maxFiles` | positive integer, MCP max `50000` | `5000` | Maximum source files to scan before filtering fonts. |
@@ -263,7 +263,7 @@ In batch mode, the output directory key is the bare `fontBaseName` unless anothe
 `batchDedupeMode` details:
 
 - `none`: do not deduplicate before processing.
-- `same-path`: preserve the old same-path, same-stem multi-format dedupe behavior.
+- `same-path`: deduplicate only multi-format files that share the same source path stem; it is fast/path-level and does not detect semantic equivalents across directories.
 - `font-identity`: deduplicate equivalent fonts across formats by comparing normalized font identity and keeping the highest-priority representative. The key uses typographic family/subfamily when available, falls back to legacy family/subfamily, then full name or PostScript name; glyph count is diagnostic only and does not split otherwise equivalent OTF/TTF/WOFF inputs.
 - If identity extraction fails, dedupe falls back to a path-based key and leaves the actual failure for the processing phase and `batchErrorMode`.
 
@@ -508,7 +508,7 @@ Metadata-driven batch grouping:
 }
 ```
 
-Fully preserve old-style batch behavior:
+Use bare names with path-level dedupe only:
 
 ```json
 {

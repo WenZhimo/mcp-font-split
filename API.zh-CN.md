@@ -181,7 +181,7 @@
 | `skipMode` | `manifest`, `force` | `manifest` | 已有输出的跳过策略。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 第一层 family 目录策略。 |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 每个字体输出目录的命名策略。 |
-| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 处理前的去重策略。 |
+| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 处理前的去重策略；`same-path` 只做路径/stem 级去重，`font-identity` 做跨格式语义身份去重。 |
 | `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `fail-after` | 单字体错误的处理策略。 |
 | `debugBatchDecisions` | boolean | `false` | 输出结构化调试日志，覆盖 dedupe、naming、skip 和 error 决策。 |
 
@@ -278,7 +278,7 @@
 | `parseFonts` | boolean | `true` | 是否读取字体元数据，用于 identity 去重、glyph count、坏字体检测和 font-family 分组。设为 `false` 时只做更快的结构优先计划。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 整理副本的目录分组策略，含义与 `split_font_batch` 相同。 |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 复制字体文件名的冲突处理策略。 |
-| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 复制计划前如何对等价字体去重。 |
+| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 复制计划前的去重策略；`same-path` 只做路径/stem 级去重，`font-identity` 做跨格式语义身份去重。 |
 | `copyInvalidFonts` | boolean | `false` | 即使字体元数据解析失败，也复制扩展名受支持的文件。除非明确要保留坏字体/伪字体文件，否则保持 `false`。 |
 | `overwriteExisting` | boolean | `false` | 是否允许替换 `outputDir` 中的匹配文件；源文件仍不会被修改。 |
 

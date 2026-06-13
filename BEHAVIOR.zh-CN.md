@@ -304,7 +304,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 行为：
 
 - `none`：完全不去重
-- `same-path`：保留旧的“同路径同 stem 多格式去重”行为
+- `same-path`：只对同一源路径 stem 的多格式文件去重；这是快速路径级策略，不会跨目录判断语义等价字体
 - `font-identity`：按归一化后的字体身份跨任意格式去重，保留优先级最高的代表。身份键优先使用 typographic family/subfamily，缺失时回退到 legacy family/subfamily，再回退到 full name 或 PostScript name；`glyphCount` 只作为诊断信息，不参与等价判定。
 
 ### 4.10 `batchErrorMode`（批量专用）

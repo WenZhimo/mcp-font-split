@@ -223,7 +223,7 @@ fonts/
 | `skipMode` | `manifest`, `force` | `manifest` | 批量模式如何判断已有输出是否可跳过。 |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | 批量模式如何决定家族目录名。 |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | 批量模式如何决定每个字体输出目录的命名冲突策略。 |
-| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 批量模式如何在处理前对等价字体做去重。 |
+| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | 批量模式如何在处理前去重；`same-path` 是路径/stem 级策略，`font-identity` 是跨格式语义身份策略。 |
 | `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `fail-after` | 每个字体处理失败时，是收集到响应里，还是为自动化场景直接抛错。 |
 | `limit` | 正整数，MCP 最大 `50000` | `20` | 去重后最多处理多少个字体。全量跑时需要显式调高。 |
 | `maxFiles` | 正整数，MCP 最大 `50000` | `5000` | 扫描阶段最多读取多少个源文件，再过滤字体扩展名。 |
@@ -263,7 +263,7 @@ fonts/
 `batchDedupeMode` 说明：
 
 - `none`：完全不去重。
-- `same-path`：保留旧的“同路径、同 stem 多格式去重”行为。
+- `same-path`：只对同一源路径 stem 的多格式文件去重；它是快速路径级策略，不会跨目录判断语义等价字体。
 - `font-identity`：按归一化后的字体身份跨格式去重，保留优先级最高的代表。身份键优先使用 typographic family/subfamily，缺失时回退到 legacy family/subfamily，再回退到 full name 或 PostScript name；`glyphCount` 只作为诊断信息，不会把等价的 OTF/TTF/WOFF 输入拆开。
 - 如果身份解析失败，去重会回退到基于路径的 key，并把真实错误留给处理阶段和 `batchErrorMode`。
 
@@ -508,7 +508,7 @@ fonts/
 }
 ```
 
-显式切回旧式批量行为：
+使用裸名并仅做路径级去重：
 
 ```json
 {

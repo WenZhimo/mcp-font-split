@@ -4035,12 +4035,37 @@ if (scenario === 'single') {
   }
 } else if (scenario === 'behavior-docs') {
   const behaviorDoc = await fs.readFile('BEHAVIOR.zh-CN.md', 'utf8');
+  const readmeZh = await fs.readFile('README.md', 'utf8');
+  const readmeEn = await fs.readFile('README.en.md', 'utf8');
+  const serverSource = await fs.readFile('src/server.js', 'utf8');
   const guidance = getAgentGuidance({ workflow: 'batch', detailLevel: 'full' });
   const assertBehaviorContains = (label, token) => {
     if (!behaviorDoc.includes(token)) {
       throw new Error(`BEHAVIOR.zh-CN.md is missing documented ${label}: ${token}`);
     }
   };
+  const samePathLegacyTokens = [
+    'preserve the old same-path',
+    'preserves old same-stem',
+    'old-style batch behavior',
+    '保留旧的“同路径',
+    '旧式批量行为',
+  ];
+  for (const [label, text] of [
+    ['README.md', readmeZh],
+    ['README.en.md', readmeEn],
+    ['BEHAVIOR.zh-CN.md', behaviorDoc],
+    ['src/server.js', serverSource],
+  ]) {
+    for (const token of samePathLegacyTokens) {
+      if (text.includes(token)) {
+        throw new Error(`${label} should describe same-path as path/stem-level dedupe, not as old behavior: ${token}`);
+      }
+    }
+  }
+  if (!readmeZh.includes('路径/stem 级') || !readmeEn.includes('path/stem-level') || !serverSource.includes('same source path stem')) {
+    throw new Error('Expected same-path documentation and schema descriptions to explain path/stem-level dedupe semantics.');
+  }
 
   for (const tool of guidance.tools || []) {
     assertBehaviorContains(`tool ${tool.name}`, `\`${tool.name}\``);
