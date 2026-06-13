@@ -160,6 +160,8 @@
 
 扫描目录、去重等价字体、分组输出，并处理选中的字体。
 
+如果源目录形态不确定，先调用 `get_agent_guidance` 并设置 `sections: ["examples"]`，查看 `source-layout-mismatch-comparison`；或先运行 `organize_font_directory` 的 `workflowPreset: "safe-preview"`。在决定真实批量写入或 copy-only 暂存前，优先使用 organizer 返回的 `recommendedBatchPreviewArgs` 对原目录做无写入预览。
+
 | 字段 | 类型 / 可选值 | 默认值 | 说明 |
 |------|---------------|--------|------|
 | `inputDir` | string | `.` | `FONT_SPLIT_ROOT` 内要扫描的目录。 |
@@ -226,6 +228,8 @@
 ## `organize_font_directory`
 
 为源字体目录生成整理计划，或把字体复制整理到一个更规整的暂存目录。
+
+当 agent 需要在“直接对原目录做批量预览”和“先复制到暂存目录再处理”之间选择时，使用这个工具。对于 flat/nested/mixed/output-inside-input 路由，`get_agent_guidance` 的 `sections: ["examples"]` 会返回 `source-layout-mismatch-comparison` 示例；但实际决策仍必须来自当前响应的 `sourceLayoutMismatchSummary`、`recommendedBatchPreviewArgs`、`organizationWarnings` 和安全字段。
 
 > [!WARNING]
 > 这个工具对源目录是非破坏性的：它不会移动、删除或重写源字体文件。默认 `dryRun: true`，只返回计划；只有显式设置 `dryRun: false` 时才会在 `outputDir` 中创建目录并复制字体。如果设置 `overwriteExisting: true`，可能会替换 `outputDir` 中的目标文件，但源文件仍不会被修改。

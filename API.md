@@ -160,6 +160,8 @@ Important result fields:
 
 Scan a directory, deduplicate equivalent fonts, group outputs, and process selected fonts.
 
+If the source directory shape is uncertain, first request `get_agent_guidance` with `sections: ["examples"]` and review `source-layout-mismatch-comparison`, or run `organize_font_directory` with `workflowPreset: "safe-preview"`. Use the organizer's `recommendedBatchPreviewArgs` for a no-write original-input preview before choosing a real batch write or copy-only staging.
+
 | Field | Type / values | Default | Description |
 |-------|---------------|---------|-------------|
 | `inputDir` | string | `.` | Directory to scan inside `FONT_SPLIT_ROOT`. |
@@ -226,6 +228,8 @@ Batch responses include `batchWarningCount` and `batchWarnings[]` for summary-le
 ## `organize_font_directory`
 
 Plan or copy-organize a source font directory into a cleaner staging layout.
+
+Use this when an agent must decide between direct original-input batch preview and copy-only staged output. For flat/nested/mixed/output-inside-input routing, `get_agent_guidance` with `sections: ["examples"]` includes the `source-layout-mismatch-comparison` example; the actual decision must still come from the current response's `sourceLayoutMismatchSummary`, `recommendedBatchPreviewArgs`, `organizationWarnings`, and safety fields.
 
 > [!WARNING]
 > This tool is source-non-destructive. It never moves, deletes, or rewrites source files. By default `dryRun` is `true`, so it only returns a plan. When `dryRun: false`, it creates directories and copies selected fonts into `outputDir`; if `overwriteExisting: true`, destination files in `outputDir` may be replaced.

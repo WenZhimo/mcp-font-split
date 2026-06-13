@@ -3360,8 +3360,8 @@ if (scenario === 'single') {
     }
     expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
-    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings']);
-    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'outputTreeInsideInputTree']);
+    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
+    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
     expectDescriptionIncludes('inspect_split_output', ['auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,

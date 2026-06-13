@@ -61,7 +61,7 @@
 - `get_agent_guidance` 包含 `recommendedWorkflowPlan`，这是当前 `workflow` 的有序路线图。它会引用安全模板 ID，把输入预检、目录形态决策、预览、审查后写入和输出审计串起来；每个步骤和决策点都会列出 `inspectFields` 与 `successCriteria`，但仍不替代实际工具响应检查。
 - 需要 warning code 或响应字段的完整机器可读目录时，调用 `get_agent_guidance` 并设置 `detailLevel: "full"`，或只请求 `sections: ["warning-catalog", "field-catalog"]`。
 - 当安装或运行环境不确定时，使用 `get_runtime_status`；它会只读检查解析后的工作区、Node engine 兼容性、包版本、cn-font-split 运行时版本和 WASM 文件，并返回便于 agent 执行/提示的 `recommendedActions[]`。
-- 当源目录是扁平、混合或与预期 family 分组不一致时，先用 `organize_font_directory` 的默认 `dryRun: true` 生成整理计划。它对源目录非破坏：不会移动或删除源文件；真正执行时也只是复制选中的字体到 `outputDir`。
+- 当源目录是扁平、混合或与预期 family 分组不一致时，先用 `organize_font_directory` 的默认 `dryRun: true` 生成整理计划。它对源目录非破坏：不会移动或删除源文件；真正执行时也只是复制选中的字体到 `outputDir`。如果不确定该直接对原目录做批量预览，还是先复制到暂存目录，调用 `get_agent_guidance` 并请求 `sections: ["examples"]`，查看 `source-layout-mismatch-comparison`。
 - 批量扫描会跳过依赖目录、已生成输出目录、`__MACOSX` 和 AppleDouble `._*` 资源叉文件。
 - `.woff` / `.woff2` 输入会先解压成 sfnt-like 数据，再进入处理流程。
 - 批量模式会按照 `batchDedupeMode` 去重；默认 `font-identity` 会在任意格式之间比较等价字体身份，并按 `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff` 的优先级保留一个代表。
