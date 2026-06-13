@@ -1,6 +1,6 @@
 import { splitFontBatch } from './src/font-split.js';
 
-const WORKFLOW_PRESETS = ['default', 'safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all'];
+const WORKFLOW_PRESETS = ['safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all'];
 const COMPACT_ERROR_LIMIT = 20;
 
 function numberOption(value, fallback) {
@@ -26,6 +26,20 @@ function booleanOption(value, fallback) {
 
 function enumOption(value, allowed, fallback) {
   return allowed.includes(value) ? value : fallback;
+}
+
+function buildInvalidWorkflowPresetError(value, fallback) {
+  const error = new Error(`FONT_SPLIT_WORKFLOW_PRESET must be one of: ${WORKFLOW_PRESETS.join(', ')}. Omit it to use batch-run's ${fallback} default.`);
+  error.name = 'BatchRunConfigurationError';
+  error.details = {
+    option: 'FONT_SPLIT_WORKFLOW_PRESET',
+    received: value,
+    allowedValues: WORKFLOW_PRESETS,
+    defaultWhenOmitted: fallback,
+    omitForDefaultBehavior: true,
+    nonIntuitiveBehavior: 'default is not a named workflow preset; omit FONT_SPLIT_WORKFLOW_PRESET to use batch-run defaults.',
+  };
+  return error;
 }
 
 function limitArray(items, limit) {
@@ -116,6 +130,7 @@ function buildBatchRunSummary({ ok, startedAt, batchOptions, result, error, summ
         errorsTruncated: limitArray(error.details.errors, COMPACT_ERROR_LIMIT).truncated,
         omittedErrorCount: limitArray(error.details.errors, COMPACT_ERROR_LIMIT).omittedCount,
       } : {}),
+      ...(summaryOnly && error.details && !error.details.summary ? { details: error.details } : {}),
       ...(!summaryOnly && error.details ? { details: error.details } : {}),
     } : {}),
   };
@@ -134,7 +149,12 @@ const jsonSummaryOutput = process.argv.includes('--json-summary') || booleanEnv(
 const jsonOutput = jsonSummaryOutput || process.argv.includes('--json') || booleanEnv(process.env.FONT_SPLIT_JSON);
 const includeResults = booleanOption(process.env.FONT_SPLIT_INCLUDE_RESULTS, undefined);
 const chunkSize = numberOption(process.env.FONT_SPLIT_CHUNK_SIZE, 70 * 1024);
-const workflowPreset = enumOption(process.env.FONT_SPLIT_WORKFLOW_PRESET, WORKFLOW_PRESETS, dryRun ? 'safe-preview' : 'reviewed-write');
+const defaultWorkflowPreset = dryRun ? 'safe-preview' : 'reviewed-write';
+const requestedWorkflowPreset = hasEnv('FONT_SPLIT_WORKFLOW_PRESET') ? process.env.FONT_SPLIT_WORKFLOW_PRESET : undefined;
+const workflowPresetConfigurationError = requestedWorkflowPreset && !WORKFLOW_PRESETS.includes(requestedWorkflowPreset)
+  ? buildInvalidWorkflowPresetError(requestedWorkflowPreset, defaultWorkflowPreset)
+  : null;
+const workflowPreset = workflowPresetConfigurationError ? defaultWorkflowPreset : (requestedWorkflowPreset || defaultWorkflowPreset);
 const skipMode = enumOption(process.env.FONT_SPLIT_SKIP_MODE, ['manifest', 'force'], undefined);
 const batchGroupBy = enumOption(process.env.FONT_SPLIT_BATCH_GROUP_BY, ['auto', 'source-dir', 'font-family'], undefined);
 const batchNamingMode = enumOption(process.env.FONT_SPLIT_BATCH_NAMING_MODE, ['plain', 'numeric-suffix', 'source-suffix'], undefined);
@@ -147,7 +167,7 @@ const batchOptions = {
   outputRoot,
   limit,
   maxFiles,
-  workflowPreset,
+  ...(workflowPresetConfigurationError ? { workflowPreset: null, requestedWorkflowPreset } : { workflowPreset }),
   silent: true,
   chunkSize,
   ...(dryRunFlag || dryRunEnvProvided ? { dryRun } : {}),
@@ -160,76 +180,93 @@ const batchOptions = {
   ...(splitFailureAction ? { splitFailureAction } : {}),
 };
 
-if (!jsonOutput) {
+if (!jsonOutput && !workflowPresetConfigurationError) {
   console.log('Starting batch font split...');
   console.log(JSON.stringify(batchOptions, null, 2));
 }
 
-try {
-  const runOptions = {
-    ...batchOptions,
-  };
-  if (!jsonOutput) {
-    runOptions.onProgress = ({ current, total, file, status }) => {
-      const pct = total > 0 ? ((current / total) * 100).toFixed(1) : '100.0';
-      const icon = status === 'done' ? '+' : status === 'skipped' ? '-' : status === 'planned' ? '?' : '!';
-      process.stdout.write(`\r[${current}/${total}] ${pct}% ${icon} ${file.slice(0, 60).padEnd(60)}`);
-    };
-  }
-
-  const result = await splitFontBatch(runOptions);
-
-  if (jsonOutput) {
-    console.log(JSON.stringify(buildBatchRunSummary({
-      ok: true,
-      startedAt,
-      batchOptions,
-      result,
-      summaryOnly: jsonSummaryOutput,
-    }), null, 2));
-  } else {
-    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-    console.log(`\n\nDone in ${elapsed}s`);
-    console.log(`Scanned: ${result.scannedFileCount}/${result.maxFiles} | maxFilesHit: ${result.maxFilesHit}`);
-    console.log(`Discovered: ${result.discoveredFontCount} | After dedupe: ${result.deduplicatedCount} (skipped ${result.skippedDuplicates} duplicates)`);
-    console.log(`Processed: ${result.processedFontCount} | Skipped existing: ${result.skippedExisting} | Errors: ${result.errorCount}`);
-    console.log(`Mode: ${result.dryRun ? 'dry-run' : 'write'} | Results included: ${result.resultsIncluded}`);
-    console.log(`Batch warnings: ${result.batchWarningCount}`);
-
-    if (result.batchWarnings?.length > 0) {
-      console.log('\nBatch warning details:');
-      for (const warning of result.batchWarnings) {
-        console.log(`  ${warning.code}: ${warning.message}`);
-      }
-    }
-
-    if (result.errors.length > 0) {
-      console.log('\nFailed fonts:');
-      for (const error of result.errors) {
-        console.log(`  ${error.file}: ${error.error.slice(0, 120)}`);
-      }
-    }
-  }
-} catch (error) {
+if (workflowPresetConfigurationError) {
   if (jsonOutput) {
     console.log(JSON.stringify(buildBatchRunSummary({
       ok: false,
       startedAt,
       batchOptions,
-      error,
+      error: workflowPresetConfigurationError,
       summaryOnly: jsonSummaryOutput,
     }), null, 2));
   } else {
-    console.error('\nBatch run failed.');
-    if (error?.details) {
-      console.error(JSON.stringify({
-        name: error.name,
-        error: error.message,
-        details: error.details,
-      }, null, 2));
-    } else {
-      console.error(error instanceof Error ? error.message : String(error));
-    }
+    console.error('\nBatch run configuration failed.');
+    console.error(workflowPresetConfigurationError.message);
+    console.error(JSON.stringify(workflowPresetConfigurationError.details, null, 2));
   }
   process.exitCode = 1;
+} else {
+  try {
+    const runOptions = {
+      ...batchOptions,
+    };
+    if (!jsonOutput) {
+      runOptions.onProgress = ({ current, total, file, status }) => {
+        const pct = total > 0 ? ((current / total) * 100).toFixed(1) : '100.0';
+        const icon = status === 'done' ? '+' : status === 'skipped' ? '-' : status === 'planned' ? '?' : '!';
+        process.stdout.write(`\r[${current}/${total}] ${pct}% ${icon} ${file.slice(0, 60).padEnd(60)}`);
+      };
+    }
+
+    const result = await splitFontBatch(runOptions);
+
+    if (jsonOutput) {
+      console.log(JSON.stringify(buildBatchRunSummary({
+        ok: true,
+        startedAt,
+        batchOptions,
+        result,
+        summaryOnly: jsonSummaryOutput,
+      }), null, 2));
+    } else {
+      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+      console.log(`\n\nDone in ${elapsed}s`);
+      console.log(`Scanned: ${result.scannedFileCount}/${result.maxFiles} | maxFilesHit: ${result.maxFilesHit}`);
+      console.log(`Discovered: ${result.discoveredFontCount} | After dedupe: ${result.deduplicatedCount} (skipped ${result.skippedDuplicates} duplicates)`);
+      console.log(`Processed: ${result.processedFontCount} | Skipped existing: ${result.skippedExisting} | Errors: ${result.errorCount}`);
+      console.log(`Mode: ${result.dryRun ? 'dry-run' : 'write'} | Results included: ${result.resultsIncluded}`);
+      console.log(`Batch warnings: ${result.batchWarningCount}`);
+
+      if (result.batchWarnings?.length > 0) {
+        console.log('\nBatch warning details:');
+        for (const warning of result.batchWarnings) {
+          console.log(`  ${warning.code}: ${warning.message}`);
+        }
+      }
+
+      if (result.errors.length > 0) {
+        console.log('\nFailed fonts:');
+        for (const error of result.errors) {
+          console.log(`  ${error.file}: ${error.error.slice(0, 120)}`);
+        }
+      }
+    }
+  } catch (error) {
+    if (jsonOutput) {
+      console.log(JSON.stringify(buildBatchRunSummary({
+        ok: false,
+        startedAt,
+        batchOptions,
+        error,
+        summaryOnly: jsonSummaryOutput,
+      }), null, 2));
+    } else {
+      console.error('\nBatch run failed.');
+      if (error?.details) {
+        console.error(JSON.stringify({
+          name: error.name,
+          error: error.message,
+          details: error.details,
+        }, null, 2));
+      } else {
+        console.error(error instanceof Error ? error.message : String(error));
+      }
+    }
+    process.exitCode = 1;
+  }
 }

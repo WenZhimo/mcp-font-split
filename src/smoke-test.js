@@ -3195,6 +3195,16 @@ if (scenario === 'single') {
       throw new Error(`${context}: expected batch-run CLI output to be parseable JSON. ${error.message}`);
     }
   };
+  const readmeText = await fs.readFile('README.md', 'utf8');
+  const readmeEnText = await fs.readFile('README.en.md', 'utf8');
+  if (
+    !readmeText.includes('`default` 不是有效值')
+    || !readmeText.includes('无效 preset 拒绝')
+    || !readmeEnText.includes('`default` is not valid')
+    || !readmeEnText.includes('invalid preset rejection')
+  ) {
+    throw new Error('Expected README docs to describe batch:run invalid workflow preset rejection.');
+  }
 
   const { stdout: safePreviewStdout } = await execFileAsync(process.execPath, ['batch-run.js', inputDir, outputRoot, '1', '1', '--dry-run'], {
     cwd: process.cwd(),
@@ -3238,6 +3248,38 @@ if (scenario === 'single') {
   ], 'includeResults env override run');
   if (includeResultsOverrideStdout.includes('batch-plan-omitted')) {
     throw new Error('includeResults env override run: expected includeResults true to keep dry-run plan details.');
+  }
+
+  let invalidPresetStdout = '';
+  let invalidPresetStderr = '';
+  try {
+    await execFileAsync(process.execPath, ['batch-run.js', '--json-summary', inputDir, outputRoot, '1', '1'], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        FONT_SPLIT_WORKFLOW_PRESET: 'default',
+      },
+    });
+  } catch (error) {
+    invalidPresetStdout = error.stdout || '';
+    invalidPresetStderr = error.stderr || '';
+  }
+  if (invalidPresetStderr.trim() !== '') {
+    throw new Error('invalid workflow preset run: expected json-summary configuration errors to keep stderr empty.');
+  }
+  const invalidPreset = parseCliJson(invalidPresetStdout, 'invalid workflow preset run');
+  if (
+    invalidPreset.ok !== false
+    || invalidPreset.name !== 'BatchRunConfigurationError'
+    || invalidPreset.options?.workflowPreset !== null
+    || invalidPreset.options?.requestedWorkflowPreset !== 'default'
+    || invalidPreset.details?.option !== 'FONT_SPLIT_WORKFLOW_PRESET'
+    || invalidPreset.details?.received !== 'default'
+    || invalidPreset.details?.allowedValues?.includes('default')
+    || invalidPreset.details?.omitForDefaultBehavior !== true
+    || !invalidPreset.error?.includes('Omit it to use batch-run')
+  ) {
+    throw new Error('invalid workflow preset run: expected default preset to be rejected with machine-readable allowed values.');
   }
 
   const { stdout: jsonSuccessStdout, stderr: jsonSuccessStderr } = await execFileAsync(process.execPath, ['batch-run.js', '--json', inputDir, outputRoot, '1', '1', '--dry-run'], {
@@ -3327,6 +3369,7 @@ if (scenario === 'single') {
     safePreview: safePreviewStdout,
     structureFirst: structureFirstStdout,
     includeResultsOverride: includeResultsOverrideStdout,
+    invalidPreset,
     jsonSuccess,
     jsonFailure,
     jsonSummarySuccess,
