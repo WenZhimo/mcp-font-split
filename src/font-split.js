@@ -2263,7 +2263,6 @@ export function getAgentGuidance(args = {}) {
     summaryType: 'local-verification-output-guide',
     purpose: 'How an AI agent should interpret local maintenance smoke output before claiming this package change is complete.',
     primaryCommand: 'npm run smoke:real-corpus-suite -- <font-corpus-dir>',
-    aliasCommand: 'npm run smoke:real-corpus -- <font-corpus-dir>',
     verboseCommand: 'npm run smoke:real-corpus-suite -- <font-corpus-dir> --verbose',
     primaryDecisionField: 'reliabilityGateDecision',
     requiredOutputFields: [

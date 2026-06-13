@@ -1740,6 +1740,7 @@ if (scenario === 'single') {
   if (
     result.localVerificationOutputGuide?.summaryType !== 'local-verification-output-guide'
     || result.localVerificationOutputGuide?.primaryCommand !== 'npm run smoke:real-corpus-suite -- <font-corpus-dir>'
+    || Object.hasOwn(result.localVerificationOutputGuide, 'aliasCommand')
     || result.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('coverageSummary.outputStructureAuditSummary')
     || !result.localVerificationOutputGuide?.passCriteria?.some((item) => item.includes('reliabilityGateDecision.status is pass'))
@@ -1747,6 +1748,10 @@ if (scenario === 'single') {
     || result.localVerificationOutputGuide?.evidenceFields?.fullCorpusFontCount !== 'testScope.corpusScan.supportedFontCount'
   ) {
     throw new Error('Expected localVerificationOutputGuide to explain real-corpus reliability gate output interpretation.');
+  }
+  const packageJson = JSON.parse(await fs.readFile('package.json', 'utf8'));
+  if (Object.hasOwn(packageJson.scripts || {}, 'smoke:real-corpus')) {
+    throw new Error('Expected real-corpus smoke command to use the single canonical smoke:real-corpus-suite script.');
   }
   if (!result.responseFieldsToCheck?.includes('safeInvocationTemplates')) {
     throw new Error('Expected agent guidance to recommend checking safe invocation templates.');

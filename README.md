@@ -588,7 +588,6 @@ npm run smoke:batch-run
 npm run smoke:batch-dry-run
 npm run smoke:batch-defaults
 npm run smoke:real-corpus-suite -- <字体语料目录>
-npm run smoke:real-corpus -- <字体语料目录>
 npm run smoke:real-corpus-readonly -- <字体语料目录>
 npm run smoke:real-corpus-targets -- <字体语料目录>
 npm run smoke:real-corpus-integration -- <字体语料目录>
@@ -605,8 +604,6 @@ npm run smoke:small-copy-original
 `smoke:real-corpus-suite` 是功能改动告一段落时推荐的本机真实语料可靠性门禁，不包含在 `npm run check` 中。`get_agent_guidance.localVerificationOutputGuide` 是解读这个本地命令输出的机器可读伴随指南。suite 会顺序运行只读全库预览、`smoke:real-corpus-targets` 和 `smoke:real-corpus-integration`，覆盖全库 compact 扫描、代表性只读抽样、目录整理预览、源目录结构判断摘要、copy-only 写入、单字体拆分、批量写入和输出结构审计。默认输出为 compact，只打印每个子检查的成功状态、耗时、人类可读 `real-corpus suite summary` 和最终 JSON 总览；JSON 里的 `humanSummary` 会重复这组短摘要，便于 agent 直接读取。最终 JSON 还包含顶层 `reliabilityGateDecision`：先检查 `status`、`reliabilityGatePassed`、`blockingReasonCodes`、`fullCorpusFontCountField` 和 `targetCountsAreFullCorpusCounts`。`status: "pass"` 表示代表性功能链通过，不表示每个字体目录都已人工验收。最终总览里的 `testScope` 会把范围拆成 `corpusScan`（全库根扫描）、`targetSampling`（固定回归点 + 自适应代表性抽样）和 `representativeWriteAudit`（一个真实写入/审计样本），`coverageSummary` 会直接列出全库字体/忽略文件计数、抽样目标数量、已选目标、代表性写入审计状态，以及 `functionalCoverage[]` 功能覆盖清单；其中 `source-layout-mismatch-summary` 会确认真实语料路径实际检查了 `sourceLayoutMismatchSummary` 的布局匹配、直接预览和 copy-only 源安全语义。需要展开完整子检查输出时加 `--verbose`，或设置 `FONT_SPLIT_REAL_CORPUS_SUITE_VERBOSE=true`。它使用真实复杂语料证明功能链可靠，不是逐个字体目录人工验收。可选参数为 `<字体语料目录> [maxFiles] [targetLimit] [integrationLimit] [sampleCount] [--verbose]`。
 
 `coverageSummary.unsupportedFileCategoryCoverage` 会把忽略文件覆盖面单独列出，包括类别数、扩展名数，以及 `.zip` / `.txt` 之外的扩展名类型数；`coverageSummary.outputStructureAuditSummary` 会单独列出代表性单字体写入和批量写入的 `outputStructureDecision`、`auditStatus`、`auditPassed` 与 `structureSummary.conforms`。这两个字段用于快速确认“忽略统计不是只看压缩包/文本文件”和“输出目录结构已经被审计”。
-
-`smoke:real-corpus` 是 `smoke:real-corpus-suite` 的便捷别名，适合直接拿本机真实语料库跑功能链可靠性检查。如果只看到 `4` 或 `10` 之类的小数字，通常指固定回归目标数、代表性抽样目标数，或某个代表性样本目录的字体数，不是全库扫描数量；先看 `testScope.corpusScan` 区分全库扫描，再看 `coverageSummary.corpusSupportedFontCount`、`corpusUnsupportedFileCount` 和 `availableTargetCount` 获取根级统计。
 
 `smoke:real-corpus-readonly` 是显式的本机真实语料只读检查，不包含在 `npm run check` 中。它会把传入目录作为 `FONT_SPLIT_ROOT`，先对语料根目录运行 `includeFiles:false` 的 `inspect_font_inputs`，再自动选择一个含字体的样本目录执行 `structure-first` 的 `organize_font_directory` 和无写入 `split_font_batch` 预览检查。它会验证全库范围的 `unsupportedFileSummary`、`sourceLayoutMismatchSummary`、`recommendedBatchPreviewArgs`、批量 `recommendedNextActions` 和安全字段，不会创建输出目录。可选第二个参数指定样本目录；可选第三个参数覆盖 `maxFiles`（默认 `50000`）。这个检查的目标是用复杂真实语料覆盖发现、统计和预览路径，不是逐个字体目录做验收。
 
