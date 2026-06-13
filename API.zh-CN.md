@@ -32,7 +32,7 @@
 
 `verificationChecklist[]` 也包含面向本包维护者的 `local-real-corpus-suite-passed`。当 agent 修改了会影响功能行为的代码后，应在本机真实语料库上运行 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，再宣称本阶段完成。这是代表性可靠性门禁，不是逐个目录验收，也不是运行时 MCP 工具调用。suite 会先打印简短的 `real-corpus suite summary`，并在 JSON `humanSummary` 中保留同样信息，用于避免把固定目标数量误读成全库扫描数量。suite 输出里的 `testScope` 会把范围拆清楚：`corpusScan` 是全库有界根扫描，`targetSampling` 是代表性 dry-run 抽样，`representativeWriteAudit` 是一个有界真实写入和输出审计路径。`coverageSummary.functionalCoverage[]` 中的 `source-layout-mismatch-summary` 表示真实语料运行已经覆盖了 `sourceLayoutMismatchSummary` 的布局提示、直接预览要求和 copy-only 源安全语义。
 
-真实语料 suite 还会返回 `coverageSummary.unsupportedFileCategoryCoverage` 和 `coverageSummary.outputStructureAuditSummary`。前者用于确认忽略文件统计覆盖了扩展名/类别摘要，而不是只看 `.zip` / `.txt`；后者用于确认代表性单字体写入和批量写入都已经通过 `inspect_split_output`，且 `structureSummary.conforms: true`。
+真实语料 suite 还会返回 `coverageSummary.unsupportedFileCategoryCoverage` 和 `coverageSummary.outputStructureAuditSummary`。前者用于确认忽略文件统计覆盖了扩展名/类别摘要，而不是只看 `.zip` / `.txt`；后者用于确认代表性单字体写入和批量写入都已经通过 `inspect_split_output`，且 `outputStructureDecision.status: "pass"`、`structureSummary.conforms: true`。
 
 `warningCodeCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["warning-catalog"]` 时返回，会把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的机器可读 warning code 映射到响应来源、严重度和建议 agent 动作。
 
@@ -345,12 +345,13 @@
 |------|------|
 | `familyCount` | 检测到的 family 目录数量。 |
 | `maxFilesHit` | 只有当 `maxFiles` 之外确实还存在更多输出文件时才为 `true`。 |
+| `outputStructureDecision` | 从 `auditStatus`、`auditBlockingReasons`、`maxFilesHit` 和 `structureSummary` 派生的快速机器可读判断。先看 `status`、`recommendedAction`、`blockingReasonCodes` 和 `issueCodes`；精确证据再看 `structureSummary`。 |
 | `auditStatus` | 紧凑审计门禁：`pass`、`action-required` 或 `incomplete`。真实输出审计只有在它为 `pass` 时才应视为完成。 |
 | `auditPassed` | `auditStatus === "pass"` 的布尔快捷字段。 |
 | `auditBlockingReasons[]` | 阻止审计通过的机器可读原因，例如 `output-scan-truncated` 或 `output-structure-issues`；结构问题会带上来自 `structureSummary.issues[]` 的 `issueCodes`。 |
 | `filesIncluded` / `familiesIncluded` | 响应中是否包含 `files[]` 和 `families[]`。 |
 | `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略、legacy 输出推断和输出结构问题等状态。 |
-| `structureSummary` | 机器可读输出结构审计。真实批量写入后，只有 `auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为审计完成。`conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`。 |
+| `structureSummary` | 机器可读输出结构审计。真实批量写入后，只有 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为审计完成。`conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`。 |
 | `fontEntryCount` | 检测到的字体输出条目数量。 |
 | `manifestCount` | 带 `split-meta.json` 的条目数量。 |
 | `legacyOutputCount` | 没有 manifest、只能保守推断的旧输出数量。 |

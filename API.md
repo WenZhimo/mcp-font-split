@@ -32,7 +32,7 @@ Use `detailLevel: "full"` when the agent needs every catalog and example in one 
 
 `verificationChecklist[]` also includes `local-real-corpus-suite-passed` for agents maintaining this package. After functionality-affecting code changes, run `npm run smoke:real-corpus-suite -- <font-corpus-dir>` against a local real corpus before calling the change complete. This is a representative reliability gate; it is not a per-directory acceptance audit and is not a runtime MCP tool call. The suite output prints a short `real-corpus suite summary` and includes the same information in JSON `humanSummary`; use it to avoid confusing fixed target counts with the full corpus scan. The JSON also includes `testScope`: `corpusScan` is the full bounded root scan, `targetSampling` is representative dry-run sampling, and `representativeWriteAudit` is one bounded real write plus output audit path. Its `coverageSummary.functionalCoverage[]` includes `source-layout-mismatch-summary` when the real-corpus run has exercised `sourceLayoutMismatchSummary` layout guidance, direct-preview requirements, and copy-only source safety.
 
-The real-corpus suite also reports `coverageSummary.unsupportedFileCategoryCoverage` and `coverageSummary.outputStructureAuditSummary`. Use the first to confirm ignored-file statistics covered extension/category summaries beyond a narrow `.zip`/`.txt` view, and use the second to confirm the representative single and batch write outputs passed `inspect_split_output` with `structureSummary.conforms: true`.
+The real-corpus suite also reports `coverageSummary.unsupportedFileCategoryCoverage` and `coverageSummary.outputStructureAuditSummary`. Use the first to confirm ignored-file statistics covered extension/category summaries beyond a narrow `.zip`/`.txt` view, and use the second to confirm the representative single and batch write outputs passed `inspect_split_output` with `outputStructureDecision.status: "pass"` and `structureSummary.conforms: true`.
 
 `warningCodeCatalog` is returned with `detailLevel: "full"` or `sections: ["warning-catalog"]`. It maps machine-readable warning codes from `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]` to their response sources, severity, and suggested agent action.
 
@@ -345,12 +345,13 @@ Important result fields:
 |-------|---------|
 | `familyCount` | Number of detected family directories. |
 | `maxFilesHit` | `true` only when more output files existed beyond `maxFiles`. |
+| `outputStructureDecision` | Quick machine-readable route derived from `auditStatus`, `auditBlockingReasons`, `maxFilesHit`, and `structureSummary`. Check `status`, `recommendedAction`, `blockingReasonCodes`, and `issueCodes` first; use `structureSummary` for exact evidence. |
 | `auditStatus` | Compact audit gate: `pass`, `action-required`, or `incomplete`. Treat real output audits as complete only when this is `pass`. |
 | `auditPassed` | Boolean shortcut for `auditStatus === "pass"`. |
 | `auditBlockingReasons[]` | Machine-readable blockers such as `output-scan-truncated` or `output-structure-issues`; structure blockers include `issueCodes` from `structureSummary.issues[]`. |
 | `filesIncluded` / `familiesIncluded` | Whether `files[]` and `families[]` are present. |
 | `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, legacy output inference, and output structure issues. |
-| `structureSummary` | Machine-readable output-structure audit. After real batch writes, treat the output directory as complete only when `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false`. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
+| `structureSummary` | Machine-readable output-structure audit. After real batch writes, treat the output directory as complete only when `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false`. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
 | `fontEntryCount` | Number of detected per-font output entries. |
 | `manifestCount` | Number of entries with `split-meta.json`. |
 | `legacyOutputCount` | Number of entries inferred without manifest. |

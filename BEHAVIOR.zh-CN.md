@@ -74,7 +74,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。响应里的 `verificationChecklist[]` 是给 agent 用的防误判清单；在向用户宣称完成前，应检查其中适用于当前工作流的项目。
 其中 `local-real-corpus-suite-passed` 是面向本包维护者的本地验证项：当改动会影响功能行为时，应在本机真实字体语料库上运行 `smoke:real-corpus-suite`，也就是 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`。它是代表性可靠性门禁，不是逐个字体目录人工验收，也不是运行时 MCP 工具调用。
 该 suite 会先打印简短的 `real-corpus suite summary`，最终 JSON 也会返回 `humanSummary`、`testScope` 和 `coverageSummary.functionalCoverage[]`。`humanSummary` 用自然语言说明全库字体数量、固定/抽样目标数量和代表性写入审计状态，避免把 `4` 或 `10` 之类的小数字误读成全库字体数量。`testScope.corpusScan` 表示全库有界根扫描，`testScope.targetSampling` 表示固定回归点加自适应代表性抽样，`testScope.representativeWriteAudit` 表示一个真实写入和输出审计样本；其中的 `functionalCoverage[]` 用于说明真实语料运行实际覆盖了哪些功能路径，例如全根输入扫描、非字体噪声分类、目录整理预览、`sourceLayoutMismatchSummary` 布局判断摘要、copy-only 写入、单字体拆分、批量写入和输出结构审计。
-`coverageSummary.unsupportedFileCategoryCoverage` 会单独列出忽略文件类别数、扩展名数，以及 `.zip` / `.txt` 之外的扩展名类型数；`coverageSummary.outputStructureAuditSummary` 会单独列出代表性单字体写入和批量写入的 `auditStatus`、`auditPassed` 与 `structureSummary.conforms`。这两个字段用于避免把忽略统计误读成只支持压缩包/文本文件，也避免只看写入成功而漏掉输出目录结构审计。
+`coverageSummary.unsupportedFileCategoryCoverage` 会单独列出忽略文件类别数、扩展名数，以及 `.zip` / `.txt` 之外的扩展名类型数；`coverageSummary.outputStructureAuditSummary` 会单独列出代表性单字体写入和批量写入的 `outputStructureDecision`、`auditStatus`、`auditPassed` 与 `structureSummary.conforms`。这两个字段用于避免把忽略统计误读成只支持压缩包/文本文件，也避免只看写入成功而漏掉输出目录结构审计。
 `configurationRecipes[]` 是给 agent 用的配置配方表；它把“保留每个源字体”“按源目录分组”“按字体 metadata 分组”“快速结构优先扫描”“copy-only 暂存整理”“大库审查后写入”等用户意图映射到最小 preset-first 参数，并列出写入行为、源目录安全性、取舍、必须检查的 `inspectFields` 和继续前必须满足的 `successCriteria`。配方不是成功证明，不能替代实际工具响应检查。
 `batchPolicyGuide` 是给 agent 用的批量策略自定义指南；它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个可选值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前必须满足的 `successCriteria`。当用户想偏离默认 preset 行为时，应优先参考它选择最小显式覆盖，并先运行 safe-preview。
 `unsupportedFileCategoryCatalog` 是给 agent 解释非字体噪声分类的机器可读目录；它会说明 `archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other` 的代表扩展名与处理行为。每次工具响应中的 `unsupportedFileDecision` 会先给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则重复当前扫描实际出现分类的处理语义。尤其要注意，`archive` 只表示“被报告的压缩包”，不会触发解压、复制或拆分。
@@ -82,7 +82,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 `directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描，以及一个面向 flat/nested/mixed/output-inside-input 的 `sourceLayoutMismatchSummary` 对照示例。示例调用也采用 preset-first 风格，并带有 `mustInspectFields` 和 `successCriteria`。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`sourceLayoutMismatchSummary` 和 warning 字段为准。
 `safeInvocationTemplates[]` 是可复制的安全起步调用模板；其中包括运行时诊断、输入预检、源目录结构不匹配时的 dry-run 整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和输出审计。每个模板都会声明 `writesFiles`、`sourceDestructive`、可自定义参数、必须检查的响应字段和继续前必须满足的 `successCriteria`。模板里的 `args` 会尽量保持最小；`workflowPreset` 已提供的默认项不会重复写入模板，需要完整展开时查看同一响应中的 `workflowPresets[]`。
 `recommendedWorkflowPlan` 是当前 `workflow` 的有序路线图；它不会复制每个模板的参数，而是用 `templateId` 引用 `safeInvocationTemplates[]`，把输入预检、目录形态决策、批量预览、审查后写入和输出审计串成阶段。每个 `orderedSteps[]` 和 `decisionPoints[]` 条目都会包含 `inspectFields` 与 `successCriteria`。它用于降低 agent 漏掉审计步骤的风险，但不能替代每个阶段的响应字段检查和条件确认。
-`toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`auditStatus`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
+`toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`outputStructureDecision`、`auditStatus`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
 
 `get_runtime_status` 也是只读工具。它会检查：
 
@@ -684,7 +684,7 @@ split-meta.json
 
 `batchDecision` 会把复杂的批量响应压缩成主线路由，例如 `review-dry-run-plan`、`rerun-batch-with-higher-maxFiles`、`inspect-batch-errors`、`audit-written-output`、`review-existing-output-skips`、`no-supported-fonts` 或 `no-selected-fonts`。它只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `batchWarnings[]`、`errors[]`、`recommendedNextActions[]`，以及真实写入后的输出审计字段。
 
-`recommendedNextActions[]` 是检查清单，不会自动执行。每项的 `successCriteria` 是继续下一步或报告完成前的判断条件。真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
+`recommendedNextActions[]` 是检查清单，不会自动执行。每项的 `successCriteria` 是继续下一步或报告完成前的判断条件。真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
 
 常见 `batchWarnings[].code`：
 
@@ -752,9 +752,11 @@ split-meta.json
 
 `includeFiles: false` 会省略扁平 `files[]` 清单；`includeFamilies: false` 会省略结构化 `families[]` 清单。它们只影响响应体大小，不影响 `fileCount`、`familyCount`、`fontEntryCount`、manifest 数量、输出模式计数或 `structureSummary`。
 
+`outputStructureDecision` 是输出结构审计的快速判断，派生自 `auditStatus`、`auditBlockingReasons`、`maxFilesHit` 和 `structureSummary`。先看 `outputStructureDecision.status`、`recommendedAction`、`blockingReasonCodes` 和 `issueCodes`；若 `status` 不是 `pass`，再看 `structureSummary` 中的详细证据。
+
 `auditStatus` 是输出审计的紧凑门禁，取值为 `pass`、`action-required` 或 `incomplete`。`auditPassed` 是 `auditStatus === "pass"` 的布尔快捷字段。`auditBlockingReasons[]` 会列出阻止通过的机器可读原因，例如 `output-scan-truncated` 或 `output-structure-issues`；结构问题会带上来自 `structureSummary.issues[]` 的 `issueCodes`。
 
-`structureSummary` 是输出目录结构验收摘要。它会检查输出是否是文档化的 `single-family` 或 `family-tree` 结构，是否有无法归类到 family/font entry 的杂项文件，每个字体条目是否都有 `split-meta.json`，以及 manifest 声明为 `subset` / `single-woff2` / `copy-original` 时是否具备对应文件。真实批量写入后，只有 `auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为结构合格。若为 false，优先查看 `auditBlockingReasons[]`、`structureSummary.issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 会出现 `output-structure-issues`。
+`structureSummary` 是输出目录结构验收摘要。它会检查输出是否是文档化的 `single-family` 或 `family-tree` 结构，是否有无法归类到 family/font entry 的杂项文件，每个字体条目是否都有 `split-meta.json`，以及 manifest 声明为 `subset` / `single-woff2` / `copy-original` 时是否具备对应文件。真实批量写入后，只有 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为结构合格。若为 false，优先查看 `auditBlockingReasons[]`、`structureSummary.issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 会出现 `output-structure-issues`。
 
 保留基础统计：
 
@@ -763,6 +765,7 @@ split-meta.json
 - `auditStatus`
 - `auditPassed`
 - `auditBlockingReasons`
+- `outputStructureDecision`
 - `filesIncluded`
 - `familiesIncluded`
 - `totalBytes`

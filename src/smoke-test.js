@@ -159,12 +159,14 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       sampleInputDir: result.sample?.inputDir,
       sampleFontPath: result.sampleFontPath,
       outputRoot: result.outputRoot,
+      singleOutputStructureDecision: result.singleAudit?.outputStructureDecision,
       singleAuditStatus: result.singleAudit?.auditStatus,
       singleAuditPassed: result.singleAudit?.auditPassed,
       singleStructureConforms: result.singleAudit?.structureSummary?.conforms,
       singleStructureLayoutKind: result.singleAudit?.structureSummary?.layoutKind,
       singleManifestCoverageOk: result.singleAudit?.structureSummary?.manifestCoverageOk,
       singleStructureIssueCount: result.singleAudit?.structureSummary?.issueCount,
+      batchOutputStructureDecision: result.batchAudit?.outputStructureDecision,
       batchAuditStatus: result.batchAudit?.auditStatus,
       batchAuditPassed: result.batchAudit?.auditPassed,
       batchStructureConforms: result.batchAudit?.structureSummary?.conforms,
@@ -234,12 +236,14 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     summaryType: 'real-corpus-output-structure-audit',
     sampleInputDir: integration.sampleInputDir,
     outputRoot: integration.outputRoot,
+    singleOutputStructureDecision: integration.singleOutputStructureDecision,
     singleAuditStatus: integration.singleAuditStatus,
     singleAuditPassed: integration.singleAuditPassed,
     singleStructureConforms: integration.singleStructureConforms,
     singleStructureLayoutKind: integration.singleStructureLayoutKind,
     singleManifestCoverageOk: integration.singleManifestCoverageOk,
     singleStructureIssueCount: integration.singleStructureIssueCount,
+    batchOutputStructureDecision: integration.batchOutputStructureDecision,
     batchAuditStatus: integration.batchAuditStatus,
     batchAuditPassed: integration.batchAuditPassed,
     batchStructureConforms: integration.batchStructureConforms,
@@ -293,9 +297,11 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
       sampleInputDir: integration.sampleInputDir,
       sampleFontPath: integration.sampleFontPath,
       outputRoot: integration.outputRoot,
+      singleOutputStructureDecisionStatus: integration.singleOutputStructureDecision?.status,
       singleAuditStatus: integration.singleAuditStatus,
       singleAuditPassed: integration.singleAuditPassed,
       singleStructureConforms: integration.singleStructureConforms,
+      batchOutputStructureDecisionStatus: integration.batchOutputStructureDecision?.status,
       batchAuditStatus: integration.batchAuditStatus,
       batchAuditPassed: integration.batchAuditPassed,
       batchStructureConforms: integration.batchStructureConforms,
@@ -923,19 +929,44 @@ function assertOutputAuditStatus(result, expected, context) {
     result.auditStatus !== expected.auditStatus
     || result.auditPassed !== expected.auditPassed
     || !Array.isArray(result.auditBlockingReasons)
+    || result.outputStructureDecision?.summaryType !== 'output-structure-decision'
+    || result.outputStructureDecision?.status !== expected.auditStatus
+    || result.outputStructureDecision?.auditPassed !== expected.auditPassed
+    || result.outputStructureDecision?.maxFilesHit !== result.maxFilesHit
+    || result.outputStructureDecision?.structureConforms !== (result.structureSummary?.conforms === true)
   ) {
-    throw new Error(`${context}: expected compact audit status ${expected.auditStatus}.`);
+    throw new Error(`${context}: expected compact output structure decision ${expected.auditStatus}.`);
   }
   if (expected.reasonCode) {
     const reason = result.auditBlockingReasons.find((item) => item.code === expected.reasonCode);
     if (!reason) {
       throw new Error(`${context}: expected auditBlockingReasons to include ${expected.reasonCode}.`);
     }
+    const expectedRecommendedAction = expected.reasonCode === 'output-scan-truncated'
+      ? 'rerun-inspect-split-output-with-higher-maxFiles'
+      : 'inspect-structureSummary-issues';
+    if (
+      result.outputStructureDecision.reviewRecommended !== true
+      || result.outputStructureDecision.recommendedAction !== expectedRecommendedAction
+    ) {
+      throw new Error(`${context}: expected outputStructureDecision to recommend ${expectedRecommendedAction}.`);
+    }
+    if (!result.outputStructureDecision.blockingReasonCodes?.includes(expected.reasonCode)) {
+      throw new Error(`${context}: expected outputStructureDecision to include blocking reason ${expected.reasonCode}.`);
+    }
     if (expected.issueCode && !(reason.issueCodes || []).includes(expected.issueCode)) {
       throw new Error(`${context}: expected ${expected.reasonCode} to reference issue code ${expected.issueCode}.`);
     }
+    if (expected.issueCode && !result.outputStructureDecision.issueCodes?.includes(expected.issueCode)) {
+      throw new Error(`${context}: expected outputStructureDecision to include issue code ${expected.issueCode}.`);
+    }
   } else if (result.auditBlockingReasons.length !== 0) {
     throw new Error(`${context}: expected no auditBlockingReasons for passing audit.`);
+  } else if (
+    result.outputStructureDecision.reviewRecommended !== false
+    || result.outputStructureDecision.recommendedAction !== 'continue'
+  ) {
+    throw new Error(`${context}: expected passing outputStructureDecision to continue without review.`);
   }
 }
 
@@ -1352,11 +1383,12 @@ if (scenario === 'single') {
     throw new Error('Expected agent guidance to recommend checking inspection warnings.');
   }
   if (
-    !result.responseFieldsToCheck?.includes('auditStatus')
+    !result.responseFieldsToCheck?.includes('outputStructureDecision')
+    || !result.responseFieldsToCheck?.includes('auditStatus')
     || !result.responseFieldsToCheck?.includes('auditPassed')
     || !result.responseFieldsToCheck?.includes('auditBlockingReasons')
   ) {
-    throw new Error('Expected agent guidance to tell agents to check compact output audit status fields.');
+    throw new Error('Expected agent guidance to tell agents to check compact output structure decision and audit status fields.');
   }
   if (!result.responseFieldsToCheck?.includes('organizationWarnings')) {
     throw new Error('Expected agent guidance to recommend checking organization warnings.');
@@ -1516,13 +1548,15 @@ if (scenario === 'single') {
   assertTemplateOmitsArgs(batchProcessTemplate, ['dryRun', 'includeResults', 'skipMode', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'], 'batch-process-reviewed-plan');
   const outputAuditTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'output-audit-compact');
   if (
-    !outputAuditTemplate?.inspectFields?.includes('auditStatus')
+    !outputAuditTemplate?.inspectFields?.includes('outputStructureDecision')
+    || !outputAuditTemplate?.inspectFields?.includes('auditStatus')
     || !outputAuditTemplate?.inspectFields?.includes('auditPassed')
     || !outputAuditTemplate?.inspectFields?.includes('auditBlockingReasons')
     || !outputAuditTemplate?.inspectFields?.includes('structureSummary')
+    || !outputAuditTemplate?.successCriteria?.includes('outputStructureDecision.status pass')
     || !outputAuditTemplate?.successCriteria?.includes('auditStatus pass')
   ) {
-    throw new Error('Expected output audit template to require compact audit status and structureSummary inspection.');
+    throw new Error('Expected output audit template to require compact outputStructureDecision, audit status, and structureSummary inspection.');
   }
   const workflowGuidances = {};
   for (const workflowName of ['overview', 'single', 'batch', 'inspect', 'organize']) {
@@ -1542,7 +1576,7 @@ if (scenario === 'single') {
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-dry-run-preview' && step.writesFiles === false && step.inspectFields?.includes('batchDecision'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true && step.inspectFields?.includes('batchDecision'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'directory-mismatch-plan' && step.inspectFields?.includes('organizationDecision'))
-    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('auditStatus') && step.inspectFields?.includes('structureSummary'))
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('outputStructureDecision') && step.inspectFields?.includes('auditStatus') && step.inspectFields?.includes('structureSummary'))
   ) {
     throw new Error('Expected batch recommendedWorkflowPlan to order preview, reviewed write, output audit, and route-decision checks.');
   }
@@ -1623,6 +1657,7 @@ if (scenario === 'single') {
     'unsupportedFileSummary.handlingSummary': 'inspect_font_inputs',
     'unsupportedFileSummary.examples': 'inspect_font_inputs',
     'unsupportedFileSummary.examplesTruncated': 'inspect_font_inputs',
+    outputStructureDecision: 'inspect_split_output',
     structureSummary: 'inspect_split_output',
     auditStatus: 'inspect_split_output',
     auditPassed: 'inspect_split_output',
@@ -1880,12 +1915,13 @@ if (scenario === 'single') {
   }
   const outputChecklist = (result.verificationChecklist || []).find((item) => item.id === 'output-audited');
   if (
-    !outputChecklist?.responseFields?.includes('auditStatus')
+    !outputChecklist?.responseFields?.includes('outputStructureDecision')
+    || !outputChecklist?.responseFields?.includes('auditStatus')
     || !outputChecklist?.responseFields?.includes('auditPassed')
     || !outputChecklist?.responseFields?.includes('auditBlockingReasons')
     || !outputChecklist?.responseFields?.includes('structureSummary')
   ) {
-    throw new Error('Expected output verification checklist to include compact audit status fields and structureSummary.');
+    throw new Error('Expected output verification checklist to include compact outputStructureDecision, audit status fields, and structureSummary.');
   }
   const corpusSuiteChecklist = (result.verificationChecklist || []).find((item) => item.id === 'local-real-corpus-suite-passed');
   if (
@@ -3403,6 +3439,8 @@ if (scenario === 'single') {
     || batchWrite.processedFontCount !== 1
     || batchInspect.auditStatus !== 'pass'
     || batchInspect.auditPassed !== true
+    || batchInspect.outputStructureDecision?.status !== 'pass'
+    || batchInspect.outputStructureDecision?.recommendedAction !== 'continue'
     || batchInspect.auditBlockingReasons?.length !== 0
     || batchInspect.structureSummary?.conforms !== true
     || batchInspect.structureSummary?.layoutKind !== 'family-tree'
@@ -3419,6 +3457,7 @@ if (scenario === 'single') {
     || auditAction?.suggestedArgs?.outDir !== batchOutputRoot
     || auditAction?.suggestedArgs?.includeFiles !== false
     || auditAction?.suggestedArgs?.includeFamilies !== false
+    || !auditAction.inspectFields?.includes('outputStructureDecision')
     || !auditAction.inspectFields?.includes('auditStatus')
     || !auditAction.inspectFields?.includes('structureSummary')
   ) {
@@ -3500,7 +3539,7 @@ if (scenario === 'single') {
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
-    expectDescriptionIncludes('inspect_split_output', ['auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
+    expectDescriptionIncludes('inspect_split_output', ['outputStructureDecision', 'auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
       guidancePropertyCount: Object.keys(guidanceProps).length,
@@ -3581,6 +3620,7 @@ if (scenario === 'single') {
       'writesOutputTree',
       'outputTreeInsideInputTree',
       'mayOverwriteOutputTree',
+      'outputStructureDecision',
       'auditStatus',
       'auditPassed',
       'auditBlockingReasons',
@@ -3687,6 +3727,7 @@ if (scenario === 'single') {
     '`unsupportedFileSummary.categoryDetails[]`',
     '`unsupportedFileSummary.handlingSummary`',
     '`unsupportedFileSummary.examples[]`',
+    '`outputStructureDecision`',
     '`auditStatus`',
     '`auditPassed`',
     '`auditBlockingReasons[]`',
@@ -4005,6 +4046,8 @@ if (scenario === 'single') {
     || coverageSummary.testScope?.targetSampling?.perDirectoryAcceptanceAudit !== false
     || coverageSummary.testScope?.representativeWriteAudit?.scopeKind !== 'single-representative-write-and-audit'
     || coverageSummary.testScope?.representativeWriteAudit?.batchAuditStatus !== coverageSummary.batchAuditStatus
+    || coverageSummary.outputStructureAuditSummary?.singleOutputStructureDecision?.status !== 'pass'
+    || coverageSummary.outputStructureAuditSummary?.batchOutputStructureDecision?.status !== 'pass'
     || coverageSummary.testScope?.representativeWriteAudit?.singleStructureConforms !== true
     || coverageSummary.testScope?.representativeWriteAudit?.batchStructureConforms !== true
     || !Array.isArray(coverageSummary.functionalCoverage)
@@ -4512,6 +4555,8 @@ if (scenario === 'single') {
     || singleAudit.manifestCount < 1
     || singleAudit.auditStatus !== 'pass'
     || singleAudit.auditPassed !== true
+    || singleAudit.outputStructureDecision?.status !== 'pass'
+    || singleAudit.outputStructureDecision?.recommendedAction !== 'continue'
     || singleAudit.structureSummary?.conforms !== true
     || singleActionWarnings.length > 0
   ) {
@@ -4571,6 +4616,8 @@ if (scenario === 'single') {
     batchAudit.maxFilesHit !== false
     || batchAudit.auditStatus !== 'pass'
     || batchAudit.auditPassed !== true
+    || batchAudit.outputStructureDecision?.status !== 'pass'
+    || batchAudit.outputStructureDecision?.recommendedAction !== 'continue'
     || batchAudit.structureSummary?.conforms !== true
     || batchActionWarnings.length > 0
     || batchAudit.fontEntryCount < 1
@@ -4629,6 +4676,7 @@ if (scenario === 'single') {
       manifestCount: singleAudit.manifestCount,
       auditStatus: singleAudit.auditStatus,
       auditPassed: singleAudit.auditPassed,
+      outputStructureDecision: singleAudit.outputStructureDecision,
       auditBlockingReasons: singleAudit.auditBlockingReasons,
       structureSummary: singleAudit.structureSummary,
       inspectionWarnings: singleAudit.inspectionWarnings,
@@ -4659,6 +4707,7 @@ if (scenario === 'single') {
       copyOriginalOutputCount: batchAudit.copyOriginalOutputCount,
       auditStatus: batchAudit.auditStatus,
       auditPassed: batchAudit.auditPassed,
+      outputStructureDecision: batchAudit.outputStructureDecision,
       auditBlockingReasons: batchAudit.auditBlockingReasons,
       inspectionWarnings: batchAudit.inspectionWarnings,
       structureSummary: batchAudit.structureSummary,

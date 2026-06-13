@@ -184,7 +184,7 @@ server.registerTool(
   'inspect_split_output',
   {
     title: 'Inspect split font output',
-    description: 'Call this to summarize and structurally inspect generated cn-font-split output files in an output directory. Inspect auditStatus, auditPassed, auditBlockingReasons, structureSummary, maxFilesHit, and inspectionWarnings before treating an audit as complete; use includeFiles:false and includeFamilies:false for compact large-output summaries.',
+    description: 'Call this to summarize and structurally inspect generated cn-font-split output files in an output directory. Inspect outputStructureDecision first, then auditStatus, auditPassed, auditBlockingReasons, structureSummary, maxFilesHit, and inspectionWarnings before treating an audit as complete; use includeFiles:false and includeFamilies:false for compact large-output summaries.',
     inputSchema: {
       outDir: z.string().optional().describe('Output directory to inspect, relative to the font workspace. Defaults to split-output.'),
       maxFiles: z.number().int().positive().max(200000).optional().describe('Maximum output files to inspect. Defaults to 200000.'),
