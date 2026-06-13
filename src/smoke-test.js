@@ -861,6 +861,30 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
   assertNonEmptyArray(summary.routes, context, 'routes');
   const routesById = new Map(summary.routes.map((route) => [route.id, route]));
   const quickExamplesById = new Map((summary.quickStartCallExamples || []).map((example) => [example.id, example]));
+  if (
+    summary.workflowQuickStart?.summaryType !== 'workflow-quick-start'
+    || summary.workflowQuickStart?.workflow !== workflow
+    || !summary.workflowQuickStart?.generatedFromQuickStartCallExamples
+    || !quickExamplesById.has(summary.workflowQuickStart?.recommendedExampleId)
+    || summary.workflowQuickStart?.recommendedCallExample?.id !== summary.workflowQuickStart?.recommendedExampleId
+    || summary.workflowQuickStart?.recommendedCallExample?.sourceDestructive !== false
+    || !summary.workflowQuickStart?.recommendedCallExample?.generatedFromTemplate
+    || !Array.isArray(summary.workflowQuickStart?.alternateExampleIds)
+    || !Array.isArray(summary.workflowQuickStart?.alternateCallExamples)
+    || typeof summary.workflowQuickStart?.decisionHint !== 'string'
+  ) {
+    throw new Error(`${context}: expected workflowQuickStart to point at a template-derived recommended quick call.`);
+  }
+  const expectedWorkflowQuickStartByWorkflow = {
+    overview: 'inspect-unfamiliar-source',
+    single: 'process-single-font',
+    batch: 'inspect-unfamiliar-source',
+    inspect: 'inspect-unfamiliar-source',
+    organize: 'plan-source-layout',
+  };
+  if (summary.workflowQuickStart.recommendedExampleId !== expectedWorkflowQuickStartByWorkflow[workflow]) {
+    throw new Error(`${context}: expected workflowQuickStart recommendation for ${workflow}.`);
+  }
   for (const requiredRoute of ['setup-uncertain', 'unfamiliar-directory', 'layout-uncertain-or-staging-wanted', 'batch-safe-preview', 'batch-reviewed-write', 'output-audit']) {
     if (!routesById.has(requiredRoute)) {
       throw new Error(`${context}: expected route ${requiredRoute}.`);
@@ -897,7 +921,7 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
   ) {
     throw new Error(`${context}: expected nextToolDecisionSummary to route layout, preview, reviewed write, and audit safely.`);
   }
-  for (const requiredExample of ['inspect-unfamiliar-source', 'plan-source-layout', 'quick-structure-first-plan', 'copy-reviewed-staging', 'preview-batch-output', 'write-reviewed-batch-output', 'audit-split-output']) {
+  for (const requiredExample of ['process-single-font', 'inspect-unfamiliar-source', 'plan-source-layout', 'quick-structure-first-plan', 'copy-reviewed-staging', 'preview-batch-output', 'write-reviewed-batch-output', 'audit-split-output']) {
     if (!quickExamplesById.has(requiredExample)) {
       throw new Error(`${context}: expected quickStartCallExamples to include ${requiredExample}.`);
     }
@@ -914,11 +938,15 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
     }
   }
   const stagingExample = quickExamplesById.get('copy-reviewed-staging');
+  const singleExample = quickExamplesById.get('process-single-font');
   const previewExample = quickExamplesById.get('preview-batch-output');
   const writeExample = quickExamplesById.get('write-reviewed-batch-output');
   const auditExample = quickExamplesById.get('audit-split-output');
   if (
-    stagingExample?.args?.workflowPreset !== 'reviewed-write'
+    singleExample?.tool !== 'split_font'
+    || singleExample?.args?.fontPath !== '<font-file>'
+    || singleExample?.nextRouteAfterSuccess !== 'output-audit'
+    || stagingExample?.args?.workflowPreset !== 'reviewed-write'
     || stagingExample?.args?.outputDir !== '<organized-output-dir>'
     || stagingExample?.writesFiles !== true
     || previewExample?.args?.workflowPreset !== 'safe-preview'
@@ -1713,6 +1741,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('nextToolDecisionSummary.quickStartCallExamples')) {
     throw new Error('Expected agent guidance to recommend checking quick start call examples.');
   }
+  if (!result.responseFieldsToCheck?.includes('nextToolDecisionSummary.workflowQuickStart')) {
+    throw new Error('Expected agent guidance to recommend checking workflow quick start.');
+  }
   for (const removedVersionField of [
     'warningCodeCatalogVersion',
     'toolResponseFieldCatalogVersion',
@@ -1967,6 +1998,7 @@ if (scenario === 'single') {
     recommendedWorkflowPlan: 'get_agent_guidance',
     nextToolDecisionSummary: 'get_agent_guidance',
     'nextToolDecisionSummary.quickStartCallExamples': 'get_agent_guidance',
+    'nextToolDecisionSummary.workflowQuickStart': 'get_agent_guidance',
     localVerificationOutputGuide: 'get_agent_guidance',
   };
   for (const [fieldName, toolName] of Object.entries(expectedFieldCatalogEntries)) {
@@ -3837,7 +3869,7 @@ if (scenario === 'single') {
     if (!Object.hasOwn(batchProps, 'workflowPreset') || !Object.hasOwn(organizeProps, 'workflowPreset')) {
       throw new Error('Expected batch and organization tools to expose workflowPreset.');
     }
-    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
@@ -3895,6 +3927,8 @@ if (scenario === 'single') {
       'guidanceView',
       'recommendedWorkflowPlan',
       'nextToolDecisionSummary',
+      'workflowQuickStart',
+      'quickStartCallExamples[]',
       'configurationRecipes',
       'batchPolicyGuide',
       'batchPolicySummary',
@@ -3990,6 +4024,8 @@ if (scenario === 'single') {
     '`guidanceView`',
     '`recommendedWorkflowPlan`',
     '`nextToolDecisionSummary`',
+    '`workflowQuickStart`',
+    '`quickStartCallExamples[]`',
     '`configurationRecipes[]`',
     '`batchPolicyGuide`',
     '`batchPolicySummary`',

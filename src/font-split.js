@@ -772,6 +772,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Template-derived minimal call examples for the most common safe agent routes, including placeholder paths, fields to inspect, and success criteria.',
     agentAction: 'Use these as quick copyable starts, customize placeholder paths and limits, then verify the referenced inspectFields and successCriteria.',
   },
+  'nextToolDecisionSummary.workflowQuickStart': {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Workflow-specific pointer to the recommended quick-start call example, plus alternates for common branch points.',
+    agentAction: 'Use recommendedCallExample as the first copyable call for the selected workflow, then switch to alternates only when the user intent or inspected response requires that route.',
+  },
   batchWarnings: {
     sourceTools: ['split_font_batch'],
     meaning: 'Summary-level batch notices with machine-readable codes.',
@@ -1166,6 +1171,21 @@ const SAFE_INVOCATION_TEMPLATES = [
     inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
     nextStep: 'If maxFilesHit is true or invalid fonts are found, resolve that before relying on batch counts.',
     successCriteria: 'Require maxFilesHit false before trusting counts, and resolve or disclose invalid fonts, missing identities, and relevant inspectionWarnings.',
+  },
+  {
+    id: 'single-font-process',
+    tool: 'split_font',
+    useWhen: 'The user named exactly one known supported font file and wants generated split output.',
+    writesFiles: true,
+    sourceDestructive: false,
+    args: {
+      fontPath: '<font-file>',
+      outDir: '<split-output-root>',
+    },
+    customizableFields: ['fontPath', 'outDir', 'fontFamily', 'fontWeight', 'fontStyle', 'smallGlyphAction', 'splitFailureAction'],
+    inspectFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'manifestPath'],
+    nextStep: 'Run inspect_split_output on outDir before reporting structural success.',
+    successCriteria: 'manifestPath must exist; disclose any fallback, copy-original, or non-subset outputMode, then require an inspect_split_output audit before reporting completion.',
   },
   {
     id: 'directory-mismatch-plan',
@@ -1760,6 +1780,16 @@ function buildQuickStartCallExamples(templateById) {
   };
 
   return [
+    fromTemplate('single-font-process', {
+      exampleId: 'process-single-font',
+      useWhen: 'Process one known supported font file, then audit the generated output.',
+      replaceArgs: {
+        fontPath: '<font-file>',
+        outDir: '<split-output-root>',
+      },
+      customize: ['fontPath', 'outDir', 'fontFamily', 'fontWeight', 'fontStyle', 'smallGlyphAction', 'splitFailureAction'],
+      nextRouteAfterSuccess: 'output-audit',
+    }),
     fromTemplate('source-preflight-compact', {
       exampleId: 'inspect-unfamiliar-source',
       useWhen: 'First read-only pass over an unfamiliar source directory.',
@@ -1821,8 +1851,58 @@ function buildQuickStartCallExamples(templateById) {
   ].filter(Boolean);
 }
 
+function buildWorkflowQuickStart(workflow, quickStartCallExamples) {
+  const examplesById = new Map(quickStartCallExamples.map((example) => [example.id, example]));
+  const route = {
+    overview: {
+      recommendedExampleId: 'inspect-unfamiliar-source',
+      alternateExampleIds: ['plan-source-layout', 'preview-batch-output'],
+      decisionHint: 'Start with a read-only source preflight for unfamiliar directories; use alternates after source shape or user intent is clear.',
+    },
+    single: {
+      recommendedExampleId: 'process-single-font',
+      alternateExampleIds: ['audit-split-output'],
+      decisionHint: 'Use only when the user supplied one supported font path; audit the output before reporting structural success.',
+    },
+    batch: {
+      recommendedExampleId: 'inspect-unfamiliar-source',
+      alternateExampleIds: ['plan-source-layout', 'preview-batch-output'],
+      decisionHint: 'For batch work, inspect the source first, resolve layout ambiguity when needed, then preview before any reviewed write.',
+    },
+    inspect: {
+      recommendedExampleId: 'inspect-unfamiliar-source',
+      alternateExampleIds: ['audit-split-output'],
+      decisionHint: 'Use the source preflight for input directories; use the audit alternate when the user points at generated split output.',
+    },
+    organize: {
+      recommendedExampleId: 'plan-source-layout',
+      alternateExampleIds: ['quick-structure-first-plan', 'copy-reviewed-staging'],
+      decisionHint: 'Start with a no-write layout plan; use structure-first for very noisy directories or copy-reviewed-staging only after a reviewed dry-run plan.',
+    },
+  }[workflow] || {
+    recommendedExampleId: 'inspect-unfamiliar-source',
+    alternateExampleIds: ['plan-source-layout'],
+    decisionHint: 'Start read-only, then choose a route from the inspected response.',
+  };
+  const recommendedCallExample = examplesById.get(route.recommendedExampleId) || null;
+  const alternateCallExamples = route.alternateExampleIds
+    .map((id) => examplesById.get(id))
+    .filter(Boolean);
+  return {
+    summaryType: 'workflow-quick-start',
+    workflow,
+    recommendedExampleId: route.recommendedExampleId,
+    recommendedCallExample,
+    alternateExampleIds: route.alternateExampleIds,
+    alternateCallExamples,
+    decisionHint: route.decisionHint,
+    generatedFromQuickStartCallExamples: true,
+  };
+}
+
 function buildNextToolDecisionSummary(workflow) {
   const templateById = new Map(SAFE_INVOCATION_TEMPLATES.map((template) => [template.id, template]));
+  const quickStartCallExamples = buildQuickStartCallExamples(templateById);
   const workflowPrimaryRoute = {
     overview: 'unfamiliar-directory',
     single: 'single-known-font',
@@ -1964,7 +2044,8 @@ function buildNextToolDecisionSummary(workflow) {
       'output-audit',
     ]),
     routes,
-    quickStartCallExamples: buildQuickStartCallExamples(templateById),
+    workflowQuickStart: buildWorkflowQuickStart(workflow, quickStartCallExamples),
+    quickStartCallExamples,
     safetyDefaults: {
       previewPreset: 'safe-preview',
       writePreset: 'reviewed-write',
@@ -2799,6 +2880,7 @@ export function getAgentGuidance(args = {}) {
       'nextToolDecisionSummary',
       'recommendedWorkflowPlan',
       'nextToolDecisionSummary.quickStartCallExamples',
+      'nextToolDecisionSummary.workflowQuickStart',
       'batchWarnings',
       'batchWarningCount',
       'batchDecision',
