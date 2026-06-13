@@ -111,6 +111,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
     return {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
+      corpusUnsupportedByExtension: result.corpus?.unsupportedFileSummary?.byExtension,
       corpusUnsupportedByCategory: result.corpus?.unsupportedFileSummary?.byCategory,
       corpusUnsupportedHandlingSummary: result.corpus?.unsupportedFileSummary?.handlingSummary,
       corpusUnsupportedArchiveCount: getUnsupportedCategoryCount(result.corpus?.unsupportedFileSummary, 'archive'),
@@ -129,6 +130,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
     return {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
+      corpusUnsupportedByExtension: result.corpus?.unsupportedFileSummary?.byExtension,
       corpusUnsupportedByCategory: result.corpus?.unsupportedFileSummary?.byCategory,
       corpusUnsupportedHandlingSummary: result.corpus?.unsupportedFileSummary?.handlingSummary,
       corpusUnsupportedArchiveCount: getUnsupportedCategoryCount(result.corpus?.unsupportedFileSummary, 'archive'),
@@ -145,6 +147,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
     return {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
+      corpusUnsupportedByExtension: result.corpus?.unsupportedFileSummary?.byExtension,
       corpusUnsupportedByCategory: result.corpus?.unsupportedFileSummary?.byCategory,
       corpusUnsupportedHandlingSummary: result.corpus?.unsupportedFileSummary?.handlingSummary,
       corpusUnsupportedArchiveCount: getUnsupportedCategoryCount(result.corpus?.unsupportedFileSummary, 'archive'),
@@ -155,9 +158,15 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       singleAuditStatus: result.singleAudit?.auditStatus,
       singleAuditPassed: result.singleAudit?.auditPassed,
       singleStructureConforms: result.singleAudit?.structureSummary?.conforms,
+      singleStructureLayoutKind: result.singleAudit?.structureSummary?.layoutKind,
+      singleManifestCoverageOk: result.singleAudit?.structureSummary?.manifestCoverageOk,
+      singleStructureIssueCount: result.singleAudit?.structureSummary?.issueCount,
       batchAuditStatus: result.batchAudit?.auditStatus,
       batchAuditPassed: result.batchAudit?.auditPassed,
       batchStructureConforms: result.batchAudit?.structureSummary?.conforms,
+      batchStructureLayoutKind: result.batchAudit?.structureSummary?.layoutKind,
+      batchManifestCoverageOk: result.batchAudit?.structureSummary?.manifestCoverageOk,
+      batchStructureIssueCount: result.batchAudit?.structureSummary?.issueCount,
       organizationPreviewSourceLayoutMismatchSummary: result.organization?.preview?.sourceLayoutMismatchSummary,
       organizationWriteSourceLayoutMismatchSummary: result.organization?.write?.sourceLayoutMismatchSummary,
     };
@@ -167,6 +176,29 @@ function summarizeRealCorpusSubprocess(scenario, result) {
 
 function getUnsupportedCategoryCount(summary, category) {
   return (summary?.byCategory || []).find((item) => item.category === category)?.count ?? 0;
+}
+
+function buildUnsupportedFileCategoryCoverage({ total, byCategory, byExtension, handlingSummary } = {}) {
+  const categoryEntries = Array.isArray(byCategory) ? byCategory : [];
+  const extensionEntries = Array.isArray(byExtension) ? byExtension : [];
+  const categories = categoryEntries.map((item) => item.category).filter(Boolean);
+  const extensions = extensionEntries.map((item) => item.extension).filter(Boolean);
+  const extensionsBeyondZipTxt = extensions.filter((extension) => extension !== '.zip' && extension !== '.txt');
+  return {
+    summaryType: 'unsupported-file-category-coverage',
+    totalUnsupportedFileCount: total,
+    categoryCount: categories.length,
+    categories,
+    extensionCount: extensions.length,
+    extensions,
+    extensionsBeyondZipTxt,
+    extensionsBeyondZipTxtCount: extensionsBeyondZipTxt.length,
+    archiveCount: categoryEntries.find((item) => item.category === 'archive')?.count ?? 0,
+    nonArchiveCategoryCount: categoryEntries.filter((item) => item.category !== 'archive').length,
+    hasMultipleCategories: categories.length > 1,
+    hasExtensionsBeyondZipTxt: extensionsBeyondZipTxt.length > 0,
+    handlingSummary,
+  };
 }
 
 function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
@@ -182,10 +214,34 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
   const fixedRegressionTargetsCovered = DEFAULT_REAL_CORPUS_TARGETS.every((target) => selectedTargetSet.has(target));
   const corpusSupportedFontCount = readonly.corpusSupportedFontCount ?? targets.corpusSupportedFontCount ?? integration.corpusSupportedFontCount;
   const corpusUnsupportedFileCount = readonly.corpusUnsupportedFileCount ?? targets.corpusUnsupportedFileCount ?? integration.corpusUnsupportedFileCount;
+  const corpusUnsupportedByExtension = readonly.corpusUnsupportedByExtension ?? targets.corpusUnsupportedByExtension ?? integration.corpusUnsupportedByExtension;
   const corpusUnsupportedByCategory = readonly.corpusUnsupportedByCategory ?? targets.corpusUnsupportedByCategory ?? integration.corpusUnsupportedByCategory;
   const corpusUnsupportedHandlingSummary = readonly.corpusUnsupportedHandlingSummary ?? targets.corpusUnsupportedHandlingSummary ?? integration.corpusUnsupportedHandlingSummary;
   const corpusUnsupportedArchiveCount = readonly.corpusUnsupportedArchiveCount ?? targets.corpusUnsupportedArchiveCount ?? integration.corpusUnsupportedArchiveCount;
   const corpusMaxFilesHit = readonly.corpusMaxFilesHit ?? targets.corpusMaxFilesHit ?? integration.corpusMaxFilesHit;
+  const unsupportedFileCategoryCoverage = buildUnsupportedFileCategoryCoverage({
+    total: corpusUnsupportedFileCount,
+    byCategory: corpusUnsupportedByCategory,
+    byExtension: corpusUnsupportedByExtension,
+    handlingSummary: corpusUnsupportedHandlingSummary,
+  });
+  const outputStructureAuditSummary = {
+    summaryType: 'real-corpus-output-structure-audit',
+    sampleInputDir: integration.sampleInputDir,
+    outputRoot: integration.outputRoot,
+    singleAuditStatus: integration.singleAuditStatus,
+    singleAuditPassed: integration.singleAuditPassed,
+    singleStructureConforms: integration.singleStructureConforms,
+    singleStructureLayoutKind: integration.singleStructureLayoutKind,
+    singleManifestCoverageOk: integration.singleManifestCoverageOk,
+    singleStructureIssueCount: integration.singleStructureIssueCount,
+    batchAuditStatus: integration.batchAuditStatus,
+    batchAuditPassed: integration.batchAuditPassed,
+    batchStructureConforms: integration.batchStructureConforms,
+    batchStructureLayoutKind: integration.batchStructureLayoutKind,
+    batchManifestCoverageOk: integration.batchManifestCoverageOk,
+    batchStructureIssueCount: integration.batchStructureIssueCount,
+  };
   const selectedTargets = targets.selectedTargets || [];
   const targetSourceLayoutMismatchSummaries = targets.targetSourceLayoutMismatchSummaries || [];
   const targetSourceLayoutMismatchSummaryCount = targetSourceLayoutMismatchSummaries
@@ -207,6 +263,10 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
       maxFilesHit: corpusMaxFilesHit,
       supportedFontCount: corpusSupportedFontCount,
       unsupportedFileCount: corpusUnsupportedFileCount,
+      unsupportedCategoryCount: unsupportedFileCategoryCoverage.categoryCount,
+      unsupportedCategories: unsupportedFileCategoryCoverage.categories,
+      unsupportedExtensionCount: unsupportedFileCategoryCoverage.extensionCount,
+      unsupportedExtensionsBeyondZipTxt: unsupportedFileCategoryCoverage.extensionsBeyondZipTxt,
     },
     targetSampling: {
       scopeKind: 'fixed-regression-plus-adaptive-sampling',
@@ -228,7 +288,11 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
       sampleFontPath: integration.sampleFontPath,
       outputRoot: integration.outputRoot,
       singleAuditStatus: integration.singleAuditStatus,
+      singleAuditPassed: integration.singleAuditPassed,
+      singleStructureConforms: integration.singleStructureConforms,
       batchAuditStatus: integration.batchAuditStatus,
+      batchAuditPassed: integration.batchAuditPassed,
+      batchStructureConforms: integration.batchStructureConforms,
     },
   };
   const functionalCoverage = [
@@ -248,12 +312,16 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
         readonlyRun.ok
         && Array.isArray(readonly.corpusUnsupportedByCategory)
         && readonly.corpusUnsupportedByCategory.length > 0
+        && unsupportedFileCategoryCoverage.categoryCount > 0
+        && unsupportedFileCategoryCoverage.extensionCount > 0
         && readonly.corpusUnsupportedHandlingSummary?.unsupportedFilesIgnored === true
         && readonly.corpusUnsupportedHandlingSummary?.archivesExtracted === false
       ),
       toolPaths: ['inspect_font_inputs', 'organize_font_directory', 'split_font_batch'],
       evidence: {
         byCategory: readonly.corpusUnsupportedByCategory,
+        byExtension: readonly.corpusUnsupportedByExtension,
+        coverage: unsupportedFileCategoryCoverage,
         archiveCount: readonly.corpusUnsupportedArchiveCount,
         handlingSummary: readonly.corpusUnsupportedHandlingSummary,
       },
@@ -357,9 +425,11 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     functionalCoverage,
     corpusSupportedFontCount,
     corpusUnsupportedFileCount,
+    corpusUnsupportedByExtension,
     corpusUnsupportedByCategory,
     corpusUnsupportedHandlingSummary,
     corpusUnsupportedArchiveCount,
+    unsupportedFileCategoryCoverage,
     corpusMaxFilesHit,
     fixedRegressionTargets: DEFAULT_REAL_CORPUS_TARGETS,
     targetSelectionMode: targets.selectionMode,
@@ -369,6 +439,7 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     selectedTargets,
     representativeReadonlySample: readonly.sampleInputDir,
     representativeWriteSample: integration.sampleInputDir,
+    outputStructureAuditSummary,
     singleAuditStatus: integration.singleAuditStatus,
     batchAuditStatus: integration.batchAuditStatus,
   };
@@ -378,6 +449,8 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
   const corpusScan = coverageSummary.testScope?.corpusScan || {};
   const targetSampling = coverageSummary.testScope?.targetSampling || {};
   const writeAudit = coverageSummary.testScope?.representativeWriteAudit || {};
+  const ignoredCoverage = coverageSummary.unsupportedFileCategoryCoverage || {};
+  const structureAudit = coverageSummary.outputStructureAuditSummary || {};
   const fixedCount = targetSampling.fixedRegressionTargetCount ?? coverageSummary.fixedRegressionTargets?.length;
   const selectedCount = targetSampling.selectedTargetCount ?? coverageSummary.selectedTargetCount;
   const availableCount = targetSampling.availableTargetCount ?? coverageSummary.availableTargetCount;
@@ -386,8 +459,9 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
   const totalCoverageCount = functionalCoverage.length;
   const lines = [
     `Full corpus scan: ${corpusScan.supportedFontCount ?? 'unknown'} supported font files and ${corpusScan.unsupportedFileCount ?? 'unknown'} ignored/non-font files; maxFilesHit=${corpusScan.maxFilesHit}.`,
+    `Ignored-file coverage: ${ignoredCoverage.categoryCount ?? 'unknown'} categories (${(ignoredCoverage.categories || []).slice(0, 6).join(', ') || 'none'}), ${ignoredCoverage.extensionCount ?? 'unknown'} extension types, ${ignoredCoverage.extensionsBeyondZipTxtCount ?? 'unknown'} extension types beyond .zip/.txt.`,
     `Target sampling: ${fixedCount ?? 'unknown'} fixed regression targets and ${selectedCount ?? 'unknown'} selected representative targets out of ${availableCount ?? 'unknown'} available target directories; this is not per-directory acceptance.`,
-    `Representative write audit: sample=${writeAudit.sampleInputDir || 'unknown'}, single=${writeAudit.singleAuditStatus || 'unknown'}, batch=${writeAudit.batchAuditStatus || 'unknown'}.`,
+    `Representative write audit: sample=${writeAudit.sampleInputDir || 'unknown'}, single=${writeAudit.singleAuditStatus || 'unknown'} structureConforms=${structureAudit.singleStructureConforms}, batch=${writeAudit.batchAuditStatus || 'unknown'} structureConforms=${structureAudit.batchStructureConforms}.`,
     `Interpretation: small numbers such as ${fixedCount ?? 'fixed'} or ${selectedCount ?? 'selected'} are target counts, not the full corpus font count; use testScope.corpusScan.supportedFontCount for the root-level font total.`,
     `Functional coverage: ${coveredCount}/${totalCoverageCount} real-corpus feature paths covered.`,
   ];
@@ -397,12 +471,17 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
     lines,
     fullCorpusSupportedFontCount: corpusScan.supportedFontCount,
     fullCorpusUnsupportedFileCount: corpusScan.unsupportedFileCount,
+    ignoredFileCategoryCount: ignoredCoverage.categoryCount,
+    ignoredFileExtensionCount: ignoredCoverage.extensionCount,
+    ignoredFileExtensionsBeyondZipTxtCount: ignoredCoverage.extensionsBeyondZipTxtCount,
     fixedRegressionTargetCount: fixedCount,
     selectedTargetCount: selectedCount,
     availableTargetCount: availableCount,
     representativeWriteSample: writeAudit.sampleInputDir,
     singleAuditStatus: writeAudit.singleAuditStatus,
+    singleStructureConforms: structureAudit.singleStructureConforms,
     batchAuditStatus: writeAudit.batchAuditStatus,
+    batchStructureConforms: structureAudit.batchStructureConforms,
     perDirectoryAcceptanceAudit: false,
   };
 }
@@ -3455,6 +3534,8 @@ if (scenario === 'single') {
       'unsupportedFileSummary.categoryDetails',
       'unsupportedFileSummary.handlingSummary',
       'unsupportedFileSummary.examples',
+      'coverageSummary.unsupportedFileCategoryCoverage',
+      'coverageSummary.outputStructureAuditSummary',
       'debugBatchDecisions',
       'humanSummary',
     ]) {
@@ -3463,6 +3544,8 @@ if (scenario === 'single') {
     assertDocsContain('real corpus suite checklist id', '`local-real-corpus-suite-passed`');
     assertDocsContain('real corpus suite command', '`npm run smoke:real-corpus-suite -- <font-corpus-dir>`');
     assertDocsContain('real corpus suite test scope', '`testScope`');
+    assertDocsContain('real corpus ignored category coverage', '`coverageSummary.unsupportedFileCategoryCoverage`');
+    assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
     assertDocsContain('two-call layout preview example', '`two-call-layout-preview`');
     assertDocsContain('recommendedBatchPreviewArgs spread example', '...organization.recommendedBatchPreviewArgs');
     assertDocsContain('recommendedBatchOptions not complete call warning', '`recommendedBatchOptions`');
@@ -3511,6 +3594,8 @@ if (scenario === 'single') {
     '`humanSummary`',
     '`testScope`',
     '`functionalCoverage[]`',
+    '`coverageSummary.unsupportedFileCategoryCoverage`',
+    '`coverageSummary.outputStructureAuditSummary`',
     '`directoryWorkflowDecisionMatrix[]`',
     '`directoryWorkflowExamples[]`',
     '`safeInvocationTemplates[]`',
@@ -3849,6 +3934,8 @@ if (scenario === 'single') {
     coverageSummary.perDirectoryAcceptanceAudit !== false
     || coverageSummary.testScope?.corpusScan?.scopeKind !== 'full-root-bounded-scan'
     || coverageSummary.testScope?.corpusScan?.supportedFontCount !== coverageSummary.corpusSupportedFontCount
+    || coverageSummary.testScope?.corpusScan?.unsupportedCategoryCount !== coverageSummary.unsupportedFileCategoryCoverage?.categoryCount
+    || coverageSummary.testScope?.corpusScan?.unsupportedExtensionCount !== coverageSummary.unsupportedFileCategoryCoverage?.extensionCount
     || coverageSummary.testScope?.targetSampling?.scopeKind !== 'fixed-regression-plus-adaptive-sampling'
     || coverageSummary.testScope?.targetSampling?.fixedRegressionTargetCount !== DEFAULT_REAL_CORPUS_TARGETS.length
     || coverageSummary.testScope?.targetSampling?.selectedTargetCount !== coverageSummary.selectedTargetCount
@@ -3856,17 +3943,30 @@ if (scenario === 'single') {
     || coverageSummary.testScope?.targetSampling?.perDirectoryAcceptanceAudit !== false
     || coverageSummary.testScope?.representativeWriteAudit?.scopeKind !== 'single-representative-write-and-audit'
     || coverageSummary.testScope?.representativeWriteAudit?.batchAuditStatus !== coverageSummary.batchAuditStatus
+    || coverageSummary.testScope?.representativeWriteAudit?.singleStructureConforms !== true
+    || coverageSummary.testScope?.representativeWriteAudit?.batchStructureConforms !== true
     || !Array.isArray(coverageSummary.functionalCoverage)
     || !coverageSummary.functionalCoverage.some((item) => item.id === 'source-layout-mismatch-summary')
     || coverageSummary.functionalCoverage.some((item) => item.covered !== true)
     || coverageSummary.corpusSupportedFontCount < 1
     || !Array.isArray(coverageSummary.corpusUnsupportedByCategory)
+    || coverageSummary.unsupportedFileCategoryCoverage?.summaryType !== 'unsupported-file-category-coverage'
+    || coverageSummary.unsupportedFileCategoryCoverage?.extensionsBeyondZipTxtCount < 1
     || coverageSummary.selectedTargetCount < 1
     || coverageSummary.batchAuditStatus !== 'pass'
+    || coverageSummary.outputStructureAuditSummary?.summaryType !== 'real-corpus-output-structure-audit'
+    || coverageSummary.outputStructureAuditSummary?.singleStructureConforms !== true
+    || coverageSummary.outputStructureAuditSummary?.batchStructureConforms !== true
     || humanSummary.summaryType !== 'real-corpus-suite-human-summary'
     || humanSummary.fullCorpusSupportedFontCount !== coverageSummary.corpusSupportedFontCount
+    || humanSummary.ignoredFileCategoryCount !== coverageSummary.unsupportedFileCategoryCoverage?.categoryCount
+    || humanSummary.ignoredFileExtensionsBeyondZipTxtCount !== coverageSummary.unsupportedFileCategoryCoverage?.extensionsBeyondZipTxtCount
     || humanSummary.selectedTargetCount !== coverageSummary.selectedTargetCount
+    || humanSummary.singleStructureConforms !== true
+    || humanSummary.batchStructureConforms !== true
     || humanSummary.perDirectoryAcceptanceAudit !== false
+    || !humanSummary.lines?.some((line) => line.includes('Ignored-file coverage'))
+    || !humanSummary.lines?.some((line) => line.includes('structureConforms=true'))
     || !humanSummary.lines?.some((line) => line.includes('not the full corpus font count'))
   ) {
     throw new Error('Expected real-corpus-suite compact coverage summary to expose explicit testScope, humanSummary, covered function paths, root counts, unsupported categories, selected targets, and passing output audits.');
