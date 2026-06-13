@@ -1035,7 +1035,7 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   structureSummary: {
     sourceTools: ['inspect_split_output'],
     meaning: 'Machine-readable check for whether output files fit the documented split-output directory structure, including unexpected files, manifest coverage, and per-entry output-mode requirements.',
-    agentAction: 'Require structureSummary.conforms true before claiming the output directory is structurally valid; inspect issues[] and unexpectedFileExamples[] when false.',
+    agentAction: 'Check outputStructureDecision.status first, then require structureSummary.conforms true before claiming the output directory is structurally valid; inspect issues[] and unexpectedFileExamples[] when false.',
   },
   outputStructureDecision: {
     sourceTools: ['inspect_split_output'],
@@ -1045,7 +1045,7 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   auditStatus: {
     sourceTools: ['inspect_split_output'],
     meaning: 'Compact output audit status: pass, incomplete, or action-required.',
-    agentAction: 'Require auditStatus pass, auditPassed true, maxFilesHit false, and structureSummary.conforms true before reporting an output audit as complete.',
+    agentAction: 'Require outputStructureDecision.status pass, auditStatus pass, auditPassed true, maxFilesHit false, and structureSummary.conforms true before reporting an output audit as complete.',
   },
   auditPassed: {
     sourceTools: ['inspect_split_output'],
@@ -1192,8 +1192,8 @@ const SAFE_INVOCATION_TEMPLATES = [
     },
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'],
     inspectFields: ['safetySummary', 'batchPolicySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
-    nextStep: 'Run inspect_split_output on outputRoot before reporting completion.',
-    successCriteria: 'The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up output audit before reporting completion.',
+    nextStep: 'Run inspect_split_output on outputRoot before reporting completion and require outputStructureDecision.status pass.',
+    successCriteria: 'The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up inspect_split_output audit with outputStructureDecision.status pass before reporting completion.',
   },
   {
     id: 'output-audit-compact',
@@ -1881,7 +1881,7 @@ export function getAgentGuidance(args = {}) {
       'Call organize_font_directory with dryRun true if directory layout is flat/mixed/unfamiliar or if the user asks to stage fonts into a cleaner structure.',
       'Call split_font_batch with dryRun true to preview output layout.',
       'Call split_font_batch with includeResults false for full-library processing.',
-      'Call inspect_split_output after processing; require auditStatus pass and structureSummary.conforms true; use includeFiles false / includeFamilies false for compact summaries.',
+      'Call inspect_split_output after processing; require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false; use includeFiles false / includeFamilies false for compact summaries.',
     ],
     single: [
       'Call split_font with one fontPath.',
@@ -1894,12 +1894,12 @@ export function getAgentGuidance(args = {}) {
       'Call split_font_batch with workflowPreset safe-preview to review planned paths without writing.',
       'Use batchNamingMode numeric-suffix and batchDedupeMode font-identity unless the user asks for another policy.',
       'Use includeResults false for large real runs.',
-      'Call inspect_split_output on the outputRoot when done; require auditStatus pass and structureSummary.conforms true; use includeFiles false / includeFamilies false for large outputs.',
+      'Call inspect_split_output on the outputRoot when done; require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false; use includeFiles false / includeFamilies false for large outputs.',
     ],
     inspect: [
       'Call get_runtime_status to verify workspace, cn-font-split package, and WASM runtime availability when setup is uncertain.',
       'Call inspect_font_inputs to audit source directories before processing.',
-      'Call inspect_split_output to audit generated output directories; require auditStatus pass and structureSummary.conforms true; set includeFiles false / includeFamilies false when only summary counts are needed.',
+      'Call inspect_split_output to audit generated output directories; require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false; set includeFiles false / includeFamilies false when only summary counts are needed.',
       'If maxFilesHit is true, rerun with a higher maxFiles before treating the summary as complete.',
     ],
     organize: [
@@ -2174,7 +2174,7 @@ export function getAgentGuidance(args = {}) {
         'Preview before writing; inspect batchDecision, batchWarnings, maxFilesHit, skippedDuplicates, errors, and safetySummary.',
       ],
       inspectFields: ['safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors', 'recommendedNextActions'],
-      successCriteria: 'Preview must be no-write and acceptable; reviewed write must have sourceDestructive false and errorCount zero; final inspect_split_output audit must pass before reporting completion.',
+      successCriteria: 'Preview must be no-write and acceptable; reviewed write must have sourceDestructive false and errorCount zero; final inspect_split_output audit must reach outputStructureDecision.status pass before reporting completion.',
       auditAfterWrite: {
         tool: 'inspect_split_output',
         requiredFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary', 'maxFilesHit', 'inspectionWarnings'],
@@ -2204,7 +2204,7 @@ export function getAgentGuidance(args = {}) {
         'Keep batchNamingMode numeric-suffix unless the user explicitly wants another collision policy.',
       ],
       inspectFields: ['batchPolicySummary', 'batchDecision', 'planned', 'plannedCount', 'skippedDuplicates', 'batchWarnings', 'outputTreeInsideInputTree'],
-      successCriteria: 'Preview and reviewed write must intentionally use batchDedupeMode none, preserve every supported selected source font, and still pass the normal output audit after writing.',
+      successCriteria: 'Preview and reviewed write must intentionally use batchDedupeMode none, preserve every supported selected source font, and still reach outputStructureDecision.status pass after writing.',
     },
     {
       id: 'source-folder-families',
@@ -2311,10 +2311,10 @@ export function getAgentGuidance(args = {}) {
       sourceDestructive: false,
       tradeoffs: [
         'includeResults is false through reviewed-write, keeping large responses compact.',
-        'Always follow the audit-split-output next action and require auditStatus pass before reporting completion.',
+        'Always follow the audit-split-output next action and require outputStructureDecision.status pass plus auditStatus pass before reporting completion.',
       ],
       inspectFields: ['safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions', 'resultsIncluded'],
-      successCriteria: 'Run only after a reviewed preview; require maxFilesHit false, errorCount zero, audit-split-output next action, and a passing inspect_split_output audit before reporting completion.',
+      successCriteria: 'Run only after a reviewed preview; require maxFilesHit false, errorCount zero, audit-split-output next action, and an inspect_split_output audit with outputStructureDecision.status pass before reporting completion.',
     },
   ];
 
@@ -3831,7 +3831,7 @@ function buildSourceLayoutMismatchSummary({
       'Treat this summary as routing guidance, not proof of success.',
       'Before writing split output, run split_font_batch with safe-preview arguments and inspect planned paths, warnings, maxFilesHit, and errors.',
       'Before copy-only staging, review planActionSummary and plan[] when available; if plan[] was omitted, rerun the organization dry-run with includePlan:true.',
-      'After any reviewed batch write, run inspect_split_output and require a passing structure audit.',
+      'After any reviewed batch write, run inspect_split_output and require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
     ],
     nonIntuitiveBehavior: [
       'copyOnlyStaging is never source-destructive: dryRun:false copies selected fonts to outputDir and does not move, delete, or rewrite source fonts.',
@@ -4073,7 +4073,7 @@ function buildDirectoryWorkflowSummary({
     successCriteria: [
       'Do not treat organization as complete until sourceDestructive is false, organizationWarnings are reviewed, and planActionSummary or plan matches user intent.',
       'Run a split_font_batch safe-preview before any reviewed batch write.',
-      'After any reviewed batch write, require inspect_split_output to pass before reporting structural success.',
+      'After any reviewed batch write, require inspect_split_output to report outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false before reporting structural success.',
     ],
     nonIntuitiveBehavior,
   };
