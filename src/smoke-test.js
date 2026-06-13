@@ -1603,6 +1603,28 @@ if (scenario === 'single') {
     workflow: 'organize',
     primaryRouteId: 'layout-uncertain-or-staging-wanted',
   });
+  const workflowOnlyGuidance = getAgentGuidance({ workflow: 'organize', sections: ['workflow'] });
+  if (
+    workflowOnlyGuidance.guidanceView?.sectionsIncluded?.length !== 1
+    || workflowOnlyGuidance.guidanceView?.sectionsIncluded?.[0] !== 'workflow'
+    || workflowOnlyGuidance.workflow !== 'organize'
+    || Object.hasOwn(workflowOnlyGuidance, 'safeInvocationTemplates')
+    || Object.hasOwn(workflowOnlyGuidance, 'configurationRecipes')
+    || Object.hasOwn(workflowOnlyGuidance, 'directoryWorkflowDecisionMatrix')
+    || !workflowOnlyGuidance.recommendedWorkflowPlan?.orderedSteps?.length
+    || workflowOnlyGuidance.nextToolDecisionSummary?.workflowQuickStart?.recommendedExampleId !== 'plan-source-layout'
+    || workflowOnlyGuidance.nextToolDecisionSummary?.workflowQuickStart?.recommendedCallExample?.tool !== 'organize_font_directory'
+    || workflowOnlyGuidance.nextToolDecisionSummary?.workflowQuickStart?.recommendedCallExample?.args?.workflowPreset !== 'safe-preview'
+    || workflowOnlyGuidance.nextToolDecisionSummary?.workflowQuickStart?.recommendedCallExample?.writesFiles !== false
+    || workflowOnlyGuidance.nextToolDecisionSummary?.workflowQuickStart?.recommendedCallExample?.sourceDestructive !== false
+  ) {
+    throw new Error('Expected workflow-only guidance to expose an organize quick start without bulky sections or write behavior.');
+  }
+  assertNextToolDecisionSummary(workflowOnlyGuidance.nextToolDecisionSummary, {
+    context: 'agent-guidance organize workflow section',
+    workflow: 'organize',
+    primaryRouteId: 'layout-uncertain-or-staging-wanted',
+  });
   assertSourceLayoutDecisionChecklistCompanionFields(result, 'agent-guidance full');
   assertSourceLayoutDecisionChecklistCompanionFields(compactGuidance, 'agent-guidance compact');
   const catalogGuidance = getAgentGuidance({ sections: ['warning-catalog', 'field-catalog'] });
@@ -3988,6 +4010,8 @@ if (scenario === 'single') {
     assertDocsContain('real corpus suite test scope', '`testScope`');
     assertDocsContain('real corpus ignored category coverage', '`coverageSummary.unsupportedFileCategoryCoverage`');
     assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
+    assertDocsContain('workflow-only quick start request', '`sections: ["workflow"]`');
+    assertDocsContain('workflow quick start recommended call', '`workflowQuickStart.recommendedCallExample`');
     assertDocsContain('two-call layout preview example', '`two-call-layout-preview`');
     assertDocsContain('recommendedBatchPreviewArgs spread example', '...organization.recommendedBatchPreviewArgs');
     assertDocsContain('recommendedBatchOptions not complete call warning', '`recommendedBatchOptions`');
@@ -4025,6 +4049,8 @@ if (scenario === 'single') {
     '`recommendedWorkflowPlan`',
     '`nextToolDecisionSummary`',
     '`workflowQuickStart`',
+    '`workflowQuickStart.recommendedCallExample`',
+    '`sections: ["workflow"]`',
     '`quickStartCallExamples[]`',
     '`configurationRecipes[]`',
     '`batchPolicyGuide`',
