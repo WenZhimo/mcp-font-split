@@ -2068,6 +2068,54 @@ export function getAgentGuidance(args = {}) {
       successCriteria: 'Use organization preview first; proceed only after mixed-layout warnings, planActionSummary, and recommendedBatchPreviewArgs are reviewed and sourceDestructive remains false.',
     },
     {
+      id: 'source-layout-mismatch-comparison',
+      sourceShape: [
+        'Compare the actual organize_font_directory response for flat, nested, mixed, and output-inside-input cases.',
+        'Do not infer from folder names alone; use layout, sourceLayoutMismatchSummary, recommendedBatchPreviewArgs, and warnings from the current response.',
+      ],
+      likelyLayoutKind: 'varies',
+      concern: 'Agents often confuse "source layout matches recommended grouping" with "organization has already succeeded"; this comparison keeps it as routing guidance only.',
+      firstTool: 'organize_font_directory',
+      firstCall: {
+        inputDir: 'fonts',
+        workflowPreset: 'safe-preview',
+      },
+      comparisonCases: [
+        {
+          caseId: 'flat',
+          expectedSignals: ['layout.layoutKind is flat', 'recommendedBatchPreviewArgs usually relies on font metadata grouping', 'sourceLayoutMismatchSummary should be reviewed before writing'],
+          preferredAction: 'Preview split_font_batch with the returned recommendedBatchPreviewArgs; copy-only staging is optional unless the user wants a cleaned source tree.',
+        },
+        {
+          caseId: 'nested',
+          expectedSignals: ['layout.layoutKind is nested', 'recommendedBatchPreviewArgs often preserves source-dir grouping', 'sourceLayoutMatchesRecommendedGrouping may be true'],
+          preferredAction: 'Direct original-input split_font_batch safe-preview is usually available, but still review planned paths, warnings, and dedupe before write.',
+        },
+        {
+          caseId: 'mixed',
+          expectedSignals: ['layout.layoutKind is mixed', 'organizationWarnings may include mixed-layout-detected', 'sourceLayoutMismatchSummary.mismatchDetected may be true'],
+          preferredAction: 'Review the organization plan before choosing original input vs copy-only staged output; do not treat the route hint as success proof.',
+        },
+        {
+          caseId: 'output-inside-input',
+          expectedSignals: ['outputTreeInsideInputTree is true', 'organizationWarnings includes output-inside-input', 'future scans may reprocess organized copies if not excluded'],
+          preferredAction: 'Keep the source-safe guarantee clear, then exclude the generated output directory from future scans or intentionally use that outputDir as the next input.',
+        },
+      ],
+      ifPlanLooksGood: [
+        'If sourceLayoutMismatchSummary says direct original-input preview is available, run split_font_batch with recommendedBatchPreviewArgs before any write.',
+        'If the user wants a cleaned staging tree, rerun organize_font_directory with workflowPreset reviewed-write only after the safe-preview plan is reviewed.',
+        'After any real split or organization write, audit the output tree or inspect the organized output before reporting success.',
+      ],
+      safety: {
+        sourceDestructive: false,
+        defaultWritesFiles: false,
+        realOrganizerMode: 'copy-only',
+      },
+      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
+      successCriteria: 'Use this comparison only to choose the next route; actual continuation requires safe-preview, sourceDestructive false, reviewed sourceLayoutMismatchSummary, reviewed warnings, and accepted recommendedBatchPreviewArgs.',
+    },
+    {
       id: 'large-noisy-first-pass',
       sourceShape: [
         'fonts/',

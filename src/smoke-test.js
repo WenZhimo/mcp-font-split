@@ -1675,7 +1675,7 @@ if (scenario === 'single') {
   assertObjectOmitsKeys(stagingDecision?.recommendedOptions, ['dryRun', 'includePlan', 'parseFonts', 'overwriteExisting'], 'user-wants-clean-staging-directory recommendedOptions');
   assertObjectOmitsKeys(stagingDecision?.followUpOptions, ['dryRun', 'includePlan', 'parseFonts', 'overwriteExisting'], 'user-wants-clean-staging-directory followUpOptions');
   const exampleIds = new Set((result.directoryWorkflowExamples || []).map((item) => item.id));
-  for (const requiredExample of ['flat-vendor-dump', 'archive-per-family-folders', 'mixed-root-and-nested-fonts', 'large-noisy-first-pass']) {
+  for (const requiredExample of ['flat-vendor-dump', 'archive-per-family-folders', 'mixed-root-and-nested-fonts', 'source-layout-mismatch-comparison', 'large-noisy-first-pass']) {
     if (!exampleIds.has(requiredExample)) {
       throw new Error(`Expected agent guidance examples to include ${requiredExample}.`);
     }
@@ -1722,6 +1722,21 @@ if (scenario === 'single') {
     throw new Error('Expected mixed-layout example to disclose source safety fields.');
   }
   assertObjectOmitsKeys(mixedExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'mixed-root-and-nested-fonts firstCall');
+  const mismatchComparisonExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'source-layout-mismatch-comparison');
+  const mismatchComparisonCaseIds = new Set((mismatchComparisonExample?.comparisonCases || []).map((item) => item.caseId));
+  if (
+    mismatchComparisonExample?.firstCall?.workflowPreset !== 'safe-preview'
+    || !['flat', 'nested', 'mixed', 'output-inside-input'].every((caseId) => mismatchComparisonCaseIds.has(caseId))
+    || !mismatchComparisonExample.mustInspectFields?.includes('sourceLayoutMismatchSummary')
+    || !mismatchComparisonExample.mustInspectFields?.includes('outputTreeInsideInputTree')
+    || !mismatchComparisonExample.mustInspectFields?.includes('organizationWarnings')
+    || !mismatchComparisonExample.mustInspectFields?.includes('recommendedBatchPreviewArgs')
+    || !mismatchComparisonExample.successCriteria?.includes('sourceLayoutMismatchSummary')
+    || !mismatchComparisonExample.concern?.includes('routing guidance only')
+  ) {
+    throw new Error('Expected source-layout mismatch comparison example to cover flat/nested/mixed/output-inside-input routing and required inspect fields.');
+  }
+  assertObjectOmitsKeys(mismatchComparisonExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'source-layout-mismatch-comparison firstCall');
   const flatExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'flat-vendor-dump');
   if (
     flatExample?.firstCall?.workflowPreset !== 'safe-preview'
