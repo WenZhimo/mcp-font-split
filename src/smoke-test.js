@@ -3200,8 +3200,10 @@ if (scenario === 'single') {
   if (
     !readmeText.includes('`default` 不是有效值')
     || !readmeText.includes('无效 preset 拒绝')
+    || !readmeText.includes('BatchRunConfigurationError')
     || !readmeEnText.includes('`default` is not valid')
     || !readmeEnText.includes('invalid preset rejection')
+    || !readmeEnText.includes('BatchRunConfigurationError')
   ) {
     throw new Error('Expected README docs to describe batch:run invalid workflow preset rejection.');
   }
@@ -3280,6 +3282,39 @@ if (scenario === 'single') {
     || !invalidPreset.error?.includes('Omit it to use batch-run')
   ) {
     throw new Error('invalid workflow preset run: expected default preset to be rejected with machine-readable allowed values.');
+  }
+
+  let invalidDedupeStdout = '';
+  let invalidDedupeStderr = '';
+  try {
+    await execFileAsync(process.execPath, ['batch-run.js', '--json-summary', inputDir, outputRoot, '1', '1'], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        FONT_SPLIT_BATCH_DEDUPE_MODE: 'semantic',
+      },
+    });
+  } catch (error) {
+    invalidDedupeStdout = error.stdout || '';
+    invalidDedupeStderr = error.stderr || '';
+  }
+  if (invalidDedupeStderr.trim() !== '') {
+    throw new Error('invalid dedupe env run: expected json-summary configuration errors to keep stderr empty.');
+  }
+  const invalidDedupe = parseCliJson(invalidDedupeStdout, 'invalid dedupe env run');
+  if (
+    invalidDedupe.ok !== false
+    || invalidDedupe.name !== 'BatchRunConfigurationError'
+    || invalidDedupe.options?.workflowPreset !== 'reviewed-write'
+    || invalidDedupe.options?.requestedBatchDedupeMode !== 'semantic'
+    || invalidDedupe.details?.option !== 'FONT_SPLIT_BATCH_DEDUPE_MODE'
+    || invalidDedupe.details?.received !== 'semantic'
+    || !invalidDedupe.details?.allowedValues?.includes('font-identity')
+    || invalidDedupe.details?.allowedValues?.includes('semantic')
+    || invalidDedupe.details?.omitForDefaultBehavior !== true
+    || !invalidDedupe.error?.includes('FONT_SPLIT_BATCH_DEDUPE_MODE must be one of')
+  ) {
+    throw new Error('invalid dedupe env run: expected invalid enum-like env var to be rejected with machine-readable allowed values.');
   }
 
   const { stdout: jsonSuccessStdout, stderr: jsonSuccessStderr } = await execFileAsync(process.execPath, ['batch-run.js', '--json', inputDir, outputRoot, '1', '1', '--dry-run'], {
@@ -3370,6 +3405,7 @@ if (scenario === 'single') {
     structureFirst: structureFirstStdout,
     includeResultsOverride: includeResultsOverrideStdout,
     invalidPreset,
+    invalidDedupe,
     jsonSuccess,
     jsonFailure,
     jsonSummarySuccess,

@@ -1,6 +1,32 @@
 import { splitFontBatch } from './src/font-split.js';
 
 const WORKFLOW_PRESETS = ['safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all'];
+const BATCH_RUN_ENUM_ENV_OPTIONS = {
+  FONT_SPLIT_SKIP_MODE: {
+    allowedValues: ['manifest', 'force'],
+    requestedField: 'requestedSkipMode',
+  },
+  FONT_SPLIT_BATCH_GROUP_BY: {
+    allowedValues: ['auto', 'source-dir', 'font-family'],
+    requestedField: 'requestedBatchGroupBy',
+  },
+  FONT_SPLIT_BATCH_NAMING_MODE: {
+    allowedValues: ['plain', 'numeric-suffix', 'source-suffix'],
+    requestedField: 'requestedBatchNamingMode',
+  },
+  FONT_SPLIT_BATCH_DEDUPE_MODE: {
+    allowedValues: ['none', 'same-path', 'font-identity'],
+    requestedField: 'requestedBatchDedupeMode',
+  },
+  FONT_SPLIT_BATCH_ERROR_MODE: {
+    allowedValues: ['collect', 'fail-fast', 'fail-after'],
+    requestedField: 'requestedBatchErrorMode',
+  },
+  FONT_SPLIT_SPLIT_FAILURE_ACTION: {
+    allowedValues: ['error', 'single-woff2'],
+    requestedField: 'requestedSplitFailureAction',
+  },
+};
 const COMPACT_ERROR_LIMIT = 20;
 
 function numberOption(value, fallback) {
@@ -24,10 +50,6 @@ function booleanOption(value, fallback) {
   return fallback;
 }
 
-function enumOption(value, allowed, fallback) {
-  return allowed.includes(value) ? value : fallback;
-}
-
 function buildInvalidWorkflowPresetError(value, fallback) {
   const error = new Error(`FONT_SPLIT_WORKFLOW_PRESET must be one of: ${WORKFLOW_PRESETS.join(', ')}. Omit it to use batch-run's ${fallback} default.`);
   error.name = 'BatchRunConfigurationError';
@@ -35,11 +57,38 @@ function buildInvalidWorkflowPresetError(value, fallback) {
     option: 'FONT_SPLIT_WORKFLOW_PRESET',
     received: value,
     allowedValues: WORKFLOW_PRESETS,
+    requestedField: 'requestedWorkflowPreset',
     defaultWhenOmitted: fallback,
     omitForDefaultBehavior: true,
     nonIntuitiveBehavior: 'default is not a named workflow preset; omit FONT_SPLIT_WORKFLOW_PRESET to use batch-run defaults.',
   };
   return error;
+}
+
+function buildInvalidEnumEnvError(name, value, allowedValues, requestedField) {
+  const error = new Error(`${name} must be one of: ${allowedValues.join(', ')}. Omit it to leave the option unset and use preset/tool defaults.`);
+  error.name = 'BatchRunConfigurationError';
+  error.details = {
+    option: name,
+    received: value,
+    allowedValues,
+    requestedField,
+    omitForDefaultBehavior: true,
+    nonIntuitiveBehavior: 'Invalid enum-like batch-run environment variables are rejected instead of silently falling back.',
+  };
+  return error;
+}
+
+function enumEnvOption(name) {
+  const config = BATCH_RUN_ENUM_ENV_OPTIONS[name];
+  if (!config || !hasEnv(name)) return { value: undefined, error: null };
+  const value = process.env[name];
+  return config.allowedValues.includes(value)
+    ? { value, error: null }
+    : {
+      value: undefined,
+      error: buildInvalidEnumEnvError(name, value, config.allowedValues, config.requestedField),
+    };
 }
 
 function limitArray(items, limit) {
@@ -155,12 +204,25 @@ const workflowPresetConfigurationError = requestedWorkflowPreset && !WORKFLOW_PR
   ? buildInvalidWorkflowPresetError(requestedWorkflowPreset, defaultWorkflowPreset)
   : null;
 const workflowPreset = workflowPresetConfigurationError ? defaultWorkflowPreset : (requestedWorkflowPreset || defaultWorkflowPreset);
-const skipMode = enumOption(process.env.FONT_SPLIT_SKIP_MODE, ['manifest', 'force'], undefined);
-const batchGroupBy = enumOption(process.env.FONT_SPLIT_BATCH_GROUP_BY, ['auto', 'source-dir', 'font-family'], undefined);
-const batchNamingMode = enumOption(process.env.FONT_SPLIT_BATCH_NAMING_MODE, ['plain', 'numeric-suffix', 'source-suffix'], undefined);
-const batchDedupeMode = enumOption(process.env.FONT_SPLIT_BATCH_DEDUPE_MODE, ['none', 'same-path', 'font-identity'], undefined);
-const batchErrorMode = enumOption(process.env.FONT_SPLIT_BATCH_ERROR_MODE, ['collect', 'fail-fast', 'fail-after'], undefined);
-const splitFailureAction = enumOption(process.env.FONT_SPLIT_SPLIT_FAILURE_ACTION, ['error', 'single-woff2'], undefined);
+const skipModeOption = enumEnvOption('FONT_SPLIT_SKIP_MODE');
+const batchGroupByOption = enumEnvOption('FONT_SPLIT_BATCH_GROUP_BY');
+const batchNamingModeOption = enumEnvOption('FONT_SPLIT_BATCH_NAMING_MODE');
+const batchDedupeModeOption = enumEnvOption('FONT_SPLIT_BATCH_DEDUPE_MODE');
+const batchErrorModeOption = enumEnvOption('FONT_SPLIT_BATCH_ERROR_MODE');
+const splitFailureActionOption = enumEnvOption('FONT_SPLIT_SPLIT_FAILURE_ACTION');
+const configurationError = workflowPresetConfigurationError
+  || skipModeOption.error
+  || batchGroupByOption.error
+  || batchNamingModeOption.error
+  || batchDedupeModeOption.error
+  || batchErrorModeOption.error
+  || splitFailureActionOption.error;
+const skipMode = skipModeOption.value;
+const batchGroupBy = batchGroupByOption.value;
+const batchNamingMode = batchNamingModeOption.value;
+const batchDedupeMode = batchDedupeModeOption.value;
+const batchErrorMode = batchErrorModeOption.value;
+const splitFailureAction = splitFailureActionOption.value;
 const startedAt = Date.now();
 const batchOptions = {
   inputDir,
@@ -168,6 +230,9 @@ const batchOptions = {
   limit,
   maxFiles,
   ...(workflowPresetConfigurationError ? { workflowPreset: null, requestedWorkflowPreset } : { workflowPreset }),
+  ...(!workflowPresetConfigurationError && configurationError?.details?.requestedField
+    ? { [configurationError.details.requestedField]: configurationError.details.received }
+    : {}),
   silent: true,
   chunkSize,
   ...(dryRunFlag || dryRunEnvProvided ? { dryRun } : {}),
@@ -180,24 +245,24 @@ const batchOptions = {
   ...(splitFailureAction ? { splitFailureAction } : {}),
 };
 
-if (!jsonOutput && !workflowPresetConfigurationError) {
+if (!jsonOutput && !configurationError) {
   console.log('Starting batch font split...');
   console.log(JSON.stringify(batchOptions, null, 2));
 }
 
-if (workflowPresetConfigurationError) {
+if (configurationError) {
   if (jsonOutput) {
     console.log(JSON.stringify(buildBatchRunSummary({
       ok: false,
       startedAt,
       batchOptions,
-      error: workflowPresetConfigurationError,
+      error: configurationError,
       summaryOnly: jsonSummaryOutput,
     }), null, 2));
   } else {
     console.error('\nBatch run configuration failed.');
-    console.error(workflowPresetConfigurationError.message);
-    console.error(JSON.stringify(workflowPresetConfigurationError.details, null, 2));
+    console.error(configurationError.message);
+    console.error(JSON.stringify(configurationError.details, null, 2));
   }
   process.exitCode = 1;
 } else {
