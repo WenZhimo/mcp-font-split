@@ -1648,6 +1648,9 @@ if (scenario === 'single') {
     throw new Error('Expected agent guidance to recommend compact output inspection.');
   }
   const presetIds = new Set((result.workflowPresets || []).map((item) => item.id));
+  if (presetIds.has('default')) {
+    throw new Error('Expected workflowPresets to omit redundant default preset; omit workflowPreset for raw defaults.');
+  }
   for (const requiredPreset of ['safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all']) {
     if (!presetIds.has(requiredPreset)) {
       throw new Error(`Expected agent guidance workflowPresets to include ${requiredPreset}.`);
@@ -3470,6 +3473,27 @@ if (scenario === 'single') {
   await fs.writeFile(ttfPath, buildMinimalTtf({ familyName: 'Fixture Sans', subfamilyName: 'Regular', glyphCount: 3 }));
   await fs.writeFile(path.join(inputDir, 'notes.txt'), 'not a font');
 
+  const rawDefaultPreview = await splitFontBatch({
+    inputDir,
+    outputRoot,
+    dryRun: true,
+    includeResults: true,
+    limit: 10,
+    maxFiles: 20,
+    silent: true,
+  });
+  if (
+    rawDefaultPreview.workflowPreset !== null
+    || rawDefaultPreview.dryRun !== true
+    || rawDefaultPreview.resultsIncluded !== true
+    || rawDefaultPreview.batchNamingMode !== 'numeric-suffix'
+    || rawDefaultPreview.batchDedupeMode !== 'font-identity'
+    || rawDefaultPreview.batchErrorMode !== 'fail-after'
+    || rawDefaultPreview.skipMode !== 'manifest'
+  ) {
+    throw new Error('Expected omitted workflowPreset to use raw defaults and report workflowPreset null.');
+  }
+
   const safePreview = await splitFontBatch({
     inputDir,
     outputRoot,
@@ -3895,6 +3919,14 @@ if (scenario === 'single') {
     }
     if (!Object.hasOwn(batchProps, 'workflowPreset') || !Object.hasOwn(organizeProps, 'workflowPreset')) {
       throw new Error('Expected batch and organization tools to expose workflowPreset.');
+    }
+    if (
+      batchProps.workflowPreset?.enum?.includes('default')
+      || organizeProps.workflowPreset?.enum?.includes('default')
+      || batchProps.workflowPreset?.anyOf?.some((entry) => entry.enum?.includes('default'))
+      || organizeProps.workflowPreset?.anyOf?.some((entry) => entry.enum?.includes('default'))
+    ) {
+      throw new Error('Expected workflowPreset schema to omit redundant default preset; callers should omit workflowPreset for raw defaults.');
     }
     expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);

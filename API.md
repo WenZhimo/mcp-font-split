@@ -20,7 +20,7 @@ For a minimal routing response, request `workflow: "organize"` with `sections: [
 
 `configurationRecipes[]` maps common user intent to preset-first calls and tradeoffs. Recipes cover safe default batch work, preserving every source font, grouping by source folders, grouping by font metadata, fast structure-first scans, copy-only staging directories, and large reviewed writes. Each recipe includes `inspectFields` and `successCriteria`. A recipe is guidance, not proof of success: agents must still run the preview/write tools, inspect those fields, and satisfy the criteria.
 
-`batchPolicyGuide` is a machine-readable customization guide for batch policy options. It covers `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, and `batchErrorMode`; each policy value includes `useWhen`, `avoidWhen`, `inspectFields`, and `successCriteria`. Use it when the user asks for behavior different from the default presets, then preview before writing.
+`batchPolicyGuide` is a machine-readable customization guide for batch policy options. It covers `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, and `batchErrorMode`; each policy value includes `useWhen`, `avoidWhen`, `inspectFields`, and `successCriteria`. Use it when the user asks for behavior different from the recommended presets, then preview before writing.
 
 `unsupportedFileCategoryCatalog` explains the categories used by `unsupportedFileSummary.byCategory[]`, including representative extensions, category meaning, and handling behavior. Tool responses also include `unsupportedFileDecision` for quick triage, plus `unsupportedFileSummary.categoryDetails[]` and `unsupportedFileSummary.handlingSummary` for evidence, so agents can interpret the current scan without a second guidance lookup. In particular, `archive` files are reported for awareness but are not extracted, copied, or split.
 
@@ -64,7 +64,6 @@ Workflow presets:
 
 | Preset | Write behavior | Batch defaults | Organization defaults | Use when |
 |--------|----------------|----------------|------------------------|----------|
-| `default` | Depends on explicit `dryRun` and tool defaults. | No preset overrides. | No preset overrides. | You want raw tool defaults. |
 | `safe-preview` | No batch or organization writes. | `dryRun: true`, `includeResults: true`, `skipMode: "manifest"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `batchErrorMode: "fail-after"`, `splitFailureAction: "single-woff2"`. | `dryRun: true`, `includePlan: true`, `parseFonts: true`, `batchGroupBy: "auto"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `copyInvalidFonts: false`, `overwriteExisting: false`. | First call on unfamiliar sources, before any write. |
 | `reviewed-write` | Batch writes output; organization copies into `outputDir`. | `dryRun: false`, `includeResults: false`, `skipMode: "manifest"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `batchErrorMode: "fail-after"`, `splitFailureAction: "single-woff2"`. | `dryRun: false`, `includePlan: true`, `parseFonts: true`, `batchGroupBy: "auto"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `copyInvalidFonts: false`, `overwriteExisting: false`. | After reviewing a no-write preview. |
 | `structure-first` | No batch or organization writes. | `dryRun: true`, `includeResults: false`, `skipMode: "manifest"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "same-path"`, `batchErrorMode: "fail-after"`. | `dryRun: true`, `includePlan: false`, `parseFonts: false`, `batchGroupBy: "auto"`, `batchNamingMode: "numeric-suffix"`, `batchDedupeMode: "font-identity"`, `copyInvalidFonts: false`, `overwriteExisting: false`. | Very large or noisy first-pass scans where metadata parsing should be deferred. |
@@ -177,7 +176,7 @@ If the source directory shape is uncertain, first request `get_agent_guidance` w
 | `maxFiles` | positive integer, MCP max `50000` | `5000` | Maximum source files to scan. |
 | `includeResults` | boolean | `true` | Include per-font `results[]`; set `false` for compact large-batch responses. |
 | `dryRun` | boolean | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
-| `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | Named preset applied before explicit options. Explicit options override preset values. |
+| `workflowPreset` | `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | unset | Named preset applied before explicit options. Omit it to use raw tool defaults. Explicit options override preset values. |
 | `skipMode` | `manifest`, `force` | `manifest` | Existing-output skip policy. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | First-level family directory strategy. |
 | `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Per-font output directory naming strategy. |
@@ -187,7 +186,7 @@ If the source directory shape is uncertain, first request `get_agent_guidance` w
 
 `split_font_batch` also accepts the split options from `split_font`, except `fontPath` and `outDir`. Batch mode applies those processing options to every selected font and uses `inputDir` / `outputRoot` for paths.
 
-`workflowPreset` is a shorthand for common configurations:
+`workflowPreset` is a shorthand for common configurations. Omit it when you want raw tool defaults without a preset:
 
 - `safe-preview`: no-write safety preview.
 - `reviewed-write`: write settings for after a reviewed preview.
@@ -272,7 +271,7 @@ Do not treat `recommendedBatchOptions` as a complete safe call. Use copy-only or
 | `inputDir` | string | `.` | Directory to scan inside `FONT_SPLIT_ROOT`. |
 | `outputDir` | string | `organized-fonts` | Destination directory for organized copies. Must be different from `inputDir`. |
 | `maxFiles` | positive integer, MCP max `50000` | `50000` | Maximum source files to scan. |
-| `workflowPreset` | `default`, `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | `default` | Named preset applied before explicit organization options. Explicit options override preset values. |
+| `workflowPreset` | `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | unset | Named preset applied before explicit organization options. Omit it to use raw organization defaults. Explicit options override preset values. |
 | `dryRun` | boolean | `true` | Plan only without writing files. Set `false` only after reviewing `plan[]` and `organizationWarnings[]`. |
 | `includePlan` | boolean | `true` | Include per-font `plan[]` entries. Set `false` for compact summaries. |
 | `parseFonts` | boolean | `true` | Read font metadata for identity dedupe, glyph counts, invalid-font detection, and font-family grouping. Set `false` for a faster structure-only plan. |

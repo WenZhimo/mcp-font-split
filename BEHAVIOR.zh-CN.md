@@ -349,11 +349,10 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 ### 4.12 `workflowPreset`（批量和目录整理）
 
-`workflowPreset` 是给 agent 使用的常见工作流快捷配置，当前用于 `split_font_batch` 和 `organize_font_directory`。
+`workflowPreset` 是给 agent 使用的常见工作流快捷配置，当前用于 `split_font_batch` 和 `organize_font_directory`。需要原始工具默认值时直接省略 `workflowPreset`。
 
 可选值：
 
-- `default`：不改变工具默认行为。
 - `safe-preview`：第一次查看陌生目录时使用的无写入预览。批量模式会启用 `dryRun: true`、`includeResults: true`、`skipMode: "manifest"`、`batchErrorMode: "fail-after"`、`batchDedupeMode: "font-identity"` 等安全默认值；目录整理会保持 `dryRun: true`、解析字体并返回完整计划。
 - `reviewed-write`：已经审查过预览后使用的写入配置。批量模式会真实写拆分输出；目录整理只会 copy-only 写入 `outputDir`，仍不会移动或删除源文件。
 - `structure-first`：面向超大或嘈杂目录的快速无写入第一遍扫描。批量模式使用 `batchDedupeMode: "same-path"`，只做路径/stem 级去重；目录整理会使用 `parseFonts: false` 和 `includePlan: false`，此时 identity 去重会受限并回退到结构/路径级判断。

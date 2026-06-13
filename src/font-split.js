@@ -73,13 +73,6 @@ const ORGANIZATION_MANIFEST_FILE_NAME = 'font-organization-manifest.json';
 const ORGANIZATION_MANIFEST_VERSION = 1;
 const PACKAGE_VERSION = packageJson.version;
 const WORKFLOW_PRESETS = {
-  default: {
-    description: 'Use the tool defaults. Explicit arguments still apply normally.',
-    writesBatchFiles: 'depends-on-dryRun',
-    writesOrganizationFiles: 'depends-on-dryRun',
-    batch: {},
-    organize: {},
-  },
   'safe-preview': {
     description: 'No-write preview for unfamiliar sources. Good first call for agents before any batch write or organization copy.',
     writesBatchFiles: false,
@@ -3131,7 +3124,7 @@ function normalizeOptionalBoolean(value) {
 }
 
 function getWorkflowPresetName(value) {
-  return typeof value === 'string' && WORKFLOW_PRESET_NAMES.includes(value) ? value : 'default';
+  return typeof value === 'string' && WORKFLOW_PRESET_NAMES.includes(value) ? value : null;
 }
 
 function dropUndefinedOptions(args = {}) {
@@ -3140,9 +3133,9 @@ function dropUndefinedOptions(args = {}) {
 
 function applyWorkflowPreset(args = {}, scope) {
   const workflowPreset = getWorkflowPresetName(args.workflowPreset);
-  const preset = WORKFLOW_PRESETS[workflowPreset] || WORKFLOW_PRESETS.default;
-  const scopePreset = preset[scope] || {};
-  const explicitArgs = dropUndefinedOptions(args);
+  const preset = workflowPreset ? WORKFLOW_PRESETS[workflowPreset] : null;
+  const scopePreset = preset?.[scope] || {};
+  const explicitArgs = dropUndefinedOptions({ ...args, workflowPreset: undefined });
   return {
     workflowPreset,
     args: {
