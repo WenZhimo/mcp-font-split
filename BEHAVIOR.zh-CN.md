@@ -742,6 +742,8 @@ split-meta.json
 
 `organizationDecision` 会把复杂的整理响应压缩成主线路由，例如 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output`。`directoryWorkflowSummary` 则把当前安全状态、布局复核原因、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示放在一起；`sourceLayoutMismatchSummary` 专门回答“原目录可否直接预览、是否需要 copy-only 暂存、暂存是否破坏源文件”，其中 `sourceLayoutMismatchSummary.decisionChecklist` 进一步集中列出源安全、直接预览、暂存、plan 可见性、warning 和输出审计检查。它们都只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility` 和可用时的 `plan[]`。
 
+目录路由相关的 `inspectFields`、`mustInspectFields` 和 `responseFields` 只要列出 `sourceLayoutMismatchSummary`，也会同时列出 `sourceLayoutMismatchSummary.decisionChecklist`。这避免 agent 只检查父摘要而漏掉嵌套决策清单。
+
 `planActionSummary.byAction` 会统计 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists`、`would-skip-target-exists` 和 `error` 等动作。它服务于 agent 快速判断计划形态；真正写文件前仍应审查 `plan[]` 明细和 `organizationWarnings[]`。
 
 ### 9.4 `inspect_split_output`

@@ -1094,6 +1094,40 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
 };
 
+const SOURCE_LAYOUT_MISMATCH_FIELD = 'sourceLayoutMismatchSummary';
+const SOURCE_LAYOUT_DECISION_CHECKLIST_FIELD = 'sourceLayoutMismatchSummary.decisionChecklist';
+const SOURCE_LAYOUT_FIELD_LIST_KEYS = new Set(['inspectFields', 'mustInspectFields', 'responseFields']);
+
+function withSourceLayoutDecisionChecklistField(fields) {
+  if (!Array.isArray(fields)) return fields;
+  const sourceLayoutIndex = fields.indexOf(SOURCE_LAYOUT_MISMATCH_FIELD);
+  if (sourceLayoutIndex === -1 || fields.includes(SOURCE_LAYOUT_DECISION_CHECKLIST_FIELD)) return fields;
+  return [
+    ...fields.slice(0, sourceLayoutIndex + 1),
+    SOURCE_LAYOUT_DECISION_CHECKLIST_FIELD,
+    ...fields.slice(sourceLayoutIndex + 1),
+  ];
+}
+
+function attachSourceLayoutDecisionChecklistFields(value, seen = new Set()) {
+  if (!value || typeof value !== 'object' || seen.has(value)) return value;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      attachSourceLayoutDecisionChecklistFields(item, seen);
+    }
+    return value;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (SOURCE_LAYOUT_FIELD_LIST_KEYS.has(key)) {
+      value[key] = withSourceLayoutDecisionChecklistField(child);
+    } else {
+      attachSourceLayoutDecisionChecklistFields(child, seen);
+    }
+  }
+  return value;
+}
+
 const SAFE_INVOCATION_TEMPLATES = [
   {
     id: 'runtime-diagnostic',
@@ -2560,7 +2594,10 @@ export function getAgentGuidance(args = {}) {
     recommendedWorkflow: workflows[workflow],
     recommendedWorkflowPlan: buildRecommendedWorkflowPlan(workflow),
   };
-  return selectGuidanceSections(guidance, guidanceView.sectionsIncluded);
+  return selectGuidanceSections(
+    attachSourceLayoutDecisionChecklistFields(guidance),
+    guidanceView.sectionsIncluded,
+  );
 }
 
 async function listFilesRecursive(root, { maxFiles = 5000, excludeDirs = [] } = {}) {
@@ -3637,7 +3674,7 @@ function buildOrganizationNextActions({
     });
   }
 
-  return actions;
+  return attachSourceLayoutDecisionChecklistFields(actions);
 }
 
 function buildOrganizationDecision({
@@ -4248,6 +4285,7 @@ function buildDirectoryWorkflowSummary({
       'organizationDecision',
       'directoryWorkflowSummary',
       'sourceLayoutMismatchSummary',
+      'sourceLayoutMismatchSummary.decisionChecklist',
       'recommendedNextActions',
       'organizationWarnings',
       'layout',
@@ -4273,7 +4311,7 @@ function buildDirectoryWorkflowSummary({
       : 'For large/noisy triage, inspect availableSummaryFields; before copy-only writes that depend on exact targets, rerun the dry-run with includePlan:true.',
   };
 
-  return {
+  return attachSourceLayoutDecisionChecklistFields({
     summaryType: 'directory-layout-workflow',
     appliesToTool: 'organize_font_directory',
     currentStep: options.dryRun ? 'layout-plan' : 'copy-only-staging',
@@ -4317,7 +4355,7 @@ function buildDirectoryWorkflowSummary({
       'After any reviewed batch write, require inspect_split_output to report outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false before reporting structural success.',
     ],
     nonIntuitiveBehavior,
-  };
+  });
 }
 
 function buildPlanActionSummary(plan) {

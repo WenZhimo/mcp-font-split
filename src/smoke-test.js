@@ -769,6 +769,7 @@ function assertInspectFieldsExist(action, responsesByTool, context) {
   if (!action) {
     throw new Error(`${context}: expected action for inspectFields check.`);
   }
+  assertSourceLayoutDecisionChecklistCompanionFields(action, `${context}: action ${action.id}`);
   if (typeof action.successCriteria !== 'string' || action.successCriteria.trim() === '') {
     throw new Error(`${context}: action ${action.id} (${action.tool}) is missing successCriteria.`);
   }
@@ -787,6 +788,30 @@ function assertInspectFieldsExist(action, responsesByTool, context) {
 function assertRecommendedNextActionInspectFields(actions, responsesByTool, context) {
   for (const action of actions || []) {
     assertInspectFieldsExist(action, responsesByTool, context);
+  }
+}
+
+function assertSourceLayoutDecisionChecklistCompanionFields(value, context, seen = new Set()) {
+  if (!value || typeof value !== 'object' || seen.has(value)) return;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      assertSourceLayoutDecisionChecklistCompanionFields(item, context, seen);
+    }
+    return;
+  }
+  for (const fieldListName of ['inspectFields', 'mustInspectFields', 'responseFields']) {
+    const fields = value[fieldListName];
+    if (
+      Array.isArray(fields)
+      && fields.includes('sourceLayoutMismatchSummary')
+      && !fields.includes('sourceLayoutMismatchSummary.decisionChecklist')
+    ) {
+      throw new Error(`${context}: ${fieldListName} must include sourceLayoutMismatchSummary.decisionChecklist whenever it includes sourceLayoutMismatchSummary.`);
+    }
+  }
+  for (const child of Object.values(value)) {
+    assertSourceLayoutDecisionChecklistCompanionFields(child, context, seen);
   }
 }
 
@@ -950,6 +975,7 @@ function assertDirectoryWorkflowSummary(summary, {
   ) {
     throw new Error(`${context}: expected directoryWorkflowSummary for organize_font_directory ${expectedCurrentStep}.`);
   }
+  assertSourceLayoutDecisionChecklistCompanionFields(summary, `${context}: directoryWorkflowSummary`);
   if (
     summary.sourceLayout?.layoutKind !== expectedLayoutKind
     || summary.route?.route !== expectedRoute
@@ -1444,6 +1470,8 @@ if (scenario === 'single') {
     throw new Error('Expected compact agent guidance to keep workflow essentials and omit bulky catalogs/examples.');
   }
   assertBatchPolicyGuide(compactGuidance.batchPolicyGuide || []);
+  assertSourceLayoutDecisionChecklistCompanionFields(result, 'agent-guidance full');
+  assertSourceLayoutDecisionChecklistCompanionFields(compactGuidance, 'agent-guidance compact');
   const catalogGuidance = getAgentGuidance({ sections: ['warning-catalog', 'field-catalog'] });
   if (
     catalogGuidance.guidanceView?.sectionsIncluded?.length !== 2
@@ -2444,6 +2472,7 @@ if (scenario === 'single') {
     || !compact.directoryWorkflowSummary?.planVisibility?.detailsOmitted?.includes('plan')
     || !compact.directoryWorkflowSummary?.planVisibility?.availableSummaryFields?.includes('planActionSummary')
     || !compact.directoryWorkflowSummary?.planVisibility?.availableSummaryFields?.includes('sourceLayoutMismatchSummary')
+    || !compact.directoryWorkflowSummary?.planVisibility?.availableSummaryFields?.includes('sourceLayoutMismatchSummary.decisionChecklist')
     || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanBeforeWrite !== true
     || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanArgs?.workflowPreset !== 'safe-preview'
     || compact.directoryWorkflowSummary?.planVisibility?.rerunWithPlanArgs?.includePlan !== true

@@ -298,6 +298,8 @@
 | `directoryWorkflowSummary` | 本次响应里的目录工作流导航摘要，用来串起源布局复核、安全批量预览、可选 copy-only 暂存、reviewed 批量写入和必须执行的输出审计。它包含 `planVisibility`、`workflowSteps[]`、路线、安全信号、成功标准和非直觉行为提示。 |
 | `sourceLayoutMismatchSummary` | 源目录结构判断摘要：当前布局与推荐分组是否匹配、能否直接对原目录做安全预览、copy-only 暂存是不需要/可选/已经写出、暂存为什么不破坏源文件，以及内嵌的 `sourceLayoutMismatchSummary.decisionChecklist`。 |
 | `sourceLayoutMismatchSummary.decisionChecklist` | 面向 agent 的紧凑决策清单：集中检查源安全、直接预览是否就绪、copy-only 暂存需求、plan 可见性、warning 复核和写入后的输出审计。 |
+
+目录路由相关的 `inspectFields`、`mustInspectFields` 和 `responseFields` 只要列出 `sourceLayoutMismatchSummary`，也会同时列出 `sourceLayoutMismatchSummary.decisionChecklist`，因此 agent 不需要从父字段中猜测是否还要检查嵌套清单。
 | `directoryWorkflowSummary.planVisibility` | 说明本次响应是否包含详细 `plan[]`。当 `includePlan: false` 时，`plan[]` 会被省略；可用 `availableSummaryFields` 做压缩 triage，但如果写入前需要确认逐文件目标路径，应按 `rerunWithPlanArgs` 重跑。 |
 | `unsupportedFileDecision` | 从 `unsupportedFileSummary` 派生的快速机器可读判断：忽略文件状态、类别/扩展名数量、是否有压缩包、是否存在 `.zip` / `.txt` 之外的噪声，以及“不解压、不复制、不拆分”的处理标志。 |
 | `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、带处理语义的 `categoryDetails`、总体 `handlingSummary`、无扩展文件的 `<none>` 计数，以及少量示例路径。它用于解释为什么嘈杂源目录里有很多压缩包、文档、图片、生成产物或无扩展文件，但不会被复制或拆分。 |
