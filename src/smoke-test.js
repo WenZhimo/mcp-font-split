@@ -84,6 +84,14 @@ function summarizeSourceLayoutMismatch(summary) {
     copyOnlyStagingSourceDestructive: summary.copyOnlyStaging?.sourceDestructive,
     copyOnlyStagingSourceFilesPreserved: summary.copyOnlyStaging?.sourceFilesPreserved,
     sourceFilesMovedDeletedOrRewritten: summary.copyOnlyStaging?.sourceFilesMovedDeletedOrRewritten,
+    decisionChecklistSummaryType: summary.decisionChecklist?.summaryType,
+    decisionChecklistPrimaryRoute: summary.decisionChecklist?.primaryRoute,
+    decisionChecklistSplitWriteReadiness: summary.decisionChecklist?.splitWriteReadiness,
+    decisionChecklistCopyOnlyStagingReadiness: summary.decisionChecklist?.copyOnlyStagingReadiness,
+    decisionChecklistItemIds: (summary.decisionChecklist?.items || []).map((item) => item.id),
+    decisionChecklistSourceSafetyStatus: (summary.decisionChecklist?.items || []).find((item) => item.id === 'source-safety-preserved')?.status,
+    decisionChecklistDirectPreviewStatus: (summary.decisionChecklist?.items || []).find((item) => item.id === 'direct-original-input-preview')?.status,
+    decisionChecklistWarningsStatus: (summary.decisionChecklist?.items || []).find((item) => item.id === 'warnings-reviewed')?.status,
   };
 }
 
@@ -96,6 +104,14 @@ function sourceLayoutMismatchSummaryCovered(summary) {
     && summary.copyOnlyStagingSourceFilesPreserved === true
     && summary.sourceFilesMovedDeletedOrRewritten === false
     && summary.directPreviewRequiredBeforeWrite === true
+    && summary.decisionChecklistSummaryType === 'source-layout-decision-checklist'
+    && summary.decisionChecklistItemIds?.includes('source-safety-preserved')
+    && summary.decisionChecklistItemIds?.includes('direct-original-input-preview')
+    && summary.decisionChecklistItemIds?.includes('copy-only-staging')
+    && summary.decisionChecklistItemIds?.includes('plan-detail-before-copy')
+    && summary.decisionChecklistItemIds?.includes('warnings-reviewed')
+    && summary.decisionChecklistItemIds?.includes('post-write-output-audit')
+    && summary.decisionChecklistSourceSafetyStatus === 'pass'
   );
 }
 
@@ -960,6 +976,32 @@ function assertDirectoryWorkflowSummary(summary, {
   ) {
     throw new Error(`${context}: expected directoryWorkflowSummary.sourceLayoutMismatchSummary to explain layout match, direct preview, copy-only staging, and source safety.`);
   }
+  const decisionChecklist = sourceLayoutMismatchSummary.decisionChecklist;
+  const decisionChecklistItemIds = new Set((decisionChecklist?.items || []).map((item) => item.id));
+  const sourceSafetyDecision = (decisionChecklist?.items || []).find((item) => item.id === 'source-safety-preserved');
+  const directPreviewDecision = (decisionChecklist?.items || []).find((item) => item.id === 'direct-original-input-preview');
+  if (
+    decisionChecklist?.summaryType !== 'source-layout-decision-checklist'
+    || decisionChecklist.primaryRoute !== expectedRoute
+    || !decisionChecklist.splitWriteReadiness
+    || !decisionChecklist.copyOnlyStagingReadiness
+    || sourceSafetyDecision?.status !== 'pass'
+    || sourceSafetyDecision?.requiredBeforeWrite !== true
+    || !directPreviewDecision?.evidenceFields?.includes('recommendedBatchPreviewArgs')
+  ) {
+    throw new Error(`${context}: expected sourceLayoutMismatchSummary.decisionChecklist to expose route, write readiness, source safety, and direct preview guidance.`);
+  }
+  if (
+    !['preview-organized-output', 'rerun-with-font-parsing', 'decide-on-invalid-fonts', 'no-copyable-fonts'].includes(expectedRoute)
+    && directPreviewDecision?.nextTool !== 'split_font_batch'
+  ) {
+    throw new Error(`${context}: expected sourceLayoutMismatchSummary.decisionChecklist to point direct preview routes at split_font_batch.`);
+  }
+  for (const expectedDecisionId of ['source-safety-preserved', 'direct-original-input-preview', 'copy-only-staging', 'plan-detail-before-copy', 'warnings-reviewed', 'post-write-output-audit']) {
+    if (!decisionChecklistItemIds.has(expectedDecisionId)) {
+      throw new Error(`${context}: expected sourceLayoutMismatchSummary.decisionChecklist item ${expectedDecisionId}.`);
+    }
+  }
   if (expectedRoute === 'review-mixed-layout' && sourceLayoutMismatchSummary.mismatchDetected !== true) {
     throw new Error(`${context}: expected mixed layout summary to mark a layout mismatch.`);
   }
@@ -1759,6 +1801,7 @@ if (scenario === 'single') {
     recommendedBatchOptions: 'organize_font_directory',
     recommendedBatchPreviewArgs: 'organize_font_directory',
     sourceLayoutMismatchSummary: 'organize_font_directory',
+    'sourceLayoutMismatchSummary.decisionChecklist': 'organize_font_directory',
     recommendedNextActions: 'split_font_batch',
     safetySummary: 'split_font_batch',
     unsupportedFileSummary: 'organize_font_directory',
@@ -3711,6 +3754,7 @@ if (scenario === 'single') {
       'batchPolicySummary',
       'directoryWorkflowSummary',
       'sourceLayoutMismatchSummary',
+      'sourceLayoutMismatchSummary.decisionChecklist',
       'planVisibility',
       'directoryWorkflowSummary.planVisibility',
       'unsupportedFileCategoryCatalog',
@@ -3804,6 +3848,7 @@ if (scenario === 'single') {
     '`batchPolicySummary`',
     '`directoryWorkflowSummary`',
     '`sourceLayoutMismatchSummary`',
+    '`sourceLayoutMismatchSummary.decisionChecklist`',
     '`planVisibility`',
     '`directoryWorkflowSummary.planVisibility`',
     '`unsupportedFileCategoryCatalog`',

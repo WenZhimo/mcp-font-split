@@ -874,8 +874,13 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   sourceLayoutMismatchSummary: {
     sourceTools: ['organize_font_directory'],
-    meaning: 'Compact response-local answer for whether the current source layout matches recommended batch grouping, whether direct original-input preview is safe, and whether copy-only staging is optional or needed.',
-    agentAction: 'Use it before choosing between direct split_font_batch preview and copy-only staging; still verify safetySummary, organizationWarnings, planActionSummary, and plan[] when available.',
+    meaning: 'Compact response-local answer for whether the current source layout matches recommended batch grouping, whether direct original-input preview is safe, whether copy-only staging is optional or needed, and a decisionChecklist for agent routing.',
+    agentAction: 'Use decisionChecklist first when choosing between direct split_font_batch preview, route-resolution reruns, and copy-only staging; still verify safetySummary, organizationWarnings, planActionSummary, and plan[] when available.',
+  },
+  'sourceLayoutMismatchSummary.decisionChecklist': {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Machine-readable checklist inside sourceLayoutMismatchSummary for source safety, direct preview readiness, copy-only staging need, plan visibility, warnings, and required output audit.',
+    agentAction: 'Inspect splitWriteReadiness, copyOnlyStagingReadiness, and items[] before writing; treat pass/ready signals as routing guidance, then satisfy the referenced evidence fields and successCriteria.',
   },
   planVisibility: {
     sourceTools: ['organize_font_directory'],
@@ -3747,6 +3752,163 @@ function buildOrganizationDecision({
   });
 }
 
+function buildSourceLayoutDecisionChecklist({
+  options,
+  safetySummary,
+  organizationDecision,
+  directStatus,
+  directReason,
+  recommendedBatchPreviewArgs,
+  stagingNeed,
+  stagingReason,
+  outputDirRelative,
+  warningCodes,
+}) {
+  const sortedWarningCodes = [...warningCodes].sort();
+  const currentCallSourceSafe = safetySummary.sourceDestructive === false
+    && safetySummary.sourceFilesPreserved === true;
+  const directPreviewStatus = directStatus === 'safe-preview-available'
+    ? 'ready'
+    : directStatus === 'review-required'
+      ? 'review-safe-preview'
+      : directStatus === 'use-organized-output'
+        ? 'use-organized-output'
+        : directStatus === 'not-applicable'
+          ? 'not-applicable'
+          : 'blocked-until-route-resolution';
+  const copyOnlyStagingStatus = stagingNeed === 'not-required-for-splitting'
+    ? 'not-required'
+    : stagingNeed === 'optional'
+      ? 'optional'
+      : stagingNeed === 'already-written-copy-only'
+        ? 'already-written'
+        : stagingNeed === 'defer-until-review'
+          ? 'defer-until-route-resolution'
+          : 'not-applicable';
+  const planDetailStatus = options.includePlan
+    ? 'visible'
+    : options.dryRun
+      ? 'summary-only-rerun-before-copy'
+      : 'summary-only-after-copy';
+  const splitWriteReadiness = directStatus === 'not-applicable'
+    ? 'not-applicable'
+    : directStatus === 'use-organized-output'
+      ? 'requires-organized-output-safe-preview'
+      : directPreviewStatus === 'blocked-until-route-resolution'
+        ? 'blocked-until-route-resolution'
+        : 'requires-original-input-safe-preview';
+  const copyOnlyStagingReadiness = !options.dryRun
+    ? 'already-wrote-copy-only-output'
+    : copyOnlyStagingStatus === 'not-applicable'
+      ? 'not-applicable'
+      : copyOnlyStagingStatus === 'not-required'
+        ? 'not-required-for-splitting'
+        : copyOnlyStagingStatus === 'defer-until-route-resolution'
+          ? 'blocked-until-route-resolution'
+          : !options.includePlan
+            ? 'rerun-with-includePlan-before-copy'
+            : 'ready-after-plan-review';
+  const directPreviewBlocked = directPreviewStatus === 'blocked-until-route-resolution';
+  const directPreviewCanRun = directStatus !== 'not-applicable'
+    && directStatus !== 'use-organized-output'
+    && !directPreviewBlocked;
+
+  return {
+    summaryType: 'source-layout-decision-checklist',
+    primaryRoute: organizationDecision.route,
+    preferredNextActionId: organizationDecision.preferredNextActionId,
+    splitWriteReadiness,
+    copyOnlyStagingReadiness,
+    items: [
+      {
+        id: 'source-safety-preserved',
+        status: currentCallSourceSafe ? 'pass' : 'action-required',
+        answer: currentCallSourceSafe
+          ? 'The current organizer call preserves source font files.'
+          : 'The current organizer safety fields must be reviewed before continuing.',
+        requiredBeforeWrite: true,
+        evidenceFields: [
+          'safetySummary.sourceDestructive',
+          'safetySummary.sourceFilesPreserved',
+          'sourceLayoutMismatchSummary.copyOnlyStaging.sourceFilesPreserved',
+        ],
+      },
+      {
+        id: 'direct-original-input-preview',
+        status: directPreviewStatus,
+        answer: directReason,
+        requiredBeforeSplitWrite: directPreviewCanRun,
+        nextTool: directPreviewCanRun ? 'split_font_batch' : directPreviewBlocked ? organizationDecision.nextTool : null,
+        suggestedArgsField: directPreviewCanRun
+          ? 'sourceLayoutMismatchSummary.directOriginalInput.safePreviewArgs'
+          : null,
+        evidenceFields: [
+          'sourceLayoutMismatchSummary.directOriginalInput.status',
+          'recommendedBatchPreviewArgs',
+          'organizationDecision',
+        ],
+        safePreviewArgs: directPreviewCanRun ? recommendedBatchPreviewArgs : null,
+      },
+      {
+        id: 'copy-only-staging',
+        status: copyOnlyStagingStatus,
+        answer: stagingReason,
+        requiredBeforeSplitWrite: false,
+        nextTool: copyOnlyStagingStatus === 'optional'
+          ? 'organize_font_directory'
+          : null,
+        outputDir: outputDirRelative,
+        sourceDestructive: false,
+        evidenceFields: [
+          'sourceLayoutMismatchSummary.copyOnlyStaging.need',
+          'sourceLayoutMismatchSummary.copyOnlyStaging.outputDir',
+          'sourceLayoutMismatchSummary.copyOnlyStaging.sourceDestructive',
+        ],
+      },
+      {
+        id: 'plan-detail-before-copy',
+        status: planDetailStatus,
+        answer: options.includePlan
+          ? 'Detailed plan[] is available for copy target review.'
+          : options.dryRun
+            ? 'Only summary fields are visible; rerun with includePlan:true before a copy-only write when exact targets matter.'
+            : 'This copy-only call already ran; use planActionSummary, copiedCount, errors, and organizationManifestPath as write evidence.',
+        requiredBeforeCopyWrite: options.dryRun && !options.includePlan,
+        nextTool: options.dryRun && !options.includePlan ? 'organize_font_directory' : null,
+        evidenceFields: [
+          'directoryWorkflowSummary.planVisibility',
+          'planActionSummary',
+          'plan',
+        ],
+      },
+      {
+        id: 'warnings-reviewed',
+        status: sortedWarningCodes.length === 0 ? 'clear' : 'review-required',
+        answer: sortedWarningCodes.length === 0
+          ? 'No organization warning codes were emitted.'
+          : 'Review organizationWarnings before relying on the preview, copy plan, or write result.',
+        requiredBeforeWrite: sortedWarningCodes.length > 0,
+        warningCodes: sortedWarningCodes,
+        evidenceFields: ['organizationWarnings'],
+      },
+      {
+        id: 'post-write-output-audit',
+        status: 'required-after-reviewed-write',
+        answer: 'After any reviewed split_font_batch write, inspect the output tree before reporting structural success.',
+        requiredAfterSplitWrite: true,
+        nextTool: 'inspect_split_output',
+        evidenceFields: [
+          'outputStructureDecision',
+          'auditStatus',
+          'auditPassed',
+          'structureSummary',
+          'maxFilesHit',
+        ],
+      },
+    ],
+  };
+}
+
 function buildSourceLayoutMismatchSummary({
   options,
   layout,
@@ -3847,6 +4009,19 @@ function buildSourceLayoutMismatchSummary({
     stagingReason = 'The original input can be previewed directly; staging is only for users who want a cleaner copied directory.';
   }
 
+  const decisionChecklist = buildSourceLayoutDecisionChecklist({
+    options,
+    safetySummary,
+    organizationDecision,
+    directStatus,
+    directReason,
+    recommendedBatchPreviewArgs,
+    stagingNeed,
+    stagingReason,
+    outputDirRelative,
+    warningCodes,
+  });
+
   return {
     summaryType: 'source-layout-mismatch',
     appliesToTool: 'organize_font_directory',
@@ -3886,6 +4061,7 @@ function buildSourceLayoutMismatchSummary({
       ),
       reason: stagingReason,
     },
+    decisionChecklist,
     policySnapshot: {
       requestedBatchDedupeMode: options.batchDedupeMode,
       effectiveBatchDedupeMode: effectiveDedupeMode,
