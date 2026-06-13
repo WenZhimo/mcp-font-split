@@ -231,7 +231,7 @@ const GUIDANCE_SECTION_FIELDS = {
   recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets', 'batchPolicyGuide', 'configurationRecipes', 'unsupportedFileCategoryCatalog'],
   'directory-workflows': ['directoryWorkflowDecisionMatrix'],
   examples: ['directoryWorkflowExamples'],
-  verification: ['verificationChecklist'],
+  verification: ['verificationChecklist', 'localVerificationOutputGuide'],
   'warning-catalog': ['warningCodeCatalog'],
   'field-catalog': ['toolResponseFieldCatalog'],
   'safe-templates': ['safeInvocationTemplates'],
@@ -746,6 +746,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Catalog of important response fields, their source tools, meanings, and suggested agent actions.',
     agentAction: 'Use it as the runtime API map before interpreting tool responses.',
+  },
+  localVerificationOutputGuide: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Machine-readable guide for interpreting local maintenance smoke output, especially smoke:real-corpus-suite and its reliabilityGateDecision field.',
+    agentAction: 'Use this after running the local real-corpus suite to decide which output fields prove the representative reliability gate passed and which small counts are only target sampling counts.',
   },
   safeInvocationTemplates: {
     sourceTools: ['get_agent_guidance'],
@@ -1871,6 +1876,63 @@ export function getAgentGuidance(args = {}) {
       responseFields: [],
     },
   ];
+  const localVerificationOutputGuide = {
+    summaryType: 'local-verification-output-guide',
+    purpose: 'How an AI agent should interpret local maintenance smoke output before claiming this package change is complete.',
+    primaryCommand: 'npm run smoke:real-corpus-suite -- <font-corpus-dir>',
+    aliasCommand: 'npm run smoke:real-corpus -- <font-corpus-dir>',
+    verboseCommand: 'npm run smoke:real-corpus-suite -- <font-corpus-dir> --verbose',
+    primaryDecisionField: 'reliabilityGateDecision',
+    requiredOutputFields: [
+      'reliabilityGateDecision',
+      'humanSummary',
+      'testScope',
+      'coverageSummary.functionalCoverage',
+      'coverageSummary.unsupportedFileCategoryCoverage',
+      'coverageSummary.outputStructureAuditSummary',
+    ],
+    passCriteria: [
+      'reliabilityGateDecision.status is pass',
+      'reliabilityGateDecision.reliabilityGatePassed is true',
+      'reliabilityGateDecision.blockingReasonCodes is empty',
+      'reliabilityGateDecision.targetCountsAreFullCorpusCounts is false',
+      'testScope.corpusScan.maxFilesHit is false',
+      'coverageSummary.functionalCoverage entries are all covered',
+      'coverageSummary.outputStructureAuditSummary single and batch outputStructureDecision.status are pass',
+    ],
+    statusMeanings: [
+      {
+        status: 'pass',
+        meaning: 'The representative real-corpus feature chain passed.',
+        agentAction: 'Report it as representative integration/regression evidence, not as manual acceptance of every font directory.',
+      },
+      {
+        status: 'incomplete',
+        meaning: 'The corpus scan was truncated or otherwise incomplete.',
+        agentAction: 'Rerun with a higher maxFiles or inspect blockingReasonCodes before claiming completion.',
+      },
+      {
+        status: 'action-required',
+        meaning: 'At least one required coverage, audit, fixed target, or scope check failed.',
+        agentAction: 'Inspect blockingReasonCodes, uncoveredFunctionalCoverageIds, coverageSummary, and child runs before fixing or rerunning.',
+      },
+    ],
+    nonIntuitiveBehavior: [
+      'This is a representative reliability gate, not a per-directory acceptance audit.',
+      'This is not a per-font manual audit.',
+      'Small numbers such as fixedRegressionTargetCount 4 or selectedTargetCount 10 are target sampling counts, not the full corpus font count.',
+      'Use reliabilityGateDecision.fullCorpusFontCountField or testScope.corpusScan.supportedFontCount for the full bounded corpus font total.',
+      'Archive files are counted as ignored files; the suite does not prove archive extraction because archive extraction is outside this tool layer.',
+    ],
+    evidenceFields: {
+      fullCorpusFontCount: 'testScope.corpusScan.supportedFontCount',
+      fixedRegressionTargets: 'testScope.targetSampling.fixedRegressionTargets',
+      selectedTargets: 'testScope.targetSampling.selectedTargets',
+      representativeWriteAudit: 'testScope.representativeWriteAudit',
+      ignoredFileCoverage: 'coverageSummary.unsupportedFileCategoryCoverage',
+      outputStructureAudit: 'coverageSummary.outputStructureAuditSummary',
+    },
+  };
 
   const workflows = {
     overview: [
@@ -2382,6 +2444,7 @@ export function getAgentGuidance(args = {}) {
     directoryWorkflowDecisionMatrix,
     directoryWorkflowExamples,
     verificationChecklist,
+    localVerificationOutputGuide,
     warningCodeCatalog: WARNING_CODE_CATALOG,
     toolResponseFieldCatalog: TOOL_RESPONSE_FIELD_CATALOG,
     safeInvocationTemplates: SAFE_INVOCATION_TEMPLATES,
@@ -2428,6 +2491,7 @@ export function getAgentGuidance(args = {}) {
       'warningCodeCatalog',
       'safetySummary',
       'toolResponseFieldCatalog',
+      'localVerificationOutputGuide',
       'safeInvocationTemplates',
       'recommendedWorkflowPlan',
       'batchWarnings',

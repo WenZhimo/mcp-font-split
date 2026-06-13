@@ -1362,6 +1362,7 @@ if (scenario === 'single') {
     || Object.hasOwn(defaultGuidance, 'toolResponseFieldCatalog')
     || Object.hasOwn(defaultGuidance, 'directoryWorkflowExamples')
     || !defaultGuidance.safeInvocationTemplates?.length
+    || defaultGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !defaultGuidance.directoryWorkflowDecisionMatrix?.length
     || !defaultGuidance.configurationRecipes?.length
     || !defaultGuidance.batchPolicyGuide?.length
@@ -1392,6 +1393,7 @@ if (scenario === 'single') {
     || Object.hasOwn(compactGuidance, 'toolResponseFieldCatalog')
     || Object.hasOwn(compactGuidance, 'directoryWorkflowExamples')
     || !compactGuidance.safeInvocationTemplates?.length
+    || compactGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !compactGuidance.directoryWorkflowDecisionMatrix?.length
     || !compactGuidance.configurationRecipes?.length
     || !compactGuidance.batchPolicyGuide?.length
@@ -1406,6 +1408,7 @@ if (scenario === 'single') {
     || !catalogGuidance.warningCodeCatalog
     || !catalogGuidance.toolResponseFieldCatalog
     || Object.hasOwn(catalogGuidance, 'safeInvocationTemplates')
+    || Object.hasOwn(catalogGuidance, 'localVerificationOutputGuide')
     || Object.hasOwn(catalogGuidance, 'directoryWorkflowDecisionMatrix')
   ) {
     throw new Error('Expected focused agent guidance sections to return only requested catalogs.');
@@ -1502,6 +1505,20 @@ if (scenario === 'single') {
   }
   if (!result.responseFieldsToCheck?.includes('toolResponseFieldCatalog')) {
     throw new Error('Expected agent guidance to recommend checking the tool response field catalog.');
+  }
+  if (!result.responseFieldsToCheck?.includes('localVerificationOutputGuide')) {
+    throw new Error('Expected agent guidance to recommend checking the local verification output guide.');
+  }
+  if (
+    result.localVerificationOutputGuide?.summaryType !== 'local-verification-output-guide'
+    || result.localVerificationOutputGuide?.primaryCommand !== 'npm run smoke:real-corpus-suite -- <font-corpus-dir>'
+    || result.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
+    || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('coverageSummary.outputStructureAuditSummary')
+    || !result.localVerificationOutputGuide?.passCriteria?.some((item) => item.includes('reliabilityGateDecision.status is pass'))
+    || !result.localVerificationOutputGuide?.nonIntuitiveBehavior?.some((item) => item.includes('not a per-directory acceptance audit'))
+    || result.localVerificationOutputGuide?.evidenceFields?.fullCorpusFontCount !== 'testScope.corpusScan.supportedFontCount'
+  ) {
+    throw new Error('Expected localVerificationOutputGuide to explain real-corpus reliability gate output interpretation.');
   }
   if (!result.responseFieldsToCheck?.includes('safeInvocationTemplates')) {
     throw new Error('Expected agent guidance to recommend checking safe invocation templates.');
@@ -1763,6 +1780,7 @@ if (scenario === 'single') {
     inspectionWarnings: 'inspect_split_output',
     warningCodeCatalog: 'get_agent_guidance',
     recommendedWorkflowPlan: 'get_agent_guidance',
+    localVerificationOutputGuide: 'get_agent_guidance',
   };
   for (const [fieldName, toolName] of Object.entries(expectedFieldCatalogEntries)) {
     if (!result.toolResponseFieldCatalog?.[fieldName]?.sourceTools?.includes(toolName)) {
@@ -2023,6 +2041,7 @@ if (scenario === 'single') {
     corpusSuiteChecklist?.command !== 'npm run smoke:real-corpus-suite -- <font-corpus-dir>'
     || corpusSuiteChecklist?.verboseCommand !== 'npm run smoke:real-corpus-suite -- <font-corpus-dir> --verbose'
     || !corpusSuiteChecklist?.check?.includes('representative reliability gate')
+    || result.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
   ) {
     throw new Error('Expected verification checklist to include the local real-corpus suite reliability gate.');
   }
@@ -3630,7 +3649,7 @@ if (scenario === 'single') {
     if (!Object.hasOwn(batchProps, 'workflowPreset') || !Object.hasOwn(organizeProps, 'workflowPreset')) {
       throw new Error('Expected batch and organization tools to expose workflowPreset.');
     }
-    expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
@@ -3697,6 +3716,7 @@ if (scenario === 'single') {
       'unsupportedFileCategoryCatalog',
       'directoryWorkflowDecisionMatrix',
       'safeInvocationTemplates',
+      'localVerificationOutputGuide',
       'warningCodeCatalog',
       'toolResponseFieldCatalog',
       'workflowPresets',
@@ -3738,6 +3758,7 @@ if (scenario === 'single') {
       assertDocsContainAny(`important field ${fieldName}`, [`\`${fieldName}\``, `\`${fieldName}[]\``]);
     }
     assertDocsContain('real corpus suite checklist id', '`local-real-corpus-suite-passed`');
+    assertDocsContain('local verification output guide', '`localVerificationOutputGuide`');
     assertDocsContain('real corpus suite command', '`npm run smoke:real-corpus-suite -- <font-corpus-dir>`');
     assertDocsContain('real corpus reliability gate decision', '`reliabilityGateDecision`');
     assertDocsContain('real corpus suite test scope', '`testScope`');
@@ -3797,6 +3818,7 @@ if (scenario === 'single') {
     '`directoryWorkflowDecisionMatrix[]`',
     '`directoryWorkflowExamples[]`',
     '`safeInvocationTemplates[]`',
+    '`localVerificationOutputGuide`',
     '`toolResponseFieldCatalog`',
     '`workflowPreset`',
     '`dryRun`',

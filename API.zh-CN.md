@@ -12,7 +12,7 @@
 | `detailLevel` | `compact`, `full` | `compact` | 响应体量。`compact` 保留工作流关键 section，并默认省略较大的 catalog / 示例；`full` 返回全部指南 section。 |
 | `sections` | section 名称数组 | 不设置 | 聚焦返回指定 section。设置后会覆盖 `detailLevel` 的默认 section 集。 |
 
-响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchPolicyGuide`、`unsupportedFileCategoryCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchPolicyGuide`、`unsupportedFileCategoryCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
 当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["warning-catalog", "field-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
 
@@ -30,7 +30,7 @@
 
 `recommendedWorkflowPlan` 是当前 `workflow` 对应的有序执行计划。它把安全模板 ID 编排成输入预检、目录形态决策、批量预览、审查后写入和输出审计等阶段。每个 `orderedSteps[]` 和 `decisionPoints[]` 条目都会包含 `inspectFields` 与 `successCriteria`。它是路线图，不替代工具响应检查；agent 从预览进入写入、或向用户宣称完成前，仍然必须检查列出的字段并满足对应条件。
 
-`verificationChecklist[]` 也包含面向本包维护者的 `local-real-corpus-suite-passed`。当 agent 修改了会影响功能行为的代码后，应在本机真实语料库上运行 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，再宣称本阶段完成。这是代表性可靠性门禁，不是逐个目录验收，也不是运行时 MCP 工具调用。suite 会先打印简短的 `real-corpus suite summary`，并在 JSON `humanSummary` 中保留同样信息，用于避免把固定目标数量误读成全库扫描数量。最终 JSON 还包含顶层 `reliabilityGateDecision`：先检查 `status`、`reliabilityGatePassed`、`blockingReasonCodes`、`fullCorpusFontCountField` 和 `targetCountsAreFullCorpusCounts`。`status: "pass"` 表示代表性功能链通过，不表示每个字体目录都已人工验收。suite 输出里的 `testScope` 会把范围拆清楚：`corpusScan` 是全库有界根扫描，`targetSampling` 是代表性 dry-run 抽样，`representativeWriteAudit` 是一个有界真实写入和输出审计路径。`coverageSummary.functionalCoverage[]` 中的 `source-layout-mismatch-summary` 表示真实语料运行已经覆盖了 `sourceLayoutMismatchSummary` 的布局提示、直接预览要求和 copy-only 源安全语义。
+`verificationChecklist[]` 也包含面向本包维护者的 `local-real-corpus-suite-passed`。当 agent 修改了会影响功能行为的代码后，应在本机真实语料库上运行 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，再宣称本阶段完成。这是代表性可靠性门禁，不是逐个目录验收，也不是运行时 MCP 工具调用。`localVerificationOutputGuide` 是解读该本地命令输出的机器可读伴随指南：它会把 `reliabilityGateDecision` 标为主判断字段，并列出必查输出字段、通过条件、状态含义和容易误解的范围边界。suite 会先打印简短的 `real-corpus suite summary`，并在 JSON `humanSummary` 中保留同样信息，用于避免把固定目标数量误读成全库扫描数量。最终 JSON 还包含顶层 `reliabilityGateDecision`：先检查 `status`、`reliabilityGatePassed`、`blockingReasonCodes`、`fullCorpusFontCountField` 和 `targetCountsAreFullCorpusCounts`。`status: "pass"` 表示代表性功能链通过，不表示每个字体目录都已人工验收。suite 输出里的 `testScope` 会把范围拆清楚：`corpusScan` 是全库有界根扫描，`targetSampling` 是代表性 dry-run 抽样，`representativeWriteAudit` 是一个有界真实写入和输出审计路径。`coverageSummary.functionalCoverage[]` 中的 `source-layout-mismatch-summary` 表示真实语料运行已经覆盖了 `sourceLayoutMismatchSummary` 的布局提示、直接预览要求和 copy-only 源安全语义。
 
 真实语料 suite 还会返回 `coverageSummary.unsupportedFileCategoryCoverage` 和 `coverageSummary.outputStructureAuditSummary`。前者用于确认忽略文件统计覆盖了扩展名/类别摘要，而不是只看 `.zip` / `.txt`；后者用于确认代表性单字体写入和批量写入都已经通过 `inspect_split_output`，且 `outputStructureDecision.status: "pass"`、`structureSummary.conforms: true`。
 
