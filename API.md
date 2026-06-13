@@ -231,6 +231,32 @@ Plan or copy-organize a source font directory into a cleaner staging layout.
 
 Use this when an agent must decide between direct original-input batch preview and copy-only staged output. For flat/nested/mixed/output-inside-input routing, `get_agent_guidance` with `sections: ["examples"]` includes the `source-layout-mismatch-comparison` example; the actual decision must still come from the current response's `sourceLayoutMismatchSummary`, `recommendedBatchPreviewArgs`, `organizationWarnings`, and safety fields.
 
+### `two-call-layout-preview` example
+
+Use this route when the source layout is unclear and the user has not explicitly asked for a copied staging directory.
+
+1. Preview the directory layout without writing:
+
+```json
+{
+  "inputDir": "fonts",
+  "workflowPreset": "safe-preview"
+}
+```
+
+Inspect `safetySummary`, `layout.layoutKind`, `sourceLayoutMismatchSummary`, `recommendedBatchPreviewArgs`, `organizationWarnings`, and `planActionSummary`.
+
+2. If direct original-input preview is appropriate, call `split_font_batch` with the returned preview args:
+
+```js
+{
+  ...organization.recommendedBatchPreviewArgs,
+  outputRoot: "split-output"
+}
+```
+
+Do not treat `recommendedBatchOptions` as a complete safe call. Use copy-only organization (`workflowPreset: "reviewed-write"`) only after the preview has been reviewed and the user wants a cleaner staging source.
+
 > [!WARNING]
 > This tool is source-non-destructive. It never moves, deletes, or rewrites source files. By default `dryRun` is `true`, so it only returns a plan. When `dryRun: false`, it creates directories and copies selected fonts into `outputDir`; if `overwriteExisting: true`, destination files in `outputDir` may be replaced.
 

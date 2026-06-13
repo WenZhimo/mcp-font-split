@@ -231,6 +231,32 @@
 
 当 agent 需要在“直接对原目录做批量预览”和“先复制到暂存目录再处理”之间选择时，使用这个工具。对于 flat/nested/mixed/output-inside-input 路由，`get_agent_guidance` 的 `sections: ["examples"]` 会返回 `source-layout-mismatch-comparison` 示例；但实际决策仍必须来自当前响应的 `sourceLayoutMismatchSummary`、`recommendedBatchPreviewArgs`、`organizationWarnings` 和安全字段。
 
+### `two-call-layout-preview` 示例
+
+当源目录结构不明确，且用户没有明确要求复制出暂存目录时，优先使用这条路线。
+
+1. 先做无写入目录形态预览：
+
+```json
+{
+  "inputDir": "fonts",
+  "workflowPreset": "safe-preview"
+}
+```
+
+检查 `safetySummary`、`layout.layoutKind`、`sourceLayoutMismatchSummary`、`recommendedBatchPreviewArgs`、`organizationWarnings` 和 `planActionSummary`。
+
+2. 如果适合直接对原目录做预览，把返回的预览参数交给 `split_font_batch`：
+
+```js
+{
+  ...organization.recommendedBatchPreviewArgs,
+  outputRoot: "split-output"
+}
+```
+
+不要把 `recommendedBatchOptions` 当作完整安全调用。只有在预览已被检查、且用户希望得到更干净的暂存源目录时，才使用 copy-only 整理（`workflowPreset: "reviewed-write"`）。
+
 > [!WARNING]
 > 这个工具对源目录是非破坏性的：它不会移动、删除或重写源字体文件。默认 `dryRun: true`，只返回计划；只有显式设置 `dryRun: false` 时才会在 `outputDir` 中创建目录并复制字体。如果设置 `overwriteExisting: true`，可能会替换 `outputDir` 中的目标文件，但源文件仍不会被修改。
 

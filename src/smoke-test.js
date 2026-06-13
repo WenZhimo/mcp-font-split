@@ -3463,6 +3463,10 @@ if (scenario === 'single') {
     assertDocsContain('real corpus suite checklist id', '`local-real-corpus-suite-passed`');
     assertDocsContain('real corpus suite command', '`npm run smoke:real-corpus-suite -- <font-corpus-dir>`');
     assertDocsContain('real corpus suite test scope', '`testScope`');
+    assertDocsContain('two-call layout preview example', '`two-call-layout-preview`');
+    assertDocsContain('recommendedBatchPreviewArgs spread example', '...organization.recommendedBatchPreviewArgs');
+    assertDocsContain('recommendedBatchOptions not complete call warning', '`recommendedBatchOptions`');
+    assertDocsContain('copy-only reviewed-write route', '`workflowPreset: "reviewed-write"`');
 
     console.log(JSON.stringify({
       ok: true,
