@@ -237,7 +237,7 @@ const GUIDANCE_SECTION_FIELDS = {
   'safe-templates': ['safeInvocationTemplates'],
   'response-fields': ['responseFieldsToCheck'],
   'path-rules': ['pathRules'],
-  workflow: ['recommendedWorkflow', 'recommendedWorkflowPlan'],
+  workflow: ['recommendedWorkflow', 'nextToolDecisionSummary', 'recommendedWorkflowPlan'],
 };
 let wasmRuntimePromise;
 let wasmPath;
@@ -761,6 +761,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Ordered workflow plan that composes safeInvocationTemplates into phases for the selected guidance workflow. Each step and decision point includes inspectFields and successCriteria.',
     agentAction: 'Follow the ordered steps, inspect each listed field, and satisfy successCriteria before advancing from preview to write or reporting completion.',
+  },
+  nextToolDecisionSummary: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Compact "which tool should I call next?" route summary for AI agents. It references safeInvocationTemplates instead of duplicating full workflow rules.',
+    agentAction: 'Use it as the first routing index, then open the referenced template or response fields and satisfy successCriteria before writing or reporting completion.',
   },
   batchWarnings: {
     sourceTools: ['split_font_batch'],
@@ -1718,6 +1723,164 @@ function buildRecommendedWorkflowPlan(workflow) {
   return plans[workflow] || plans.overview;
 }
 
+function buildNextToolDecisionSummary(workflow) {
+  const workflowPrimaryRoute = {
+    overview: 'unfamiliar-directory',
+    single: 'single-known-font',
+    batch: 'unfamiliar-directory',
+    inspect: 'source-or-output-inspection',
+    organize: 'layout-uncertain-or-staging-wanted',
+  }[workflow] || 'unfamiliar-directory';
+
+  const routes = [
+    {
+      id: 'setup-uncertain',
+      useWhen: 'Workspace, Node runtime, package install, cn-font-split runtime, or WASM availability is uncertain.',
+      firstTool: 'get_runtime_status',
+      templateId: 'runtime-diagnostic',
+      writesFiles: false,
+      sourceDestructive: false,
+      inspectFields: ['ok', 'recommendedActions', 'workspace', 'wasm', 'cnFontSplit'],
+      continueWhen: 'ok is true, or every recommendedActions item has been handled or disclosed.',
+      nextRouteAfterSuccess: workflowPrimaryRoute === 'setup-uncertain' ? 'unfamiliar-directory' : workflowPrimaryRoute,
+    },
+    {
+      id: 'single-known-font',
+      useWhen: 'The user named exactly one known supported font file.',
+      firstTool: 'split_font',
+      writesFiles: true,
+      sourceDestructive: false,
+      inspectFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'manifestPath'],
+      continueWhen: 'manifestPath exists and fallback/copy-original behavior has been disclosed when present.',
+      requiredAfterWriteTool: 'inspect_split_output',
+      requiredAfterWriteFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary'],
+    },
+    {
+      id: 'unfamiliar-directory',
+      useWhen: 'The source is a directory and the agent first needs counts, ignored-file categories, invalid-font signals, or scan truncation status.',
+      firstTool: 'inspect_font_inputs',
+      templateId: 'source-preflight-compact',
+      writesFiles: false,
+      sourceDestructive: false,
+      inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
+      continueWhen: 'maxFilesHit is false or truncation is intentionally accepted; ignored files and invalid fonts are reviewed.',
+      nextRouteAfterSuccess: 'layout-uncertain-or-staging-wanted',
+    },
+    {
+      id: 'layout-uncertain-or-staging-wanted',
+      useWhen: 'The directory is flat, mixed, unfamiliar, or the user wants a cleaner copied staging directory before splitting.',
+      firstTool: 'organize_font_directory',
+      templateId: 'directory-mismatch-plan',
+      firstArgsHint: { workflowPreset: 'safe-preview' },
+      writesFiles: false,
+      sourceDestructive: false,
+      inspectFields: ['safetySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.decisionChecklist', 'organizationWarnings', 'planActionSummary'],
+      continueWhen: 'The route, warnings, and sourceLayoutMismatchSummary.decisionChecklist are reviewed.',
+      nextRouteAfterSuccess: 'batch-safe-preview',
+      optionalRoute: 'copy-only-staging',
+    },
+    {
+      id: 'large-noisy-structure-first',
+      useWhen: 'The directory is huge/noisy and the agent only needs a quick structural read before metadata-sensitive decisions.',
+      firstTool: 'organize_font_directory',
+      templateId: 'structure-first-large-directory',
+      firstArgsHint: { workflowPreset: 'structure-first' },
+      writesFiles: false,
+      sourceDestructive: false,
+      inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'dedupeLimitedByParsing', 'organizationDecision', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.decisionChecklist', 'recommendedBatchPreviewArgs'],
+      continueWhen: 'Use only for structure-level routing; rerun with safe-preview / parseFonts:true before identity dedupe or metadata-family grouping.',
+      nextRouteAfterSuccess: 'layout-uncertain-or-staging-wanted',
+    },
+    {
+      id: 'copy-only-staging',
+      useWhen: 'The user explicitly wants an organized source-like staging directory after a dry-run plan has been reviewed.',
+      firstTool: 'organize_font_directory',
+      templateId: 'copy-organized-staging',
+      firstArgsHint: { workflowPreset: 'reviewed-write' },
+      writesFiles: true,
+      sourceDestructive: false,
+      writeBehavior: 'copy-only-outputDir',
+      inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.decisionChecklist', 'organizationWarnings'],
+      continueWhen: 'The copy run remains sourceDestructive false and copy-only, with errors resolved and warnings reviewed.',
+      nextRouteAfterSuccess: 'batch-safe-preview',
+    },
+    {
+      id: 'batch-safe-preview',
+      useWhen: 'Before writing split output for either the original directory or an organized staging directory.',
+      firstTool: 'split_font_batch',
+      templateId: 'batch-dry-run-preview',
+      firstArgsHint: { workflowPreset: 'safe-preview' },
+      writesFiles: false,
+      sourceDestructive: false,
+      inspectFields: ['safetySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
+      continueWhen: 'The preview is no-write, source-safe, untruncated, error-free, and planned paths/dedupe/naming match user intent.',
+      nextRouteAfterSuccess: 'batch-reviewed-write',
+    },
+    {
+      id: 'batch-reviewed-write',
+      useWhen: 'The batch dry-run has been reviewed and the user wants generated split output.',
+      firstTool: 'split_font_batch',
+      templateId: 'batch-process-reviewed-plan',
+      firstArgsHint: { workflowPreset: 'reviewed-write' },
+      writesFiles: true,
+      sourceDestructive: false,
+      inspectFields: ['safetySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+      continueWhen: 'errorCount is zero and the response recommends or allows output audit.',
+      nextRouteAfterSuccess: 'output-audit',
+    },
+    {
+      id: 'output-audit',
+      useWhen: 'After any split_font or split_font_batch write, or when validating an existing split-output directory.',
+      firstTool: 'inspect_split_output',
+      templateId: 'output-audit-compact',
+      writesFiles: false,
+      sourceDestructive: false,
+      inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
+      continueWhen: 'outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
+      nextRouteAfterSuccess: 'complete',
+    },
+    {
+      id: 'source-or-output-inspection',
+      useWhen: 'The user asks to inspect inputs or audit generated output without writing.',
+      firstTool: 'inspect_font_inputs',
+      alternateTool: 'inspect_split_output',
+      writesFiles: false,
+      sourceDestructive: false,
+      inspectFields: ['maxFilesHit', 'inspectionWarnings', 'unsupportedFileDecision', 'unsupportedFileSummary', 'outputStructureDecision', 'auditStatus', 'structureSummary'],
+      continueWhen: 'Use inspect_font_inputs for source directories and inspect_split_output for generated output; rerun with higher maxFiles or details when warnings require it.',
+    },
+  ];
+
+  return attachSourceLayoutDecisionChecklistFields({
+    summaryType: 'next-tool-decision-summary',
+    workflow,
+    primaryRouteId: workflowPrimaryRoute,
+    purpose: 'Compact first routing index for agents choosing the next MCP tool call.',
+    routeOrder: uniqueStrings([
+      'setup-uncertain',
+      workflowPrimaryRoute,
+      'layout-uncertain-or-staging-wanted',
+      'batch-safe-preview',
+      'batch-reviewed-write',
+      'output-audit',
+    ]),
+    routes,
+    safetyDefaults: {
+      previewPreset: 'safe-preview',
+      writePreset: 'reviewed-write',
+      organizationWritesAreCopyOnly: true,
+      sourceDestructive: false,
+      outputAuditRequiredAfterWrite: true,
+    },
+    nonIntuitiveBehavior: [
+      'This summary is a routing index, not proof of completion.',
+      'organize_font_directory dryRun:false copies selected fonts into outputDir only; it does not move, delete, or rewrite source fonts.',
+      'split_font_batch safe-preview is the normal next step before reviewed-write, even when organize_font_directory says direct original-input preview is available.',
+      'After any real split write, inspect_split_output is required before reporting structural success.',
+    ],
+  });
+}
+
 export async function getRuntimeStatus() {
   const configuredRoot = process.env.FONT_SPLIT_ROOT || null;
   const configuredWasmPath = process.env.FONT_SPLIT_WASM_PATH || null;
@@ -2487,6 +2650,7 @@ export function getAgentGuidance(args = {}) {
     warningCodeCatalog: WARNING_CODE_CATALOG,
     toolResponseFieldCatalog: TOOL_RESPONSE_FIELD_CATALOG,
     safeInvocationTemplates: SAFE_INVOCATION_TEMPLATES,
+    nextToolDecisionSummary: buildNextToolDecisionSummary(workflow),
     responseFieldsToCheck: [
       'ok',
       'node',
@@ -2532,6 +2696,7 @@ export function getAgentGuidance(args = {}) {
       'toolResponseFieldCatalog',
       'localVerificationOutputGuide',
       'safeInvocationTemplates',
+      'nextToolDecisionSummary',
       'recommendedWorkflowPlan',
       'batchWarnings',
       'batchWarningCount',

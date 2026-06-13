@@ -66,6 +66,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `unsupportedFileCategoryCatalog`：解释 `unsupportedFileSummary.byCategory[]` 中各分类的代表扩展名、含义和处理行为
 - `unsupportedFileDecision`：每次输入扫描响应里的快速判断，说明是否存在被忽略文件、是否包含压缩包、是否存在 `.zip` / `.txt` 之外的噪声，以及这些文件是否会被解压、复制或拆分
 - `safeInvocationTemplates[]`：常见工作流的安全起步调用模板
+- `nextToolDecisionSummary`：更短的“下一步该调用哪个工具”路由索引
 - `recommendedWorkflowPlan`：把安全模板编排成有序阶段的推荐路线图
 - `guidanceView`：说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称
 
@@ -81,6 +82,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 `directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段、继续前必须满足的 `successCriteria` 和非直觉行为。推荐参数会优先使用 `workflowPreset`，只保留路径、规模或目录形态造成的差异覆盖。它不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
 `directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描，以及一个面向 flat/nested/mixed/output-inside-input 的 `sourceLayoutMismatchSummary` 对照示例。示例调用也采用 preset-first 风格，并带有 `mustInspectFields` 和 `successCriteria`。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`sourceLayoutMismatchSummary` 和 warning 字段为准。
 `safeInvocationTemplates[]` 是可复制的安全起步调用模板；其中包括运行时诊断、输入预检、源目录结构不匹配时的 dry-run 整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和输出审计。每个模板都会声明 `writesFiles`、`sourceDestructive`、可自定义参数、必须检查的响应字段和继续前必须满足的 `successCriteria`。模板里的 `args` 会尽量保持最小；`workflowPreset` 已提供的默认项不会重复写入模板，需要完整展开时查看同一响应中的 `workflowPresets[]`。
+`nextToolDecisionSummary` 是更短的路由索引，用于回答 agent 最常见的第一问：“下一步该调用哪个工具？”它会把 setup 诊断、输入预检、目录结构判断、copy-only 暂存、批量预览、审查后写入和输出审计映射到首选工具，并尽量引用 `safeInvocationTemplates[]` 的模板 ID。它只是路线索引，不是完成证明；继续前仍要检查引用模板或实际响应里的字段，并满足 `successCriteria`。
 `recommendedWorkflowPlan` 是当前 `workflow` 的有序路线图；它不会复制每个模板的参数，而是用 `templateId` 引用 `safeInvocationTemplates[]`，把输入预检、目录形态决策、批量预览、审查后写入和输出审计串成阶段。每个 `orderedSteps[]` 和 `decisionPoints[]` 条目都会包含 `inspectFields` 与 `successCriteria`。它用于降低 agent 漏掉审计步骤的风险，但不能替代每个阶段的响应字段检查和条件确认。
 `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`outputStructureDecision`、`auditStatus`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
 

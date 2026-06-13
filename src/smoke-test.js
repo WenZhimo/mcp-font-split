@@ -845,6 +845,60 @@ function assertGuidanceItemsHaveCompletionProof(items, { collectionName, inspect
   }
 }
 
+function assertNextToolDecisionSummary(summary, { context, workflow, primaryRouteId }) {
+  if (
+    !summary
+    || summary.summaryType !== 'next-tool-decision-summary'
+    || summary.workflow !== workflow
+    || summary.primaryRouteId !== primaryRouteId
+    || summary.safetyDefaults?.organizationWritesAreCopyOnly !== true
+    || summary.safetyDefaults?.sourceDestructive !== false
+    || summary.safetyDefaults?.outputAuditRequiredAfterWrite !== true
+  ) {
+    throw new Error(`${context}: expected nextToolDecisionSummary for ${workflow}.`);
+  }
+  assertNonEmptyStringArray(summary.routeOrder, context, 'routeOrder');
+  assertNonEmptyArray(summary.routes, context, 'routes');
+  const routesById = new Map(summary.routes.map((route) => [route.id, route]));
+  for (const requiredRoute of ['setup-uncertain', 'unfamiliar-directory', 'layout-uncertain-or-staging-wanted', 'batch-safe-preview', 'batch-reviewed-write', 'output-audit']) {
+    if (!routesById.has(requiredRoute)) {
+      throw new Error(`${context}: expected route ${requiredRoute}.`);
+    }
+  }
+  for (const route of summary.routes) {
+    assertNonEmptyString(route.id, `${context}.routes`, 'id');
+    assertNonEmptyString(route.useWhen, `${context}.${route.id}`, 'useWhen');
+    assertNonEmptyString(route.firstTool, `${context}.${route.id}`, 'firstTool');
+    assertNonEmptyStringArray(route.inspectFields, `${context}.${route.id}`, 'inspectFields');
+    assertNonEmptyString(route.continueWhen, `${context}.${route.id}`, 'continueWhen');
+    if (typeof route.writesFiles !== 'boolean' || route.sourceDestructive !== false) {
+      throw new Error(`${context}.${route.id}: expected explicit write and source-safety flags.`);
+    }
+  }
+  const layoutRoute = routesById.get('layout-uncertain-or-staging-wanted');
+  const stagingRoute = routesById.get('copy-only-staging');
+  const batchPreviewRoute = routesById.get('batch-safe-preview');
+  const batchWriteRoute = routesById.get('batch-reviewed-write');
+  const auditRoute = routesById.get('output-audit');
+  if (
+    layoutRoute?.firstTool !== 'organize_font_directory'
+    || layoutRoute?.firstArgsHint?.workflowPreset !== 'safe-preview'
+    || !layoutRoute.inspectFields?.includes('sourceLayoutMismatchSummary.decisionChecklist')
+    || stagingRoute?.writeBehavior !== 'copy-only-outputDir'
+    || stagingRoute?.sourceDestructive !== false
+    || batchPreviewRoute?.writesFiles !== false
+    || batchPreviewRoute?.firstArgsHint?.workflowPreset !== 'safe-preview'
+    || batchWriteRoute?.writesFiles !== true
+    || batchWriteRoute?.firstArgsHint?.workflowPreset !== 'reviewed-write'
+    || batchWriteRoute?.nextRouteAfterSuccess !== 'output-audit'
+    || auditRoute?.firstTool !== 'inspect_split_output'
+    || !auditRoute.inspectFields?.includes('outputStructureDecision')
+  ) {
+    throw new Error(`${context}: expected nextToolDecisionSummary to route layout, preview, reviewed write, and audit safely.`);
+  }
+  assertSourceLayoutDecisionChecklistCompanionFields(summary, `${context}: nextToolDecisionSummary`);
+}
+
 function assertRecommendedWorkflowPlanHasCompletionProof(plan, templateIds, context) {
   if (!plan || typeof plan !== 'object') {
     throw new Error(`${context}: expected recommendedWorkflowPlan object.`);
@@ -1435,11 +1489,17 @@ if (scenario === 'single') {
     || !defaultGuidance.configurationRecipes?.length
     || !defaultGuidance.batchPolicyGuide?.length
     || !defaultGuidance.unsupportedFileCategoryCatalog?.archive
+    || defaultGuidance.nextToolDecisionSummary?.primaryRouteId !== 'unfamiliar-directory'
     || !defaultGuidance.recommendedWorkflowPlan?.orderedSteps?.length
   ) {
     throw new Error('Expected default agent guidance to be compact and omit bulky catalogs/examples.');
   }
   assertBatchPolicyGuide(defaultGuidance.batchPolicyGuide || []);
+  assertNextToolDecisionSummary(defaultGuidance.nextToolDecisionSummary, {
+    context: 'agent-guidance default compact',
+    workflow: 'batch',
+    primaryRouteId: 'unfamiliar-directory',
+  });
   const result = getAgentGuidance({ workflow: 'batch', detailLevel: 'full' });
   if (result.agentOptimized !== true || result.workflow !== 'batch' || !result.tools.some((tool) => tool.name === 'inspect_font_inputs')) {
     throw new Error('Expected agent guidance to describe the batch workflow and preflight tool.');
@@ -1466,10 +1526,21 @@ if (scenario === 'single') {
     || !compactGuidance.configurationRecipes?.length
     || !compactGuidance.batchPolicyGuide?.length
     || !compactGuidance.unsupportedFileCategoryCatalog?.archive
+    || compactGuidance.nextToolDecisionSummary?.primaryRouteId !== 'layout-uncertain-or-staging-wanted'
   ) {
     throw new Error('Expected compact agent guidance to keep workflow essentials and omit bulky catalogs/examples.');
   }
   assertBatchPolicyGuide(compactGuidance.batchPolicyGuide || []);
+  assertNextToolDecisionSummary(result.nextToolDecisionSummary, {
+    context: 'agent-guidance full',
+    workflow: 'batch',
+    primaryRouteId: 'unfamiliar-directory',
+  });
+  assertNextToolDecisionSummary(compactGuidance.nextToolDecisionSummary, {
+    context: 'agent-guidance organize compact',
+    workflow: 'organize',
+    primaryRouteId: 'layout-uncertain-or-staging-wanted',
+  });
   assertSourceLayoutDecisionChecklistCompanionFields(result, 'agent-guidance full');
   assertSourceLayoutDecisionChecklistCompanionFields(compactGuidance, 'agent-guidance compact');
   const catalogGuidance = getAgentGuidance({ sections: ['warning-catalog', 'field-catalog'] });
@@ -1601,6 +1672,9 @@ if (scenario === 'single') {
   }
   if (!result.responseFieldsToCheck?.includes('recommendedWorkflowPlan')) {
     throw new Error('Expected agent guidance to recommend checking the ordered workflow plan.');
+  }
+  if (!result.responseFieldsToCheck?.includes('nextToolDecisionSummary')) {
+    throw new Error('Expected agent guidance to recommend checking the next tool decision summary.');
   }
   for (const removedVersionField of [
     'warningCodeCatalogVersion',
@@ -1854,6 +1928,7 @@ if (scenario === 'single') {
     inspectionWarnings: 'inspect_split_output',
     warningCodeCatalog: 'get_agent_guidance',
     recommendedWorkflowPlan: 'get_agent_guidance',
+    nextToolDecisionSummary: 'get_agent_guidance',
     localVerificationOutputGuide: 'get_agent_guidance',
   };
   for (const [fieldName, toolName] of Object.entries(expectedFieldCatalogEntries)) {
@@ -3724,7 +3799,7 @@ if (scenario === 'single') {
     if (!Object.hasOwn(batchProps, 'workflowPreset') || !Object.hasOwn(organizeProps, 'workflowPreset')) {
       throw new Error('Expected batch and organization tools to expose workflowPreset.');
     }
-    expectDescriptionIncludes('get_agent_guidance', ['configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
@@ -3781,6 +3856,7 @@ if (scenario === 'single') {
     for (const fieldName of [
       'guidanceView',
       'recommendedWorkflowPlan',
+      'nextToolDecisionSummary',
       'configurationRecipes',
       'batchPolicyGuide',
       'batchPolicySummary',
@@ -3875,6 +3951,7 @@ if (scenario === 'single') {
     '`FONT_SPLIT_ROOT`',
     '`guidanceView`',
     '`recommendedWorkflowPlan`',
+    '`nextToolDecisionSummary`',
     '`configurationRecipes[]`',
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
