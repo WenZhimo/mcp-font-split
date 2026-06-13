@@ -860,6 +860,7 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
   assertNonEmptyStringArray(summary.routeOrder, context, 'routeOrder');
   assertNonEmptyArray(summary.routes, context, 'routes');
   const routesById = new Map(summary.routes.map((route) => [route.id, route]));
+  const quickExamplesById = new Map((summary.quickStartCallExamples || []).map((example) => [example.id, example]));
   for (const requiredRoute of ['setup-uncertain', 'unfamiliar-directory', 'layout-uncertain-or-staging-wanted', 'batch-safe-preview', 'batch-reviewed-write', 'output-audit']) {
     if (!routesById.has(requiredRoute)) {
       throw new Error(`${context}: expected route ${requiredRoute}.`);
@@ -895,6 +896,39 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
     || !auditRoute.inspectFields?.includes('outputStructureDecision')
   ) {
     throw new Error(`${context}: expected nextToolDecisionSummary to route layout, preview, reviewed write, and audit safely.`);
+  }
+  for (const requiredExample of ['inspect-unfamiliar-source', 'plan-source-layout', 'quick-structure-first-plan', 'copy-reviewed-staging', 'preview-batch-output', 'write-reviewed-batch-output', 'audit-split-output']) {
+    if (!quickExamplesById.has(requiredExample)) {
+      throw new Error(`${context}: expected quickStartCallExamples to include ${requiredExample}.`);
+    }
+  }
+  for (const example of summary.quickStartCallExamples || []) {
+    assertNonEmptyString(example.templateId, `${context}.quickStartCallExamples.${example.id}`, 'templateId');
+    assertNonEmptyString(example.tool, `${context}.quickStartCallExamples.${example.id}`, 'tool');
+    assertNonEmptyString(example.useWhen, `${context}.quickStartCallExamples.${example.id}`, 'useWhen');
+    assertNonEmptyStringArray(example.inspectFields, `${context}.quickStartCallExamples.${example.id}`, 'inspectFields');
+    assertNonEmptyStringArray(example.customize, `${context}.quickStartCallExamples.${example.id}`, 'customize');
+    assertNonEmptyString(example.successCriteria, `${context}.quickStartCallExamples.${example.id}`, 'successCriteria');
+    if (!example.generatedFromTemplate || typeof example.writesFiles !== 'boolean' || example.sourceDestructive !== false) {
+      throw new Error(`${context}.quickStartCallExamples.${example.id}: expected template-derived explicit safety flags.`);
+    }
+  }
+  const stagingExample = quickExamplesById.get('copy-reviewed-staging');
+  const previewExample = quickExamplesById.get('preview-batch-output');
+  const writeExample = quickExamplesById.get('write-reviewed-batch-output');
+  const auditExample = quickExamplesById.get('audit-split-output');
+  if (
+    stagingExample?.args?.workflowPreset !== 'reviewed-write'
+    || stagingExample?.args?.outputDir !== '<organized-output-dir>'
+    || stagingExample?.writesFiles !== true
+    || previewExample?.args?.workflowPreset !== 'safe-preview'
+    || previewExample?.writesFiles !== false
+    || writeExample?.args?.workflowPreset !== 'reviewed-write'
+    || writeExample?.nextRouteAfterSuccess !== 'output-audit'
+    || auditExample?.tool !== 'inspect_split_output'
+    || auditExample?.args?.outDir !== '<split-output-root>'
+  ) {
+    throw new Error(`${context}: expected quickStartCallExamples to preserve safe template args and write/audit routing.`);
   }
   assertSourceLayoutDecisionChecklistCompanionFields(summary, `${context}: nextToolDecisionSummary`);
 }
@@ -1676,6 +1710,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('nextToolDecisionSummary')) {
     throw new Error('Expected agent guidance to recommend checking the next tool decision summary.');
   }
+  if (!result.responseFieldsToCheck?.includes('nextToolDecisionSummary.quickStartCallExamples')) {
+    throw new Error('Expected agent guidance to recommend checking quick start call examples.');
+  }
   for (const removedVersionField of [
     'warningCodeCatalogVersion',
     'toolResponseFieldCatalogVersion',
@@ -1929,6 +1966,7 @@ if (scenario === 'single') {
     warningCodeCatalog: 'get_agent_guidance',
     recommendedWorkflowPlan: 'get_agent_guidance',
     nextToolDecisionSummary: 'get_agent_guidance',
+    'nextToolDecisionSummary.quickStartCallExamples': 'get_agent_guidance',
     localVerificationOutputGuide: 'get_agent_guidance',
   };
   for (const [fieldName, toolName] of Object.entries(expectedFieldCatalogEntries)) {

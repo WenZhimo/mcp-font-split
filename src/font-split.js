@@ -767,6 +767,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Compact "which tool should I call next?" route summary for AI agents. It references safeInvocationTemplates instead of duplicating full workflow rules.',
     agentAction: 'Use it as the first routing index, then open the referenced template or response fields and satisfy successCriteria before writing or reporting completion.',
   },
+  'nextToolDecisionSummary.quickStartCallExamples': {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Template-derived minimal call examples for the most common safe agent routes, including placeholder paths, fields to inspect, and success criteria.',
+    agentAction: 'Use these as quick copyable starts, customize placeholder paths and limits, then verify the referenced inspectFields and successCriteria.',
+  },
   batchWarnings: {
     sourceTools: ['split_font_batch'],
     meaning: 'Summary-level batch notices with machine-readable codes.',
@@ -1723,7 +1728,101 @@ function buildRecommendedWorkflowPlan(workflow) {
   return plans[workflow] || plans.overview;
 }
 
+function buildQuickStartCallExamples(templateById) {
+  const fromTemplate = (id, {
+    exampleId,
+    useWhen,
+    customize = [],
+    replaceArgs = {},
+    inspectFields = null,
+    successCriteria = null,
+    nextRouteAfterSuccess = null,
+  } = {}) => {
+    const template = templateById.get(id);
+    if (!template) return null;
+    return {
+      id: exampleId || id,
+      templateId: id,
+      tool: template.tool,
+      useWhen: useWhen || template.useWhen,
+      writesFiles: template.writesFiles,
+      sourceDestructive: template.sourceDestructive,
+      args: {
+        ...(template.args || {}),
+        ...replaceArgs,
+      },
+      customize: uniqueStrings(customize.length ? customize : template.customizableFields || []),
+      inspectFields: inspectFields || template.inspectFields,
+      successCriteria: successCriteria || template.successCriteria,
+      ...(nextRouteAfterSuccess ? { nextRouteAfterSuccess } : {}),
+      generatedFromTemplate: true,
+    };
+  };
+
+  return [
+    fromTemplate('source-preflight-compact', {
+      exampleId: 'inspect-unfamiliar-source',
+      useWhen: 'First read-only pass over an unfamiliar source directory.',
+      replaceArgs: { inputDir: '<font-source-dir>' },
+      customize: ['inputDir', 'maxFiles'],
+      nextRouteAfterSuccess: 'layout-uncertain-or-staging-wanted',
+    }),
+    fromTemplate('directory-mismatch-plan', {
+      exampleId: 'plan-source-layout',
+      useWhen: 'Source layout is flat, mixed, unfamiliar, or may not match the desired grouping.',
+      replaceArgs: { inputDir: '<font-source-dir>' },
+      customize: ['inputDir', 'outputDir', 'batchGroupBy', 'maxFiles'],
+      nextRouteAfterSuccess: 'batch-safe-preview',
+    }),
+    fromTemplate('structure-first-large-directory', {
+      exampleId: 'quick-structure-first-plan',
+      useWhen: 'Large/noisy directory where the first pass should avoid metadata parsing.',
+      replaceArgs: { inputDir: '<font-source-dir>' },
+      customize: ['inputDir', 'outputDir', 'maxFiles'],
+      nextRouteAfterSuccess: 'layout-uncertain-or-staging-wanted',
+    }),
+    fromTemplate('copy-organized-staging', {
+      exampleId: 'copy-reviewed-staging',
+      useWhen: 'User wants a cleaner copied staging directory after reviewing a dry-run organization plan.',
+      replaceArgs: {
+        inputDir: '<font-source-dir>',
+        outputDir: '<organized-output-dir>',
+      },
+      customize: ['inputDir', 'outputDir', 'overwriteExisting'],
+      nextRouteAfterSuccess: 'batch-safe-preview',
+    }),
+    fromTemplate('batch-dry-run-preview', {
+      exampleId: 'preview-batch-output',
+      useWhen: 'Preview split output before any real batch write.',
+      replaceArgs: {
+        inputDir: '<font-source-dir-or-organized-outputDir>',
+        outputRoot: '<split-output-root>',
+      },
+      customize: ['inputDir', 'outputRoot', 'batchGroupBy', 'limit', 'maxFiles'],
+      nextRouteAfterSuccess: 'batch-reviewed-write',
+    }),
+    fromTemplate('batch-process-reviewed-plan', {
+      exampleId: 'write-reviewed-batch-output',
+      useWhen: 'Write split output only after the batch preview has been reviewed.',
+      replaceArgs: {
+        inputDir: '<font-source-dir-or-organized-outputDir>',
+        outputRoot: '<split-output-root>',
+      },
+      customize: ['inputDir', 'outputRoot', 'limit', 'maxFiles'],
+      nextRouteAfterSuccess: 'output-audit',
+    }),
+    fromTemplate('output-audit-compact', {
+      exampleId: 'audit-split-output',
+      useWhen: 'Audit generated split output before reporting structural success.',
+      replaceArgs: { outDir: '<split-output-root>' },
+      customize: ['outDir', 'maxFiles'],
+      nextRouteAfterSuccess: 'complete',
+    }),
+  ].filter(Boolean);
+}
+
 function buildNextToolDecisionSummary(workflow) {
+  const templateById = new Map(SAFE_INVOCATION_TEMPLATES.map((template) => [template.id, template]));
   const workflowPrimaryRoute = {
     overview: 'unfamiliar-directory',
     single: 'single-known-font',
@@ -1865,6 +1964,7 @@ function buildNextToolDecisionSummary(workflow) {
       'output-audit',
     ]),
     routes,
+    quickStartCallExamples: buildQuickStartCallExamples(templateById),
     safetyDefaults: {
       previewPreset: 'safe-preview',
       writePreset: 'reviewed-write',
@@ -2698,6 +2798,7 @@ export function getAgentGuidance(args = {}) {
       'safeInvocationTemplates',
       'nextToolDecisionSummary',
       'recommendedWorkflowPlan',
+      'nextToolDecisionSummary.quickStartCallExamples',
       'batchWarnings',
       'batchWarningCount',
       'batchDecision',
