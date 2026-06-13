@@ -503,6 +503,101 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
   };
 }
 
+function buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary) {
+  const functionalCoverage = coverageSummary.functionalCoverage || [];
+  const uncoveredFunctionalCoverageIds = functionalCoverage
+    .filter((item) => item.covered !== true)
+    .map((item) => item.id)
+    .filter(Boolean);
+  const outputAudit = coverageSummary.outputStructureAuditSummary || {};
+  const targetSampling = coverageSummary.testScope?.targetSampling || {};
+  const corpusScan = coverageSummary.testScope?.corpusScan || {};
+  const writeAudit = coverageSummary.testScope?.representativeWriteAudit || {};
+  const blockingReasonCodes = [];
+
+  if (coverageSummary.perDirectoryAcceptanceAudit !== false || humanSummary?.perDirectoryAcceptanceAudit !== false) {
+    blockingReasonCodes.push('scope-ambiguous');
+  }
+  if (coverageSummary.corpusMaxFilesHit === true || corpusScan.maxFilesHit === true) {
+    blockingReasonCodes.push('corpus-scan-truncated');
+  }
+  if (!(coverageSummary.corpusSupportedFontCount > 0)) {
+    blockingReasonCodes.push('no-supported-fonts-found');
+  }
+  if (!(coverageSummary.unsupportedFileCategoryCoverage?.categoryCount > 0)) {
+    blockingReasonCodes.push('ignored-file-coverage-missing');
+  }
+  if (!(coverageSummary.unsupportedFileCategoryCoverage?.extensionsBeyondZipTxtCount > 0)) {
+    blockingReasonCodes.push('ignored-file-extension-coverage-too-narrow');
+  }
+  if (!(coverageSummary.selectedTargetCount > 0)) {
+    blockingReasonCodes.push('target-sampling-empty');
+  }
+  if (
+    !Array.isArray(coverageSummary.selectedTargets)
+    || !DEFAULT_REAL_CORPUS_TARGETS.every((target) => coverageSummary.selectedTargets.includes(target))
+  ) {
+    blockingReasonCodes.push('fixed-regression-targets-missing');
+  }
+  if (uncoveredFunctionalCoverageIds.length > 0 || functionalCoverage.length === 0) {
+    blockingReasonCodes.push('functional-coverage-gaps');
+  }
+  if (
+    outputAudit.singleOutputStructureDecision?.status !== 'pass'
+    || outputAudit.batchOutputStructureDecision?.status !== 'pass'
+    || outputAudit.singleStructureConforms !== true
+    || outputAudit.batchStructureConforms !== true
+    || writeAudit.singleAuditPassed !== true
+    || writeAudit.batchAuditPassed !== true
+  ) {
+    blockingReasonCodes.push('representative-output-audit-failed');
+  }
+
+  const status = blockingReasonCodes.includes('corpus-scan-truncated')
+    ? 'incomplete'
+    : (blockingReasonCodes.length === 0 ? 'pass' : 'action-required');
+  const recommendedAction = status === 'pass'
+    ? 'continue'
+    : (status === 'incomplete' ? 'rerun-real-corpus-suite-with-higher-maxFiles' : 'inspect-coverageSummary-and-runs');
+
+  return {
+    summaryType: 'real-corpus-reliability-gate-decision',
+    status,
+    reliabilityGatePassed: status === 'pass',
+    recommendedAction,
+    representativeReliabilityGate: true,
+    perDirectoryAcceptanceAudit: false,
+    perFontManualAudit: false,
+    blockingReasonCodes,
+    uncoveredFunctionalCoverageIds,
+    fullCorpusFontCountField: 'testScope.corpusScan.supportedFontCount',
+    targetCountsAreFullCorpusCounts: false,
+    targetCountFields: [
+      'testScope.targetSampling.fixedRegressionTargetCount',
+      'testScope.targetSampling.selectedTargetCount',
+    ],
+    corpusSupportedFontCount: corpusScan.supportedFontCount,
+    corpusUnsupportedFileCount: corpusScan.unsupportedFileCount,
+    fixedRegressionTargetCount: targetSampling.fixedRegressionTargetCount,
+    selectedTargetCount: targetSampling.selectedTargetCount,
+    availableTargetCount: targetSampling.availableTargetCount,
+    coveredFunctionalCoverageCount: functionalCoverage.filter((item) => item.covered === true).length,
+    totalFunctionalCoverageCount: functionalCoverage.length,
+    representativeWriteSample: writeAudit.sampleInputDir,
+    singleOutputStructureDecisionStatus: outputAudit.singleOutputStructureDecision?.status,
+    batchOutputStructureDecisionStatus: outputAudit.batchOutputStructureDecision?.status,
+    evidenceFields: [
+      'humanSummary',
+      'testScope',
+      'coverageSummary.functionalCoverage',
+      'coverageSummary.unsupportedFileCategoryCoverage',
+      'coverageSummary.outputStructureAuditSummary',
+    ],
+    passCriteria: 'Require a complete full-root corpus scan, selected target sampling, all functionalCoverage entries covered, representative single and batch outputStructureDecision.status pass, structureSummary.conforms true, and perDirectoryAcceptanceAudit false.',
+    nonIntuitiveBehavior: 'status pass means the representative real-corpus feature chain passed; it is not a per-directory acceptance audit and target counts such as 4 or 10 are not the full corpus font count.',
+  };
+}
+
 function printRealCorpusSuiteHumanSummary(humanSummary) {
   console.log('\n--- real-corpus suite summary ---');
   for (const line of humanSummary.lines || []) {
@@ -3636,6 +3731,7 @@ if (scenario === 'single') {
       'unsupportedFileSummary.examples',
       'coverageSummary.unsupportedFileCategoryCoverage',
       'coverageSummary.outputStructureAuditSummary',
+      'reliabilityGateDecision',
       'debugBatchDecisions',
       'humanSummary',
     ]) {
@@ -3643,6 +3739,7 @@ if (scenario === 'single') {
     }
     assertDocsContain('real corpus suite checklist id', '`local-real-corpus-suite-passed`');
     assertDocsContain('real corpus suite command', '`npm run smoke:real-corpus-suite -- <font-corpus-dir>`');
+    assertDocsContain('real corpus reliability gate decision', '`reliabilityGateDecision`');
     assertDocsContain('real corpus suite test scope', '`testScope`');
     assertDocsContain('real corpus ignored category coverage', '`coverageSummary.unsupportedFileCategoryCoverage`');
     assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
@@ -3691,6 +3788,7 @@ if (scenario === 'single') {
     '`unsupportedFileCategoryCatalog`',
     '`verificationChecklist[]`',
     '`smoke:real-corpus-suite`',
+    '`reliabilityGateDecision`',
     '`humanSummary`',
     '`testScope`',
     '`functionalCoverage[]`',
@@ -4032,6 +4130,7 @@ if (scenario === 'single') {
     sampleCount,
   });
   const humanSummary = buildRealCorpusSuiteHumanSummary(coverageSummary);
+  const reliabilityGateDecision = buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary);
   if (
     coverageSummary.perDirectoryAcceptanceAudit !== false
     || coverageSummary.testScope?.corpusScan?.scopeKind !== 'full-root-bounded-scan'
@@ -4073,11 +4172,26 @@ if (scenario === 'single') {
     || humanSummary.singleStructureConforms !== true
     || humanSummary.batchStructureConforms !== true
     || humanSummary.perDirectoryAcceptanceAudit !== false
+    || reliabilityGateDecision.summaryType !== 'real-corpus-reliability-gate-decision'
+    || reliabilityGateDecision.status !== 'pass'
+    || reliabilityGateDecision.reliabilityGatePassed !== true
+    || reliabilityGateDecision.recommendedAction !== 'continue'
+    || reliabilityGateDecision.representativeReliabilityGate !== true
+    || reliabilityGateDecision.perDirectoryAcceptanceAudit !== false
+    || reliabilityGateDecision.perFontManualAudit !== false
+    || reliabilityGateDecision.targetCountsAreFullCorpusCounts !== false
+    || reliabilityGateDecision.corpusSupportedFontCount !== coverageSummary.corpusSupportedFontCount
+    || reliabilityGateDecision.selectedTargetCount !== coverageSummary.selectedTargetCount
+    || reliabilityGateDecision.coveredFunctionalCoverageCount !== coverageSummary.functionalCoverage.length
+    || reliabilityGateDecision.blockingReasonCodes?.length !== 0
+    || !reliabilityGateDecision.evidenceFields?.includes('coverageSummary.outputStructureAuditSummary')
+    || !reliabilityGateDecision.passCriteria?.includes('outputStructureDecision.status pass')
+    || !reliabilityGateDecision.nonIntuitiveBehavior?.includes('not the full corpus font count')
     || !humanSummary.lines?.some((line) => line.includes('Ignored-file coverage'))
     || !humanSummary.lines?.some((line) => line.includes('structureConforms=true'))
     || !humanSummary.lines?.some((line) => line.includes('not the full corpus font count'))
   ) {
-    throw new Error('Expected real-corpus-suite compact coverage summary to expose explicit testScope, humanSummary, covered function paths, root counts, unsupported categories, selected targets, and passing output audits.');
+    throw new Error('Expected real-corpus-suite compact coverage summary to expose explicit reliabilityGateDecision, testScope, humanSummary, covered function paths, root counts, unsupported categories, selected targets, and passing output audits.');
   }
 
   printRealCorpusSuiteHumanSummary(humanSummary);
@@ -4090,6 +4204,7 @@ if (scenario === 'single') {
     targetLimit,
     integrationLimit,
     sampleCount,
+    reliabilityGateDecision,
     humanSummary,
     testScope: coverageSummary.testScope,
     coverageSummary,
