@@ -1542,6 +1542,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('organizationDecision')) {
     throw new Error('Expected agent guidance to recommend checking organization decision summaries.');
   }
+  if (!result.responseFieldsToCheck?.includes('sourceLayoutMismatchSummary.decisionChecklist')) {
+    throw new Error('Expected agent guidance to recommend checking source layout decision checklist summaries.');
+  }
   if (!result.responseFieldsToCheck?.includes('warningCodeCatalog')) {
     throw new Error('Expected agent guidance to recommend checking the warning code catalog.');
   }

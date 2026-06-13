@@ -2522,6 +2522,7 @@ export function getAgentGuidance(args = {}) {
       'organizationDecision',
       'directoryWorkflowSummary',
       'sourceLayoutMismatchSummary',
+      'sourceLayoutMismatchSummary.decisionChecklist',
       'planVisibility',
       'plan',
       'sourceDestructive',
