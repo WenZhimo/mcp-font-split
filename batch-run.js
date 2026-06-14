@@ -1,33 +1,47 @@
-import { splitFontBatch } from './src/font-split.js';
+import {
+  BATCH_DEDUPE_MODES,
+  BATCH_ERROR_MODES,
+  BATCH_GROUP_BY_MODES,
+  BATCH_NAMING_MODES,
+  SKIP_MODES,
+  SPLIT_FAILURE_ACTIONS,
+  WORKFLOW_PRESET_NAMES,
+  splitFontBatch,
+} from './src/font-split.js';
 import { inferErrorType } from './src/mcp-response.js';
 
-const WORKFLOW_PRESETS = ['safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all'];
 const BOOLEAN_TRUE_VALUES = ['1', 'true', 'yes', 'on'];
 const BOOLEAN_FALSE_VALUES = ['0', 'false', 'no', 'off'];
 const BATCH_RUN_ENUM_ENV_OPTIONS = {
   FONT_SPLIT_SKIP_MODE: {
-    allowedValues: ['manifest', 'force'],
+    allowedValues: SKIP_MODES,
     requestedField: 'requestedSkipMode',
+    targetField: 'skipMode',
   },
   FONT_SPLIT_BATCH_GROUP_BY: {
-    allowedValues: ['auto', 'source-dir', 'font-family'],
+    allowedValues: BATCH_GROUP_BY_MODES,
     requestedField: 'requestedBatchGroupBy',
+    targetField: 'batchGroupBy',
   },
   FONT_SPLIT_BATCH_NAMING_MODE: {
-    allowedValues: ['plain', 'numeric-suffix', 'source-suffix'],
+    allowedValues: BATCH_NAMING_MODES,
     requestedField: 'requestedBatchNamingMode',
+    targetField: 'batchNamingMode',
   },
   FONT_SPLIT_BATCH_DEDUPE_MODE: {
-    allowedValues: ['none', 'same-path', 'font-identity'],
+    allowedValues: BATCH_DEDUPE_MODES,
     requestedField: 'requestedBatchDedupeMode',
+    targetField: 'batchDedupeMode',
   },
   FONT_SPLIT_BATCH_ERROR_MODE: {
-    allowedValues: ['collect', 'fail-fast', 'fail-after'],
+    allowedValues: BATCH_ERROR_MODES,
     requestedField: 'requestedBatchErrorMode',
+    targetField: 'batchErrorMode',
   },
   FONT_SPLIT_SPLIT_FAILURE_ACTION: {
-    allowedValues: ['error', 'single-woff2'],
+    allowedValues: SPLIT_FAILURE_ACTIONS,
     requestedField: 'requestedSplitFailureAction',
+    targetField: 'splitFailureAction',
   },
 };
 const COMPACT_ERROR_LIMIT = 20;
@@ -37,13 +51,15 @@ function hasEnv(name) {
 }
 
 function buildInvalidWorkflowPresetError(value, fallback) {
-  const error = new Error(`FONT_SPLIT_WORKFLOW_PRESET must be one of: ${WORKFLOW_PRESETS.join(', ')}. Omit it to use batch-run's ${fallback} default.`);
+  const error = new Error(`FONT_SPLIT_WORKFLOW_PRESET must be one of: ${WORKFLOW_PRESET_NAMES.join(', ')}. Omit it to use batch-run's ${fallback} default.`);
   error.name = 'BatchRunConfigurationError';
   error.details = {
     summaryType: 'configuration-error',
     option: 'FONT_SPLIT_WORKFLOW_PRESET',
+    source: 'env',
+    targetField: 'workflowPreset',
     received: value,
-    allowedValues: WORKFLOW_PRESETS,
+    allowedValues: WORKFLOW_PRESET_NAMES,
     requestedField: 'requestedWorkflowPreset',
     defaultWhenOmitted: fallback,
     omitForDefaultBehavior: true,
@@ -89,12 +105,14 @@ function buildInvalidPositiveIntegerError({ name, value, requestedField, targetF
   return error;
 }
 
-function buildInvalidEnumEnvError(name, value, allowedValues, requestedField) {
+function buildInvalidEnumEnvError(name, value, allowedValues, requestedField, targetField) {
   const error = new Error(`${name} must be one of: ${allowedValues.join(', ')}. Omit it to leave the option unset and use preset/tool defaults.`);
   error.name = 'BatchRunConfigurationError';
   error.details = {
     summaryType: 'configuration-error',
     option: name,
+    source: 'env',
+    targetField,
     received: value,
     allowedValues,
     requestedField,
@@ -124,7 +142,7 @@ function enumEnvOption(name) {
     ? { value, error: null }
     : {
       value: undefined,
-      error: buildInvalidEnumEnvError(name, value, config.allowedValues, config.requestedField),
+      error: buildInvalidEnumEnvError(name, value, config.allowedValues, config.requestedField, config.targetField),
     };
 }
 
@@ -290,7 +308,7 @@ const includeResults = includeResultsOption.value;
 const chunkSize = chunkSizeOption.value;
 const defaultWorkflowPreset = dryRun ? 'safe-preview' : 'reviewed-write';
 const requestedWorkflowPreset = hasEnv('FONT_SPLIT_WORKFLOW_PRESET') ? process.env.FONT_SPLIT_WORKFLOW_PRESET : undefined;
-const workflowPresetConfigurationError = requestedWorkflowPreset && !WORKFLOW_PRESETS.includes(requestedWorkflowPreset)
+const workflowPresetConfigurationError = requestedWorkflowPreset && !WORKFLOW_PRESET_NAMES.includes(requestedWorkflowPreset)
   ? buildInvalidWorkflowPresetError(requestedWorkflowPreset, defaultWorkflowPreset)
   : null;
 const workflowPreset = workflowPresetConfigurationError ? defaultWorkflowPreset : (requestedWorkflowPreset || defaultWorkflowPreset);

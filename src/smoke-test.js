@@ -15,6 +15,7 @@ import {
   SKIP_MODES,
   SMALL_GLYPH_ACTIONS,
   SPLIT_FAILURE_ACTIONS,
+  WORKFLOW_PRESET_NAMES,
   getAgentGuidance,
   getRuntimeStatus,
   inspectFontInputs,
@@ -3320,6 +3321,14 @@ if (scenario === 'single') {
       }
     }
   };
+  const assertExactValues = (actualValues, expectedValues, context) => {
+    const actual = Array.isArray(actualValues) ? actualValues : [];
+    const missing = expectedValues.filter((value) => !actual.includes(value));
+    const extra = actual.filter((value) => !expectedValues.includes(value));
+    if (missing.length > 0 || extra.length > 0 || actual.length !== expectedValues.length) {
+      throw new Error(`${context}: expected values to match core constants; missing ${missing.join(', ') || '<none>'}; extra ${extra.join(', ') || '<none>'}.`);
+    }
+  };
   const parseCliJson = (stdout, context) => {
     try {
       return JSON.parse(stdout);
@@ -3414,6 +3423,8 @@ if (scenario === 'single') {
     || invalidPreset.options?.requestedWorkflowPreset !== 'default'
     || invalidPreset.details?.summaryType !== 'configuration-error'
     || invalidPreset.details?.option !== 'FONT_SPLIT_WORKFLOW_PRESET'
+    || invalidPreset.details?.source !== 'env'
+    || invalidPreset.details?.targetField !== 'workflowPreset'
     || invalidPreset.details?.received !== 'default'
     || invalidPreset.details?.allowedValues?.includes('default')
     || invalidPreset.details?.omitForDefaultBehavior !== true
@@ -3421,6 +3432,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('invalid workflow preset run: expected default preset to be rejected with machine-readable allowed values.');
   }
+  assertExactValues(invalidPreset.details.allowedValues, WORKFLOW_PRESET_NAMES, 'invalid workflow preset allowed values');
 
   let invalidDedupeStdout = '';
   let invalidDedupeStderr = '';
@@ -3448,6 +3460,8 @@ if (scenario === 'single') {
     || invalidDedupe.options?.requestedBatchDedupeMode !== 'semantic'
     || invalidDedupe.details?.summaryType !== 'configuration-error'
     || invalidDedupe.details?.option !== 'FONT_SPLIT_BATCH_DEDUPE_MODE'
+    || invalidDedupe.details?.source !== 'env'
+    || invalidDedupe.details?.targetField !== 'batchDedupeMode'
     || invalidDedupe.details?.received !== 'semantic'
     || !invalidDedupe.details?.allowedValues?.includes('font-identity')
     || invalidDedupe.details?.allowedValues?.includes('semantic')
@@ -3456,6 +3470,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('invalid dedupe env run: expected invalid enum-like env var to be rejected with machine-readable allowed values.');
   }
+  assertExactValues(invalidDedupe.details.allowedValues, BATCH_DEDUPE_MODES, 'invalid dedupe env allowed values');
 
   let invalidBooleanStdout = '';
   let invalidBooleanStderr = '';
