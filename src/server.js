@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { BATCH_DEDUPE_MODES, BATCH_ERROR_MODES, BATCH_GROUP_BY_MODES, BATCH_NAMING_MODES, GUIDANCE_SECTION_NAMES, OVERSIZED_KERN_ACTIONS, SKIP_MODES, SMALL_GLYPH_ACTIONS, SPLIT_FAILURE_ACTIONS, WORKFLOW_PRESET_NAMES, getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
+import { BATCH_DEDUPE_MODES, BATCH_ERROR_MODES, BATCH_GROUP_BY_MODES, BATCH_NAMING_MODES, GUIDANCE_DETAIL_LEVELS, GUIDANCE_SECTION_NAMES, GUIDANCE_WORKFLOWS, OVERSIZED_KERN_ACTIONS, SKIP_MODES, SMALL_GLYPH_ACTIONS, SPLIT_FAILURE_ACTIONS, WORKFLOW_PRESET_NAMES, getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
 import { errorText, jsonText } from './mcp-response.js';
 
 const require = createRequire(import.meta.url);
@@ -60,8 +60,8 @@ server.registerTool(
     title: 'Get AI agent usage guidance',
     description: 'Call this first when an AI coding assistant needs to choose a safe font-splitting workflow. It returns workspace path rules, nextToolDecisionSummary with workflowQuickStart and quickStartCallExamples, configurationRecipes, batchPolicyGuide, unsupportedFileCategoryCatalog, directoryWorkflowDecisionMatrix, directoryWorkflowExamples, safeInvocationTemplates, localVerificationOutputGuide, errorResponseCatalog, warningCodeCatalog, toolResponseFieldCatalog, recommended tool order, defaults, response fields to inspect, and successCriteria to satisfy before advancing. Use detailLevel or sections for a compact or focused response.',
     inputSchema: {
-      workflow: z.enum(['overview', 'single', 'batch', 'inspect', 'organize']).optional().describe('Guidance focus. Default: overview.'),
-      detailLevel: z.enum(['compact', 'full']).optional().describe('Response detail. compact keeps workflow essentials and omits bulky catalogs/examples unless requested; full returns all guidance sections. Default: compact.'),
+      workflow: z.enum(GUIDANCE_WORKFLOWS).optional().describe('Guidance focus. Default: overview.'),
+      detailLevel: z.enum(GUIDANCE_DETAIL_LEVELS).optional().describe('Response detail. compact keeps workflow essentials and omits bulky catalogs/examples unless requested; full returns all guidance sections. Default: compact.'),
       sections: z.array(z.enum(GUIDANCE_SECTION_NAMES)).optional().describe('Optional focused guidance sections to return. When set, this overrides the detailLevel default section set.'),
     },
   },

@@ -197,7 +197,8 @@ export const BATCH_ERROR_MODES = ['collect', 'fail-fast', 'fail-after'];
 export const OVERSIZED_KERN_ACTIONS = ['preserve', 'strip'];
 export const SMALL_GLYPH_ACTIONS = ['subset', 'single-woff2', 'copy-original'];
 export const SPLIT_FAILURE_ACTIONS = ['error', 'single-woff2'];
-const GUIDANCE_DETAIL_LEVELS = ['compact', 'full'];
+export const GUIDANCE_WORKFLOWS = ['overview', 'single', 'batch', 'inspect', 'organize'];
+export const GUIDANCE_DETAIL_LEVELS = ['compact', 'full'];
 export const GUIDANCE_SECTION_NAMES = [
   'workspace',
   'tools',
@@ -2271,7 +2272,7 @@ function selectGuidanceSections(guidance, sectionsIncluded) {
 }
 
 export function getAgentGuidance(args = {}) {
-  const workflow = ['overview', 'single', 'batch', 'inspect', 'organize'].includes(args.workflow) ? args.workflow : 'overview';
+  const workflow = GUIDANCE_WORKFLOWS.includes(args.workflow) ? args.workflow : 'overview';
   const guidanceView = buildGuidanceView(args);
   const configuredRoot = process.env.FONT_SPLIT_ROOT || null;
   const root = workspaceRoot();
@@ -2286,7 +2287,7 @@ export function getAgentGuidance(args = {}) {
   const verificationChecklist = [
     {
       id: 'runtime-ready',
-      appliesTo: ['overview', 'single', 'batch', 'inspect', 'organize'],
+      appliesTo: GUIDANCE_WORKFLOWS,
       check: 'Before splitting, get_runtime_status.ok is true, or every recommendedActions[] item has been handled.',
       responseFields: ['ok', 'recommendedActions', 'node', 'workspace', 'wasm', 'cnFontSplit'],
     },
@@ -2328,7 +2329,7 @@ export function getAgentGuidance(args = {}) {
     },
     {
       id: 'local-compact-check-passed',
-      appliesTo: ['overview', 'single', 'batch', 'inspect', 'organize'],
+      appliesTo: GUIDANCE_WORKFLOWS,
       check: 'When maintaining this package, run npm run check:compact for the standard syntax and smoke gate with low-noise output before committing. It suppresses noisy child output on success and reports failed-step tails on failure.',
       command: 'npm run check:compact',
       jsonCommand: 'npm run --silent check:compact -- --json',

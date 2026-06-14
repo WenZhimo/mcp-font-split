@@ -9,6 +9,8 @@ import {
   BATCH_ERROR_MODES,
   BATCH_GROUP_BY_MODES,
   BATCH_NAMING_MODES,
+  GUIDANCE_DETAIL_LEVELS,
+  GUIDANCE_WORKFLOWS,
   OVERSIZED_KERN_ACTIONS,
   SKIP_MODES,
   SMALL_GLYPH_ACTIONS,
@@ -1964,7 +1966,7 @@ if (scenario === 'single') {
     throw new Error('Expected output audit template to require compact outputStructureDecision, audit status, and structureSummary inspection.');
   }
   const workflowGuidances = {};
-  for (const workflowName of ['overview', 'single', 'batch', 'inspect', 'organize']) {
+  for (const workflowName of GUIDANCE_WORKFLOWS) {
     workflowGuidances[workflowName] = workflowName === 'batch'
       ? result
       : getAgentGuidance({ workflow: workflowName, detailLevel: 'full' });
@@ -4270,6 +4272,8 @@ if (scenario === 'single') {
         throw new Error(`get_agent_guidance is missing ${requiredGuidanceProp}`);
       }
     }
+    assertEnumMatches('get_agent_guidance workflow', getSchemaEnumValues(guidanceProps.workflow), GUIDANCE_WORKFLOWS);
+    assertEnumMatches('get_agent_guidance detailLevel', getSchemaEnumValues(guidanceProps.detailLevel), GUIDANCE_DETAIL_LEVELS);
     assertEnumMatches('get_agent_guidance sections', guidanceSectionEnum, coreGuidanceSections);
     for (const requiredOrganizeProp of ['dryRun', 'outputDir', 'overwriteExisting', 'copyInvalidFonts']) {
       if (!Object.hasOwn(organizeProps, requiredOrganizeProp)) {
