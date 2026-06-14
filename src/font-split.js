@@ -1271,7 +1271,7 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   recommendedBatchPreviewArgs: {
     sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
-    meaning: 'Copyable no-write split_font_batch preview arguments for the detected layout. It includes inputDir, workflowPreset safe-preview, and only layout-specific overrides.',
+    meaning: 'Copyable no-write split_font_batch preview arguments for the detected layout. It includes inputDir, workflowPreset safe-preview, layout-specific overrides, and the current scan maxFiles as recommendedBatchPreviewArgs.maxFiles.',
     agentAction: 'Use this before writing batch output, then inspect safetySummary, batchWarnings, maxFilesHit, unsupportedFileDecision, unsupportedFileSummary, skippedDuplicates, and errors.',
   },
   layout: {
@@ -5622,7 +5622,7 @@ function buildDirectoryWorkflowSummary({
 
   const nonIntuitiveBehavior = [
     'organize_font_directory never moves, deletes, or rewrites source font files; dryRun:false is copy-only into outputDir.',
-    'recommendedBatchOptions is only a policy fragment; use recommendedBatchPreviewArgs or a workflowSteps suggestedArgs object for a copyable safe-preview call.',
+    'recommendedBatchOptions is only a policy fragment; use recommendedBatchPreviewArgs or a workflowSteps suggestedArgs object for a copyable safe-preview call that preserves the current scan maxFiles.',
   ];
   if (!options.parseFonts) {
     nonIntuitiveBehavior.push('parseFonts:false makes identity dedupe and metadata-family grouping provisional until rerun with parsing.');
@@ -6771,6 +6771,7 @@ function buildInputDirectoryDecision({
     inputDir: inputDirRelative,
     outputDir: 'organized-fonts',
     workflowPreset: 'safe-preview',
+    maxFiles,
   };
   const baseMustInspectFields = [
     'inputCountGuide',
@@ -6838,7 +6839,7 @@ function buildInputDirectoryDecision({
 
   const nonIntuitiveBehavior = [
     'inspect_font_inputs never writes output; this decision is routing guidance, not proof that splitting or organization succeeded.',
-    'recommendedBatchPreviewArgs is safe-preview only; a later reviewed-write call is still required to create split output.',
+    'recommendedBatchPreviewArgs is safe-preview only and preserves the current scan maxFiles; a later reviewed-write call is still required to create split output.',
     'safeOrganizationPreviewArgs is also no-write; organize_font_directory only copies files when rerun with dryRun:false or workflowPreset reviewed-write.',
   ];
   if (unsupportedFileDecision?.hasArchives) {
@@ -8003,6 +8004,7 @@ export async function inspectFontInputs(args) {
   const recommendedBatchPreviewArgs = buildSuggestedBatchPreviewArgs({
     inputDir: inputDirRelative,
     recommendedBatchOptions: layout.recommendedBatchOptions,
+    extraArgs: { maxFiles },
   });
   const inputCountGuide = buildInputCountGuide({
     appliesToTool: 'inspect_font_inputs',
@@ -8312,6 +8314,7 @@ export async function organizeFontDirectory(args = {}) {
   const recommendedBatchPreviewArgs = buildSuggestedBatchPreviewArgs({
     inputDir: inputDirRelative,
     recommendedBatchOptions: layout.recommendedBatchOptions,
+    extraArgs: { maxFiles },
   });
   const recommendedNextActions = buildOrganizationNextActions({
     options,

@@ -168,7 +168,7 @@
 | `inputCountGuide` | 解释 `scannedFileCount`、支持/忽略数量、`maxFilesHit`、文件详情是否返回或被故意省略，以及非字体文件处理方式的紧凑指南。 |
 | `inputDirectoryDecision` | 本输入目录的无写入第一步路线：重扫、复核坏字体、直接运行 `split_font_batch` safe-preview，或先运行非破坏性的 `organize_font_directory` safe-preview。它会包含 `safeBatchPreviewArgs`、`safeOrganizationPreviewArgs`、`mustInspectFields` 和 `nonIntuitiveBehavior`。 |
 | `layout` | 目录形态摘要：`empty`、`flat`、`nested` 或 `mixed`，并包含根/嵌套字体数量和推荐批量分组。 |
-| `recommendedBatchPreviewArgs` | 按检测到的目录形态生成、可直接复制的 `split_font_batch` 无写入预览参数。 |
+| `recommendedBatchPreviewArgs` | 按检测到的目录形态生成、可直接复制的 `split_font_batch` 无写入预览参数，并通过 `recommendedBatchPreviewArgs.maxFiles` 保留本次扫描上限。 |
 | `supportedFontCount` | 扩展名属于受支持字体格式的文件数。 |
 | `unsupportedFileDecision` | 从 `unsupportedFileSummary` 派生的快速机器可读判断：忽略文件状态、类别/扩展名数量、是否有压缩包、是否存在 `.zip` / `.txt` 之外的噪声，以及“不解压、不复制、不拆分”的处理标志。 |
 | `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、带处理语义的 `categoryDetails`、总体 `handlingSummary`、无扩展文件的 `<none>` 计数，以及少量示例路径。源目录混有压缩包、说明文档、截图或生成产物时优先看它。 |
@@ -336,7 +336,7 @@
 | `unsupportedFileSummary` | 所有被忽略的非字体文件摘要，包含精确 `byExtension`、概览 `byCategory`、带处理语义的 `categoryDetails`、总体 `handlingSummary`、无扩展文件的 `<none>` 计数，以及少量示例路径。它用于解释为什么嘈杂源目录里有很多压缩包、文档、图片、生成产物或无扩展文件，但不会被复制或拆分。 |
 | `layout.layoutKind` | `empty`、`flat`、`nested` 或 `mixed`。`mixed` 表示输入根目录和子目录里都发现了字体。 |
 | `recommendedBatchOptions` | 根据目录形态建议的 `split_font_batch` 策略片段；嵌套或混合目录通常建议 `batchGroupBy: "source-dir"`，扁平目录通常建议 `font-family`。它本身不是完整安全调用。 |
-| `recommendedBatchPreviewArgs` | 可直接复制的 `split_font_batch` 无写入预览参数，包含 `inputDir`、`workflowPreset: "safe-preview"` 和 `batchGroupBy` 等目录形态覆盖项。真实批量写入前优先使用它。 |
+| `recommendedBatchPreviewArgs` | 可直接复制的 `split_font_batch` 无写入预览参数，包含 `inputDir`、`workflowPreset: "safe-preview"`、`batchGroupBy` 等目录形态覆盖项，以及保留本次扫描上限的 `recommendedBatchPreviewArgs.maxFiles`。真实批量写入前优先使用它。 |
 | `recommendedNextActionCount` / `recommendedNextActions[]` | 面向 agent 的机器可读后续动作。批量 dry-run 可能建议 `run-reviewed-batch-write`；真实批量写入可能建议 `audit-split-output`，并附带 `inspect_split_output` 参数。每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs`、`inspectFields` 和 `successCriteria`。`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对该 preset 的差异覆盖。 |
 | `organizationDecision` | 整理响应的紧凑主线路由建议。它会给出 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output` 等分支，并在可用时指向首选后续动作。 |
 | `organizationWarningCount` / `organizationWarnings[]` | 摘要级提示，例如 `organization-dry-run`、`organization-writes-output`、`output-overwrite-enabled`、`mixed-layout-detected`、`invalid-fonts-skipped`、`output-inside-input`。 |

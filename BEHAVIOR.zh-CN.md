@@ -537,7 +537,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 1. 先调用 `organize_font_directory`，保持默认 `dryRun: true`。
 2. 检查 `safetySummary`、`layout.layoutKind`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`recommendedNextActions[]`、`organizationWarnings[]`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree` 和 `mayOverwriteOutputTree`。
-3. 如果用户只是想调整批量参数，不一定需要真的整理目录；优先把 `recommendedBatchPreviewArgs` 用于 `split_font_batch` 无写入预览。`recommendedBatchOptions` 只是策略片段，不能单独当作完整安全调用。
+3. 如果用户只是想调整批量参数，不一定需要真的整理目录；优先把 `recommendedBatchPreviewArgs` 用于 `split_font_batch` 无写入预览。`recommendedBatchPreviewArgs.maxFiles` 会保留本次扫描上限，避免复制下一步调用时退回默认值；`recommendedBatchOptions` 只是策略片段，不能单独当作完整安全调用。
 4. 如果用户明确希望得到更规整的暂存目录，再用 `dryRun: false` 执行 copy-only 整理。
 5. 整理完成后，对 `outputDir` 调用 `inspect_font_inputs` 或把它作为后续 `split_font_batch.inputDir`。
 6. `recommendedNextActions[]` 是给 agent 的下一步清单；它不会自动执行，也不能替代对每项 `inspectFields` 的检查和 `successCriteria` 的确认。
@@ -748,7 +748,7 @@ split-meta.json
 | `directoryWorkflowSummary.planVisibility` | 说明本次响应是否包含详细 `plan[]`；当 `includePlan: false` 时，列出仍可用于压缩判断的摘要字段，并提供需要逐文件审查时的 `rerunWithPlanArgs` |
 | `layout.layoutKind` | `empty` / `flat` / `nested` / `mixed` |
 | `recommendedBatchOptions` | 根据目录结构建议的后续批量策略片段，不是完整安全调用 |
-| `recommendedBatchPreviewArgs` | 可直接复制的后续 `split_font_batch` 无写入预览参数 |
+| `recommendedBatchPreviewArgs` | 可直接复制的后续 `split_font_batch` 无写入预览参数；`recommendedBatchPreviewArgs.maxFiles` 会保留本次扫描上限 |
 | `recommendedNextActions[]` | 面向 agent 的后续动作建议，包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs`、`inspectFields` 和 `successCriteria`；`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对该 preset 的差异覆盖 |
 | `organizationDecision` | 当前整理响应的紧凑主线路由建议 |
 | `organizationWarnings[]` | 摘要级风险和状态提示 |

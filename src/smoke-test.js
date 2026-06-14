@@ -2258,6 +2258,7 @@ function assertSafeRecommendedBatchPreviewArgs(previewArgs, expected, context) {
     previewArgs?.inputDir !== expected.inputDir
     || previewArgs?.workflowPreset !== 'safe-preview'
     || (expected.batchGroupBy !== undefined && previewArgs?.batchGroupBy !== expected.batchGroupBy)
+    || (expected.maxFiles !== undefined && previewArgs?.maxFiles !== expected.maxFiles)
   ) {
     throw new Error(`${context}: expected recommendedBatchPreviewArgs to be a copyable safe-preview batch call for the detected layout.`);
   }
@@ -3577,6 +3578,7 @@ if (scenario === 'single') {
   assertSafeRecommendedBatchPreviewArgs(result.recommendedBatchPreviewArgs, {
     inputDir,
     batchGroupBy: 'font-family',
+    maxFiles: 10,
   }, 'font-inputs invalid-root');
   if (
     result.layout?.layoutKind !== 'flat'
@@ -3588,7 +3590,9 @@ if (scenario === 'single') {
     || result.inputDirectoryDecision?.writesFilesBeforeReview !== false
     || result.inputDirectoryDecision?.sourceDestructive !== false
     || result.inputDirectoryDecision?.safeBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || result.inputDirectoryDecision?.safeBatchPreviewArgs?.maxFiles !== 10
     || result.inputDirectoryDecision?.safeOrganizationPreviewArgs?.workflowPreset !== 'safe-preview'
+    || result.inputDirectoryDecision?.safeOrganizationPreviewArgs?.maxFiles !== 10
     || result.inputDirectoryDecision?.evidence?.hasArchives !== true
     || !result.inputDirectoryDecision?.mustInspectFields?.includes('recommendedBatchPreviewArgs')
     || !result.inputDirectoryDecision?.nonIntuitiveBehavior?.some((item) => item.includes('never writes output'))
@@ -3613,6 +3617,7 @@ if (scenario === 'single') {
   assertSafeRecommendedBatchPreviewArgs(mixedLayout.recommendedBatchPreviewArgs, {
     inputDir: layoutDir,
     batchGroupBy: 'source-dir',
+    maxFiles: 20,
   }, 'font-inputs mixed-layout');
   if (
     mixedLayout.layout?.layoutKind !== 'mixed'
@@ -3621,7 +3626,9 @@ if (scenario === 'single') {
     || mixedLayout.inputDirectoryDecision?.directoryStructureRisk !== 'high'
     || mixedLayout.inputDirectoryDecision?.safeOrganizationPreviewArgs?.inputDir !== layoutDir
     || mixedLayout.inputDirectoryDecision?.safeOrganizationPreviewArgs?.workflowPreset !== 'safe-preview'
+    || mixedLayout.inputDirectoryDecision?.safeOrganizationPreviewArgs?.maxFiles !== 20
     || mixedLayout.inputDirectoryDecision?.suggestedArgs?.workflowPreset !== 'safe-preview'
+    || mixedLayout.inputDirectoryDecision?.suggestedArgs?.maxFiles !== 20
     || mixedLayout.inputDirectoryDecision?.evidence?.rootFontCount !== 1
     || mixedLayout.inputDirectoryDecision?.evidence?.nestedFontCount !== 1
   ) {
@@ -3814,6 +3821,7 @@ if (scenario === 'single') {
   assertSafeRecommendedBatchPreviewArgs(result.recommendedBatchPreviewArgs, {
     inputDir,
     batchGroupBy: 'source-dir',
+    maxFiles: 10,
   }, 'organize-dry-run');
   if (!result.organizationWarnings?.some((warning) => warning.code === 'organization-dry-run')) {
     throw new Error('Expected organization dry-run warning.');
@@ -4259,6 +4267,7 @@ if (scenario === 'single') {
   assertSafeRecommendedBatchPreviewArgs(result.recommendedBatchPreviewArgs, {
     inputDir,
     batchGroupBy: 'source-dir',
+    maxFiles: 10,
   }, 'organize-valid-font');
   assertStagingDirectoryDecision(result.stagingDirectoryDecision, {
     context: 'organize-valid-font',
@@ -4378,6 +4387,7 @@ if (scenario === 'single') {
   assertSafeRecommendedBatchPreviewArgs(result.recommendedBatchPreviewArgs, {
     inputDir,
     batchGroupBy: 'source-dir',
+    maxFiles: 10,
   }, 'organize-structure-only');
   const rerunWithParsingAction = (result.recommendedNextActions || []).find((action) => action.id === 'rerun-with-font-parsing');
   if (
@@ -5782,6 +5792,7 @@ if (scenario === 'single') {
       'toolOptionCatalog',
       'workflowPresets',
       'recommendedBatchPreviewArgs',
+      'recommendedBatchPreviewArgs.maxFiles',
       'recommendedNextActions',
       'successCriteria',
       'sourceSafetyDecision',
@@ -5969,6 +5980,7 @@ if (scenario === 'single') {
     '`outputTreeInsideInputTree`',
     '`mayOverwriteOutputTree`',
     '`recommendedBatchPreviewArgs`',
+    '`recommendedBatchPreviewArgs.maxFiles`',
     '`recommendedNextActions[]`',
     '`successCriteria`',
     '`planActionSummary`',
@@ -6571,12 +6583,15 @@ if (scenario === 'single') {
   if (
     corpusInspection.layout?.layoutKind === undefined
     || corpusInspection.recommendedBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || corpusInspection.recommendedBatchPreviewArgs?.maxFiles !== maxFiles
     || corpusInspection.inputDirectoryDecision?.summaryType !== 'input-directory-decision'
     || corpusInspection.inputDirectoryDecision?.appliesToTool !== 'inspect_font_inputs'
     || corpusInspection.inputDirectoryDecision?.writesFilesBeforeReview !== false
     || corpusInspection.inputDirectoryDecision?.sourceDestructive !== false
     || corpusInspection.inputDirectoryDecision?.safeBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || corpusInspection.inputDirectoryDecision?.safeBatchPreviewArgs?.maxFiles !== maxFiles
     || corpusInspection.inputDirectoryDecision?.safeOrganizationPreviewArgs?.workflowPreset !== 'safe-preview'
+    || corpusInspection.inputDirectoryDecision?.safeOrganizationPreviewArgs?.maxFiles !== maxFiles
     || !corpusInspection.inputDirectoryDecision?.mustInspectFields?.includes('recommendedBatchPreviewArgs')
   ) {
     throw new Error('Expected real corpus root inspection to expose inputDirectoryDecision, layout, and safe preview args.');
@@ -6606,12 +6621,15 @@ if (scenario === 'single') {
   if (
     inspection.layout?.layoutKind === undefined
     || inspection.recommendedBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || inspection.recommendedBatchPreviewArgs?.maxFiles !== maxFiles
     || inspection.inputDirectoryDecision?.summaryType !== 'input-directory-decision'
     || inspection.inputDirectoryDecision?.appliesToTool !== 'inspect_font_inputs'
     || inspection.inputDirectoryDecision?.writesFilesBeforeReview !== false
     || inspection.inputDirectoryDecision?.sourceDestructive !== false
     || inspection.inputDirectoryDecision?.safeBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || inspection.inputDirectoryDecision?.safeBatchPreviewArgs?.maxFiles !== maxFiles
     || inspection.inputDirectoryDecision?.safeOrganizationPreviewArgs?.workflowPreset !== 'safe-preview'
+    || inspection.inputDirectoryDecision?.safeOrganizationPreviewArgs?.maxFiles !== maxFiles
   ) {
     throw new Error('Expected real corpus sample inspection to expose inputDirectoryDecision, layout, and safe preview args.');
   }
@@ -6642,6 +6660,7 @@ if (scenario === 'single') {
     || organization.sourceDestructive !== false
     || organization.recommendedBatchPreviewArgs?.inputDir !== sample.inputDir
     || organization.recommendedBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || organization.recommendedBatchPreviewArgs?.maxFiles !== maxFiles
   ) {
     throw new Error('Expected real corpus organization smoke to stay structure-first, no-write, and return safe batch preview args.');
   }
@@ -6859,6 +6878,7 @@ if (scenario === 'single') {
       || organization.sourceDestructive !== false
       || organization.recommendedBatchPreviewArgs?.inputDir !== sample.inputDir
       || organization.recommendedBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+      || organization.recommendedBatchPreviewArgs?.maxFiles !== maxFiles
       || batchPreview.dryRun !== true
       || batchPreview.writesOutputTree !== false
       || batchPreview.sourceDestructive !== false
@@ -7034,6 +7054,9 @@ if (scenario === 'single') {
   if (corpusInspection.supportedFontCount < 1 || corpusInspection.filesIncluded !== false || corpusInspection.maxFilesHit !== false) {
     throw new Error('Expected real-corpus-integration to inspect the full bounded corpus root without truncation.');
   }
+  if (corpusInspection.recommendedBatchPreviewArgs?.maxFiles !== maxFiles) {
+    throw new Error('Expected real-corpus-integration root inspection safe-preview args to preserve maxFiles.');
+  }
   if (!inputCountGuideCovered(corpusInspection.inputCountGuide, {
     appliesToTool: 'inspect_font_inputs',
     fileDetailsVisibility: 'omitted-by-request',
@@ -7050,6 +7073,7 @@ if (scenario === 'single') {
     sampleInspection.supportedFontCount < 1
     || sampleInspection.filesIncluded !== false
     || sampleInspection.unsupportedFileSummary?.total !== sample.summary.unsupportedCount
+    || sampleInspection.recommendedBatchPreviewArgs?.maxFiles !== maxFiles
   ) {
     throw new Error('Expected real-corpus-integration sample inspection to summarize the selected real sample.');
   }
@@ -7071,6 +7095,7 @@ if (scenario === 'single') {
     || organizationPreview.writesOutputTree !== false
     || organizationPreview.sourceDestructive !== false
     || organizationPreview.recommendedBatchPreviewArgs?.inputDir !== sample.inputDir
+    || organizationPreview.recommendedBatchPreviewArgs?.maxFiles !== maxFiles
   ) {
     throw new Error('Expected real-corpus-integration organization preview to be source-safe and no-write.');
   }

@@ -60,7 +60,7 @@
 - `get_agent_guidance` 默认还会返回 `toolOptionCatalog`，这是高影响输入参数的机器可读目录。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的默认值、允许值、安全写入语义、非直觉行为，以及改写参数后应检查哪些响应字段；只想看它时可请求 `sections: ["option-catalog"]`。
 - `get_agent_guidance` 还会返回 `unsupportedFileCategoryCatalog`，解释 `unsupportedFileSummary.byCategory[]` 中 `archive`、`document`、`unsupported-font` 等分类的代表扩展名和处理行为；每个工具响应里的 `unsupportedFileDecision` 会给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则提供证据，压缩包只会被报告，不会被解压、复制或拆分。
 - 输入扫描类工具会返回 `inputCountGuide`，用一个紧凑对象解释扫描文件数、支持字体数、忽略文件数、`maxFilesHit` 是否导致计数不完整、文件明细是否被故意省略，以及非字体文件的处理方式。把真实语料计数当作完整结论前应先看它。
-- `inspect_font_inputs` 还会返回 `inputDirectoryDecision`、`layout` 和 `recommendedBatchPreviewArgs`。这是无写入的第一步 triage：它会提示应调高 `maxFiles`、先处理坏字体、直接做 `split_font_batch` safe-preview，还是先做非破坏性的 `organize_font_directory` safe-preview；它不是整理计划或拆分成功证明。
+- `inspect_font_inputs` 还会返回 `inputDirectoryDecision`、`layout` 和 `recommendedBatchPreviewArgs`。这是无写入的第一步 triage：它会提示应调高 `maxFiles`、先处理坏字体、直接做 `split_font_batch` safe-preview，还是先做非破坏性的 `organize_font_directory` safe-preview；它不是整理计划或拆分成功证明。返回的安全预览参数会通过 `recommendedBatchPreviewArgs.maxFiles` 保留本次扫描上限，复制下一步调用时不会意外退回默认值。
 - `get_agent_guidance` 还会返回 `directoryHandlingModeCatalog`，解释每个 `layoutDecision.directoryHandling.recommendedMode` 取值，包括它何时出现、下一步建议、是否会在复核前写文件、源目录安全性、必须检查的字段和容易误解的行为。
 - `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。决策表和 `directoryWorkflowExamples[]` 示例也会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖参数，并提供必须检查的字段和 `successCriteria`；完整示例里还包含 flat/nested/mixed/output-inside-input 的 `sourceLayoutMismatchSummary` 对照。
 - `get_agent_guidance` 包含 `safeInvocationTemplates[]`，提供运行时检查、单字体处理、输入预检、目录不匹配整理计划、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和紧凑输出审计等可复制起步调用。每个模板都会声明是否写文件、是否可能修改源文件、必须检查的 `inspectFields` 和继续前要满足的 `successCriteria`；模板会尽量保持最小参数，`workflowPreset` 已提供的默认项可从 `workflowPresets[]` 查看。
@@ -303,7 +303,7 @@ fonts/
 - `inputCountGuide`：解释扫描计数、`maxFilesHit`、`filesIncluded` 和非字体文件处理方式的紧凑指南
 - `inputDirectoryDecision`：第一步目录路线提示，说明应重扫、复核坏字体、直接批量 safe-preview，还是先运行非破坏性的目录整理 safe-preview
 - `layout`：`empty`、`flat`、`nested` 或 `mixed`，以及推荐的批量分组策略
-- `recommendedBatchPreviewArgs`：可直接复制的 `split_font_batch` 无写入预览参数
+- `recommendedBatchPreviewArgs`：可直接复制的 `split_font_batch` 无写入预览参数，会通过 `recommendedBatchPreviewArgs.maxFiles` 保留本次扫描上限
 - `supportedFontCount`、`validFontCount`、`invalidFontCount`
 - `unsupportedFileDecision`：从 `unsupportedFileSummary` 派生的快速判断，直接说明是否有忽略文件、是否包含压缩包、是否存在 `.zip` / `.txt` 之外的噪声，以及这些文件是否会被解压、复制或拆分
 - `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`
@@ -367,7 +367,7 @@ fonts/
 - `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；源目录混有压缩包、图片、文档或生成产物时优先看它
 - `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`
 - `recommendedBatchOptions`：根据目录形态给出的后续 `split_font_batch` 策略片段，不是完整安全调用
-- `recommendedBatchPreviewArgs`：可直接复制的 `split_font_batch` 无写入预览参数，包含 `inputDir`、`workflowPreset: "safe-preview"` 和必要的目录形态覆盖项
+- `recommendedBatchPreviewArgs`：可直接复制的 `split_font_batch` 无写入预览参数，包含 `inputDir`、`workflowPreset: "safe-preview"`、必要的目录形态覆盖项，以及保留本次扫描上限的 `recommendedBatchPreviewArgs.maxFiles`
 - `recommendedNextActionCount`、`recommendedNextActions[]`：面向 agent 的机器可读后续动作，每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs`、`inspectFields` 和 `successCriteria`
 - `organizationDecision`：整理响应的紧凑主线路由建议，用于区分应重扫、开启字体解析、处理坏字体、预览原目录、审查 mixed layout，还是预览已复制的暂存目录
 - `organizationWarningCount`、`organizationWarnings[]`，每项包含机器可读的 `code` 和 `message`
