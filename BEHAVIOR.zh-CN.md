@@ -71,10 +71,11 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `safeInvocationTemplates[]`：常见工作流的安全起步调用模板
 - `nextToolDecisionSummary`：更短的“下一步该调用哪个工具”路由索引
 - `recommendedWorkflowPlan`：把安全模板编排成有序阶段的推荐路线图
+- `toolOptionCatalog`：高影响工具输入参数的机器可读选项目录
 - `errorResponseCatalog`：解释结构化 MCP 错误和普通错误的响应形态
 - `guidanceView`：说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称
 
-当 agent 需要完整错误响应目录、warning code 目录、响应字段目录或示例时，应设置 `detailLevel: "full"`，或用 `sections` 精确请求，例如 `["error-catalog", "warning-catalog", "field-catalog"]`。
+当 agent 需要完整错误响应目录、warning code 目录、响应字段目录、工具选项目录或示例时，应设置 `detailLevel: "full"`，或用 `sections` 精确请求，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog"]`。
 
 当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。响应里的 `verificationChecklist[]` 是给 agent 用的防误判清单；在向用户宣称完成前，应检查其中适用于当前工作流的项目。
 其中 `local-compact-check-passed` 是面向本包维护者的普通本地门禁：运行 `npm run check:compact` 可用低噪声方式执行标准 syntax/smoke 检查；需要纯 JSON 时运行 `npm run --silent check:compact -- --json`。成功时它只打印步骤摘要和 `compact-check-result`，失败时返回失败步骤的 stdout/stderr 尾部，便于 agent 快速定位。`local-real-corpus-suite-passed` 是真实语料验证项：当改动会影响功能行为时，应在本机真实字体语料库上运行 `smoke:real-corpus-suite`，也就是 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`。它是代表性可靠性门禁，不是逐个字体目录人工验收，也不是运行时 MCP 工具调用。
@@ -85,6 +86,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 `configurationRecipes[]` 是给 agent 用的配置配方表；它把“保留每个源字体”“按源目录分组”“按字体 metadata 分组”“快速结构优先扫描”“copy-only 暂存整理”“大库审查后写入”等用户意图映射到最小 preset-first 参数，并列出写入行为、源目录安全性、取舍、必须检查的 `inspectFields` 和继续前必须满足的 `successCriteria`。配方不是成功证明，不能替代实际工具响应检查。
 `batchPolicyGuide` 是给 agent 用的批量策略自定义指南；它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个可选值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前必须满足的 `successCriteria`。当用户想偏离默认 preset 行为时，应优先参考它选择最小显式覆盖，并先运行 safe-preview。
+`toolOptionCatalog` 是给 agent 用的工具输入选项目录，默认 compact 指南就会返回，也可用 `sections: ["option-catalog"]` 单独请求。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的高影响参数，说明默认值、允许值、写入/源安全语义、响应体量影响、非直觉行为，以及改写参数后必须检查哪些响应字段。它尤其用于避免误读 `split_font_batch.dryRun` 原始默认会写输出、`organize_font_directory.dryRun` 默认只预览、`parseFonts: false` 会限制 identity 去重，以及 `includeResults: false` / `includeFiles: false` 会故意省略大块明细。
 `unsupportedFileCategoryCatalog` 是给 agent 解释非字体噪声分类的机器可读目录；它会说明 `archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other` 的代表扩展名与处理行为。每次工具响应中的 `unsupportedFileDecision` 会先给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则重复当前扫描实际出现分类的处理语义。尤其要注意，`archive` 只表示“被报告的压缩包”，不会触发解压、复制或拆分。
 `directoryHandlingModeCatalog` 是给 agent 解释 `layoutDecision.directoryHandling.recommendedMode` 的机器可读目录；它会说明每个 mode 何时出现、下一步建议、是否会在复核前写文件、源目录安全性、必须检查的字段和非直觉行为。`directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段、继续前必须满足的 `successCriteria` 和非直觉行为。推荐参数会优先使用 `workflowPreset`，只保留路径、规模或目录形态造成的差异覆盖。它们不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
 `directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描，以及一个面向 flat/nested/mixed/output-inside-input 的 `sourceLayoutMismatchSummary` 对照示例。示例调用也采用 preset-first 风格，并带有 `mustInspectFields` 和 `successCriteria`。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`sourceLayoutMismatchSummary` 和 warning 字段为准。
@@ -94,6 +96,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 `recommendedWorkflowPlan` 是当前 `workflow` 的有序路线图；它不会复制每个模板的参数，而是用 `templateId` 引用 `safeInvocationTemplates[]`，把输入预检、目录形态决策、批量预览、审查后写入和输出审计串成阶段。每个 `orderedSteps[]` 和 `decisionPoints[]` 条目都会包含 `inspectFields` 与 `successCriteria`。它用于降低 agent 漏掉审计步骤的风险，但不能替代每个阶段的响应字段检查和条件确认。
 `errorResponseCatalog` 会解释 MCP 错误文本何时是 JSON、何时只是普通文本。带 `details` 的错误会以 JSON 文本返回，并包含 `ok: false`、`name`、`errorType`、`error` 和 `details`；没有 `details` 的普通错误保持简短文本。`errorType` 是 agent 最短路由字段；如果存在 `details.summaryType`，会优先使用它作为 `errorType`。`FontSplitConfigurationError` 的 `errorType` 是 `configuration-error`，agent 应把它视为调用方配置错误：省略该字段以使用默认值，或改成允许值 / 正确类型，而不是用同一个无效值重试；`BatchSplitError` 的 `errorType` 是 `batch-split-error`，继续前应检查 `details.errors[]` 和 `details.summary`。
 `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`outputStructureDecision`、`auditStatus`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
+`toolOptionCatalog` 是与字段目录配套的输入侧目录；它不会替代实际预览和审计，但会告诉 agent 改哪个参数最可能影响安全、输出结构、响应体量、去重、命名或跳过行为。偏离默认行为时应先看 `workflowPreset`，再添加最小显式覆盖，并按每个选项列出的 `inspectFields` 检查实际响应。
 
 `get_runtime_status` 也是只读工具。它会检查：
 

@@ -2324,6 +2324,7 @@ if (scenario === 'single') {
     || !defaultGuidance.directoryWorkflowDecisionMatrix?.length
     || !defaultGuidance.configurationRecipes?.length
     || !defaultGuidance.batchPolicyGuide?.length
+    || defaultGuidance.toolOptionCatalog?.summaryType !== 'tool-option-catalog'
     || !defaultGuidance.unsupportedFileCategoryCatalog?.archive
     || defaultGuidance.nextToolDecisionSummary?.primaryRouteId !== 'unfamiliar-directory'
     || !defaultGuidance.recommendedWorkflowPlan?.orderedSteps?.length
@@ -2346,6 +2347,8 @@ if (scenario === 'single') {
     || !result.guidanceView?.sectionsIncluded?.includes('error-catalog')
     || !result.guidanceView?.availableSections?.includes('field-catalog')
     || !result.guidanceView?.availableSections?.includes('error-catalog')
+    || result.guidanceView.availableSections.length !== new Set(result.guidanceView.availableSections).size
+    || result.guidanceView.sectionsIncluded.length !== new Set(result.guidanceView.sectionsIncluded).size
   ) {
     throw new Error('Expected explicit full guidance to expose the full guidance view.');
   }
@@ -2365,7 +2368,10 @@ if (scenario === 'single') {
     || !compactGuidance.directoryWorkflowDecisionMatrix?.length
     || !compactGuidance.configurationRecipes?.length
     || !compactGuidance.batchPolicyGuide?.length
+    || compactGuidance.toolOptionCatalog?.summaryType !== 'tool-option-catalog'
     || !compactGuidance.unsupportedFileCategoryCatalog?.archive
+    || compactGuidance.guidanceView.availableSections.length !== new Set(compactGuidance.guidanceView.availableSections).size
+    || compactGuidance.guidanceView.sectionsIncluded.length !== new Set(compactGuidance.guidanceView.sectionsIncluded).size
     || compactGuidance.nextToolDecisionSummary?.primaryRouteId !== 'layout-uncertain-or-staging-wanted'
   ) {
     throw new Error('Expected compact agent guidance to keep workflow essentials and omit bulky catalogs/examples.');
@@ -2537,12 +2543,42 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('toolResponseFieldCatalog')) {
     throw new Error('Expected agent guidance to recommend checking the tool response field catalog.');
   }
+  if (!result.responseFieldsToCheck?.includes('toolOptionCatalog')) {
+    throw new Error('Expected agent guidance to recommend checking the tool option catalog.');
+  }
   if (
     !result.responseFieldsToCheck?.includes('errorResponseCatalog')
     || !result.toolResponseFieldCatalog?.errorResponseCatalog
     || result.errorResponseCatalog?.configurationError?.detailsSummaryType !== 'configuration-error'
   ) {
     throw new Error('Expected agent guidance to describe structured MCP error responses.');
+  }
+  const optionCatalogGuidance = getAgentGuidance({ sections: ['option-catalog'] });
+  if (
+    optionCatalogGuidance.guidanceView?.sectionsIncluded?.length !== 1
+    || optionCatalogGuidance.guidanceView.sectionsIncluded[0] !== 'option-catalog'
+    || optionCatalogGuidance.toolOptionCatalog?.summaryType !== 'tool-option-catalog'
+    || Object.hasOwn(optionCatalogGuidance, 'toolResponseFieldCatalog')
+    || Object.hasOwn(optionCatalogGuidance, 'safeInvocationTemplates')
+  ) {
+    throw new Error('Expected focused option-catalog guidance to return only the tool option catalog section.');
+  }
+  if (
+    result.toolOptionCatalog?.summaryType !== 'tool-option-catalog'
+    || !result.toolResponseFieldCatalog?.toolOptionCatalog
+    || !result.toolOptionCatalog?.split_font_batch?.options?.workflowPreset?.allowedValues?.includes('safe-preview')
+    || !result.toolOptionCatalog?.split_font_batch?.options?.workflowPreset?.allowedValues?.includes('reviewed-write')
+    || result.toolOptionCatalog?.split_font_batch?.options?.dryRun?.defaultValue !== false
+    || !result.toolOptionCatalog?.split_font_batch?.options?.includeResults?.nonIntuitiveBehavior?.includes('Set false for large reviewed writes')
+    || result.toolOptionCatalog?.organize_font_directory?.options?.dryRun?.defaultValue !== true
+    || result.toolOptionCatalog?.organize_font_directory?.sourceDestructive !== false
+    || !result.toolOptionCatalog?.organize_font_directory?.options?.overwriteExisting?.nonIntuitiveBehavior?.includes('outputDir')
+    || !result.toolOptionCatalog?.organize_font_directory?.options?.parseFonts?.nonIntuitiveBehavior?.includes('identity dedupe')
+    || !result.toolOptionCatalog?.split_font?.options?.smallGlyphAction?.allowedValues?.includes('copy-original')
+    || !result.toolOptionCatalog?.split_font?.options?.splitFailureAction?.allowedValues?.includes('single-woff2')
+    || !result.toolOptionCatalog?.inspect_split_output?.options?.includeFiles?.nonIntuitiveBehavior?.includes('compact')
+  ) {
+    throw new Error('Expected toolOptionCatalog to explain defaults, allowed values, safety, and non-intuitive configuration behavior.');
   }
   if (!result.responseFieldsToCheck?.includes('localVerificationOutputGuide')) {
     throw new Error('Expected agent guidance to recommend checking the local verification output guide.');
@@ -5419,6 +5455,7 @@ if (scenario === 'single') {
       'errorResponseCatalog',
       'warningCodeCatalog',
       'toolResponseFieldCatalog',
+      'toolOptionCatalog',
       'workflowPresets',
       'recommendedBatchPreviewArgs',
       'recommendedNextActions',
@@ -5551,6 +5588,7 @@ if (scenario === 'single') {
     '`sections: ["workflow"]`',
     '`quickStartCallExamples[]`',
     '`configurationRecipes[]`',
+    '`toolOptionCatalog`',
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
     '`dedupeDecisionSummary`',

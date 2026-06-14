@@ -14,15 +14,17 @@
 | `detailLevel` | `compact`, `full` | `compact` | 响应体量。`compact` 保留工作流关键 section，并默认省略较大的 catalog / 示例；`full` 返回全部指南 section。 |
 | `sections` | section 名称数组 | 不设置 | 聚焦返回指定 section。设置后会覆盖 `detailLevel` 的默认 section 集。 |
 
-响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchPolicyGuide`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchPolicyGuide`、`toolOptionCatalog`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
-当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["error-catalog", "warning-catalog", "field-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
+当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
 
 如果只需要最小路线响应，可用 `workflow: "organize"` 搭配 `sections: ["workflow"]`，然后检查 `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`。其中嵌套的 `workflowQuickStart.recommendedCallExample` 对象就是可复制的第一步调用。对于结构不确定的源目录，推荐调用应是无写入的 `organize_font_directory` safe preview（`workflowPreset: "safe-preview"`），并且 `writesFiles: false`、`sourceDestructive: false`。只有当用户明确需要暂存目录，或实际响应要求切换分支时，才使用其中的 `alternateCallExamples[]`。
 
 `configurationRecipes[]` 会把常见用户意图映射成 preset-first 调用和取舍说明。当前覆盖默认安全批量、保留每个源字体、按源目录分组、按字体 metadata 分组、快速结构优先扫描、copy-only 暂存整理，以及大库审查后写入。每个配方都会包含 `inspectFields` 和 `successCriteria`。配方只是指南，不是成功证明；agent 仍必须实际运行预览/写入工具，检查这些字段，并满足对应条件。
 
 `batchPolicyGuide` 是批量策略选项的机器可读自定义指南。它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`；每个策略值都会包含 `useWhen`、`avoidWhen`、`inspectFields` 和 `successCriteria`。当用户要求偏离默认 preset 的行为时，先参考它选择最小显式覆盖，然后先预览再写入。
+
+`toolOptionCatalog` 默认返回，也可通过 `sections: ["option-catalog"]` 聚焦请求。它是高影响工具输入参数的机器可读目录，包含原始默认值、preset-first 自定义路线、允许值、写入/源安全行为、响应体量控制、非直觉行为，以及改写参数后必须检查的响应字段。修改 `dryRun`、`includeResults`、`maxFiles`、`batchGroupBy`、`batchNamingMode`、`batchDedupeMode`、`parseFonts`、`smallGlyphAction`、`splitFailureAction` 或 `includeFiles` 前应先看它。
 
 `unsupportedFileCategoryCatalog` 会解释 `unsupportedFileSummary.byCategory[]` 使用的分类，包括代表性扩展名、分类含义和处理行为。工具响应也会提供用于快速判断的 `unsupportedFileDecision`，以及作为证据的 `unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary`，agent 不必再次查 guidance 也能解释它们。尤其是 `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
 
@@ -50,6 +52,8 @@
 
 `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，会把重要响应字段路径映射到产生这些字段的工具、字段含义，以及 AI agent 在宣称成功前应该采取的动作。它是本文档的运行时补充，尤其用于避免误读 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit` 和 `recommendedNextActions` 这类容易违反直觉的字段。
 
+`toolOptionCatalog` 是输入侧的配套目录。它说明哪些选项会改变安全性、输出形态、响应体量、去重/命名语义或审计紧凑程度，并特别标出非直觉默认值，例如原始 `split_font_batch.dryRun: false`、`organize_font_directory.dryRun: true`、`parseFonts: false` 会限制 identity 去重，以及 `includeResults: false` / `includeFiles: false` 会产生紧凑响应。
+
 指南 section 名称：
 
 | Section | 内容 |
@@ -64,6 +68,7 @@
 | `error-catalog` | `FontSplitConfigurationError`、`BatchSplitError` 等结构化 MCP 错误的错误响应目录。 |
 | `warning-catalog` | `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 的 warning code 目录。 |
 | `field-catalog` | 把响应字段映射到含义和 agent 动作的字段目录。 |
+| `option-catalog` | 把高影响工具输入参数映射到默认值、允许值、安全行为、非直觉行为和必查响应字段的选项目录。 |
 | `safe-templates` | 常见工作流的可复制安全调用模板。 |
 | `response-fields` | agent 应检查的响应字段短清单。 |
 | `path-rules` | 路径限制和相对路径规则。 |
