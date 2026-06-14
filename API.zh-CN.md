@@ -207,12 +207,14 @@
 
 预设会先展开；同一次调用里显式传入的参数会覆盖预设值。
 
-批量响应会包含 `sourceSafetyDecision`、`safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree`、`mayOverwriteOutputTree`、`batchPolicySummary`、`inputCountGuide`、`scannedFileCount`、`maxFiles`、`maxFilesHit`、`unsupportedFileDecision`、`unsupportedFileSummary` 和 `batchDecision`。先看 `sourceSafetyDecision` 获取最短源安全结论：源字体不会被移动、删除或重写，`sourceBackupRequired` 应为 `false`，真实批量写入后 `requiresOutputAudit` 为 true。`sourceDestructive` 应始终为 `false`：批量处理不会移动、删除或重写源字体。`dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。只有当真实输出树位于 `inputDir` 内时，`writesSourceTree` 才为 `true`；此时源字体文件仍会保留，但输入目录树会新增生成输出。`mayOverwriteOutputTree` 只作用于生成输出路径。`inputCountGuide.countCompleteness` 会说明源计数是当前扫描根下完整，还是被 `maxFiles` 截断；`maxFilesHit: true` 表示调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileDecision` 给出忽略文件的压缩判断路线；`unsupportedFileSummary` 则提供精确证据。
+批量响应会包含 `sourceSafetyDecision`、`safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree`、`mayOverwriteOutputTree`、`batchPolicySummary`、`dedupeDecisionSummary`、`inputCountGuide`、`scannedFileCount`、`maxFiles`、`maxFilesHit`、`unsupportedFileDecision`、`unsupportedFileSummary` 和 `batchDecision`。先看 `sourceSafetyDecision` 获取最短源安全结论：源字体不会被移动、删除或重写，`sourceBackupRequired` 应为 `false`，真实批量写入后 `requiresOutputAudit` 为 true。`sourceDestructive` 应始终为 `false`：批量处理不会移动、删除或重写源字体。`dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。只有当真实输出树位于 `inputDir` 内时，`writesSourceTree` 才为 `true`；此时源字体文件仍会保留，但输入目录树会新增生成输出。`mayOverwriteOutputTree` 只作用于生成输出路径。`inputCountGuide.countCompleteness` 会说明源计数是当前扫描根下完整，还是被 `maxFiles` 截断；`maxFilesHit: true` 表示调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileDecision` 给出忽略文件的压缩判断路线；`unsupportedFileSummary` 则提供精确证据。
 
 批量格式代表优先级为：`.otf`、`.ttf`、`.woff2`、`.ttc`、`.otc`、`.woff`。
 
 `font-identity` 会跨格式比较归一化后的字体身份。身份键优先使用 typographic family/subfamily，再回退到 legacy family/subfamily，再回退到 full name 或 PostScript name。`glyphCount` 只用于诊断，不参与等价判定，因此不会把等价的 OTF/TTF/WOFF 输入拆开。
 如果某个文件的身份解析失败，批量去重会回退到该文件的路径 stem，保证扫描继续进行，并把真正的单字体错误留到处理阶段报告。
+
+`dedupeDecisionSummary` 是面向 agent 的紧凑去重解释。它会报告请求/实际去重模式、`keyStrategy`、`deduplicatedCount`、`skippedDuplicateCount`、`identityKeyMissingCount`、`pathFallbackUsed`、`dedupeLimitedByParsing` 和 `representativePriority`。如果 `pathFallbackUsed` 或 `dedupeLimitedByParsing` 为 true，就不要宣称语义 identity 去重已经完整可用。
 
 `batchErrorMode` 默认是 `fail-after`，会处理完选中的字体后，如果存在任何单字体错误就抛错。只有当调用方会主动检查 `errors[]` 和 `errorCount` 时才建议显式使用 `collect`；需要首个错误立刻失败时使用 `fail-fast`。
 当 `fail-fast` 或 `fail-after` 通过 MCP Server 抛错时，错误响应文本是 JSON，包含 `ok: false`、`name`、`errorType`、`error` 和 `details`，因此 agent 可以先按 `errorType: "batch-split-error"` 路由，再读取 `details.errors[]` 与 `details.summary`。
@@ -308,6 +310,7 @@
 | `unparsedFontCount` | 因 `parseFonts: false` 而被有意跳过元数据解析的受支持扩展名文件数。 |
 | `effectiveBatchDedupeMode` | 实际使用的去重策略。当 `parseFonts: false` 且请求 `batchDedupeMode: "font-identity"` 时，会回退到 `same-path`。 |
 | `dedupeLimitedByParsing` | 请求 identity 去重但因为跳过字体解析而无法执行时为 `true`。 |
+| `dedupeDecisionSummary` | 目录整理/复制阶段的紧凑去重解释。声称 identity 去重可用前，应先检查其中的 `effectiveMode`、`pathFallbackUsed` 和 `dedupeLimitedByParsing`。 |
 | `batchPolicySummary` | 本次整理调用所采用的分组、命名和去重策略摘要，以及对应的 `batchPolicyGuide` 成功标准。若 `parseFonts: false` 导致 identity 去重降级，`effectiveValues.batchDedupeMode` 会显示真实回退值。 |
 | `layoutDecision` | `organize_font_directory` 的顶层紧凑路线摘要：`shortAnswer`、检测到的布局、推荐分组、主线路由、源安全信号、原目录安全预览状态和 copy-only 暂存状态。它是路线索引，不是成功证明。 |
 | `layoutDecision.directoryHandling` | 第一层目录处理答案：说明应预览原目录、复核 mixed 布局、使用 copy-only 整理输出、重跑整理，还是因为没有可复制字体而停止。它也会说明辅助工具是 `organize_font_directory`、默认是 dry-run、真实整理只是 copy-only 写入 `outputDir`。 |

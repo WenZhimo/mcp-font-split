@@ -1540,6 +1540,7 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
     || batchWriteRoute?.writesFiles !== true
     || batchWriteRoute?.firstArgsHint?.workflowPreset !== 'reviewed-write'
     || batchWriteRoute?.nextRouteAfterSuccess !== 'output-audit'
+    || !batchWriteRoute.inspectFields?.includes('dedupeDecisionSummary')
     || auditRoute?.firstTool !== 'inspect_split_output'
     || !auditRoute.inspectFields?.includes('outputStructureDecision')
   ) {
@@ -1582,6 +1583,7 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
     || previewExample?.writesFiles !== false
     || writeExample?.args?.workflowPreset !== 'reviewed-write'
     || writeExample?.nextRouteAfterSuccess !== 'output-audit'
+    || !writeExample.inspectFields?.includes('dedupeDecisionSummary')
     || auditExample?.tool !== 'inspect_split_output'
     || auditExample?.args?.outDir !== '<split-output-root>'
   ) {
@@ -2766,6 +2768,7 @@ if (scenario === 'single') {
     || batchProcessTemplate?.args?.limit !== 50000
     || batchProcessTemplate?.args?.maxFiles !== 50000
     || !batchProcessTemplate.inspectFields?.includes('batchDecision')
+    || !batchProcessTemplate.inspectFields?.includes('dedupeDecisionSummary')
     || !batchProcessTemplate.nextStep?.includes('inspect_split_output')
   ) {
     throw new Error('Expected reviewed batch processing template to rely on the reviewed-write preset and require output inspection.');
@@ -2799,7 +2802,7 @@ if (scenario === 'single') {
   if (
     workflowPlan?.id !== 'batch-workflow'
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-dry-run-preview' && step.writesFiles === false && step.inspectFields?.includes('batchDecision'))
-    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true && step.inspectFields?.includes('batchDecision'))
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true && step.inspectFields?.includes('batchDecision') && step.inspectFields?.includes('dedupeDecisionSummary'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'directory-mismatch-plan' && step.inspectFields?.includes('organizationDecision'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('outputStructureDecision') && step.inspectFields?.includes('auditStatus') && step.inspectFields?.includes('structureSummary'))
   ) {
@@ -3864,6 +3867,17 @@ if (scenario === 'single') {
   if (result.operationMode !== 'copy-only' || result.validFontCount !== 2 || result.invalidFontCount !== 0 || result.deduplicatedCount !== 1 || result.skippedDuplicates !== 1 || result.copiedCount !== 1) {
     throw new Error('Expected valid-font organization to parse, identity-dedupe, and copy one representative.');
   }
+  if (
+    result.dedupeDecisionSummary?.summaryType !== 'dedupe-decision-summary'
+    || result.dedupeDecisionSummary?.appliesToTool !== 'organize_font_directory'
+    || result.dedupeDecisionSummary?.requestedMode !== 'font-identity'
+    || result.dedupeDecisionSummary?.effectiveMode !== 'font-identity'
+    || result.dedupeDecisionSummary?.skippedDuplicateCount !== 1
+    || result.dedupeDecisionSummary?.identityKeyMissingCount !== 0
+    || result.dedupeDecisionSummary?.pathFallbackUsed !== false
+  ) {
+    throw new Error('Expected valid-font organization to expose a compact dedupeDecisionSummary.');
+  }
   assertBatchPolicySummary(result.batchPolicySummary, {
     context: 'organize-valid-font',
     appliesToTool: 'organize_font_directory',
@@ -3960,6 +3974,15 @@ if (scenario === 'single') {
   }
   if (result.effectiveBatchDedupeMode !== 'same-path' || result.dedupeLimitedByParsing !== true) {
     throw new Error('Expected structure-only organization to downgrade identity dedupe.');
+  }
+  if (
+    result.dedupeDecisionSummary?.requestedMode !== 'font-identity'
+    || result.dedupeDecisionSummary?.effectiveMode !== 'same-path'
+    || result.dedupeDecisionSummary?.dedupeLimitedByParsing !== true
+    || result.dedupeDecisionSummary?.pathFallbackUsed !== true
+    || result.dedupeDecisionSummary?.identityDedupeAvailable !== false
+  ) {
+    throw new Error('Expected structure-only organization dedupeDecisionSummary to explain same-path fallback.');
   }
   assertBatchPolicySummary(result.batchPolicySummary, {
     context: 'organize-structure-only',
@@ -4695,6 +4718,18 @@ if (scenario === 'single') {
   if (identityDedupe.discoveredFontCount !== 2 || identityDedupe.deduplicatedCount !== 1 || identityDedupe.skippedDuplicates !== 1 || identityDedupe.planned?.length !== 1) {
     throw new Error('Expected font-identity batch dedupe to collapse same-identity fonts despite glyph count differences.');
   }
+  if (
+    identityDedupe.dedupeDecisionSummary?.summaryType !== 'dedupe-decision-summary'
+    || identityDedupe.dedupeDecisionSummary?.appliesToTool !== 'split_font_batch'
+    || identityDedupe.dedupeDecisionSummary?.requestedMode !== 'font-identity'
+    || identityDedupe.dedupeDecisionSummary?.effectiveMode !== 'font-identity'
+    || identityDedupe.dedupeDecisionSummary?.skippedDuplicateCount !== 1
+    || identityDedupe.dedupeDecisionSummary?.identityKeyMissingCount !== 0
+    || identityDedupe.dedupeDecisionSummary?.pathFallbackUsed !== false
+    || identityDedupe.dedupeDecisionSummary?.representativePriority?.[0] !== '.otf'
+  ) {
+    throw new Error('Expected font-identity batch dedupe to expose a compact dedupeDecisionSummary.');
+  }
   assertBatchPolicySummary(identityDedupe.batchPolicySummary, {
     context: 'batch-identity font-identity dry-run',
     appliesToTool: 'split_font_batch',
@@ -5369,6 +5404,7 @@ if (scenario === 'single') {
       'configurationRecipes',
       'batchPolicyGuide',
       'batchPolicySummary',
+      'dedupeDecisionSummary',
       'layoutDecision',
       'layoutDecision.directoryHandling',
       'directoryWorkflowSummary',
@@ -5517,6 +5553,7 @@ if (scenario === 'single') {
     '`configurationRecipes[]`',
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
+    '`dedupeDecisionSummary`',
     '`layoutDecision`',
     '`layoutDecision.directoryHandling`',
     '`directoryWorkflowSummary`',
@@ -5706,6 +5743,7 @@ if (scenario === 'single') {
     || batchWriteAction?.suggestedArgs?.outputRoot !== outputRoot
     || !batchWriteAction.inspectFields?.includes('writesOutputTree')
     || !batchWriteAction.inspectFields?.includes('batchDecision')
+    || !batchWriteAction.inspectFields?.includes('dedupeDecisionSummary')
   ) {
     throw new Error('Expected batch dry-run to recommend a reviewed-write follow-up with safety and route-decision fields.');
   }

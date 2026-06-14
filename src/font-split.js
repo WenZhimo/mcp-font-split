@@ -67,6 +67,9 @@ const UNSUPPORTED_FILE_CATEGORY_DETAILS = {
   },
 };
 const FORMAT_PRIORITY = { '.otf': 0, '.ttf': 1, '.woff2': 2, '.ttc': 3, '.otc': 4, '.woff': 5 };
+const FORMAT_PRIORITY_ORDER = Object.entries(FORMAT_PRIORITY)
+  .sort((a, b) => a[1] - b[1])
+  .map(([extension]) => extension);
 const MANIFEST_FILE_NAME = 'split-meta.json';
 const MANIFEST_VERSION = 1;
 const ORGANIZATION_MANIFEST_FILE_NAME = 'font-organization-manifest.json';
@@ -1232,6 +1235,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Compact echo of the batch-related policies selected for this call, linked to the relevant batchPolicyGuide success criteria.',
     agentAction: 'Use this first to explain the effective grouping, naming, dedupe, and error policy for the response; then inspect the listed fields and satisfy policySuccessCriteria.',
   },
+  dedupeDecisionSummary: {
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
+    meaning: 'Compact explanation of the dedupe pass: requested/effective mode, selected representative count, skipped duplicate count, identity-key gaps, path fallback, and representative format priority.',
+    agentAction: 'Use this with skippedDuplicates before claiming semantic dedupe worked; if pathFallbackUsed or dedupeLimitedByParsing is true, disclose the limitation or rerun with parsing enabled.',
+  },
   configurationRecipes: {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Machine-readable mapping from common user intent to preset-first tool calls, explicit tradeoffs, inspectFields, and successCriteria.',
@@ -1528,7 +1536,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       maxFiles: 50000,
     },
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'includeResults', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'splitFailureAction'],
-    inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
+    inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errorCount', 'errors'],
     nextStep: 'If the plan is acceptable, rerun with dryRun:false; use includeResults:false for large real runs.',
     successCriteria: 'The preview must have dryRun true, sourceDestructive false, maxFilesHit false, errorCount zero, and acceptable planned paths, warnings, naming, and dedupe decisions before writing.',
   },
@@ -1546,7 +1554,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       maxFiles: 50000,
     },
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'],
-    inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
+    inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'dedupeDecisionSummary', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
     nextStep: 'Run inspect_split_output on outputRoot before reporting completion and require outputStructureDecision.status pass.',
     successCriteria: 'The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up inspect_split_output audit with outputStructureDecision.status pass before reporting completion.',
   },
@@ -1641,21 +1649,21 @@ const BATCH_POLICY_GUIDE = [
         value: 'font-identity',
         useWhen: 'Default behavior: dedupe equivalent fonts across formats when they represent the same effective font.',
         avoidWhen: 'Every supported source font file must be preserved, even when only format/container differs.',
-        inspectFields: ['batchDedupeMode', 'skippedDuplicates', 'planned', 'batchWarnings', 'dedupeLimitedByParsing'],
+        inspectFields: ['batchDedupeMode', 'dedupeDecisionSummary', 'skippedDuplicates', 'planned', 'batchWarnings', 'dedupeLimitedByParsing'],
         successCriteria: 'Duplicate skips match user intent; if parsing was skipped, rerun with parseFonts true before trusting identity dedupe.',
       },
       {
         value: 'same-path',
         useWhen: 'A fast structure/path-level dedupe is enough, or parseFonts is intentionally disabled for a structure-first pass.',
         avoidWhen: 'Equivalent fonts may appear across arbitrary folders/formats and should be deduped semantically.',
-        inspectFields: ['batchDedupeMode', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'skippedDuplicates', 'planned'],
+        inspectFields: ['batchDedupeMode', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'dedupeDecisionSummary', 'skippedDuplicates', 'planned'],
         successCriteria: 'The caller accepts path/stem-level dedupe limits and does not rely on it as semantic font identity.',
       },
       {
         value: 'none',
         useWhen: 'The user wants to preserve every supported source font file, including apparent duplicates or alternate containers.',
         avoidWhen: 'The goal is one representative output per effective font.',
-        inspectFields: ['batchDedupeMode', 'skippedDuplicates', 'planned', 'batchWarnings', 'outputTreeInsideInputTree'],
+        inspectFields: ['batchDedupeMode', 'dedupeDecisionSummary', 'skippedDuplicates', 'planned', 'batchWarnings', 'outputTreeInsideInputTree'],
         successCriteria: 'Preview intentionally keeps every selected supported font, skippedDuplicates is zero, and naming collisions are handled or disclosed.',
       },
     ],
@@ -1756,6 +1764,63 @@ function buildBatchPolicySummary({ appliesToTool, workflowPreset, values, effect
   };
 }
 
+function buildDedupeDecisionSummary({
+  appliesToTool,
+  requestedMode,
+  effectiveMode = requestedMode,
+  inputFontCount = 0,
+  deduplicatedCount = 0,
+  skippedDuplicateCount = 0,
+  identityKeyMissingCount = 0,
+  pathFallbackCount = 0,
+  dedupeLimitedByParsing = false,
+}) {
+  const requestedIdentity = requestedMode === 'font-identity';
+  const effectiveIdentity = effectiveMode === 'font-identity';
+  const pathFallbackUsed = requestedIdentity && (
+    dedupeLimitedByParsing
+    || pathFallbackCount > 0
+    || !effectiveIdentity
+  );
+  const keyStrategy = effectiveMode === 'none'
+    ? 'none'
+    : effectiveMode === 'same-path'
+      ? 'path-stem'
+      : 'font-identity';
+  const notes = [];
+  if (effectiveMode === 'none') {
+    notes.push('Dedupe is disabled; every supported input selected before limit remains eligible.');
+  } else if (effectiveMode === 'same-path') {
+    notes.push('Dedupe compares normalized source path stems only; it does not prove semantic font identity.');
+  } else {
+    notes.push('Dedupe compares normalized font identity and keeps the highest-priority representative format.');
+  }
+  if (dedupeLimitedByParsing) {
+    notes.push('Requested identity dedupe could not run because font metadata parsing was skipped.');
+  }
+  if (pathFallbackCount > 0) {
+    notes.push('Some fonts lacked a usable identity key and fell back to source path stem keys.');
+  }
+
+  return {
+    summaryType: 'dedupe-decision-summary',
+    appliesToTool,
+    requestedMode,
+    effectiveMode,
+    keyStrategy,
+    inputFontCount,
+    deduplicatedCount,
+    skippedDuplicateCount,
+    identityKeyMissingCount,
+    pathFallbackCount,
+    dedupeLimitedByParsing,
+    pathFallbackUsed,
+    identityDedupeAvailable: effectiveIdentity && !dedupeLimitedByParsing,
+    representativePriority: FORMAT_PRIORITY_ORDER,
+    nonIntuitiveBehavior: notes,
+  };
+}
+
 function buildRecommendedWorkflowPlan(workflow) {
   const auditStep = {
     id: 'audit-output',
@@ -1809,7 +1874,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Preview dedupe, naming, skip checks, warnings, and planned output paths before writing.',
-          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'dedupeDecisionSummary', 'skippedDuplicates', 'errorCount', 'errors'],
           successCriteria: 'dryRun is true, sourceDestructive is false, maxFilesHit is false, and planned paths/warnings are acceptable.',
         },
         {
@@ -1819,7 +1884,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: true,
           sourceDestructive: false,
           goal: 'Write split output only after the preview has been reviewed.',
-          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'errorCount', 'errors', 'recommendedNextActions'],
           successCriteria: 'errorCount is zero and the response recommends or allows output audit.',
         },
         auditStep,
@@ -1919,7 +1984,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Preview selected fonts, dedupe, naming, skip decisions, and warnings.',
-          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'skippedDuplicates', 'errorCount', 'errors'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'dedupeDecisionSummary', 'skippedDuplicates', 'errorCount', 'errors'],
           successCriteria: 'The preview paths, warnings, and dedupe policy match the user intent.',
         },
         {
@@ -1929,7 +1994,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: true,
           sourceDestructive: false,
           goal: 'Run the reviewed batch write.',
-          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'errorCount', 'errors', 'recommendedNextActions'],
           successCriteria: 'errorCount is zero and output audit is available.',
         },
         auditStep,
@@ -1939,7 +2004,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           id: 'preserve-all-files',
           when: 'The user requires every supported source font file to be preserved even if duplicates appear equivalent.',
           action: 'Use workflowPreset preserve-all or explicitly set batchDedupeMode none before previewing.',
-          inspectFields: ['batchDedupeMode', 'batchDecision', 'planned', 'skippedDuplicates'],
+          inspectFields: ['batchDedupeMode', 'dedupeDecisionSummary', 'batchDecision', 'planned', 'skippedDuplicates'],
           successCriteria: 'The following preview/write intentionally uses batchDedupeMode none or preserve-all, and skippedDuplicates reflects the preserve-all intent.',
         },
       ],
@@ -2011,7 +2076,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Preview split output using either recommendedBatchPreviewArgs or the staged outputDir.',
-          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'planned', 'batchWarnings', 'skippedDuplicates'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'planned', 'batchWarnings', 'dedupeDecisionSummary', 'skippedDuplicates'],
           successCriteria: 'The batch preview matches the selected grouping and dedupe policy.',
         },
       ],
@@ -2272,7 +2337,7 @@ function buildNextToolDecisionSummary(workflow) {
       firstArgsHint: { workflowPreset: 'safe-preview' },
       writesFiles: false,
       sourceDestructive: false,
-      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'dedupeDecisionSummary', 'skippedDuplicates', 'errorCount', 'errors'],
       continueWhen: 'The preview is no-write, source-safe, untruncated, error-free, and planned paths/dedupe/naming match user intent.',
       nextRouteAfterSuccess: 'batch-reviewed-write',
     },
@@ -2284,7 +2349,7 @@ function buildNextToolDecisionSummary(workflow) {
       firstArgsHint: { workflowPreset: 'reviewed-write' },
       writesFiles: true,
       sourceDestructive: false,
-      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'errorCount', 'errors', 'recommendedNextActions'],
       continueWhen: 'errorCount is zero and the response recommends or allows output audit.',
       nextRouteAfterSuccess: 'output-audit',
     },
@@ -2511,7 +2576,7 @@ export function getAgentGuidance(args = {}) {
       id: 'batch-plan-reviewed',
       appliesTo: ['overview', 'batch'],
       check: 'For unfamiliar batch runs, review a dryRun plan, sourceSafetyDecision, and safetySummary before writing output.',
-      responseFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'planIncluded', 'plannedCount', 'wouldProcessCount', 'skippedDuplicates'],
+      responseFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'planIncluded', 'plannedCount', 'wouldProcessCount', 'dedupeDecisionSummary', 'skippedDuplicates'],
     },
     {
       id: 'process-outcome-checked',
@@ -2730,7 +2795,7 @@ export function getAgentGuidance(args = {}) {
       followUpOptions: {
         workflowPreset: 'reviewed-write',
       },
-      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'inputCountGuide', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'inputCountGuide', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errorCount', 'errors'],
       successCriteria: 'Start with safe-preview dryRun true and sourceDestructive false; proceed to reviewed-write only after planned paths, warnings, maxFilesHit, and errors are acceptable, then audit output.',
       nonIntuitiveBehavior: 'split_font_batch dryRun defaults to false, so agents should set dryRun:true explicitly for planning.',
     },
@@ -2839,7 +2904,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'not-needed-unless-staging',
       },
-      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'inputCountGuide', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'inputCountGuide', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'Use direct source-dir batch only after safe-preview confirms dryRun true, sourceDestructive false, maxFilesHit false, acceptable planned paths/warnings, and no blocking errors.',
     },
     {
@@ -2967,7 +3032,7 @@ export function getAgentGuidance(args = {}) {
         'Uses font-identity dedupe, numeric-suffix naming, manifest skip checks, and fail-after error handling.',
         'Preview before writing; inspect batchDecision, batchWarnings, maxFilesHit, skippedDuplicates, errors, and safetySummary.',
       ],
-      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors', 'recommendedNextActions'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'maxFilesHit', 'dedupeDecisionSummary', 'skippedDuplicates', 'errorCount', 'errors', 'recommendedNextActions'],
       successCriteria: 'Preview must be no-write and acceptable; reviewed write must have sourceDestructive false and errorCount zero; final inspect_split_output audit must reach outputStructureDecision.status pass before reporting completion.',
       auditAfterWrite: {
         tool: 'inspect_split_output',
@@ -2997,7 +3062,7 @@ export function getAgentGuidance(args = {}) {
         'Disables pre-processing dedupe, so more output entries and more naming collisions are expected.',
         'Keep batchNamingMode numeric-suffix unless the user explicitly wants another collision policy.',
       ],
-      inspectFields: ['batchPolicySummary', 'batchDecision', 'planned', 'plannedCount', 'skippedDuplicates', 'batchWarnings', 'outputTreeInsideInputTree'],
+      inspectFields: ['batchPolicySummary', 'dedupeDecisionSummary', 'batchDecision', 'planned', 'plannedCount', 'skippedDuplicates', 'batchWarnings', 'outputTreeInsideInputTree'],
       successCriteria: 'Preview and reviewed write must intentionally use batchDedupeMode none, preserve every supported selected source font, and still reach outputStructureDecision.status pass after writing.',
     },
     {
@@ -3107,7 +3172,7 @@ export function getAgentGuidance(args = {}) {
         'includeResults is false through reviewed-write, keeping large responses compact.',
         'Always follow the audit-split-output next action and require outputStructureDecision.status pass plus auditStatus pass before reporting completion.',
       ],
-      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions', 'resultsIncluded'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'errorCount', 'errors', 'recommendedNextActions', 'resultsIncluded'],
       successCriteria: 'Run only after a reviewed preview; require maxFilesHit false, errorCount zero, audit-split-output next action, and an inspect_split_output audit with outputStructureDecision.status pass before reporting completion.',
     },
   ];
@@ -3246,6 +3311,7 @@ export function getAgentGuidance(args = {}) {
       'plannedCount',
       'wouldProcessCount',
       'skippedDuplicates',
+      'dedupeDecisionSummary',
       'inspectionWarnings',
       'inspectionWarningCount',
       'organizationWarnings',
@@ -4290,7 +4356,7 @@ function buildBatchNextActions({
           effectiveArgs,
           batchOptions,
         }),
-        inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
+        inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
         successCriteria: 'The reviewed write should return dryRun false, sourceDestructive false, errorCount zero, and an audit-split-output next action whenever output was written.',
       });
     }
@@ -4515,7 +4581,7 @@ function buildOrganizationNextActions({
         inputDir: inputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
-      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'The batch preview should remain dryRun true and sourceDestructive false, with planned grouping and warnings reviewed before any real write.',
     });
   }
@@ -4530,7 +4596,7 @@ function buildOrganizationNextActions({
         inputDir: outputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
-      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'inputDir', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'batchWarnings', 'planned'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'inputDir', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
       note: 'Use the organized outputDir intentionally as the next inputDir, or keep future scans scoped so they do not reprocess organized copies.',
       successCriteria: 'The follow-up batch preview should intentionally target the organized outputDir, remain no-write, and be reviewed before any real batch write.',
     });
@@ -4567,7 +4633,7 @@ function buildOrganizationNextActions({
           inputDir: inputDirRelative,
           recommendedBatchOptions: layout.recommendedBatchOptions,
         }),
-        inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+        inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
         successCriteria: 'The original-layout batch preview should remain dryRun true and sourceDestructive false, with planned paths and grouping reviewed before a real write.',
       });
       push({
@@ -4608,7 +4674,7 @@ function buildOrganizationNextActions({
         inputDir: outputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
-      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'The organized-output batch preview should remain dryRun true and sourceDestructive false, with planned paths and warnings reviewed before a real write.',
     });
   }
@@ -5195,7 +5261,7 @@ function buildDirectoryWorkflowSummary({
         outputRoot: '<reviewed split output root>',
         workflowPreset: 'reviewed-write',
       },
-      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'errorCount', 'errors', 'recommendedNextActions'],
       successCriteria: 'Only run after the safe-preview plan is acceptable; require sourceDestructive false, maxFilesHit false, and errorCount zero.',
     },
     {
@@ -6914,6 +6980,8 @@ export async function splitFontBatch(args = {}) {
   });
 
   let deduplicated;
+  let identityKeyMissingCount = 0;
+  let pathFallbackCount = 0;
   if (batchOptions.batchDedupeMode === 'none') {
     deduplicated = [...fontFiles];
   } else if (batchOptions.batchDedupeMode === 'same-path') {
@@ -6947,6 +7015,10 @@ export async function splitFontBatch(args = {}) {
     for (const file of fontFiles) {
       const ext = path.extname(file).toLowerCase();
       const identityKey = await buildBatchDedupeIdentity(file);
+      if (!identityKey) {
+        identityKeyMissingCount++;
+        pathFallbackCount++;
+      }
       const key = identityKey || `path:${file.slice(0, -ext.length)}`;
       const existing = byIdentity.get(key);
       if (!existing || compareBatchDedupeRepresentative(file, existing) < 0) {
@@ -6975,6 +7047,16 @@ export async function splitFontBatch(args = {}) {
 
   const deduplicatedCount = deduplicated.length;
   const skippedCount = fontFiles.length - deduplicatedCount;
+  const dedupeDecisionSummary = buildDedupeDecisionSummary({
+    appliesToTool: 'split_font_batch',
+    requestedMode: batchOptions.batchDedupeMode,
+    effectiveMode: batchOptions.batchDedupeMode,
+    inputFontCount: fontFiles.length,
+    deduplicatedCount,
+    skippedDuplicateCount: skippedCount,
+    identityKeyMissingCount,
+    pathFallbackCount,
+  });
   const selected = deduplicated.slice(0, limit);
 
   const results = [];
@@ -7252,6 +7334,7 @@ export async function splitFontBatch(args = {}) {
       'planned',
       'batchWarnings',
       'skippedDuplicates',
+      'dedupeDecisionSummary',
       'errorCount',
       'errors',
       'batchDecision',
@@ -7289,6 +7372,7 @@ export async function splitFontBatch(args = {}) {
     discoveredFontCount: fontFiles.length,
     deduplicatedCount,
     skippedDuplicates: skippedCount,
+    dedupeDecisionSummary,
     selectedFontCount: selected.length,
     skippedExisting,
     skippedByManifest,
@@ -7468,6 +7552,23 @@ export async function organizeFontDirectory(args = {}) {
   const invalidEntries = entries.filter((entry) => entry.status === 'invalid');
   const effectiveDedupeMode = options.parseFonts ? options.batchDedupeMode : options.batchDedupeMode === 'none' ? 'none' : 'same-path';
   const dedupe = dedupeOrganizationEntries(validEntries, effectiveDedupeMode);
+  const identityKeyMissingCount = options.parseFonts && effectiveDedupeMode === 'font-identity'
+    ? validEntries.filter((entry) => !entry.identityKey).length
+    : 0;
+  const pathFallbackCount = options.batchDedupeMode === 'font-identity'
+    ? options.parseFonts ? identityKeyMissingCount : validEntries.length
+    : 0;
+  const dedupeDecisionSummary = buildDedupeDecisionSummary({
+    appliesToTool: 'organize_font_directory',
+    requestedMode: options.batchDedupeMode,
+    effectiveMode: effectiveDedupeMode,
+    inputFontCount: validEntries.length,
+    deduplicatedCount: dedupe.selected.length,
+    skippedDuplicateCount: dedupe.duplicates.length,
+    identityKeyMissingCount,
+    pathFallbackCount,
+    dedupeLimitedByParsing: !options.parseFonts && options.batchDedupeMode === 'font-identity',
+  });
   const selectedEntries = [
     ...dedupe.selected,
     ...(options.copyInvalidFonts ? invalidEntries : []),
@@ -7657,6 +7758,7 @@ export async function organizeFontDirectory(args = {}) {
       'effectiveBatchDedupeMode',
       'dedupeLimitedByParsing',
       'skippedDuplicates',
+      'dedupeDecisionSummary',
       'plan',
       'organizationWarnings',
       'planActionSummary',
@@ -7704,6 +7806,7 @@ export async function organizeFontDirectory(args = {}) {
     unsupportedFileSummary,
     deduplicatedCount: dedupe.selected.length,
     skippedDuplicates: dedupe.duplicates.length,
+    dedupeDecisionSummary,
     selectedFontCount: selectedEntries.length,
     copiedCount,
     skippedTargetExists,

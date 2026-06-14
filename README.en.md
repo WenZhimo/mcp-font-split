@@ -272,6 +272,8 @@ In batch mode, the output directory key is the bare `fontBaseName` unless anothe
 - `font-identity`: deduplicate equivalent fonts across formats by comparing normalized font identity and keeping the highest-priority representative. The key uses typographic family/subfamily when available, falls back to legacy family/subfamily, then full name or PostScript name; glyph count is diagnostic only and does not split otherwise equivalent OTF/TTF/WOFF inputs.
 - If identity extraction fails, dedupe falls back to a path-based key and leaves the actual failure for the processing phase and `batchErrorMode`.
 
+Use `dedupeDecisionSummary` for a compact read on the dedupe pass. It reports requested/effective mode, key strategy, skipped duplicate count, identity-key gaps, path fallback, parsing limitations, and representative format priority. If `pathFallbackUsed` or `dedupeLimitedByParsing` is true, disclose that semantic identity dedupe was limited.
+
 `batchErrorMode` details:
 
 - `collect`: keep processing and return `ok: true` with `errors[]` and `errorCount`; use it only when the caller will inspect the error list.
@@ -347,6 +349,7 @@ Treat `batchDecision` as a route hint, not proof of success. It helps agents cho
 - `sourceFilesPreserved`: always `true`
 - `parsedFontMetadata`: false when `parseFonts: false`; then `validFontCount` / `invalidFontCount` are `null`
 - `effectiveBatchDedupeMode`, `dedupeLimitedByParsing`: explain whether identity dedupe was available
+- `dedupeDecisionSummary`: compact dedupe explanation with effective mode, path fallback, parsing limits, skipped duplicate count, and representative priority
 - `batchPolicySummary`: compact summary of the grouping, naming, and dedupe policies selected for this organization call; when `parseFonts: false` limits identity dedupe, `effectiveValues.batchDedupeMode` shows the actual fallback
 - `layoutDecision`: top-level compact route summary with `shortAnswer`, `layoutKind`, recommended grouping, main route, source-safety signals, direct original-input preview status, and copy-only staging status. Start with `layoutDecision.directoryHandling`; it gives a `recommendedMode` and `shortAnswer` for whether to preview the original input, use copy-only staging, or switch to an organized output as the next input. It is useful for the agent's first "where next?" decision, not proof that organization or splitting succeeded.
 - `directoryWorkflowSummary`: response-local navigation summary for layout review, safe batch preview, optional copy-only staging, reviewed batch write, and required output audit. It repeats source-safety signals, route choice, `planVisibility`, `workflowSteps[]`, success criteria, and non-intuitive behavior notes.

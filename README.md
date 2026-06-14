@@ -272,6 +272,8 @@ fonts/
 - `font-identity`：按归一化后的字体身份跨格式去重，保留优先级最高的代表。身份键优先使用 typographic family/subfamily，缺失时回退到 legacy family/subfamily，再回退到 full name 或 PostScript name；`glyphCount` 只作为诊断信息，不会把等价的 OTF/TTF/WOFF 输入拆开。
 - 如果身份解析失败，去重会回退到基于路径的 key，并把真实错误留给处理阶段和 `batchErrorMode`。
 
+查看 `dedupeDecisionSummary` 可以快速理解本次去重：它会报告请求/实际模式、key 策略、跳过重复数、缺失 identity key 数量、是否路径回退、是否因跳过解析而受限，以及代表格式优先级。如果 `pathFallbackUsed` 或 `dedupeLimitedByParsing` 为 true，应说明语义 identity 去重受到限制。
+
 `batchErrorMode` 说明：
 
 - `collect`：继续处理，并返回 `ok: true`、`errors[]` 和 `errorCount`；仅在调用方会主动检查错误列表时使用。
@@ -347,6 +349,7 @@ fonts/
 - `sourceFilesPreserved`：恒为 `true`
 - `parsedFontMetadata`：`parseFonts: false` 时为 false；此时 `validFontCount` / `invalidFontCount` 是 `null`
 - `effectiveBatchDedupeMode`、`dedupeLimitedByParsing`：说明 identity 去重是否真正可用
+- `dedupeDecisionSummary`：紧凑解释本次去重的实际模式、路径回退、解析限制、跳过重复数量和代表格式优先级
 - `batchPolicySummary`：本次整理调用采用的分组、命名和去重策略摘要；当 `parseFonts: false` 限制 identity 去重时，`effectiveValues.batchDedupeMode` 会显示实际回退值
 - `layoutDecision`：顶层紧凑路线摘要，汇总 `shortAnswer`、`layoutKind`、推荐分组、主线路由、源安全信号、原目录安全预览状态和 copy-only 暂存状态。先看其中的 `layoutDecision.directoryHandling`，它会用 `recommendedMode` 和 `shortAnswer` 直接回答“原目录能否预览、是否要 copy-only 暂存、下一步用哪个输入目录”。它适合 agent 先快速判断“下一步看哪里”，但不是整理或拆分已经成功的证明。
 - `directoryWorkflowSummary`：本次响应里的目录工作流导航摘要，用来串起布局复核、安全批量预览、可选 copy-only 暂存、reviewed 批量写入和必须执行的输出审计。它会重复源目录安全信号、路线选择、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示。
