@@ -77,7 +77,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。响应里的 `verificationChecklist[]` 是给 agent 用的防误判清单；在向用户宣称完成前，应检查其中适用于当前工作流的项目。
 其中 `local-compact-check-passed` 是面向本包维护者的普通本地门禁：运行 `npm run check:compact` 可用低噪声方式执行标准 syntax/smoke 检查；需要纯 JSON 时运行 `npm run --silent check:compact -- --json`。成功时它只打印步骤摘要和 `compact-check-result`，失败时返回失败步骤的 stdout/stderr 尾部，便于 agent 快速定位。`local-real-corpus-suite-passed` 是真实语料验证项：当改动会影响功能行为时，应在本机真实字体语料库上运行 `smoke:real-corpus-suite`，也就是 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`。它是代表性可靠性门禁，不是逐个字体目录人工验收，也不是运行时 MCP 工具调用。
-`localVerificationOutputGuide` 是 `get_agent_guidance` 返回的本地验证输出解读指南，用于维护本包时解释 `check:compact` 和 `smoke:real-corpus-suite` 的最终 JSON。它会给出 `standardCommand` / `standardJsonCommand`，并把真实语料 suite 的 `reliabilityGateDecision` 作为主判断字段。该 suite 会先打印简短的 `real-corpus suite summary`，最终 JSON 也会返回顶层 `reliabilityGateDecision`、`humanSummary`、`testScope` 和 `coverageSummary.functionalCoverage[]`。默认 compact 输出会用字段 `runSummaries` / `runSummaries[]` 替代完整子检查 `runs`，并在 `omittedDetailFields` 中标出省略的大块 evidence；需要完整子检查摘要和 evidence 时使用 `--verbose`。`reliabilityGateDecision` 是最快的机器可读判断：先看 `status`、`reliabilityGatePassed`、`blockingReasonCodes`、`fullCorpusFontCountField` 和 `targetCountsAreFullCorpusCounts`；`status: "pass"` 表示代表性功能链通过，不表示每个字体目录都已人工验收。`humanSummary` 用自然语言说明全库字体数量、固定/抽样目标数量和代表性写入审计状态，避免把 `4` 或 `10` 之类的小数字误读成全库字体数量。`testScope.corpusScan` 表示全库有界根扫描，`testScope.targetSampling` 表示固定回归点加自适应代表性抽样，`testScope.representativeWriteAudit` 表示一个真实写入和输出审计样本；其中的 `functionalCoverage[]` 用于说明真实语料运行实际覆盖了哪些功能路径，例如全根输入扫描、非字体噪声分类、目录整理预览、`sourceLayoutMismatchSummary` 布局判断摘要、copy-only 写入、单字体拆分、批量写入和输出结构审计。
+`localVerificationOutputGuide` 是 `get_agent_guidance` 返回的本地验证输出解读指南，用于维护本包时解释 `check:compact` 和 `smoke:real-corpus-suite` 的最终 JSON。它会给出 `standardCommand` / `standardJsonCommand`，并把真实语料 suite 的 `reliabilityGateDecision` 作为主判断字段。该 suite 会先打印简短的 `real-corpus suite summary`，最终 JSON 也会返回顶层 `reliabilityGateDecision`、`humanSummary`、`testScope` 和 `coverageSummary.functionalCoverage[]`。默认 compact 输出会用字段 `runSummaries` / `runSummaries[]` 替代完整子检查 `runs`，并在 `omittedDetailFields` 中标出省略的大块 evidence；需要完整子检查摘要和 evidence 时使用 `--verbose`。`reliabilityGateDecision` 是最快的机器可读判断：先看 `status`、`reliabilityGatePassed`、`blockingReasonCodes`、`fullCorpusFontCountField` 和 `targetCountsAreFullCorpusCounts`；`status: "pass"` 表示代表性功能链通过，不表示每个字体目录都已人工验收。`humanSummary` 用自然语言说明全库字体数量、固定/抽样目标数量和代表性写入审计状态，避免把 `4` 或 `10` 之类的小数字误读成全库字体数量。`testScope.corpusScan` 表示全库有界根扫描，`testScope.targetSampling` 表示固定回归点加自适应代表性抽样，`testScope.representativeWriteAudit` 表示一个真实写入和输出审计样本；其中的 `functionalCoverage[]` 用于说明真实语料运行实际覆盖了哪些功能路径，例如全根输入扫描、非字体噪声分类、目录整理预览、`sourceSafetyDecision` 源安全结论、`sourceLayoutMismatchSummary` 布局判断摘要、copy-only 写入、单字体拆分、批量写入和输出结构审计。
 `coverageSummary.unsupportedFileCategoryCoverage` 会单独列出忽略文件类别数、扩展名数，以及 `.zip` / `.txt` 之外的扩展名类型数；`coverageSummary.outputStructureAuditSummary` 会单独列出代表性单字体写入和批量写入的 `outputStructureDecision`、`auditStatus`、`auditPassed` 与 `structureSummary.conforms`。这两个字段用于避免把忽略统计误读成只支持压缩包/文本文件，也避免只看写入成功而漏掉输出目录结构审计。
 `configurationRecipes[]` 是给 agent 用的配置配方表；它把“保留每个源字体”“按源目录分组”“按字体 metadata 分组”“快速结构优先扫描”“copy-only 暂存整理”“大库审查后写入”等用户意图映射到最小 preset-first 参数，并列出写入行为、源目录安全性、取舍、必须检查的 `inspectFields` 和继续前必须满足的 `successCriteria`。配方不是成功证明，不能替代实际工具响应检查。
 `batchPolicyGuide` 是给 agent 用的批量策略自定义指南；它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个可选值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前必须满足的 `successCriteria`。当用户想偏离默认 preset 行为时，应优先参考它选择最小显式覆盖，并先运行 safe-preview。
@@ -419,7 +419,8 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `dryRun: true` 时 `writesOutputTree: false`，不会写 `outputRoot`。
 - `dryRun: false` 时 `writesOutputTree: true`，只会在 `outputRoot` 下写生成文件、原字体副本和 `split-meta.json`。
 - 非 dry-run 且有选中字体时 `mayOverwriteOutputTree: true`，表示已有输出文件可能被替换；这个风险只限输出目录，不表示源字体文件会被替换。
-- `safetySummary` 会集中重复这些字段，agent 判断批量工具是否破坏源目录时应优先看它。
+- `sourceSafetyDecision` 是第一层源安全结论，会直接给出 `status`、`sourceBackupRequired`、`writesFiles`、`requiresOutputAudit` 和 `mustInspectFields`。
+- `safetySummary` 会集中重复这些字段，agent 判断批量工具是否破坏源目录时应先看 `sourceSafetyDecision`，再看它。
 
 ### 6.1 批量去重策略
 
@@ -498,7 +499,8 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 只有显式设置 `dryRun: false` 才会写入文件。
 - 写入模式是 `copy-only`：只把选中的字体复制到 `outputDir`。
 - 不会移动、删除或重写源目录中的任何文件。
-- `safetySummary` 会用一个对象集中说明 operation mode、写入范围、覆盖范围和源目录保留状态。判断整理工具是否破坏源目录时，应优先看这个字段。
+- `sourceSafetyDecision` 是第一层源安全结论；`sourceBackupRequired` 应为 `false`，因为整理工具不会移动、删除或重写源字体。
+- `safetySummary` 会用一个对象集中说明 operation mode、写入范围、覆盖范围和源目录保留状态。判断整理工具是否破坏源目录时，应先看 `sourceSafetyDecision`，再看这个字段。
 - `sourceDestructive` 恒为 `false`。
 - `outputTreeInsideInputTree` 表示 `outputDir` 是否位于或等于 `inputDir`。
 - `writesSourceTree` 只有在 `dryRun: false` 且 `outputTreeInsideInputTree: true` 时才为 `true`；这表示输入目录树内会出现整理副本，不表示源字体文件被移动、删除或重写。
@@ -658,7 +660,8 @@ split-meta.json
 - `reprocessedBecauseSourceChanged`
 - `reprocessedBecauseOptionsChanged`
 - `processedFontCount`
-- `safetySummary`：集中的源目录/输出目录安全摘要；优先用于判断批量工具是否会写文件、是否影响源目录、覆盖风险是否只限输出目录
+- `sourceSafetyDecision`：第一层源安全结论；直接说明源字体是否会被移动/删除/重写、是否需要源文件备份、是否写文件、输出是否在输入树内、是否需要后续输出审计
+- `safetySummary`：集中的源目录/输出目录安全摘要；用于在 `sourceSafetyDecision` 之后判断批量工具是否会写文件、是否影响源目录、覆盖风险是否只限输出目录
 - `sourceDestructive`：恒为 `false`
 - `sourceFilesPreserved`：恒为 `true`
 - `writesSourceTree`：只有真实批量写入且 `outputRoot` 位于 `inputDir` 内时才为 `true`
@@ -708,7 +711,8 @@ split-meta.json
 
 | 字段 | 含义 |
 |------|------|
-| `safetySummary` | 集中的源目录/输出目录安全摘要；优先用于判断整理工具是否会写文件、是否会影响源目录、覆盖风险是否只限输出目录 |
+| `sourceSafetyDecision` | 第一层源安全结论；直接说明源字体是否会被移动/删除/重写、是否需要源文件备份、是否写文件、输出是否在输入树内 |
+| `safetySummary` | 集中的源目录/输出目录安全摘要；用于在 `sourceSafetyDecision` 之后判断整理工具是否会写文件、是否会影响源目录、覆盖风险是否只限输出目录 |
 | `operationMode` | `plan-only` 或 `copy-only` |
 | `sourceDestructive` | 恒为 `false` |
 | `sourceFilesPreserved` | 恒为 `true` |

@@ -66,14 +66,14 @@
 - `get_agent_guidance` 会返回 `errorResponseCatalog`，说明什么时候应把 MCP 错误文本当作 JSON 解析，以及如何按 `errorType: "configuration-error"` 路由 `FontSplitConfigurationError`、按 `errorType: "batch-split-error"` 路由 `BatchSplitError`，以及如何处理普通非结构化错误。
 - 需要错误响应、warning code 或响应字段的完整机器可读目录时，调用 `get_agent_guidance` 并设置 `detailLevel: "full"`，或只请求 `sections: ["error-catalog", "warning-catalog", "field-catalog"]`。
 - 当安装或运行环境不确定时，使用 `get_runtime_status`；它会只读检查解析后的工作区、Node engine 兼容性、包版本、cn-font-split 运行时版本和 WASM 文件，并返回便于 agent 执行/提示的 `recommendedActions[]`。
-- 当源目录是扁平、混合或与预期 family 分组不一致时，先用 `organize_font_directory` 的默认 `dryRun: true` 生成整理计划。它对源目录非破坏：不会移动或删除源文件；真正执行时也只是复制选中的字体到 `outputDir`。如果不确定该直接对原目录做批量预览，还是先复制到暂存目录，调用 `get_agent_guidance` 并请求 `sections: ["examples"]`，查看 `source-layout-mismatch-comparison`。
+- 当源目录是扁平、混合或与预期 family 分组不一致时，先用 `organize_font_directory` 的默认 `dryRun: true` 生成整理计划。它对源目录非破坏：不会移动或删除源文件；真正执行时也只是复制选中的字体到 `outputDir`。响应里的 `sourceSafetyDecision` 是第一层源安全结论，先看它，再看 `safetySummary` 和详细 warning。如果不确定该直接对原目录做批量预览，还是先复制到暂存目录，调用 `get_agent_guidance` 并请求 `sections: ["examples"]`，查看 `source-layout-mismatch-comparison`。
 - 批量扫描会跳过依赖目录、已生成输出目录、`__MACOSX` 和 AppleDouble `._*` 资源叉文件。
 - `.woff` / `.woff2` 输入会先解压成 sfnt-like 数据，再进入处理流程。
 - 批量模式会按照 `batchDedupeMode` 去重；默认 `font-identity` 会在任意格式之间比较等价字体身份，并按 `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff` 的优先级保留一个代表。
 - 批量分组默认是 `batchGroupBy: "auto"`，会保留之前的目录优先行为。
 - 批量命名默认是 `batchNamingMode: "numeric-suffix"`：先用裸 `fontBaseName`，只有真实冲突时才分配稳定的 `-1`、`-2`、`-3`。
 - 当 OTF / TTF 仅容器不同但字体身份相同时，批量模式会去重并只保留一个代表。
-- 批量处理不会移动、删除或重写源字体文件：`sourceDestructive` 应始终为 `false`。如果 `outputRoot` 位于 `inputDir` 内，真实写入仍会落在输入目录树里，因此描述“源目录树无写入”前必须检查 `writesSourceTree` 和 `outputTreeInsideInputTree`。
+- 批量处理不会移动、删除或重写源字体文件：`sourceDestructive` 应始终为 `false`，`sourceSafetyDecision.sourceBackupRequired` 应为 `false`。如果 `outputRoot` 位于 `inputDir` 内，真实写入仍会落在输入目录树里，因此描述“源目录树无写入”前必须检查 `sourceSafetyDecision`、`writesSourceTree` 和 `outputTreeInsideInputTree`。
 - 批量增量跳过默认是 `skipMode: "manifest"`，会用 `split-meta.json` 比较源文件和有效配置。
 - 只有明确需要重跑时才使用 `skipMode: "force"`；默认 manifest 跳过是安全的增量路径。
 - 批量错误处理默认是 `batchErrorMode: "fail-after"`，会处理完选中的字体后把任何单字体错误升级为批量错误。
@@ -313,7 +313,8 @@ fonts/
 - `batchPolicySummary`：本次实际采用的批量分组、命名、去重和错误策略摘要，并附带对应 `batchPolicyGuide` 成功标准
 - `batchDecision`：批量响应的紧凑主线路由建议，用于区分 dry-run 计划审查、提高 `maxFiles` 重跑、错误检查、输出审计、已有输出跳过和空批量等分支
 - `batchErrorMode`、`errorCount`、`errors[]`
-- `safetySummary`：批量源目录/输出目录安全摘要。判断批量调用是否写文件、是否影响源目录树时优先看它；源字体文件应始终保留，写入范围只限 `outputRoot`。
+- `sourceSafetyDecision`：第一层源安全结论。它直接说明源字体是否会被移动/删除/重写、是否需要源文件备份、是否写文件、写入是否位于输入目录树内，以及写入后是否需要输出审计；它不替代 `safetySummary` 的细节字段。
+- `safetySummary`：批量源目录/输出目录安全摘要。判断批量调用是否写文件、是否影响源目录树时先看 `sourceSafetyDecision`，再看它；源字体文件应始终保留，写入范围只限 `outputRoot`。
 - `sourceDestructive`：批量工具应始终返回 `false`
 - `writesSourceTree`：只有真实批量写入且 `outputRoot` 位于 `inputDir` 内时才为 `true`
 - `writesOutputTree`：`dryRun: false` 时为 `true`
@@ -332,7 +333,8 @@ fonts/
 
 `organize_font_directory` 会返回源目录安全性摘要和可选整理计划：
 
-- `safetySummary`：紧凑的源目录/输出目录安全摘要。判断整理工具是否写文件、是否影响源目录树时优先看它；它会确认源文件会被保留，并把任何覆盖风险限定到 `outputDir`。
+- `sourceSafetyDecision`：第一层源安全结论。整理工具的 `sourceBackupRequired` 应为 `false`，因为它不会移动、删除或重写源字体；`dryRun: false` 也只是 copy-only 写入 `outputDir`。
+- `safetySummary`：紧凑的源目录/输出目录安全摘要。判断整理工具是否写文件、是否影响源目录树时先看 `sourceSafetyDecision`，再看它；它会确认源文件会被保留，并把任何覆盖风险限定到 `outputDir`。
 - `operationMode`：默认 dry-run 时为 `plan-only`，`dryRun: false` 时为 `copy-only`
 - `sourceDestructive`：恒为 `false`
 - `writesSourceTree`：只有真实整理复制且 `outputDir` 位于 `inputDir` 内时才为 `true`
@@ -606,7 +608,7 @@ npm run smoke:small-copy-original
 
 `npm run check` 是推荐给 AI agent / CI 的入口。它会运行语法检查和一组能自造最小输入的 smoke 场景，不依赖真实字体库。需要低噪声输出时使用 `npm run check:compact`；它顺序运行同一组 syntax/smoke 门禁，成功时只打印步骤摘要和 `compact-check-result`，失败时返回失败步骤的 stdout/stderr 尾部。需要纯 JSON 给 agent 解析时使用 `npm run --silent check:compact -- --json`。
 
-`smoke:real-corpus-suite` 是功能改动告一段落时推荐的本机真实语料可靠性门禁，不包含在 `npm run check` 中。`get_agent_guidance.localVerificationOutputGuide` 是解读这个本地命令输出的机器可读伴随指南。suite 会顺序运行只读全库预览、`smoke:real-corpus-targets` 和 `smoke:real-corpus-integration`，覆盖全库 compact 扫描、代表性只读抽样、目录整理预览、源目录结构判断摘要、copy-only 写入、单字体拆分、批量写入和输出结构审计。默认输出为 compact，只打印每个子检查的成功状态、耗时、人类可读 `real-corpus suite summary` 和低噪声最终 JSON；JSON 里的 `humanSummary` 会重复这组短摘要，便于 agent 直接读取。最终 JSON 还包含顶层 `reliabilityGateDecision`：先检查 `status`、`reliabilityGatePassed`、`blockingReasonCodes`、`fullCorpusFontCountField` 和 `targetCountsAreFullCorpusCounts`。`status: "pass"` 表示代表性功能链通过，不表示每个字体目录都已人工验收。最终总览里的 `testScope` 会把范围拆成 `corpusScan`（全库根扫描）、`targetSampling`（固定回归点 + 自适应代表性抽样）和 `representativeWriteAudit`（一个真实写入/审计样本），`coverageSummary` 会直接列出全库字体/忽略文件计数、抽样目标数量、已选目标、代表性写入审计状态，以及省略大证据的 `functionalCoverage[]` 功能覆盖清单；其中 `source-layout-mismatch-summary` 和 `layout-decision-route-summary` 会确认真实语料路径实际检查了 `sourceLayoutMismatchSummary` 与 `layoutDecision` 的布局匹配、直接预览、路线摘要和 copy-only 源安全语义。默认 JSON 只保留 `runSummaries[]`，并通过 `omittedDetailFields` 标明省略了子检查详情和大块 evidence；需要展开完整子检查输出时加 `--verbose`，或设置 `FONT_SPLIT_REAL_CORPUS_SUITE_VERBOSE=true`。它使用真实复杂语料证明功能链可靠，不是逐个字体目录人工验收。可选参数为 `<字体语料目录> [maxFiles] [targetLimit] [integrationLimit] [sampleCount] [--verbose]`。
+`smoke:real-corpus-suite` 是功能改动告一段落时推荐的本机真实语料可靠性门禁，不包含在 `npm run check` 中。`get_agent_guidance.localVerificationOutputGuide` 是解读这个本地命令输出的机器可读伴随指南。suite 会顺序运行只读全库预览、`smoke:real-corpus-targets` 和 `smoke:real-corpus-integration`，覆盖全库 compact 扫描、代表性只读抽样、目录整理预览、源安全结论、源目录结构判断摘要、copy-only 写入、单字体拆分、批量写入和输出结构审计。默认输出为 compact，只打印每个子检查的成功状态、耗时、人类可读 `real-corpus suite summary` 和低噪声最终 JSON；JSON 里的 `humanSummary` 会重复这组短摘要，便于 agent 直接读取。最终 JSON 还包含顶层 `reliabilityGateDecision`：先检查 `status`、`reliabilityGatePassed`、`blockingReasonCodes`、`fullCorpusFontCountField` 和 `targetCountsAreFullCorpusCounts`。`status: "pass"` 表示代表性功能链通过，不表示每个字体目录都已人工验收。最终总览里的 `testScope` 会把范围拆成 `corpusScan`（全库根扫描）、`targetSampling`（固定回归点 + 自适应代表性抽样）和 `representativeWriteAudit`（一个真实写入/审计样本），`coverageSummary` 会直接列出全库字体/忽略文件计数、抽样目标数量、已选目标、代表性写入审计状态，以及省略大证据的 `functionalCoverage[]` 功能覆盖清单；其中 `source-safety-decision`、`source-layout-mismatch-summary` 和 `layout-decision-route-summary` 会确认真实语料路径实际检查了 `sourceSafetyDecision`、`sourceLayoutMismatchSummary` 与 `layoutDecision` 的源文件保留、布局匹配、直接预览、路线摘要和 copy-only 源安全语义。默认 JSON 只保留 `runSummaries[]`，并通过 `omittedDetailFields` 标明省略了子检查详情和大块 evidence；需要展开完整子检查输出时加 `--verbose`，或设置 `FONT_SPLIT_REAL_CORPUS_SUITE_VERBOSE=true`。它使用真实复杂语料证明功能链可靠，不是逐个字体目录人工验收。可选参数为 `<字体语料目录> [maxFiles] [targetLimit] [integrationLimit] [sampleCount] [--verbose]`。
 
 `coverageSummary.unsupportedFileCategoryCoverage` 会把忽略文件覆盖面单独列出，包括类别数、扩展名数，以及 `.zip` / `.txt` 之外的扩展名类型数；`coverageSummary.outputStructureAuditSummary` 会单独列出代表性单字体写入和批量写入的 `outputStructureDecision`、`auditStatus`、`auditPassed` 与 `structureSummary.conforms`。这两个字段用于快速确认“忽略统计不是只看压缩包/文本文件”和“输出目录结构已经被审计”。
 

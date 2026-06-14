@@ -799,6 +799,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Compact source/output safety summary for batch or directory organization calls.',
     agentAction: 'Inspect this before treating a call as non-destructive, dry-run only, or output-writing.',
   },
+  sourceSafetyDecision: {
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
+    meaning: 'Top-level compact answer for whether source font files are moved, deleted, or rewritten, whether the call writes output, and whether output is inside the input tree.',
+    agentAction: 'Use this as the first source-safety triage field, then inspect safetySummary, writesSourceTree, writesOutputTree, outputTreeInsideInputTree, and output audit fields when output was written.',
+  },
   toolResponseFieldCatalog: {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Catalog of important response fields, their source tools, meanings, and suggested agent actions.',
@@ -1280,7 +1285,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       workflowPreset: 'safe-preview',
     },
     customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
-    inspectFields: ['safetySummary', 'batchPolicySummary', 'dryRun', 'operationMode', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+    inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'operationMode', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
     nextStep: 'Use recommendedBatchPreviewArgs for a batch dry-run, or copy to a staging directory only after reviewing the plan.',
     successCriteria: 'The organization preview must remain no-write and sourceDestructive false, with layout, route decision, plan summary, warnings, and recommendedBatchPreviewArgs reviewed before any write.',
   },
@@ -1311,7 +1316,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       workflowPreset: 'reviewed-write',
     },
     customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'],
-    inspectFields: ['safetySummary', 'batchPolicySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'errorCount', 'errors'],
+    inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'errorCount', 'errors'],
     nextStep: 'Use outputDir as the next split_font_batch input only after checking organizationWarnings.',
     successCriteria: 'The copy run must be sourceDestructive false, operationMode copy-only, errorCount zero, and copiedCount or planActionSummary must match the reviewed plan.',
   },
@@ -1329,7 +1334,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       maxFiles: 50000,
     },
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'includeResults', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'splitFailureAction'],
-    inspectFields: ['safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
+    inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
     nextStep: 'If the plan is acceptable, rerun with dryRun:false; use includeResults:false for large real runs.',
     successCriteria: 'The preview must have dryRun true, sourceDestructive false, maxFilesHit false, errorCount zero, and acceptable planned paths, warnings, naming, and dedupe decisions before writing.',
   },
@@ -1347,7 +1352,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       maxFiles: 50000,
     },
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'],
-    inspectFields: ['safetySummary', 'batchPolicySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
+    inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
     nextStep: 'Run inspect_split_output on outputRoot before reporting completion and require outputStructureDecision.status pass.',
     successCriteria: 'The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up inspect_split_output audit with outputStructureDecision.status pass before reporting completion.',
   },
@@ -1600,7 +1605,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Use the organizer dry-run to decide whether direct batch splitting is safe or whether a copy-only staging directory is useful.',
-          inspectFields: ['safetySummary', 'batchPolicySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'planActionSummary'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'planActionSummary'],
           successCriteria: 'The desired grouping is clear and any organizationWarnings have been reviewed.',
         },
         {
@@ -1610,7 +1615,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Preview dedupe, naming, skip checks, warnings, and planned output paths before writing.',
-          inspectFields: ['safetySummary', 'batchPolicySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
           successCriteria: 'dryRun is true, sourceDestructive is false, maxFilesHit is false, and planned paths/warnings are acceptable.',
         },
         {
@@ -1620,7 +1625,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: true,
           sourceDestructive: false,
           goal: 'Write split output only after the preview has been reviewed.',
-          inspectFields: ['safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
           successCriteria: 'errorCount is zero and the response recommends or allows output audit.',
         },
         auditStep,
@@ -1630,7 +1635,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           id: 'staging-needed',
           when: 'The user wants a cleaner source staging directory, or the source layout is too ambiguous for direct grouping.',
           useTemplateId: 'copy-organized-staging',
-          inspectFields: ['safetySummary', 'batchPolicySummary', 'copiedCount', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'organizationManifestPath'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'copiedCount', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'organizationManifestPath'],
           nextInput: 'Use the organizer outputDir as split_font_batch inputDir only after reviewing warnings.',
           successCriteria: 'The copy plan remains sourceDestructive false and copy-only, with copiedCount and organizationWarnings matching the reviewed plan.',
         },
@@ -1638,7 +1643,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           id: 'direct-batch-ok',
           when: 'The source layout already matches the desired grouping.',
           useTemplateId: 'batch-dry-run-preview',
-          inspectFields: ['safetySummary', 'batchDecision', 'planned', 'batchWarnings', 'unsupportedFileDecision', 'unsupportedFileSummary'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchDecision', 'planned', 'batchWarnings', 'unsupportedFileDecision', 'unsupportedFileSummary'],
           nextInput: 'Use the original inputDir for split_font_batch.',
           successCriteria: 'The direct batch preview remains dryRun true and sourceDestructive false, with planned grouping and warnings acceptable for the original inputDir.',
         },
@@ -1710,7 +1715,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Check whether source directory layout matches desired family grouping.',
-          inspectFields: ['layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'planActionSummary'],
+          inspectFields: ['sourceSafetyDecision', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'planActionSummary'],
           successCriteria: 'The grouping strategy is chosen and any layout warnings are reviewed.',
         },
         {
@@ -1720,7 +1725,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Preview selected fonts, dedupe, naming, skip decisions, and warnings.',
-          inspectFields: ['safetySummary', 'batchPolicySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'skippedDuplicates', 'errorCount', 'errors'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'skippedDuplicates', 'errorCount', 'errors'],
           successCriteria: 'The preview paths, warnings, and dedupe policy match the user intent.',
         },
         {
@@ -1730,7 +1735,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: true,
           sourceDestructive: false,
           goal: 'Run the reviewed batch write.',
-          inspectFields: ['safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
           successCriteria: 'errorCount is zero and output audit is available.',
         },
         auditStep,
@@ -1782,7 +1787,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Plan source grouping and copy actions without writing.',
-          inspectFields: ['safetySummary', 'batchPolicySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
           successCriteria: 'The copy plan and grouping policy are acceptable.',
         },
         {
@@ -1792,7 +1797,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: true,
           sourceDestructive: false,
           goal: 'Copy selected fonts into outputDir without moving or deleting source files.',
-          inspectFields: ['safetySummary', 'batchPolicySummary', 'copiedCount', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'organizationManifestPath'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'copiedCount', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'organizationManifestPath'],
           successCriteria: 'sourceDestructive is false and copiedCount/organizationWarnings match the reviewed plan.',
         },
         {
@@ -1812,7 +1817,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Preview split output using either recommendedBatchPreviewArgs or the staged outputDir.',
-          inspectFields: ['safetySummary', 'batchPolicySummary', 'batchDecision', 'planned', 'batchWarnings', 'skippedDuplicates'],
+          inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'planned', 'batchWarnings', 'skippedDuplicates'],
           successCriteria: 'The batch preview matches the selected grouping and dedupe policy.',
         },
       ],
@@ -2035,7 +2040,7 @@ function buildNextToolDecisionSummary(workflow) {
       firstArgsHint: { workflowPreset: 'safe-preview' },
       writesFiles: false,
       sourceDestructive: false,
-      inspectFields: ['safetySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.decisionChecklist', 'organizationWarnings', 'planActionSummary'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'layout', 'recommendedBatchPreviewArgs', 'organizationDecision', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.decisionChecklist', 'organizationWarnings', 'planActionSummary'],
       continueWhen: 'The route, warnings, and sourceLayoutMismatchSummary.decisionChecklist are reviewed.',
       nextRouteAfterSuccess: 'batch-safe-preview',
       optionalRoute: 'copy-only-staging',
@@ -2061,7 +2066,7 @@ function buildNextToolDecisionSummary(workflow) {
       writesFiles: true,
       sourceDestructive: false,
       writeBehavior: 'copy-only-outputDir',
-      inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.decisionChecklist', 'organizationWarnings'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.decisionChecklist', 'organizationWarnings'],
       continueWhen: 'The copy run remains sourceDestructive false and copy-only, with errors resolved and warnings reviewed.',
       nextRouteAfterSuccess: 'batch-safe-preview',
     },
@@ -2073,7 +2078,7 @@ function buildNextToolDecisionSummary(workflow) {
       firstArgsHint: { workflowPreset: 'safe-preview' },
       writesFiles: false,
       sourceDestructive: false,
-      inspectFields: ['safetySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors'],
       continueWhen: 'The preview is no-write, source-safe, untruncated, error-free, and planned paths/dedupe/naming match user intent.',
       nextRouteAfterSuccess: 'batch-reviewed-write',
     },
@@ -2085,7 +2090,7 @@ function buildNextToolDecisionSummary(workflow) {
       firstArgsHint: { workflowPreset: 'reviewed-write' },
       writesFiles: true,
       sourceDestructive: false,
-      inspectFields: ['safetySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
       continueWhen: 'errorCount is zero and the response recommends or allows output audit.',
       nextRouteAfterSuccess: 'output-audit',
     },
@@ -2305,14 +2310,14 @@ export function getAgentGuidance(args = {}) {
     {
       id: 'layout-plan-reviewed',
       appliesTo: ['overview', 'batch', 'organize'],
-      check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect safetySummary, layout, recommendedBatchOptions, recommendedBatchPreviewArgs, organizationDecision, directoryWorkflowSummary, sourceLayoutMismatchSummary, sourceDestructive, writesSourceTree, writesOutputTree, outputTreeInsideInputTree, mayOverwriteOutputTree, organizationWarnings, and planActionSummary before applying any copy plan.',
-      responseFields: ['safetySummary', 'batchPolicySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedNextActions', 'unsupportedFileDecision', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
+      check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect sourceSafetyDecision, safetySummary, layout, recommendedBatchOptions, recommendedBatchPreviewArgs, organizationDecision, directoryWorkflowSummary, sourceLayoutMismatchSummary, sourceDestructive, writesSourceTree, writesOutputTree, outputTreeInsideInputTree, mayOverwriteOutputTree, organizationWarnings, and planActionSummary before applying any copy plan.',
+      responseFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedNextActions', 'unsupportedFileDecision', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'organizationWarnings', 'planActionSummary', 'plan'],
     },
     {
       id: 'batch-plan-reviewed',
       appliesTo: ['overview', 'batch'],
-      check: 'For unfamiliar batch runs, review a dryRun plan and safetySummary before writing output.',
-      responseFields: ['safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'planIncluded', 'plannedCount', 'wouldProcessCount', 'skippedDuplicates'],
+      check: 'For unfamiliar batch runs, review a dryRun plan, sourceSafetyDecision, and safetySummary before writing output.',
+      responseFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'planIncluded', 'plannedCount', 'wouldProcessCount', 'skippedDuplicates'],
     },
     {
       id: 'process-outcome-checked',
@@ -2476,7 +2481,7 @@ export function getAgentGuidance(args = {}) {
       followUpOptions: {
         workflowPreset: 'reviewed-write',
       },
-      mustInspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
       successCriteria: 'Start with safe-preview dryRun true and sourceDestructive false; proceed to reviewed-write only after planned paths, warnings, maxFilesHit, and errors are acceptable, then audit output.',
       nonIntuitiveBehavior: 'split_font_batch dryRun defaults to false, so agents should set dryRun:true explicitly for planning.',
     },
@@ -2494,7 +2499,7 @@ export function getAgentGuidance(args = {}) {
         inputDir: '<original-inputDir-or-organized-outputDir>',
         workflowPreset: 'safe-preview',
       },
-      mustInspectFields: ['safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
       successCriteria: 'The organization pass must remain no-write and sourceDestructive false; choose original input or organized output only after reviewing layout, warnings, plan summary, and recommendedBatchPreviewArgs.',
       nonIntuitiveBehavior: 'organize_font_directory defaults to dryRun:true and never moves or deletes source files; dryRun:false copies into outputDir only.',
     },
@@ -2524,7 +2529,7 @@ export function getAgentGuidance(args = {}) {
       followUpOptions: {
         workflowPreset: 'reviewed-write',
       },
-      mustInspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
       successCriteria: 'Review the dry-run plan before copying; real organization must remain copy-only and sourceDestructive false, with copiedCount/manifest and warnings matching the reviewed plan.',
       nonIntuitiveBehavior: 'A real organize run is copy-only. overwriteExisting:true can replace files in outputDir but still does not modify source files.',
     },
@@ -2554,7 +2559,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
       successCriteria: 'Use the example only if actual layout is flat or equivalent; continue after organization preview is no-write, source-safe, and recommendedBatchPreviewArgs/grouping have been reviewed.',
     },
     {
@@ -2584,7 +2589,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'not-needed-unless-staging',
       },
-      mustInspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'Use direct source-dir batch only after safe-preview confirms dryRun true, sourceDestructive false, maxFilesHit false, acceptable planned paths/warnings, and no blocking errors.',
     },
     {
@@ -2613,7 +2618,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileDecision', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'layout.layoutKind', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileDecision', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
       successCriteria: 'Use organization preview first; proceed only after mixed-layout warnings, planActionSummary, and recommendedBatchPreviewArgs are reviewed and sourceDestructive remains false.',
     },
     {
@@ -2661,7 +2666,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['safetySummary', 'layout.layoutKind', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'layout.layoutKind', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
       successCriteria: 'Use this comparison only to choose the next route; actual continuation requires safe-preview, sourceDestructive false, reviewed sourceLayoutMismatchSummary, reviewed warnings, and accepted recommendedBatchPreviewArgs.',
     },
     {
@@ -2712,7 +2717,7 @@ export function getAgentGuidance(args = {}) {
         'Uses font-identity dedupe, numeric-suffix naming, manifest skip checks, and fail-after error handling.',
         'Preview before writing; inspect batchDecision, batchWarnings, maxFilesHit, skippedDuplicates, errors, and safetySummary.',
       ],
-      inspectFields: ['safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors', 'recommendedNextActions'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'maxFilesHit', 'skippedDuplicates', 'errorCount', 'errors', 'recommendedNextActions'],
       successCriteria: 'Preview must be no-write and acceptable; reviewed write must have sourceDestructive false and errorCount zero; final inspect_split_output audit must reach outputStructureDecision.status pass before reporting completion.',
       auditAfterWrite: {
         tool: 'inspect_split_output',
@@ -2832,7 +2837,7 @@ export function getAgentGuidance(args = {}) {
         'Real organization writes copy selected fonts into outputDir only; it never moves, deletes, or rewrites source files.',
         'overwriteExisting only affects files in outputDir and should be enabled explicitly.',
       ],
-      inspectFields: ['safetySummary', 'batchPolicySummary', 'operationMode', 'copiedCount', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'organizationWarnings', 'planActionSummary'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'operationMode', 'copiedCount', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'organizationWarnings', 'planActionSummary'],
       successCriteria: 'Dry-run plan must be reviewed first; real organization must remain sourceDestructive false and copy-only, and the staged output should be inspected or batch-previewed before splitting.',
     },
     {
@@ -2852,7 +2857,7 @@ export function getAgentGuidance(args = {}) {
         'includeResults is false through reviewed-write, keeping large responses compact.',
         'Always follow the audit-split-output next action and require outputStructureDecision.status pass plus auditStatus pass before reporting completion.',
       ],
-      inspectFields: ['safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions', 'resultsIncluded'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions', 'resultsIncluded'],
       successCriteria: 'Run only after a reviewed preview; require maxFilesHit false, errorCount zero, audit-split-output next action, and an inspect_split_output audit with outputStructureDecision.status pass before reporting completion.',
     },
   ];
@@ -2969,6 +2974,7 @@ export function getAgentGuidance(args = {}) {
       'guidanceView',
       'errorResponseCatalog',
       'warningCodeCatalog',
+      'sourceSafetyDecision',
       'safetySummary',
       'toolResponseFieldCatalog',
       'localVerificationOutputGuide',
@@ -3546,6 +3552,81 @@ function buildBatchSafetySummary({ dryRun, selectedCount, outputTreeInsideInputT
   };
 }
 
+function buildSourceSafetyDecision({
+  appliesToTool,
+  safetySummary,
+  inputPath,
+  outputPath,
+  outputPathRole,
+  requiresOutputAudit = false,
+}) {
+  const sourceSafe = safetySummary.sourceDestructive === false
+    && safetySummary.sourceFilesPreserved === true;
+  const writesFiles = safetySummary.writesOutputTree === true;
+  const outputInsideInput = safetySummary.outputTreeInsideInputTree === true;
+  const status = !sourceSafe
+    ? 'action-required'
+    : !writesFiles
+      ? 'source-safe-no-write'
+      : outputInsideInput
+        ? 'source-safe-output-inside-input-tree'
+        : 'source-safe-output-tree-write';
+  const shortAnswer = !sourceSafe
+    ? 'Review safety fields before continuing; source preservation could not be confirmed.'
+    : !writesFiles
+      ? 'Source font files are preserved and this call writes no output files.'
+      : outputInsideInput
+        ? 'Source font files are preserved, but generated output is written inside the input directory tree.'
+        : 'Source font files are preserved; writes are limited to the configured output tree.';
+  const nonIntuitiveBehavior = [
+    'sourceDestructive false means source font files are not moved, deleted, or rewritten.',
+  ];
+  if (outputInsideInput) {
+    if (safetySummary.writesSourceTree === true) {
+      nonIntuitiveBehavior.push('writesSourceTree true means generated output is inside the input tree; it does not mean source font files are modified.');
+    } else {
+      nonIntuitiveBehavior.push('outputTreeInsideInputTree true only identifies the configured output location; when writesFiles is false, no output files are written.');
+    }
+  }
+  if (safetySummary.mayOverwriteOutputTree) {
+    nonIntuitiveBehavior.push('mayOverwriteOutputTree applies to generated output paths, not source font files.');
+  }
+
+  return {
+    summaryType: 'source-safety-decision',
+    appliesToTool,
+    status,
+    shortAnswer,
+    operationMode: safetySummary.operationMode,
+    sourceDestructive: safetySummary.sourceDestructive,
+    sourceFilesPreserved: safetySummary.sourceFilesPreserved,
+    sourceFilesMovedDeletedOrRewritten: safetySummary.sourceDestructive === true,
+    sourceBackupRequired: false,
+    writesFiles,
+    writesSourceTree: safetySummary.writesSourceTree,
+    writesOutputTree: safetySummary.writesOutputTree,
+    outputTreeInsideInputTree: safetySummary.outputTreeInsideInputTree,
+    mayOverwriteOutputTree: safetySummary.mayOverwriteOutputTree,
+    writeScope: safetySummary.writeScope,
+    overwriteScope: safetySummary.overwriteScope,
+    inputPath,
+    outputPath,
+    outputPathRole,
+    requiresOutputAudit,
+    mustInspectFields: [
+      'sourceSafetyDecision',
+      'safetySummary',
+      'sourceDestructive',
+      'sourceFilesPreserved',
+      'writesSourceTree',
+      'writesOutputTree',
+      'outputTreeInsideInputTree',
+      'mayOverwriteOutputTree',
+    ],
+    nonIntuitiveBehavior,
+  };
+}
+
 function buildInputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, invalidFontCount, missingIdentityCount }) {
   const warnings = [];
   const push = (code, message) => warnings.push({ code, message });
@@ -3876,7 +3957,7 @@ function buildBatchNextActions({
           effectiveArgs,
           batchOptions,
         }),
-        inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
+        inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
         successCriteria: 'The reviewed write should return dryRun false, sourceDestructive false, errorCount zero, and an audit-split-output next action whenever output was written.',
       });
     }
@@ -4101,7 +4182,7 @@ function buildOrganizationNextActions({
         inputDir: inputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
-      inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'The batch preview should remain dryRun true and sourceDestructive false, with planned grouping and warnings reviewed before any real write.',
     });
   }
@@ -4116,7 +4197,7 @@ function buildOrganizationNextActions({
         inputDir: outputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
-      inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'inputDir', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'batchWarnings', 'planned'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'inputDir', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'batchWarnings', 'planned'],
       note: 'Use the organized outputDir intentionally as the next inputDir, or keep future scans scoped so they do not reprocess organized copies.',
       successCriteria: 'The follow-up batch preview should intentionally target the organized outputDir, remain no-write, and be reviewed before any real batch write.',
     });
@@ -4139,7 +4220,7 @@ function buildOrganizationNextActions({
       priority: 'high',
       tool: 'organize_font_directory',
       reason: 'dryRun:true wrote no files; review the plan and warnings before choosing a write step.',
-      inspectFields: ['safetySummary', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'planActionSummary', 'plan', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'planActionSummary', 'plan', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree'],
       successCriteria: 'Proceed to copy only after safetySummary confirms sourceDestructive false and the plan, planActionSummary, and organizationWarnings are acceptable.',
     });
 
@@ -4153,7 +4234,7 @@ function buildOrganizationNextActions({
           inputDir: inputDirRelative,
           recommendedBatchOptions: layout.recommendedBatchOptions,
         }),
-        inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+        inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
         successCriteria: 'The original-layout batch preview should remain dryRun true and sourceDestructive false, with planned paths and grouping reviewed before a real write.',
       });
       push({
@@ -4168,7 +4249,7 @@ function buildOrganizationNextActions({
           options,
           optionOverrides: { dryRun: false, overwriteExisting: false },
         }),
-        inspectFields: ['safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
+        inspectFields: ['sourceSafetyDecision', 'safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary'],
         successCriteria: 'The reviewed organization copy should be sourceDestructive false and copy-only, with copiedCount or planActionSummary matching the reviewed plan.',
       });
     }
@@ -4194,7 +4275,7 @@ function buildOrganizationNextActions({
         inputDir: outputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
       }),
-      inspectFields: ['safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'The organized-output batch preview should remain dryRun true and sourceDestructive false, with planned paths and warnings reviewed before a real write.',
     });
   }
@@ -4692,7 +4773,7 @@ function buildDirectoryWorkflowSummary({
       tool: 'organize_font_directory',
       writesFiles: safetySummary.writesOutputTree,
       sourceDestructive: false,
-      inspectFields: ['safetySummary', 'layout', 'batchPolicySummary', 'organizationDecision', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'layout', 'batchPolicySummary', 'organizationDecision', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
       successCriteria: 'Confirm sourceDestructive false, review layout and organizationWarnings, and decide whether original input or copy-only staging should be previewed next.',
     },
   ];
@@ -4765,7 +4846,7 @@ function buildDirectoryWorkflowSummary({
         outputRoot: '<reviewed split output root>',
         workflowPreset: 'reviewed-write',
       },
-      inspectFields: ['safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'errorCount', 'errors', 'recommendedNextActions'],
       successCriteria: 'Only run after the safe-preview plan is acceptable; require sourceDestructive false, maxFilesHit false, and errorCount zero.',
     },
     {
@@ -5893,6 +5974,7 @@ function buildOrganizationManifest({ inputDirRelative, outputDirRelative, option
       skippedCount: result.skippedCount,
       errorCount: result.errorCount,
       safetySummary: result.safetySummary,
+      sourceSafetyDecision: result.sourceSafetyDecision,
     },
     entries: result.plan
       .filter((item) => item.action === 'copied' || item.action === 'would-copy' || item.action === 'skipped-target-exists')
@@ -6641,13 +6723,23 @@ export async function splitFontBatch(args = {}) {
           selectedCount: selected.length,
           outputTreeInsideInputTree,
         });
+        const fastFailInputDirRelative = toRelativeWorkspacePath(inputDir);
+        const fastFailSourceSafetyDecision = buildSourceSafetyDecision({
+          appliesToTool: 'split_font_batch',
+          safetySummary: fastFailSafetySummary,
+          inputPath: fastFailInputDirRelative,
+          outputPath: outputRoot,
+          outputPathRole: 'outputRoot',
+          requiresOutputAudit: fastFailSafetySummary.writesOutputTree,
+        });
         throw buildBatchError({
           mode: batchOptions.batchErrorMode,
           errors,
           summary: {
-            inputDir: toRelativeWorkspacePath(inputDir),
+            inputDir: fastFailInputDirRelative,
             outputRoot,
             safetySummary: fastFailSafetySummary,
+            sourceSafetyDecision: fastFailSourceSafetyDecision,
             sourceDestructive: fastFailSafetySummary.sourceDestructive,
             sourceFilesPreserved: fastFailSafetySummary.sourceFilesPreserved,
             writesSourceTree: fastFailSafetySummary.writesSourceTree,
@@ -6684,6 +6776,14 @@ export async function splitFontBatch(args = {}) {
     outputTreeInsideInputTree,
   });
   const inputDirRelative = toRelativeWorkspacePath(inputDir);
+  const sourceSafetyDecision = buildSourceSafetyDecision({
+    appliesToTool: 'split_font_batch',
+    safetySummary,
+    inputPath: inputDirRelative,
+    outputPath: outputRoot,
+    outputPathRole: 'outputRoot',
+    requiresOutputAudit: safetySummary.writesOutputTree,
+  });
   const recommendedNextActions = buildBatchNextActions({
     dryRun,
     inputDirRelative,
@@ -6741,6 +6841,7 @@ export async function splitFontBatch(args = {}) {
     outputRoot,
     workflowPreset: batchOptions.workflowPreset,
     safetySummary,
+    sourceSafetyDecision,
     sourceDestructive: safetySummary.sourceDestructive,
     sourceFilesPreserved: safetySummary.sourceFilesPreserved,
     writesSourceTree: safetySummary.writesSourceTree,
@@ -7035,6 +7136,14 @@ export async function organizeFontDirectory(args = {}) {
     overwriteScope,
     summary,
   };
+  const sourceSafetyDecision = buildSourceSafetyDecision({
+    appliesToTool: 'organize_font_directory',
+    safetySummary,
+    inputPath: inputDirRelative,
+    outputPath: outputDirRelative,
+    outputPathRole: 'outputDir',
+    requiresOutputAudit: false,
+  });
   const warnings = buildOrganizationWarnings({
     dryRun: options.dryRun,
     overwriteExisting: options.overwriteExisting,
@@ -7151,6 +7260,7 @@ export async function organizeFontDirectory(args = {}) {
     errorCount: errors.length,
     errors,
     safetySummary,
+    sourceSafetyDecision,
     sourceDestructive,
     writesSourceTree,
     writesOutputTree,

@@ -134,6 +134,56 @@ function sourceLayoutMismatchSummaryCovered(summary) {
   );
 }
 
+function summarizeSourceSafetyDecision(decision) {
+  if (!decision || typeof decision !== 'object') return null;
+  return {
+    summaryType: decision.summaryType,
+    appliesToTool: decision.appliesToTool,
+    status: decision.status,
+    operationMode: decision.operationMode,
+    sourceDestructive: decision.sourceDestructive,
+    sourceFilesPreserved: decision.sourceFilesPreserved,
+    sourceFilesMovedDeletedOrRewritten: decision.sourceFilesMovedDeletedOrRewritten,
+    sourceBackupRequired: decision.sourceBackupRequired,
+    writesFiles: decision.writesFiles,
+    writesSourceTree: decision.writesSourceTree,
+    writesOutputTree: decision.writesOutputTree,
+    outputTreeInsideInputTree: decision.outputTreeInsideInputTree,
+    mayOverwriteOutputTree: decision.mayOverwriteOutputTree,
+    outputPathRole: decision.outputPathRole,
+    requiresOutputAudit: decision.requiresOutputAudit,
+    mustInspectFields: decision.mustInspectFields,
+  };
+}
+
+function sourceSafetyDecisionCovered(summary, {
+  appliesToTool,
+  status,
+  writesFiles,
+  writesSourceTree,
+  outputPathRole,
+  requiresOutputAudit,
+}) {
+  return Boolean(
+    summary
+    && summary.summaryType === 'source-safety-decision'
+    && summary.appliesToTool === appliesToTool
+    && summary.status === status
+    && summary.sourceDestructive === false
+    && summary.sourceFilesPreserved === true
+    && summary.sourceFilesMovedDeletedOrRewritten === false
+    && summary.sourceBackupRequired === false
+    && summary.writesFiles === writesFiles
+    && summary.writesOutputTree === writesFiles
+    && summary.writesSourceTree === writesSourceTree
+    && summary.outputPathRole === outputPathRole
+    && summary.requiresOutputAudit === requiresOutputAudit
+    && Array.isArray(summary.mustInspectFields)
+    && summary.mustInspectFields.includes('sourceSafetyDecision')
+    && summary.mustInspectFields.includes('safetySummary')
+  );
+}
+
 function summarizeLayoutDecision(decision) {
   if (!decision || typeof decision !== 'object') return null;
   return {
@@ -216,6 +266,8 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       sampleUnsupportedFileDecision: result.inspection?.unsupportedFileDecision,
       layoutDecision: result.organization?.layoutDecision,
       sourceLayoutMismatchSummary: result.organization?.sourceLayoutMismatchSummary,
+      organizationSourceSafetyDecision: result.organization?.sourceSafetyDecision,
+      batchPreviewSourceSafetyDecision: result.batchPreview?.sourceSafetyDecision,
     };
   }
   if (scenario === 'real-corpus-targets') {
@@ -226,6 +278,14 @@ function summarizeRealCorpusSubprocess(scenario, result) {
     const targetSourceLayoutMismatchSummaries = (result.targets || []).map((target) => ({
       inputDir: target.inputDir,
       summary: target.sourceLayoutMismatchSummary,
+    }));
+    const targetOrganizationSourceSafetyDecisions = (result.targets || []).map((target) => ({
+      inputDir: target.inputDir,
+      summary: target.organizationSourceSafetyDecision,
+    }));
+    const targetBatchPreviewSourceSafetyDecisions = (result.targets || []).map((target) => ({
+      inputDir: target.inputDir,
+      summary: target.batchPreviewSourceSafetyDecision,
     }));
     return {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
@@ -243,6 +303,8 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       selectedTargets: (result.targets || []).map((target) => target.inputDir),
       targetLayoutDecisionSummaries,
       targetSourceLayoutMismatchSummaries,
+      targetOrganizationSourceSafetyDecisions,
+      targetBatchPreviewSourceSafetyDecisions,
     };
   }
   if (scenario === 'real-corpus-integration') {
@@ -276,6 +338,10 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       organizationWriteLayoutDecision: result.organization?.write?.layoutDecision,
       organizationPreviewSourceLayoutMismatchSummary: result.organization?.preview?.sourceLayoutMismatchSummary,
       organizationWriteSourceLayoutMismatchSummary: result.organization?.write?.sourceLayoutMismatchSummary,
+      organizationPreviewSourceSafetyDecision: result.organization?.preview?.sourceSafetyDecision,
+      organizationWriteSourceSafetyDecision: result.organization?.write?.sourceSafetyDecision,
+      batchPreviewSourceSafetyDecision: result.batchPreview?.sourceSafetyDecision,
+      batchWriteSourceSafetyDecision: result.batchWrite?.sourceSafetyDecision,
     };
   }
   return null;
@@ -377,6 +443,41 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     integrationPreview: integration.organizationPreviewLayoutDecision,
     integrationWrite: integration.organizationWriteLayoutDecision,
   };
+  const targetOrganizationSourceSafetyDecisions = targets.targetOrganizationSourceSafetyDecisions || [];
+  const targetBatchPreviewSourceSafetyDecisions = targets.targetBatchPreviewSourceSafetyDecisions || [];
+  const targetOrganizationSourceSafetyDecisionCount = targetOrganizationSourceSafetyDecisions
+    .filter((item) => sourceSafetyDecisionCovered(item.summary, {
+      appliesToTool: 'organize_font_directory',
+      status: 'source-safe-no-write',
+      writesFiles: false,
+      writesSourceTree: false,
+      outputPathRole: 'outputDir',
+      requiresOutputAudit: false,
+    }))
+    .length;
+  const targetBatchPreviewSourceSafetyDecisionCount = targetBatchPreviewSourceSafetyDecisions
+    .filter((item) => sourceSafetyDecisionCovered(item.summary, {
+      appliesToTool: 'split_font_batch',
+      status: 'source-safe-no-write',
+      writesFiles: false,
+      writesSourceTree: false,
+      outputPathRole: 'outputRoot',
+      requiresOutputAudit: false,
+    }))
+    .length;
+  const sourceSafetyDecisionEvidence = {
+    readonlyOrganization: readonly.organizationSourceSafetyDecision,
+    readonlyBatchPreview: readonly.batchPreviewSourceSafetyDecision,
+    targetOrganizationCount: targetOrganizationSourceSafetyDecisionCount,
+    targetBatchPreviewCount: targetBatchPreviewSourceSafetyDecisionCount,
+    targetSelectedCount: targets.selectedTargetCount,
+    targetOrganizationSamples: targetOrganizationSourceSafetyDecisions.slice(0, 3),
+    targetBatchPreviewSamples: targetBatchPreviewSourceSafetyDecisions.slice(0, 3),
+    integrationOrganizationPreview: integration.organizationPreviewSourceSafetyDecision,
+    integrationOrganizationWrite: integration.organizationWriteSourceSafetyDecision,
+    integrationBatchPreview: integration.batchPreviewSourceSafetyDecision,
+    integrationBatchWrite: integration.batchWriteSourceSafetyDecision,
+  };
   const testScope = {
     corpusScan: {
       scopeKind: 'full-root-bounded-scan',
@@ -463,6 +564,67 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
         sampleInputDir: readonly.sampleInputDir,
         writesFiles: false,
       },
+    },
+    {
+      id: 'source-safety-decision',
+      covered: Boolean(
+        readonlyRun.ok
+        && targetsRun.ok
+        && integrationRun.ok
+        && sourceSafetyDecisionCovered(readonly.organizationSourceSafetyDecision, {
+          appliesToTool: 'organize_font_directory',
+          status: 'source-safe-no-write',
+          writesFiles: false,
+          writesSourceTree: false,
+          outputPathRole: 'outputDir',
+          requiresOutputAudit: false,
+        })
+        && sourceSafetyDecisionCovered(readonly.batchPreviewSourceSafetyDecision, {
+          appliesToTool: 'split_font_batch',
+          status: 'source-safe-no-write',
+          writesFiles: false,
+          writesSourceTree: false,
+          outputPathRole: 'outputRoot',
+          requiresOutputAudit: false,
+        })
+        && targetOrganizationSourceSafetyDecisionCount === targets.selectedTargetCount
+        && targetBatchPreviewSourceSafetyDecisionCount === targets.selectedTargetCount
+        && targets.selectedTargetCount > 0
+        && sourceSafetyDecisionCovered(integration.organizationPreviewSourceSafetyDecision, {
+          appliesToTool: 'organize_font_directory',
+          status: 'source-safe-no-write',
+          writesFiles: false,
+          writesSourceTree: false,
+          outputPathRole: 'outputDir',
+          requiresOutputAudit: false,
+        })
+        && sourceSafetyDecisionCovered(integration.organizationWriteSourceSafetyDecision, {
+          appliesToTool: 'organize_font_directory',
+          status: 'source-safe-output-tree-write',
+          writesFiles: true,
+          writesSourceTree: false,
+          outputPathRole: 'outputDir',
+          requiresOutputAudit: false,
+        })
+        && sourceSafetyDecisionCovered(integration.batchPreviewSourceSafetyDecision, {
+          appliesToTool: 'split_font_batch',
+          status: 'source-safe-no-write',
+          writesFiles: false,
+          writesSourceTree: false,
+          outputPathRole: 'outputRoot',
+          requiresOutputAudit: false,
+        })
+        && sourceSafetyDecisionCovered(integration.batchWriteSourceSafetyDecision, {
+          appliesToTool: 'split_font_batch',
+          status: 'source-safe-output-tree-write',
+          writesFiles: true,
+          writesSourceTree: false,
+          outputPathRole: 'outputRoot',
+          requiresOutputAudit: true,
+        })
+      ),
+      toolPaths: ['organize_font_directory', 'split_font_batch'],
+      evidence: sourceSafetyDecisionEvidence,
     },
     {
       id: 'source-layout-mismatch-summary',
@@ -1291,6 +1453,55 @@ function assertBatchPolicySummary(summary, { context, appliesToTool, expectedVal
     if (summary.effectiveValues?.[optionName] !== value || selected?.effectiveValue !== value || success?.effectiveValue !== value) {
       throw new Error(`${context}: expected batchPolicySummary effective ${optionName} to be ${value}.`);
     }
+  }
+}
+
+function assertSourceSafetyDecision(decision, {
+  context,
+  appliesToTool,
+  expectedStatus,
+  expectedWritesFiles,
+  expectedWritesSourceTree,
+  expectedOutputTreeInsideInputTree,
+  expectedOutputPathRole,
+  expectedRequiresOutputAudit,
+}) {
+  if (
+    !decision
+    || decision.summaryType !== 'source-safety-decision'
+    || decision.appliesToTool !== appliesToTool
+    || decision.status !== expectedStatus
+    || decision.sourceDestructive !== false
+    || decision.sourceFilesPreserved !== true
+    || decision.sourceFilesMovedDeletedOrRewritten !== false
+    || decision.sourceBackupRequired !== false
+    || decision.writesFiles !== expectedWritesFiles
+    || decision.writesOutputTree !== expectedWritesFiles
+    || decision.writesSourceTree !== expectedWritesSourceTree
+    || decision.outputTreeInsideInputTree !== expectedOutputTreeInsideInputTree
+    || decision.outputPathRole !== expectedOutputPathRole
+    || decision.requiresOutputAudit !== expectedRequiresOutputAudit
+    || typeof decision.shortAnswer !== 'string'
+    || decision.shortAnswer.trim() === ''
+  ) {
+    throw new Error(`${context}: expected sourceSafetyDecision to summarize source preservation and write scope.`);
+  }
+  for (const fieldName of [
+    'sourceSafetyDecision',
+    'safetySummary',
+    'sourceDestructive',
+    'sourceFilesPreserved',
+    'writesSourceTree',
+    'writesOutputTree',
+    'outputTreeInsideInputTree',
+    'mayOverwriteOutputTree',
+  ]) {
+    if (!decision.mustInspectFields?.includes(fieldName)) {
+      throw new Error(`${context}: expected sourceSafetyDecision.mustInspectFields to include ${fieldName}.`);
+    }
+  }
+  if (!Array.isArray(decision.nonIntuitiveBehavior) || decision.nonIntuitiveBehavior.length === 0) {
+    throw new Error(`${context}: expected sourceSafetyDecision to include nonIntuitiveBehavior notes.`);
   }
 }
 
@@ -2138,6 +2349,7 @@ if (scenario === 'single') {
     || mismatchTemplate?.writesFiles !== false
     || mismatchTemplate?.sourceDestructive !== false
     || mismatchTemplate?.args?.workflowPreset !== 'safe-preview'
+    || !mismatchTemplate.inspectFields?.includes('sourceSafetyDecision')
     || !mismatchTemplate.inspectFields?.includes('sourceDestructive')
     || !mismatchTemplate.inspectFields?.includes('organizationDecision')
     || !mismatchTemplate.inspectFields?.includes('unsupportedFileSummary')
@@ -2163,6 +2375,7 @@ if (scenario === 'single') {
     || copyTemplate?.sourceDestructive !== false
     || copyTemplate?.args?.workflowPreset !== 'reviewed-write'
     || copyTemplate?.args?.outputDir !== 'organized-fonts'
+    || !copyTemplate.inspectFields?.includes('sourceSafetyDecision')
     || !copyTemplate.inspectFields?.includes('writesSourceTree')
     || !copyTemplate.inspectFields?.includes('organizationDecision')
     || !copyTemplate.inspectFields?.includes('unsupportedFileSummary')
@@ -2177,6 +2390,7 @@ if (scenario === 'single') {
     || batchPreviewTemplate?.args?.workflowPreset !== 'safe-preview'
     || batchPreviewTemplate?.args?.limit !== 50000
     || batchPreviewTemplate?.args?.maxFiles !== 50000
+    || !batchPreviewTemplate.inspectFields?.includes('sourceSafetyDecision')
     || !batchPreviewTemplate.inspectFields?.includes('safetySummary')
     || !batchPreviewTemplate.inspectFields?.includes('sourceDestructive')
     || !batchPreviewTemplate.inspectFields?.includes('writesOutputTree')
@@ -2345,7 +2559,7 @@ if (scenario === 'single') {
     collectionName: 'configurationRecipes',
   });
   const safeDefaultRecipe = (result.configurationRecipes || []).find((item) => item.id === 'safe-default-batch');
-  if (!safeDefaultRecipe?.inspectFields?.includes('batchDecision') || !safeDefaultRecipe?.successCriteria?.includes('audit')) {
+  if (!safeDefaultRecipe?.inspectFields?.includes('sourceSafetyDecision') || !safeDefaultRecipe?.inspectFields?.includes('batchDecision') || !safeDefaultRecipe?.successCriteria?.includes('audit')) {
     throw new Error('Expected safe-default-batch recipe to include route-decision inspection and output audit success criteria.');
   }
   const preserveRecipe = (result.configurationRecipes || []).find((item) => item.id === 'preserve-every-source-font');
@@ -2831,6 +3045,16 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected organizeFontDirectory dry-run safetySummary to emphasize no writes and source preservation.');
   }
+  assertSourceSafetyDecision(result.sourceSafetyDecision, {
+    context: 'organize-dry-run',
+    appliesToTool: 'organize_font_directory',
+    expectedStatus: 'source-safe-no-write',
+    expectedWritesFiles: false,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputDir',
+    expectedRequiresOutputAudit: false,
+  });
   if (result.layout?.layoutKind !== 'nested' || result.recommendedBatchOptions?.batchGroupBy !== 'source-dir') {
     throw new Error('Expected organization layout analysis to recommend source-dir grouping for nested input.');
   }
@@ -2957,6 +3181,16 @@ if (scenario === 'single') {
   if (compact.organizationDecision?.route !== 'decide-on-invalid-fonts') {
     throw new Error('Expected compact organization dry-run to keep organizationDecision.');
   }
+  assertSourceSafetyDecision(compact.sourceSafetyDecision, {
+    context: 'organize-dry-run compact',
+    appliesToTool: 'organize_font_directory',
+    expectedStatus: 'source-safe-no-write',
+    expectedWritesFiles: false,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputDir',
+    expectedRequiresOutputAudit: false,
+  });
   assertLayoutDecision(compact.layoutDecision, {
     context: 'organize-dry-run compact',
     expectedLayoutKind: 'nested',
@@ -3020,6 +3254,16 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected organizeFontDirectory copy safetySummary to limit writes to the output tree.');
   }
+  assertSourceSafetyDecision(copied.sourceSafetyDecision, {
+    context: 'organize-copy',
+    appliesToTool: 'organize_font_directory',
+    expectedStatus: 'source-safe-output-tree-write',
+    expectedWritesFiles: true,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputDir',
+    expectedRequiresOutputAudit: false,
+  });
   if (copied.copiedCount !== 1 || copied.organizationManifestWritten !== true || copied.organizationManifestPath !== `${outputDir}/font-organization-manifest.json`) {
     throw new Error('Expected organizeFontDirectory copy mode to copy one file and write a manifest.');
   }
@@ -3078,7 +3322,11 @@ if (scenario === 'single') {
   if (manifest.summary?.copiedCount !== 1 || manifest.entries?.[0]?.source !== `${inputDir}/FamilyA/not-a-font.ttf`) {
     throw new Error('Expected organization manifest to record the copied source.');
   }
-  if (manifest.summary?.safetySummary?.sourceDestructive !== false || manifest.summary?.safetySummary?.writeScope !== 'output-tree-only') {
+  if (
+    manifest.summary?.safetySummary?.sourceDestructive !== false
+    || manifest.summary?.safetySummary?.writeScope !== 'output-tree-only'
+    || manifest.summary?.sourceSafetyDecision?.status !== 'source-safe-output-tree-write'
+  ) {
     throw new Error('Expected organization manifest summary to record source-safe output-only writes.');
   }
   const copiedInspect = await inspectFontInputs({
@@ -3125,6 +3373,16 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected overwrite safetySummary to scope destructive risk to the output tree only.');
   }
+  assertSourceSafetyDecision(overwritten.sourceSafetyDecision, {
+    context: 'organize-copy overwrite',
+    appliesToTool: 'organize_font_directory',
+    expectedStatus: 'source-safe-output-tree-write',
+    expectedWritesFiles: true,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputDir',
+    expectedRequiresOutputAudit: false,
+  });
   if (overwritten.planActionSummary?.total !== 1 || overwritten.planActionSummary?.byAction?.copied !== 1) {
     throw new Error('Expected overwrite-enabled organization copy to summarize copied plan actions.');
   }
@@ -3394,6 +3652,16 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected output-inside-input organization smoke to stay dry-run while disclosing nested output.');
   }
+  assertSourceSafetyDecision(result.sourceSafetyDecision, {
+    context: 'organize-output-inside-input dry-run',
+    appliesToTool: 'organize_font_directory',
+    expectedStatus: 'source-safe-no-write',
+    expectedWritesFiles: false,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: true,
+    expectedOutputPathRole: 'outputDir',
+    expectedRequiresOutputAudit: false,
+  });
   if (!result.organizationWarnings?.some((warning) => warning.code === 'output-inside-input')) {
     throw new Error('Expected organization warning when outputDir is inside inputDir.');
   }
@@ -3455,6 +3723,16 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected real organization inside inputDir to disclose source-tree writes without source destruction.');
   }
+  assertSourceSafetyDecision(copiedInside.sourceSafetyDecision, {
+    context: 'organize-output-inside-input copy',
+    appliesToTool: 'organize_font_directory',
+    expectedStatus: 'source-safe-output-inside-input-tree',
+    expectedWritesFiles: true,
+    expectedWritesSourceTree: true,
+    expectedOutputTreeInsideInputTree: true,
+    expectedOutputPathRole: 'outputDir',
+    expectedRequiresOutputAudit: false,
+  });
   assertDirectoryWorkflowSummary(copiedInside.directoryWorkflowSummary, {
     context: 'organize-output-inside-input copy',
     expectedLayoutKind: 'nested',
@@ -3493,6 +3771,16 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected real batch output inside inputDir to disclose source-tree writes without source destruction.');
   }
+  assertSourceSafetyDecision(batchInside.sourceSafetyDecision, {
+    context: 'organize-output-inside-input batch write',
+    appliesToTool: 'split_font_batch',
+    expectedStatus: 'source-safe-output-inside-input-tree',
+    expectedWritesFiles: true,
+    expectedWritesSourceTree: true,
+    expectedOutputTreeInsideInputTree: true,
+    expectedOutputPathRole: 'outputRoot',
+    expectedRequiresOutputAudit: true,
+  });
   const batchInsideInspect = await inspectSplitOutput({
     outDir: batchOutputRoot,
     includeFiles: false,
@@ -4600,8 +4888,8 @@ if (scenario === 'single') {
     assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
     expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
-    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
-    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
+    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
+    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
     expectDescriptionIncludes('inspect_split_output', ['outputStructureDecision', 'auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
@@ -4678,6 +4966,7 @@ if (scenario === 'single') {
       'recommendedBatchPreviewArgs',
       'recommendedNextActions',
       'successCriteria',
+      'sourceSafetyDecision',
       'safetySummary',
       'batchGroupBy',
       'batchNamingMode',
@@ -4724,6 +5013,7 @@ if (scenario === 'single') {
     assertDocsContain('real corpus suite test scope', '`testScope`');
     assertDocsContain('real corpus ignored category coverage', '`coverageSummary.unsupportedFileCategoryCoverage`');
     assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
+    assertDocsContain('source safety decision', '`sourceSafetyDecision`');
     assertDocsContain('error response catalog', '`errorResponseCatalog`');
     assertDocsContain('error catalog section', '`error-catalog`');
     assertDocsContain('error type field', '`errorType`');
@@ -4866,6 +5156,7 @@ if (scenario === 'single') {
     '`batchErrorMode`',
     '`skipMode`',
     '`debugBatchDecisions`',
+    '`sourceSafetyDecision`',
     '`font-identity`',
     '`glyphCount`',
     '`resultType`',
@@ -4963,6 +5254,16 @@ if (scenario === 'single') {
   if (Object.hasOwn(result, 'results')) {
     throw new Error('Expected dry-run batch response to omit results.');
   }
+  assertSourceSafetyDecision(result.sourceSafetyDecision, {
+    context: 'batch-dry-run',
+    appliesToTool: 'split_font_batch',
+    expectedStatus: 'source-safe-no-write',
+    expectedWritesFiles: false,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputRoot',
+    expectedRequiresOutputAudit: false,
+  });
   const batchWriteAction = (result.recommendedNextActions || []).find((action) => action.id === 'run-reviewed-batch-write');
   if (
     result.recommendedNextActionCount !== (result.recommendedNextActions || []).length
@@ -5447,6 +5748,16 @@ if (scenario === 'single') {
   }
   assertRealCorpusSourceLayoutMismatchSummary(organization.sourceLayoutMismatchSummary, 'real-corpus-readonly organization');
   assertRealCorpusLayoutDecision(organization.layoutDecision, 'real-corpus-readonly organization');
+  assertSourceSafetyDecision(organization.sourceSafetyDecision, {
+    context: 'real-corpus-readonly organization',
+    appliesToTool: 'organize_font_directory',
+    expectedStatus: 'source-safe-no-write',
+    expectedWritesFiles: false,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputDir',
+    expectedRequiresOutputAudit: false,
+  });
   assertObjectOmitsKeys(organization.recommendedBatchPreviewArgs, [
     'dryRun',
     'includeResults',
@@ -5478,6 +5789,16 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected real corpus batch preview to stay read-only and recommend a reviewed-write follow-up.');
   }
+  assertSourceSafetyDecision(batchPreview.sourceSafetyDecision, {
+    context: 'real-corpus-readonly batch preview',
+    appliesToTool: 'split_font_batch',
+    expectedStatus: 'source-safe-no-write',
+    expectedWritesFiles: false,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputRoot',
+    expectedRequiresOutputAudit: false,
+  });
   assertInspectFieldsExist(batchWriteAction, {
     split_font_batch: batchPreview,
   }, 'real-corpus-readonly batch preview action');
@@ -5509,6 +5830,7 @@ if (scenario === 'single') {
     organization: {
       layout: organization.layout,
       recommendedBatchPreviewArgs: organization.recommendedBatchPreviewArgs,
+      sourceSafetyDecision: summarizeSourceSafetyDecision(organization.sourceSafetyDecision),
       safetySummary: organization.safetySummary,
       parsedFontMetadata: organization.parsedFontMetadata,
       dedupeLimitedByParsing: organization.dedupeLimitedByParsing,
@@ -5522,6 +5844,7 @@ if (scenario === 'single') {
       deduplicatedCount: batchPreview.deduplicatedCount,
       selectedFontCount: batchPreview.selectedFontCount,
       skippedDuplicates: batchPreview.skippedDuplicates,
+      sourceSafetyDecision: summarizeSourceSafetyDecision(batchPreview.sourceSafetyDecision),
       recommendedNextActions: batchPreview.recommendedNextActions,
     },
   }, null, 2));
@@ -5619,6 +5942,26 @@ if (scenario === 'single') {
     }
     assertRealCorpusSourceLayoutMismatchSummary(organization.sourceLayoutMismatchSummary, `real-corpus-targets ${target} organization`);
     assertRealCorpusLayoutDecision(organization.layoutDecision, `real-corpus-targets ${target} organization`);
+    assertSourceSafetyDecision(organization.sourceSafetyDecision, {
+      context: `real-corpus-targets ${target} organization`,
+      appliesToTool: 'organize_font_directory',
+      expectedStatus: 'source-safe-no-write',
+      expectedWritesFiles: false,
+      expectedWritesSourceTree: false,
+      expectedOutputTreeInsideInputTree: false,
+      expectedOutputPathRole: 'outputDir',
+      expectedRequiresOutputAudit: false,
+    });
+    assertSourceSafetyDecision(batchPreview.sourceSafetyDecision, {
+      context: `real-corpus-targets ${target} batch preview`,
+      appliesToTool: 'split_font_batch',
+      expectedStatus: 'source-safe-no-write',
+      expectedWritesFiles: false,
+      expectedWritesSourceTree: false,
+      expectedOutputTreeInsideInputTree: false,
+      expectedOutputPathRole: 'outputRoot',
+      expectedRequiresOutputAudit: false,
+    });
     assertInspectFieldsExist(batchWriteAction, {
       split_font_batch: batchPreview,
     }, `real-corpus-targets ${target} batch action`);
@@ -5644,6 +5987,7 @@ if (scenario === 'single') {
       unsupportedFileSummary: inspection.unsupportedFileSummary,
       layout: organization.layout,
       recommendedBatchPreviewArgs: organization.recommendedBatchPreviewArgs,
+      organizationSourceSafetyDecision: summarizeSourceSafetyDecision(organization.sourceSafetyDecision),
       layoutDecision: summarizeLayoutDecision(organization.layoutDecision),
       sourceLayoutMismatchSummary: summarizeSourceLayoutMismatch(organization.sourceLayoutMismatchSummary),
       discoveredFontCount: batchPreview.discoveredFontCount,
@@ -5652,6 +5996,7 @@ if (scenario === 'single') {
       skippedDuplicates: batchPreview.skippedDuplicates,
       numericSuffixCount,
       sourceSuffixCount,
+      batchPreviewSourceSafetyDecision: summarizeSourceSafetyDecision(batchPreview.sourceSafetyDecision),
       planned: planned.map((item) => ({
         input: item.input,
         groupName: item.groupName,
@@ -5762,6 +6107,16 @@ if (scenario === 'single') {
   }
   assertRealCorpusSourceLayoutMismatchSummary(organizationPreview.sourceLayoutMismatchSummary, 'real-corpus-integration organization preview');
   assertRealCorpusLayoutDecision(organizationPreview.layoutDecision, 'real-corpus-integration organization preview');
+  assertSourceSafetyDecision(organizationPreview.sourceSafetyDecision, {
+    context: 'real-corpus-integration organization preview',
+    appliesToTool: 'organize_font_directory',
+    expectedStatus: 'source-safe-no-write',
+    expectedWritesFiles: false,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputDir',
+    expectedRequiresOutputAudit: false,
+  });
 
   const organizationWrite = await organizeFontDirectory({
     inputDir: sample.inputDir,
@@ -5782,6 +6137,16 @@ if (scenario === 'single') {
   }
   assertRealCorpusSourceLayoutMismatchSummary(organizationWrite.sourceLayoutMismatchSummary, 'real-corpus-integration organization write');
   assertRealCorpusLayoutDecision(organizationWrite.layoutDecision, 'real-corpus-integration organization write');
+  assertSourceSafetyDecision(organizationWrite.sourceSafetyDecision, {
+    context: 'real-corpus-integration organization write',
+    appliesToTool: 'organize_font_directory',
+    expectedStatus: 'source-safe-output-tree-write',
+    expectedWritesFiles: true,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputDir',
+    expectedRequiresOutputAudit: false,
+  });
 
   const organizedInspection = await inspectFontInputs({
     inputDir: organizationOutputDir,
@@ -5849,6 +6214,16 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected real-corpus-integration batch preview to be no-write and suggest reviewed-write.');
   }
+  assertSourceSafetyDecision(batchPreview.sourceSafetyDecision, {
+    context: 'real-corpus-integration batch preview',
+    appliesToTool: 'split_font_batch',
+    expectedStatus: 'source-safe-no-write',
+    expectedWritesFiles: false,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputRoot',
+    expectedRequiresOutputAudit: false,
+  });
   assertInspectFieldsExist(batchWriteAction, {
     split_font_batch: batchPreview,
   }, 'real-corpus-integration batch preview action');
@@ -5874,6 +6249,16 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected real-corpus-integration batch write to write output and recommend audit.');
   }
+  assertSourceSafetyDecision(batchWrite.sourceSafetyDecision, {
+    context: 'real-corpus-integration batch write',
+    appliesToTool: 'split_font_batch',
+    expectedStatus: 'source-safe-output-tree-write',
+    expectedWritesFiles: true,
+    expectedWritesSourceTree: false,
+    expectedOutputTreeInsideInputTree: false,
+    expectedOutputPathRole: 'outputRoot',
+    expectedRequiresOutputAudit: true,
+  });
 
   const batchAudit = await inspectSplitOutput(auditAction.suggestedArgs);
   const batchActionWarnings = (batchAudit.inspectionWarnings || [])
@@ -5909,6 +6294,7 @@ if (scenario === 'single') {
       preview: {
         layout: organizationPreview.layout,
         recommendedBatchPreviewArgs: organizationPreview.recommendedBatchPreviewArgs,
+        sourceSafetyDecision: summarizeSourceSafetyDecision(organizationPreview.sourceSafetyDecision),
         safetySummary: organizationPreview.safetySummary,
         layoutDecision: summarizeLayoutDecision(organizationPreview.layoutDecision),
         sourceLayoutMismatchSummary: summarizeSourceLayoutMismatch(organizationPreview.sourceLayoutMismatchSummary),
@@ -5918,6 +6304,7 @@ if (scenario === 'single') {
         copiedCount: organizationWrite.copiedCount,
         deduplicatedCount: organizationWrite.deduplicatedCount,
         skippedDuplicates: organizationWrite.skippedDuplicates,
+        sourceSafetyDecision: summarizeSourceSafetyDecision(organizationWrite.sourceSafetyDecision),
         safetySummary: organizationWrite.safetySummary,
         organizationManifestPath: organizationWrite.organizationManifestPath,
         layoutDecision: summarizeLayoutDecision(organizationWrite.layoutDecision),
@@ -5955,6 +6342,7 @@ if (scenario === 'single') {
       deduplicatedCount: batchPreview.deduplicatedCount,
       selectedFontCount: batchPreview.selectedFontCount,
       skippedDuplicates: batchPreview.skippedDuplicates,
+      sourceSafetyDecision: summarizeSourceSafetyDecision(batchPreview.sourceSafetyDecision),
       recommendedNextActions: batchPreview.recommendedNextActions,
     },
     batchWrite: {
@@ -5962,6 +6350,7 @@ if (scenario === 'single') {
       processedFontCount: batchWrite.processedFontCount,
       errorCount: batchWrite.errorCount,
       processingSummary: batchWrite.processingSummary,
+      sourceSafetyDecision: summarizeSourceSafetyDecision(batchWrite.sourceSafetyDecision),
       recommendedNextActions: batchWrite.recommendedNextActions,
     },
     batchAudit: {
