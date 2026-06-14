@@ -1105,6 +1105,7 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
   const targetSampling = coverageSummary.testScope?.targetSampling || {};
   const writeAudit = coverageSummary.testScope?.representativeWriteAudit || {};
   const ignoredCoverage = coverageSummary.unsupportedFileCategoryCoverage || {};
+  const ignoredCategoryText = (ignoredCoverage.categories || []).join(', ') || 'none';
   const structureAudit = coverageSummary.outputStructureAuditSummary || {};
   const fixedCount = targetSampling.fixedRegressionTargetCount ?? coverageSummary.fixedRegressionTargets?.length;
   const selectedCount = targetSampling.selectedTargetCount ?? coverageSummary.selectedTargetCount;
@@ -1114,7 +1115,7 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
   const totalCoverageCount = functionalCoverage.length;
   const lines = [
     `Full corpus scan: ${corpusScan.supportedFontCount ?? 'unknown'} supported font files and ${corpusScan.unsupportedFileCount ?? 'unknown'} ignored/non-font files; maxFilesHit=${corpusScan.maxFilesHit}.`,
-    `Ignored-file coverage: ${ignoredCoverage.categoryCount ?? 'unknown'} categories (${(ignoredCoverage.categories || []).slice(0, 6).join(', ') || 'none'}), ${ignoredCoverage.extensionCount ?? 'unknown'} extension types, ${ignoredCoverage.extensionsBeyondZipTxtCount ?? 'unknown'} extension types beyond .zip/.txt.`,
+    `Ignored-file coverage: ${ignoredCoverage.categoryCount ?? 'unknown'} categories (${ignoredCategoryText}), ${ignoredCoverage.extensionCount ?? 'unknown'} extension types, ${ignoredCoverage.extensionsBeyondZipTxtCount ?? 'unknown'} extension types beyond .zip/.txt.`,
     `Target sampling: ${fixedCount ?? 'unknown'} fixed regression targets and ${selectedCount ?? 'unknown'} selected representative targets out of ${availableCount ?? 'unknown'} available target directories; this is not per-directory acceptance.`,
     `Representative write audit: sample=${writeAudit.sampleInputDir || 'unknown'}, single=${writeAudit.singleAuditStatus || 'unknown'} structureConforms=${structureAudit.singleStructureConforms}, batch=${writeAudit.batchAuditStatus || 'unknown'} structureConforms=${structureAudit.batchStructureConforms}.`,
     `Interpretation: small numbers such as ${fixedCount ?? 'fixed'} or ${selectedCount ?? 'selected'} are target counts, not the full corpus font count; use testScope.corpusScan.supportedFontCount for the root-level font total.`,
@@ -6392,6 +6393,9 @@ if (scenario === 'single') {
   const humanSummary = buildRealCorpusSuiteHumanSummary(coverageSummary);
   const corpusCountGuide = buildRealCorpusCountGuide(coverageSummary, humanSummary);
   const reliabilityGateDecision = buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary);
+  const ignoredCoverageLine = (humanSummary.lines || []).find((line) => line.includes('Ignored-file coverage')) || '';
+  const missingIgnoredCategories = (coverageSummary.unsupportedFileCategoryCoverage?.categories || [])
+    .filter((category) => !ignoredCoverageLine.includes(category));
   if (
     coverageSummary.perDirectoryAcceptanceAudit !== false
     || coverageSummary.testScope?.corpusScan?.scopeKind !== 'full-root-bounded-scan'
@@ -6457,7 +6461,8 @@ if (scenario === 'single') {
     || !reliabilityGateDecision.evidenceFields?.includes('coverageSummary.outputStructureAuditSummary')
     || !reliabilityGateDecision.passCriteria?.includes('outputStructureDecision.status pass')
     || !reliabilityGateDecision.nonIntuitiveBehavior?.includes('not the full corpus font count')
-    || !humanSummary.lines?.some((line) => line.includes('Ignored-file coverage'))
+    || !ignoredCoverageLine
+    || missingIgnoredCategories.length !== 0
     || !humanSummary.lines?.some((line) => line.includes('structureConforms=true'))
     || !humanSummary.lines?.some((line) => line.includes('not the full corpus font count'))
   ) {
