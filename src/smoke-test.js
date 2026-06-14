@@ -9,7 +9,10 @@ import {
   BATCH_ERROR_MODES,
   BATCH_GROUP_BY_MODES,
   BATCH_NAMING_MODES,
+  OVERSIZED_KERN_ACTIONS,
   SKIP_MODES,
+  SMALL_GLYPH_ACTIONS,
+  SPLIT_FAILURE_ACTIONS,
   getAgentGuidance,
   getRuntimeStatus,
   inspectFontInputs,
@@ -4286,6 +4289,14 @@ if (scenario === 'single') {
     }
     assertEnumMatches('split_font_batch workflowPreset', getSchemaEnumValues(batchProps.workflowPreset), coreWorkflowPresetIds);
     assertEnumMatches('organize_font_directory workflowPreset', getSchemaEnumValues(organizeProps.workflowPreset), coreWorkflowPresetIds);
+    for (const [optionName, expectedValues] of Object.entries({
+      oversizedKernAction: OVERSIZED_KERN_ACTIONS,
+      smallGlyphAction: SMALL_GLYPH_ACTIONS,
+      splitFailureAction: SPLIT_FAILURE_ACTIONS,
+    })) {
+      assertEnumMatches(`split_font ${optionName}`, getSchemaEnumValues(splitFontProps[optionName]), expectedValues);
+      assertEnumMatches(`split_font_batch ${optionName}`, getSchemaEnumValues(batchProps[optionName]), expectedValues);
+    }
     assertEnumMatches('split_font_batch skipMode', getSchemaEnumValues(batchProps.skipMode), SKIP_MODES);
     for (const [optionName, expectedValues] of Object.entries({
       batchGroupBy: BATCH_GROUP_BY_MODES,
