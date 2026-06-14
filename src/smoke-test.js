@@ -1441,6 +1441,30 @@ function assertGuidanceItemsHaveCompletionProof(items, { collectionName, inspect
   }
 }
 
+const DIRECTORY_ROUTE_REQUIRED_INSPECT_FIELDS = [
+  'inputCountGuide',
+  'layoutDecision',
+  'layoutDecision.directoryHandling',
+  'organizationDecision',
+  'directoryWorkflowSummary',
+  'sourceLayoutMismatchSummary',
+  'sourceLayoutMismatchSummary.decisionChecklist',
+  'recommendedBatchPreviewArgs',
+  'unsupportedFileDecision',
+  'unsupportedFileSummary',
+  'organizationWarnings',
+  'planActionSummary',
+];
+
+function assertDirectoryRouteInspectFields(fields, context, fieldListName = 'inspectFields') {
+  assertNonEmptyStringArray(fields, context, fieldListName);
+  for (const fieldName of DIRECTORY_ROUTE_REQUIRED_INSPECT_FIELDS) {
+    if (!fields.includes(fieldName)) {
+      throw new Error(`${context}: expected directory route ${fieldListName} to include ${fieldName}.`);
+    }
+  }
+}
+
 function assertNextToolDecisionSummary(summary, { context, workflow, primaryRouteId }) {
   if (
     !summary
@@ -1498,9 +1522,13 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
   }
   const layoutRoute = routesById.get('layout-uncertain-or-staging-wanted');
   const stagingRoute = routesById.get('copy-only-staging');
+  const structureRoute = routesById.get('large-noisy-structure-first');
   const batchPreviewRoute = routesById.get('batch-safe-preview');
   const batchWriteRoute = routesById.get('batch-reviewed-write');
   const auditRoute = routesById.get('output-audit');
+  assertDirectoryRouteInspectFields(layoutRoute?.inspectFields, `${context}.routes.layout-uncertain-or-staging-wanted`);
+  assertDirectoryRouteInspectFields(structureRoute?.inspectFields, `${context}.routes.large-noisy-structure-first`);
+  assertDirectoryRouteInspectFields(stagingRoute?.inspectFields, `${context}.routes.copy-only-staging`);
   if (
     layoutRoute?.firstTool !== 'organize_font_directory'
     || layoutRoute?.firstArgsHint?.workflowPreset !== 'safe-preview'
@@ -1534,10 +1562,15 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
     }
   }
   const stagingExample = quickExamplesById.get('copy-reviewed-staging');
+  const layoutExample = quickExamplesById.get('plan-source-layout');
+  const structureExample = quickExamplesById.get('quick-structure-first-plan');
   const singleExample = quickExamplesById.get('process-single-font');
   const previewExample = quickExamplesById.get('preview-batch-output');
   const writeExample = quickExamplesById.get('write-reviewed-batch-output');
   const auditExample = quickExamplesById.get('audit-split-output');
+  assertDirectoryRouteInspectFields(layoutExample?.inspectFields, `${context}.quickStartCallExamples.plan-source-layout`);
+  assertDirectoryRouteInspectFields(structureExample?.inspectFields, `${context}.quickStartCallExamples.quick-structure-first-plan`);
+  assertDirectoryRouteInspectFields(stagingExample?.inspectFields, `${context}.quickStartCallExamples.copy-reviewed-staging`);
   if (
     singleExample?.tool !== 'split_font'
     || singleExample?.args?.fontPath !== '<font-file>'
@@ -1573,6 +1606,12 @@ function assertRecommendedWorkflowPlanHasCompletionProof(plan, templateIds, cont
     if (step.templateId && !templateIds.has(step.templateId)) {
       throw new Error(`${context}.orderedSteps.${step.id}: references missing safe template ${step.templateId}.`);
     }
+    if (
+      ['directory-mismatch-plan', 'structure-first-large-directory', 'copy-organized-staging'].includes(step.templateId)
+      || (step.inspectFields?.includes('directoryWorkflowSummary') && step.inspectFields?.includes('recommendedBatchPreviewArgs'))
+    ) {
+      assertDirectoryRouteInspectFields(step.inspectFields, `${context}.orderedSteps.${step.id}`);
+    }
   }
   if (Array.isArray(plan.decisionPoints)) {
     assertGuidanceItemsHaveCompletionProof(plan.decisionPoints, {
@@ -1584,6 +1623,12 @@ function assertRecommendedWorkflowPlanHasCompletionProof(plan, templateIds, cont
       }
       if (decision.useTemplateId && !templateIds.has(decision.useTemplateId)) {
         throw new Error(`${context}.decisionPoints.${decision.id}: references missing safe template ${decision.useTemplateId}.`);
+      }
+      if (
+        ['directory-mismatch-plan', 'structure-first-large-directory', 'copy-organized-staging'].includes(decision.useTemplateId)
+        || (decision.inspectFields?.includes('directoryWorkflowSummary') && decision.inspectFields?.includes('recommendedBatchPreviewArgs'))
+      ) {
+        assertDirectoryRouteInspectFields(decision.inspectFields, `${context}.decisionPoints.${decision.id}`);
       }
     }
   }
@@ -2659,6 +2704,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected directory mismatch template to rely on the safe-preview organization preset.');
   }
+  assertDirectoryRouteInspectFields(mismatchTemplate?.inspectFields, 'safeInvocationTemplates.directory-mismatch-plan');
   assertTemplateOmitsArgs(mismatchTemplate, ['dryRun', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'], 'directory-mismatch-plan');
   const structureTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'structure-first-large-directory');
   if (
@@ -2670,6 +2716,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected structure-first template to expose dedupe limitations and safe batch preview args.');
   }
+  assertDirectoryRouteInspectFields(structureTemplate?.inspectFields, 'safeInvocationTemplates.structure-first-large-directory');
   const copyTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'copy-organized-staging');
   if (
     copyTemplate?.tool !== 'organize_font_directory'
@@ -2684,6 +2731,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected copy staging template to disclose copy-only source safety.');
   }
+  assertDirectoryRouteInspectFields(copyTemplate?.inspectFields, 'safeInvocationTemplates.copy-organized-staging');
   assertTemplateOmitsArgs(copyTemplate, ['dryRun', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'], 'copy-organized-staging');
   const batchPreviewTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'batch-dry-run-preview');
   if (
@@ -2897,6 +2945,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected copy-clean-staging-directory recipe to disclose copy-only source safety.');
   }
+  assertDirectoryRouteInspectFields(stagingRecipe?.inspectFields, 'configurationRecipes.copy-clean-staging-directory');
   const structureRecipe = (result.configurationRecipes || []).find((item) => item.id === 'fast-structure-first-scan');
   if (
     structureRecipe?.previewArgs?.workflowPreset !== 'structure-first'
@@ -2906,10 +2955,12 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected fast structure recipe to use structure-first and require dedupe limitation inspection.');
   }
+  assertDirectoryRouteInspectFields(structureRecipe?.inspectFields, 'configurationRecipes.fast-structure-first-scan');
   const metadataRecipe = (result.configurationRecipes || []).find((item) => item.id === 'metadata-family-groups');
   if (!metadataRecipe?.inspectFields?.includes('organizationDecision')) {
     throw new Error('Expected metadata-family-groups recipe to require organizationDecision inspection.');
   }
+  assertDirectoryRouteInspectFields(metadataRecipe?.inspectFields, 'configurationRecipes.metadata-family-groups');
   const reviewedWriteRecipe = (result.configurationRecipes || []).find((item) => item.id === 'large-reviewed-write');
   if (!reviewedWriteRecipe?.inspectFields?.includes('batchDecision')) {
     throw new Error('Expected large-reviewed-write recipe to require batchDecision inspection.');
@@ -2937,6 +2988,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected structure-first guidance to use the structure-first preset and require dedupe checks.');
   }
+  assertDirectoryRouteInspectFields(structureDecision?.mustInspectFields, 'directoryWorkflowDecisionMatrix.large-or-noisy-directory-first-pass', 'mustInspectFields');
   assertObjectOmitsKeys(structureDecision?.recommendedOptions, ['dryRun', 'includePlan', 'parseFonts'], 'large-or-noisy-directory-first-pass recommendedOptions');
   const knownBatchDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'known-good-batch-layout');
   if (
@@ -2964,6 +3016,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected mixed-layout guidance to use safe-preview and require planActionSummary inspection.');
   }
+  assertDirectoryRouteInspectFields(mixedDecision?.mustInspectFields, 'directoryWorkflowDecisionMatrix.unknown-or-mixed-directory-layout', 'mustInspectFields');
   assertObjectOmitsKeys(mixedDecision?.recommendedOptions, ['dryRun', 'includePlan', 'parseFonts', 'batchNamingMode', 'batchDedupeMode'], 'unknown-or-mixed-directory-layout recommendedOptions');
   assertObjectOmitsKeys(mixedDecision?.followUpOptions, ['dryRun', 'includeResults', 'skipMode', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode'], 'unknown-or-mixed-directory-layout followUpOptions');
   const stagingDecision = (result.directoryWorkflowDecisionMatrix || []).find((item) => item.id === 'user-wants-clean-staging-directory');
@@ -2980,6 +3033,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected staging guidance to disclose source safety and preset-based copy-only follow-up.');
   }
+  assertDirectoryRouteInspectFields(stagingDecision?.mustInspectFields, 'directoryWorkflowDecisionMatrix.user-wants-clean-staging-directory', 'mustInspectFields');
   assertObjectOmitsKeys(stagingDecision?.recommendedOptions, ['dryRun', 'includePlan', 'parseFonts', 'overwriteExisting'], 'user-wants-clean-staging-directory recommendedOptions');
   assertObjectOmitsKeys(stagingDecision?.followUpOptions, ['dryRun', 'includePlan', 'parseFonts', 'overwriteExisting'], 'user-wants-clean-staging-directory followUpOptions');
   const exampleIds = new Set((result.directoryWorkflowExamples || []).map((item) => item.id));
@@ -3004,6 +3058,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected noisy-directory example to use structure-first and require dedupe limitation checks.');
   }
+  assertDirectoryRouteInspectFields(noisyExample?.mustInspectFields, 'directoryWorkflowExamples.large-noisy-first-pass', 'mustInspectFields');
   assertObjectOmitsKeys(noisyExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan'], 'large-noisy-first-pass firstCall');
   const archiveExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'archive-per-family-folders');
   if (
@@ -3029,6 +3084,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected mixed-layout example to disclose source safety fields.');
   }
+  assertDirectoryRouteInspectFields(mixedExample?.mustInspectFields, 'directoryWorkflowExamples.mixed-root-and-nested-fonts', 'mustInspectFields');
   assertObjectOmitsKeys(mixedExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'mixed-root-and-nested-fonts firstCall');
   const mismatchComparisonExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'source-layout-mismatch-comparison');
   const mismatchComparisonCaseIds = new Set((mismatchComparisonExample?.comparisonCases || []).map((item) => item.caseId));
@@ -3044,6 +3100,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected source-layout mismatch comparison example to cover flat/nested/mixed/output-inside-input routing and required inspect fields.');
   }
+  assertDirectoryRouteInspectFields(mismatchComparisonExample?.mustInspectFields, 'directoryWorkflowExamples.source-layout-mismatch-comparison', 'mustInspectFields');
   assertObjectOmitsKeys(mismatchComparisonExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'source-layout-mismatch-comparison firstCall');
   const flatExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'flat-vendor-dump');
   if (
@@ -3054,6 +3111,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected flat vendor example to use the safe-preview organization preset.');
   }
+  assertDirectoryRouteInspectFields(flatExample?.mustInspectFields, 'directoryWorkflowExamples.flat-vendor-dump', 'mustInspectFields');
   assertObjectOmitsKeys(flatExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'flat-vendor-dump firstCall');
   const checklistIds = new Set((result.verificationChecklist || []).map((item) => item.id));
   for (const requiredId of ['runtime-ready', 'layout-plan-reviewed', 'process-outcome-checked', 'fallback-disclosed', 'output-audited', 'local-compact-check-passed', 'local-real-corpus-suite-passed']) {
@@ -3086,6 +3144,7 @@ if (scenario === 'single') {
   if (!layoutChecklist?.responseFields?.includes('organizationDecision')) {
     throw new Error('Expected layout verification checklist to include organizationDecision.');
   }
+  assertDirectoryRouteInspectFields(layoutChecklist?.responseFields, 'verificationChecklist.layout-plan-reviewed', 'responseFields');
   const processChecklist = (result.verificationChecklist || []).find((item) => item.id === 'process-outcome-checked');
   if (
     !processChecklist?.responseFields?.includes('batchDecision')
