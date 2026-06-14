@@ -138,6 +138,7 @@ organized-fonts/
 ```
 
 这个暂存目录不是拆分结果，也不包含 CSS。它只是一个 copy-only 的整理辅助输出，用于在后续 `split_font_batch` 前准备更稳定的源目录。
+整理响应还会包含 `stagingDirectoryDecision`，明确把 `outputDir` 标记为源目录式暂存（`isSplitOutput: false`），并提示先用 `inspect_font_inputs` 检查暂存目录，再用 `split_font_batch` 做 safe-preview；只有后续真正生成拆分输出后，才用 `inspect_split_output` 审计输出结构。
 
 ## 常见源目录形态
 
@@ -353,6 +354,7 @@ fonts/
 - `dedupeDecisionSummary`：紧凑解释本次去重的实际模式、路径回退、解析限制、跳过重复数量和代表格式优先级
 - `batchPolicySummary`：本次整理调用采用的分组、命名和去重策略摘要；当 `parseFonts: false` 限制 identity 去重时，`effectiveValues.batchDedupeMode` 会显示实际回退值
 - `layoutDecision`：顶层紧凑路线摘要，汇总 `shortAnswer`、`layoutKind`、推荐分组、主线路由、源安全信号、原目录安全预览状态和 copy-only 暂存状态。先看其中的 `layoutDecision.directoryHandling`，它会用 `recommendedMode` 和 `shortAnswer` 直接回答“原目录能否预览、是否要 copy-only 暂存、下一步用哪个输入目录”。它适合 agent 先快速判断“下一步看哪里”，但不是整理或拆分已经成功的证明。
+- `stagingDirectoryDecision`：整理工具 `outputDir` 的紧凑判断；说明该目录只是计划、已可作为源目录式暂存、被错误阻断、已有目标需复核，还是没有可复制字体/没有新增副本。它会明确 `isSplitOutput: false`，因此应先用 `inspect_font_inputs` 检查暂存目录，再用 `split_font_batch` safe-preview，只有后续写出真正拆分输出后才用 `inspect_split_output`。
 - `directoryWorkflowSummary`：本次响应里的目录工作流导航摘要，用来串起布局复核、安全批量预览、可选 copy-only 暂存、reviewed 批量写入和必须执行的输出审计。它会重复源目录安全信号、路线选择、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示。
 - `sourceLayoutMismatchSummary`：直接回答“当前源目录结构和推荐批量分组是否匹配、能否直接对原目录做安全预览、copy-only 暂存是不需要/可选/已经写出、为什么暂存不会破坏源文件”等常见判断。其中的 `sourceLayoutMismatchSummary.decisionChecklist` 是更短的 agent 决策清单，用于集中检查源安全、直接预览是否就绪、copy-only 暂存需求、plan 可见性、warning 复核和写入后的输出审计。任何目录路由相关的 `inspectFields` / `mustInspectFields` / `responseFields` 只要列出 `sourceLayoutMismatchSummary`，也会同时列出 `sourceLayoutMismatchSummary.decisionChecklist`。
 - `directoryWorkflowSummary.planVisibility`：说明本次响应是否包含详细 `plan[]`。当 `includePlan: false` 时，`plan[]` 会被省略，但 `planActionSummary`、`layoutDecision`、`layoutDecision.directoryHandling`、`organizationDecision`、`sourceLayoutMismatchSummary`、`recommendedNextActions[]`、`organizationWarnings[]`、`layout`、`safetySummary` 和 `batchPolicySummary` 仍可用于大目录 triage；如果写入前需要确认每个文件的目标路径，应按其中的 `rerunWithPlanArgs` 重新 dry-run。
@@ -368,7 +370,7 @@ fonts/
 - `planActionSummary`：始终返回；按动作统计 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists` 和 `error` 等数量，即使 `includePlan: false` 省略明细也会保留
 - 可选 `plan[]` 条目，包含 `source`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`
 
-应把 `layoutDecision`、`layoutDecision.directoryHandling`、`organizationDecision`、`directoryWorkflowSummary`、`sourceLayoutMismatchSummary` 和 `sourceLayoutMismatchSummary.decisionChecklist` 当作主线提示，而不是成功证明。它们帮助 agent 选择下一步分支；真正继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility` 和可用时的 `plan[]`。
+应把 `layoutDecision`、`layoutDecision.directoryHandling`、`stagingDirectoryDecision`、`organizationDecision`、`directoryWorkflowSummary`、`sourceLayoutMismatchSummary` 和 `sourceLayoutMismatchSummary.decisionChecklist` 当作主线提示，而不是成功证明。它们帮助 agent 选择下一步分支；真正继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility` 和可用时的 `plan[]`。
 应把 `recommendedNextActions[]` 当作检查清单，而不是自动执行结果。Agent 仍然要检查每项里的 `inspectFields`，并满足 `successCriteria` 后再继续或报告完成，尤其是当某个动作建议写文件、审计输出或用不同扫描/解析上限重跑时。`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对 preset 的差异覆盖。批量 dry-run 可能返回 `run-reviewed-batch-write`；真实批量写入可能返回 `audit-split-output`，其建议的下一步工具是 `inspect_split_output`。
 应把 `planActionSummary` 当作压缩概览，而不是无需审查详细计划就可以写文件的许可。
 

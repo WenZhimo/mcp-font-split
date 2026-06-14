@@ -1445,6 +1445,7 @@ const DIRECTORY_ROUTE_REQUIRED_INSPECT_FIELDS = [
   'inputCountGuide',
   'layoutDecision',
   'layoutDecision.directoryHandling',
+  'stagingDirectoryDecision',
   'organizationDecision',
   'directoryWorkflowSummary',
   'sourceLayoutMismatchSummary',
@@ -1868,6 +1869,7 @@ function assertDirectoryWorkflowSummary(summary, {
     'inputCountGuide',
     'layoutDecision',
     'layoutDecision.directoryHandling',
+    'stagingDirectoryDecision',
     'directoryWorkflowSummary',
     'sourceLayoutMismatchSummary.decisionChecklist',
     'recommendedBatchPreviewArgs',
@@ -1958,6 +1960,37 @@ function assertLayoutDecision(decision, {
     || decision.copyOnlyStaging?.sourceFilesMovedDeletedOrRewritten !== false
   ) {
     throw new Error(`${context}: expected layoutDecision copyOnlyStaging to be source-safe.`);
+  }
+}
+
+function assertStagingDirectoryDecision(decision, {
+  context,
+  expectedStatus,
+  expectedOutputDir,
+  expectedCopiedCount,
+}) {
+  if (
+    !decision
+    || decision.summaryType !== 'staging-directory-decision'
+    || decision.appliesToTool !== 'organize_font_directory'
+    || decision.status !== expectedStatus
+    || decision.outputDir !== expectedOutputDir
+    || decision.outputDirRole !== 'organized-font-source-staging'
+    || decision.isSplitOutput !== false
+    || decision.sourceDestructive !== false
+    || decision.sourceFilesPreserved !== true
+    || decision.copiedCount !== expectedCopiedCount
+    || decision.inspectTool !== 'inspect_font_inputs'
+    || decision.previewTool !== 'split_font_batch'
+    || decision.auditToolAfterSplitWrite !== 'inspect_split_output'
+    || decision.safePreviewArgs?.inputDir !== expectedOutputDir
+    || decision.safePreviewArgs?.workflowPreset !== 'safe-preview'
+    || !decision.mustInspectFields?.includes('inputCountGuide')
+    || !decision.mustInspectFields?.includes('organizationManifestPath')
+    || !decision.successCriteria?.some((item) => item.includes('inspect_font_inputs'))
+    || !decision.nonIntuitiveBehavior?.some((item) => item.includes('not split output'))
+  ) {
+    throw new Error(`${context}: expected stagingDirectoryDecision to distinguish organized source staging from split output.`);
   }
 }
 
@@ -2528,6 +2561,9 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('organizationDecision')) {
     throw new Error('Expected agent guidance to recommend checking organization decision summaries.');
   }
+  if (!result.responseFieldsToCheck?.includes('stagingDirectoryDecision')) {
+    throw new Error('Expected agent guidance to recommend checking staging directory decision summaries.');
+  }
   if (!result.responseFieldsToCheck?.includes('sourceLayoutMismatchSummary.decisionChecklist')) {
     throw new Error('Expected agent guidance to recommend checking source layout decision checklist summaries.');
   }
@@ -2915,6 +2951,7 @@ if (scenario === 'single') {
     recommendedBatchPreviewArgs: 'organize_font_directory',
     layoutDecision: 'organize_font_directory',
     'layoutDecision.directoryHandling.recommendedMode': 'organize_font_directory',
+    stagingDirectoryDecision: 'organize_font_directory',
     directoryHandlingModeCatalog: 'get_agent_guidance',
     sourceLayoutMismatchSummary: 'organize_font_directory',
     'sourceLayoutMismatchSummary.decisionChecklist': 'organize_font_directory',
@@ -3754,6 +3791,12 @@ if (scenario === 'single') {
     expectedStagingNeed: 'already-written-copy-only',
     expectedRecommendedMode: 'preview-organized-output',
   });
+  assertStagingDirectoryDecision(copied.stagingDirectoryDecision, {
+    context: 'organize-copy',
+    expectedStatus: 'ready-for-source-preflight',
+    expectedOutputDir: outputDir,
+    expectedCopiedCount: 1,
+  });
   if (!copied.organizationWarnings?.some((warning) => warning.code === 'organization-writes-output')) {
     throw new Error('Expected organization copy warning.');
   }
@@ -3951,6 +3994,12 @@ if (scenario === 'single') {
     inputDir,
     batchGroupBy: 'source-dir',
   }, 'organize-valid-font');
+  assertStagingDirectoryDecision(result.stagingDirectoryDecision, {
+    context: 'organize-valid-font',
+    expectedStatus: 'ready-for-source-preflight',
+    expectedOutputDir: outputDir,
+    expectedCopiedCount: 1,
+  });
   if (result.plan?.filter((item) => item.action === 'skipped-duplicate').length !== 1) {
     throw new Error('Expected valid-font organization plan to disclose the duplicate skipped by identity.');
   }
@@ -5443,6 +5492,7 @@ if (scenario === 'single') {
       'dedupeDecisionSummary',
       'layoutDecision',
       'layoutDecision.directoryHandling',
+      'stagingDirectoryDecision',
       'directoryWorkflowSummary',
       'sourceLayoutMismatchSummary',
       'sourceLayoutMismatchSummary.decisionChecklist',
@@ -5515,6 +5565,7 @@ if (scenario === 'single') {
     assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
     assertDocsContain('source safety decision', '`sourceSafetyDecision`');
     assertDocsContain('directory handling decision', '`layoutDecision.directoryHandling`');
+    assertDocsContain('staging directory decision', '`stagingDirectoryDecision`');
     assertDocsContain('error response catalog', '`errorResponseCatalog`');
     assertDocsContain('error catalog section', '`error-catalog`');
     assertDocsContain('error type field', '`errorType`');
@@ -5594,6 +5645,7 @@ if (scenario === 'single') {
     '`dedupeDecisionSummary`',
     '`layoutDecision`',
     '`layoutDecision.directoryHandling`',
+    '`stagingDirectoryDecision`',
     '`directoryWorkflowSummary`',
     '`sourceLayoutMismatchSummary`',
     '`sourceLayoutMismatchSummary.decisionChecklist`',

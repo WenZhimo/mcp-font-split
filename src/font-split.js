@@ -655,6 +655,7 @@ const DIRECTORY_HANDLING_MUST_INSPECT_FIELDS = Object.freeze([
   'layoutDecision.directoryHandling.recommendedMode',
   'sourceSafetyDecision',
   'safetySummary',
+  'stagingDirectoryDecision',
   'organizationDecision',
   'sourceLayoutMismatchSummary',
   'sourceLayoutMismatchSummary.decisionChecklist',
@@ -1123,6 +1124,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Path to the font-organization-manifest.json written by a non-dry-run organization call.',
     agentAction: 'Use this as evidence of the copied staging layout when dryRun is false.',
   },
+  stagingDirectoryDecision: {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Compact input-side decision for the organizer outputDir: whether it is only a planned staging directory, a ready source-like staging directory, existing targets needing review, or blocked by errors.',
+    agentAction: 'Use this after organize_font_directory to distinguish organized source staging from split output. Inspect the staging with inspect_font_inputs, then run split_font_batch safe-preview before any split write; do not use inspect_split_output until split output has been generated.',
+  },
   planActionSummary: {
     sourceTools: ['organize_font_directory'],
     meaning: 'Compact counts of planned or executed organization actions.',
@@ -1483,7 +1489,7 @@ const TOOL_OPTION_CATALOG = {
     writeBehavior: 'dryRun false copies selected fonts into outputDir only',
     preferredSafeStart: { workflowPreset: 'safe-preview' },
     preferredReviewedWrite: { workflowPreset: 'reviewed-write' },
-    inspectAfterOverride: ['sourceSafetyDecision', 'safetySummary', 'layoutDecision', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'planActionSummary', 'organizationWarnings'],
+    inspectAfterOverride: ['sourceSafetyDecision', 'safetySummary', 'layoutDecision', 'stagingDirectoryDecision', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'planActionSummary', 'organizationWarnings'],
     options: {
       workflowPreset: {
         defaultValue: 'omitted-raw-organization-defaults',
@@ -1641,6 +1647,7 @@ const DIRECTORY_ROUTE_REQUIRED_INSPECT_FIELDS = [
   'inputCountGuide',
   'layoutDecision',
   'layoutDecision.directoryHandling',
+  'stagingDirectoryDecision',
   'organizationDecision',
   'directoryWorkflowSummary',
   SOURCE_LAYOUT_MISMATCH_FIELD,
@@ -2826,7 +2833,7 @@ export function getAgentGuidance(args = {}) {
     {
       id: 'layout-plan-reviewed',
       appliesTo: ['overview', 'batch', 'organize'],
-      check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect inputCountGuide, layoutDecision, layoutDecision.directoryHandling, sourceSafetyDecision, safetySummary, layout, recommendedBatchOptions, recommendedBatchPreviewArgs, organizationDecision, directoryWorkflowSummary, sourceLayoutMismatchSummary, unsupported file summaries, source write flags, organizationWarnings, and planActionSummary before applying any copy plan.',
+      check: 'When source layout may not match the intended output grouping, call organize_font_directory with dryRun true and inspect inputCountGuide, layoutDecision, layoutDecision.directoryHandling, stagingDirectoryDecision, sourceSafetyDecision, safetySummary, layout, recommendedBatchOptions, recommendedBatchPreviewArgs, organizationDecision, directoryWorkflowSummary, sourceLayoutMismatchSummary, unsupported file summaries, source write flags, organizationWarnings, and planActionSummary before applying any copy plan.',
       responseFields: withDirectoryRouteInspectFields(['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'layout', 'recommendedBatchOptions', 'recommendedNextActions', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'plan']),
     },
     {
@@ -3579,6 +3586,7 @@ export function getAgentGuidance(args = {}) {
       'operationMode',
       'copiedCount',
       'organizationManifestPath',
+      'stagingDirectoryDecision',
       'planActionSummary',
       'layoutDecision',
       'layoutDecision.directoryHandling',
@@ -5439,6 +5447,7 @@ function buildDirectoryWorkflowSummary({
         'layoutDecision',
         'layoutDecision.directoryHandling',
         'batchPolicySummary',
+        'stagingDirectoryDecision',
         'organizationDecision',
         'directoryWorkflowSummary',
         'sourceLayoutMismatchSummary',
@@ -5564,6 +5573,7 @@ function buildDirectoryWorkflowSummary({
       'planActionSummary',
       'layoutDecision',
       'layoutDecision.directoryHandling',
+      'stagingDirectoryDecision',
       'organizationDecision',
       'directoryWorkflowSummary',
       'sourceLayoutMismatchSummary',
@@ -5749,6 +5759,7 @@ function buildLayoutDecision({
       'layout',
       'layoutDecision',
       'layoutDecision.directoryHandling',
+      'stagingDirectoryDecision',
       'organizationDecision',
       'sourceLayoutMismatchSummary',
       'sourceLayoutMismatchSummary.decisionChecklist',
@@ -5767,6 +5778,95 @@ function buildLayoutDecision({
       'organize_font_directory never moves, deletes, or rewrites source font files; dryRun:false is copy-only into outputDir.',
       'writesSourceTree true means the output tree is inside the input tree, not that source font files are modified.',
       'copyOnlyStaging is optional unless the route or user intent requires a cleaner staging directory.',
+    ],
+  };
+}
+
+function buildStagingDirectoryDecision({
+  options,
+  outputDirRelative,
+  layout,
+  copiedCount,
+  skippedTargetExists,
+  selectedFontCount,
+  errorCount,
+  organizationManifestPath,
+  safePreviewArgs,
+}) {
+  let status = 'not-written-dry-run';
+  let recommendedAction = 'review-plan-before-copying';
+  let shortAnswer = 'No staging directory was written; review the plan before deciding whether copy-only organization is needed.';
+
+  if (!options.dryRun && errorCount > 0) {
+    status = 'organization-errors';
+    recommendedAction = 'inspect-organization-errors';
+    shortAnswer = 'The copy-only organization run reported errors; resolve them before using outputDir as a split source.';
+  } else if (!options.dryRun && copiedCount > 0) {
+    status = 'ready-for-source-preflight';
+    recommendedAction = 'inspect-staging-with-inspect_font_inputs';
+    shortAnswer = 'The organizer wrote a source-like staging directory; inspect it as input, then run split_font_batch safe-preview before any split write.';
+  } else if (!options.dryRun && skippedTargetExists > 0) {
+    status = 'review-existing-targets';
+    recommendedAction = 'inspect-existing-staging-targets';
+    shortAnswer = 'No new files were copied because targets already existed; inspect outputDir before deciding whether to reuse or overwrite it.';
+  } else if (!options.dryRun && selectedFontCount === 0) {
+    status = 'no-copyable-fonts';
+    recommendedAction = 'adjust-organization-policy-or-stop';
+    shortAnswer = 'No copyable fonts were selected, so outputDir is not a useful staging source yet.';
+  } else if (!options.dryRun) {
+    status = 'no-new-copies';
+    recommendedAction = 'inspect-outputDir-before-reuse';
+    shortAnswer = 'The organization call wrote no new font copies; inspect outputDir before using it as the next input.';
+  }
+
+  return {
+    summaryType: 'staging-directory-decision',
+    appliesToTool: 'organize_font_directory',
+    status,
+    shortAnswer,
+    recommendedAction,
+    outputDir: outputDirRelative,
+    outputDirRole: 'organized-font-source-staging',
+    isSplitOutput: false,
+    sourceDestructive: false,
+    sourceFilesPreserved: true,
+    sourceFilesMovedDeletedOrRewritten: false,
+    operationMode: options.dryRun ? 'plan-only' : 'copy-only',
+    copiedCount,
+    skippedTargetExists,
+    selectedFontCount,
+    layoutKind: layout.layoutKind,
+    recommendedBatchGroupBy: layout.recommendedBatchOptions?.batchGroupBy || null,
+    organizationManifestPath,
+    inspectTool: 'inspect_font_inputs',
+    inspectArgs: {
+      inputDir: outputDirRelative,
+      includeFiles: false,
+    },
+    previewTool: 'split_font_batch',
+    safePreviewArgs,
+    auditToolAfterSplitWrite: 'inspect_split_output',
+    mustInspectFields: [
+      'stagingDirectoryDecision',
+      'inputCountGuide',
+      'supportedFontCount',
+      'unsupportedFileDecision',
+      'unsupportedFileSummary',
+      'invalidFontCount',
+      'missingIdentityCount',
+      'inspectionWarnings',
+      'organizationManifestPath',
+      'planActionSummary',
+      'organizationWarnings',
+    ],
+    successCriteria: [
+      'If status is ready-for-source-preflight, run inspect_font_inputs on outputDir and require maxFilesHit false before using it as split input.',
+      'Before any reviewed split write, run split_font_batch safe-preview on outputDir and review planned paths, warnings, dedupe, maxFilesHit, and errors.',
+      'After any reviewed split write, run inspect_split_output on the split outputRoot and require outputStructureDecision.status pass.',
+    ],
+    nonIntuitiveBehavior: [
+      'The organizer outputDir is source-like staging, not split output; inspect_split_output applies only after split_font or split_font_batch writes generated output.',
+      'organize_font_directory dryRun:false copies fonts into outputDir; it never moves, deletes, or rewrites source font files.',
     ],
   };
 }
@@ -8044,6 +8144,23 @@ export async function organizeFontDirectory(args = {}) {
     organizationDecision,
     directoryWorkflowSummary,
   });
+  const organizationManifestPath = options.dryRun
+    ? null
+    : toRelativeWorkspacePath(path.join(outputDir, ORGANIZATION_MANIFEST_FILE_NAME));
+  const stagingDirectoryDecision = buildStagingDirectoryDecision({
+    options,
+    outputDirRelative,
+    layout,
+    copiedCount,
+    skippedTargetExists,
+    selectedFontCount: selectedEntries.length,
+    errorCount: errors.length,
+    organizationManifestPath,
+    safePreviewArgs: organizationDecision.safeBatchPreviewArgs || buildSuggestedBatchPreviewArgs({
+      inputDir: outputDirRelative,
+      recommendedBatchOptions: layout.recommendedBatchOptions,
+    }),
+  });
 
   const result = {
     ok: errors.length === 0,
@@ -8097,6 +8214,7 @@ export async function organizeFontDirectory(args = {}) {
     recommendedNextActionCount: recommendedNextActions.length,
     recommendedNextActions,
     layoutDecision,
+    stagingDirectoryDecision,
     organizationDecision,
     directoryWorkflowSummary,
     sourceLayoutMismatchSummary: directoryWorkflowSummary.sourceLayoutMismatchSummary,
@@ -8119,7 +8237,7 @@ export async function organizeFontDirectory(args = {}) {
       },
     });
     await writeOrganizationManifest(outputDir, manifest);
-    result.organizationManifestPath = toRelativeWorkspacePath(path.join(outputDir, ORGANIZATION_MANIFEST_FILE_NAME));
+    result.organizationManifestPath = organizationManifestPath;
     result.organizationManifestWritten = true;
   } else {
     result.organizationManifestWritten = false;

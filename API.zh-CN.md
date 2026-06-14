@@ -319,6 +319,7 @@
 | `batchPolicySummary` | 本次整理调用所采用的分组、命名和去重策略摘要，以及对应的 `batchPolicyGuide` 成功标准。若 `parseFonts: false` 导致 identity 去重降级，`effectiveValues.batchDedupeMode` 会显示真实回退值。 |
 | `layoutDecision` | `organize_font_directory` 的顶层紧凑路线摘要：`shortAnswer`、检测到的布局、推荐分组、主线路由、源安全信号、原目录安全预览状态和 copy-only 暂存状态。它是路线索引，不是成功证明。 |
 | `layoutDecision.directoryHandling` | 第一层目录处理答案：说明应预览原目录、复核 mixed 布局、使用 copy-only 整理输出、重跑整理，还是因为没有可复制字体而停止。它也会说明辅助工具是 `organize_font_directory`、默认是 dry-run、真实整理只是 copy-only 写入 `outputDir`。 |
+| `stagingDirectoryDecision` | `organize_font_directory.outputDir` 的紧凑判断：说明该目录只是计划、已可作为源目录式暂存、被错误阻断、已有目标需复核，还是没有可复制字体/没有新增副本。它会明确 `isSplitOutput: false`，建议先用 `inspect_font_inputs` 检查暂存目录，再用 `split_font_batch` safe-preview；只有后续生成真正拆分输出后才使用 `inspect_split_output`。 |
 | `directoryWorkflowSummary` | 本次响应里的目录工作流导航摘要，用来串起源布局复核、安全批量预览、可选 copy-only 暂存、reviewed 批量写入和必须执行的输出审计。它包含 `planVisibility`、`workflowSteps[]`、路线、安全信号、成功标准和非直觉行为提示。 |
 | `sourceLayoutMismatchSummary` | 源目录结构判断摘要：当前布局与推荐分组是否匹配、能否直接对原目录做安全预览、copy-only 暂存是不需要/可选/已经写出、暂存为什么不破坏源文件，以及内嵌的 `sourceLayoutMismatchSummary.decisionChecklist`。 |
 | `sourceLayoutMismatchSummary.decisionChecklist` | 面向 agent 的紧凑决策清单：集中检查源安全、直接预览是否就绪、copy-only 暂存需求、plan 可见性、warning 复核和写入后的输出审计。 |
