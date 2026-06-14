@@ -2061,6 +2061,7 @@ if (scenario === 'single') {
     || Object.hasOwn(defaultGuidance, 'directoryWorkflowExamples')
     || !defaultGuidance.safeInvocationTemplates?.length
     || defaultGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
+    || !defaultGuidance.directoryHandlingModeCatalog?.['preview-original-input']
     || !defaultGuidance.directoryWorkflowDecisionMatrix?.length
     || !defaultGuidance.configurationRecipes?.length
     || !defaultGuidance.batchPolicyGuide?.length
@@ -2101,6 +2102,7 @@ if (scenario === 'single') {
     || Object.hasOwn(compactGuidance, 'directoryWorkflowExamples')
     || !compactGuidance.safeInvocationTemplates?.length
     || compactGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
+    || !compactGuidance.directoryHandlingModeCatalog?.['preview-organized-output']
     || !compactGuidance.directoryWorkflowDecisionMatrix?.length
     || !compactGuidance.configurationRecipes?.length
     || !compactGuidance.batchPolicyGuide?.length
@@ -2127,6 +2129,7 @@ if (scenario === 'single') {
     || workflowOnlyGuidance.workflow !== 'organize'
     || Object.hasOwn(workflowOnlyGuidance, 'safeInvocationTemplates')
     || Object.hasOwn(workflowOnlyGuidance, 'configurationRecipes')
+    || Object.hasOwn(workflowOnlyGuidance, 'directoryHandlingModeCatalog')
     || Object.hasOwn(workflowOnlyGuidance, 'directoryWorkflowDecisionMatrix')
     || !workflowOnlyGuidance.recommendedWorkflowPlan?.orderedSteps?.length
     || workflowOnlyGuidance.nextToolDecisionSummary?.workflowQuickStart?.recommendedExampleId !== 'plan-source-layout'
@@ -2152,6 +2155,7 @@ if (scenario === 'single') {
     || !catalogGuidance.errorResponseCatalog
     || Object.hasOwn(catalogGuidance, 'safeInvocationTemplates')
     || Object.hasOwn(catalogGuidance, 'localVerificationOutputGuide')
+    || Object.hasOwn(catalogGuidance, 'directoryHandlingModeCatalog')
     || Object.hasOwn(catalogGuidance, 'directoryWorkflowDecisionMatrix')
   ) {
     throw new Error('Expected focused agent guidance sections to return only requested catalogs.');
@@ -2261,6 +2265,12 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('sourceLayoutMismatchSummary.decisionChecklist')) {
     throw new Error('Expected agent guidance to recommend checking source layout decision checklist summaries.');
   }
+  if (
+    !result.responseFieldsToCheck?.includes('layoutDecision.directoryHandling.recommendedMode')
+    || !result.responseFieldsToCheck?.includes('directoryHandlingModeCatalog')
+  ) {
+    throw new Error('Expected agent guidance to recommend checking directory handling mode catalog fields.');
+  }
   if (!result.responseFieldsToCheck?.includes('warningCodeCatalog')) {
     throw new Error('Expected agent guidance to recommend checking the warning code catalog.');
   }
@@ -2334,6 +2344,43 @@ if (scenario === 'single') {
       || result.toolResponseFieldCatalog?.[removedVersionField]
     ) {
       throw new Error(`Expected unreleased forward-compatibility field ${removedVersionField} to be removed from agent guidance.`);
+    }
+  }
+  const expectedDirectoryHandlingModes = [
+    'rerun-organization',
+    'rerun-organization-with-font-parsing',
+    'inspect-organization-errors',
+    'resolve-invalid-font-policy',
+    'stop-no-copyable-fonts',
+    'preview-organized-output',
+    'inspect-organized-output',
+    'review-original-input-safe-preview',
+    'preview-original-input',
+    'review-organization-decision',
+  ];
+  for (const mode of expectedDirectoryHandlingModes) {
+    const entry = result.directoryHandlingModeCatalog?.[mode];
+    if (
+      entry?.value !== mode
+      || !entry.shortAnswer
+      || !entry.meaning
+      || !entry.whenSeen
+      || !entry.recommendedNextStep
+      || entry.writesFilesBeforeReview !== false
+      || entry.sourceDestructive !== false
+      || !Array.isArray(entry.mustInspectFields)
+      || !entry.mustInspectFields.includes('layoutDecision.directoryHandling.recommendedMode')
+      || !entry.mustInspectFields.includes('sourceSafetyDecision')
+      || !entry.mustInspectFields.includes('organizationWarnings')
+      || !entry.mustInspectFields.includes('planActionSummary')
+      || !entry.nonIntuitiveBehavior
+    ) {
+      throw new Error(`Expected directoryHandlingModeCatalog.${mode} to describe routing, safety, and required inspection fields.`);
+    }
+  }
+  for (const mode of Object.keys(result.directoryHandlingModeCatalog || {})) {
+    if (!expectedDirectoryHandlingModes.includes(mode)) {
+      throw new Error(`Unexpected directory handling mode catalog entry ${mode}.`);
     }
   }
   const expectedWarningCodes = [
@@ -2513,6 +2560,9 @@ if (scenario === 'single') {
   for (const item of result.directoryWorkflowDecisionMatrix || []) {
     for (const fieldName of item.mustInspectFields || []) referencedFieldNames.add(fieldName);
   }
+  for (const item of Object.values(result.directoryHandlingModeCatalog || {})) {
+    for (const fieldName of item.mustInspectFields || []) referencedFieldNames.add(fieldName);
+  }
   for (const item of result.directoryWorkflowExamples || []) {
     for (const fieldName of item.mustInspectFields || []) referencedFieldNames.add(fieldName);
   }
@@ -2555,6 +2605,8 @@ if (scenario === 'single') {
     recommendedBatchOptions: 'organize_font_directory',
     recommendedBatchPreviewArgs: 'organize_font_directory',
     layoutDecision: 'organize_font_directory',
+    'layoutDecision.directoryHandling.recommendedMode': 'organize_font_directory',
+    directoryHandlingModeCatalog: 'get_agent_guidance',
     sourceLayoutMismatchSummary: 'organize_font_directory',
     'sourceLayoutMismatchSummary.decisionChecklist': 'organize_font_directory',
     recommendedNextActions: 'split_font_batch',
@@ -4929,7 +4981,7 @@ if (scenario === 'single') {
       assertEnumMatches(`organize_font_directory ${optionName}`, getSchemaEnumValues(organizeProps[optionName]), expectedValues);
     }
     assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
-    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'layoutDecision.directoryHandling', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);

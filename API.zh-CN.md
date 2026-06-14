@@ -14,7 +14,7 @@
 | `detailLevel` | `compact`, `full` | `compact` | 响应体量。`compact` 保留工作流关键 section，并默认省略较大的 catalog / 示例；`full` 返回全部指南 section。 |
 | `sections` | section 名称数组 | 不设置 | 聚焦返回指定 section。设置后会覆盖 `detailLevel` 的默认 section 集。 |
 
-响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchPolicyGuide`、`unsupportedFileCategoryCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchPolicyGuide`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
 当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["error-catalog", "warning-catalog", "field-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
 
@@ -25,6 +25,8 @@
 `batchPolicyGuide` 是批量策略选项的机器可读自定义指南。它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`；每个策略值都会包含 `useWhen`、`avoidWhen`、`inspectFields` 和 `successCriteria`。当用户要求偏离默认 preset 的行为时，先参考它选择最小显式覆盖，然后先预览再写入。
 
 `unsupportedFileCategoryCatalog` 会解释 `unsupportedFileSummary.byCategory[]` 使用的分类，包括代表性扩展名、分类含义和处理行为。工具响应也会提供用于快速判断的 `unsupportedFileDecision`，以及作为证据的 `unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary`，agent 不必再次查 guidance 也能解释它们。尤其是 `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
+
+`directoryHandlingModeCatalog` 是面向 `layoutDecision.directoryHandling.recommendedMode` 的机器可读目录。每个条目解释 `meaning`、`whenSeen`、`recommendedNextStep`、`writesFilesBeforeReview`、`sourceDestructive`、`mustInspectFields` 和 `nonIntuitiveBehavior`，让 agent 不必从字符串猜测目录处理模式含义。
 
 `directoryWorkflowDecisionMatrix[]` 是面向常见目录场景的机器可读决策表。每个条目包含 `id`、`useWhen`、`firstTool`、默认写入/源目录安全标记、`recommendedOptions`、可选后续工具/参数、`mustInspectFields`、`successCriteria` 和 `nonIntuitiveBehavior`。其中的参数会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖项。
 

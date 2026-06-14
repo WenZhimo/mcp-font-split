@@ -233,7 +233,7 @@ const GUIDANCE_SECTION_FIELDS = {
   tools: ['tools', 'supportedExtensions'],
   defaults: ['defaultPolicies'],
   recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets', 'batchPolicyGuide', 'configurationRecipes', 'unsupportedFileCategoryCatalog'],
-  'directory-workflows': ['directoryWorkflowDecisionMatrix'],
+  'directory-workflows': ['directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix'],
   examples: ['directoryWorkflowExamples'],
   verification: ['verificationChecklist', 'localVerificationOutputGuide'],
   'error-catalog': ['errorResponseCatalog'],
@@ -643,6 +643,159 @@ const ALL_TOOL_NAMES = [
   'inspect_split_output',
 ];
 
+const DIRECTORY_HANDLING_MUST_INSPECT_FIELDS = Object.freeze([
+  'layoutDecision',
+  'layoutDecision.directoryHandling',
+  'layoutDecision.directoryHandling.recommendedMode',
+  'sourceSafetyDecision',
+  'safetySummary',
+  'organizationDecision',
+  'sourceLayoutMismatchSummary',
+  'sourceLayoutMismatchSummary.decisionChecklist',
+  'recommendedNextActions',
+  'organizationWarnings',
+  'planActionSummary',
+]);
+
+const DIRECTORY_HANDLING_MODE_BY_ORGANIZATION_ROUTE = Object.freeze({
+  'rerun-with-higher-maxFiles': 'rerun-organization',
+  'rerun-with-font-parsing': 'rerun-organization-with-font-parsing',
+  'inspect-organization-errors': 'inspect-organization-errors',
+  'decide-on-invalid-fonts': 'resolve-invalid-font-policy',
+  'no-copyable-fonts': 'stop-no-copyable-fonts',
+  'preview-organized-output': 'preview-organized-output',
+  'review-existing-targets': 'inspect-organized-output',
+  'review-mixed-layout': 'review-original-input-safe-preview',
+  'preview-original-layout': 'preview-original-input',
+});
+
+const DIRECTORY_HANDLING_MODE_CATALOG_ENTRIES = Object.freeze([
+  {
+    value: 'rerun-organization',
+    shortAnswer: 'The scan was truncated; rerun organize_font_directory with a higher maxFiles before deciding how to split.',
+    meaning: 'The organizer did not see the whole input tree, so the current route is incomplete.',
+    whenSeen: 'organizationDecision.route is rerun-with-higher-maxFiles, usually because maxFilesHit is true.',
+    recommendedNextStep: 'Rerun organize_font_directory with a higher maxFiles before choosing direct batch preview or copy-only staging.',
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    mustInspectFields: DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+    nonIntuitiveBehavior: 'Counts, layoutKind, and ignored-file summaries may describe only the scanned prefix until the rerun completes.',
+  },
+  {
+    value: 'rerun-organization-with-font-parsing',
+    shortAnswer: 'This was a structure-only pass; rerun organize_font_directory with font parsing before relying on metadata grouping or identity dedupe.',
+    meaning: 'The organizer intentionally skipped font parsing, so metadata-dependent grouping and identity dedupe are limited.',
+    whenSeen: 'organizationDecision.route is rerun-with-font-parsing after a structure-first or parseFonts:false pass.',
+    recommendedNextStep: 'Rerun organize_font_directory with parseFonts:true or workflowPreset safe-preview before using font-family grouping, invalid-font counts, or identity dedupe.',
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    mustInspectFields: DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+    nonIntuitiveBehavior: 'validFontCount and invalidFontCount can be null, not zero, because parsing was skipped.',
+  },
+  {
+    value: 'inspect-organization-errors',
+    shortAnswer: 'The organization run recorded errors; inspect them before choosing a split or staging route.',
+    meaning: 'The organizer hit one or more errors that may change which fonts can be copied or split.',
+    whenSeen: 'organizationDecision.route is inspect-organization-errors.',
+    recommendedNextStep: 'Inspect organization errors and warnings, then rerun or adjust policy before writing or batch-splitting.',
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    mustInspectFields: DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+    nonIntuitiveBehavior: 'ok can still be true for collected-error modes; errorCount and organizationWarnings decide whether the route is trustworthy.',
+  },
+  {
+    value: 'resolve-invalid-font-policy',
+    shortAnswer: 'Some supported-extension files could not be parsed; decide whether to preserve invalid font-like files before treating the route as ready.',
+    meaning: 'At least one supported-extension file failed metadata parsing, so the copy/split policy must decide whether to keep or skip it.',
+    whenSeen: 'organizationDecision.route is decide-on-invalid-fonts.',
+    recommendedNextStep: 'Review invalid font counts and warnings; choose copyInvalidFonts only if preserving broken or font-like files is intentional.',
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    mustInspectFields: DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+    nonIntuitiveBehavior: 'Unsupported files are ignored separately; this mode is about supported extensions that failed font parsing.',
+  },
+  {
+    value: 'stop-no-copyable-fonts',
+    shortAnswer: 'No copyable supported fonts were found for the current policy; do not split until the input or policy changes.',
+    meaning: 'The current input/policy combination produced no fonts that should be copied or split.',
+    whenSeen: 'organizationDecision.route is no-copyable-fonts.',
+    recommendedNextStep: 'Stop and inspect supportedFontCount, validFontCount, invalidFontCount, unsupportedFileSummary, and policy choices before retrying.',
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    mustInspectFields: DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+    nonIntuitiveBehavior: 'A noisy corpus can contain many files while still producing zero copyable supported fonts under the selected policy.',
+  },
+  {
+    value: 'preview-organized-output',
+    shortAnswer: 'A copy-only staging directory has been written; run split_font_batch safe-preview on that organized output before any split write.',
+    meaning: 'The next split input should be the already-created organized output directory.',
+    whenSeen: 'organizationDecision.route is preview-organized-output after a reviewed organize run copied files into outputDir.',
+    recommendedNextStep: 'Run split_font_batch with workflowPreset safe-preview against the organized output, then audit split output after any reviewed write.',
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    mustInspectFields: DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+    nonIntuitiveBehavior: 'The staging copy may already exist, but the split itself still needs a no-write safe-preview before a reviewed write.',
+  },
+  {
+    value: 'inspect-organized-output',
+    shortAnswer: 'No new files were copied; inspect the organized output or existing targets before using them as split input.',
+    meaning: 'The organizer found existing target files instead of producing new copies.',
+    whenSeen: 'organizationDecision.route is review-existing-targets.',
+    recommendedNextStep: 'Inspect the organized output or existing target paths, then decide whether to reuse, overwrite, or rerun with different options.',
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    mustInspectFields: DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+    nonIntuitiveBehavior: 'copiedCount can be zero because targets already exist, not because the source tree was changed.',
+  },
+  {
+    value: 'review-original-input-safe-preview',
+    shortAnswer: 'Mixed root and nested fonts were detected; safe-preview the original input and review grouping, or copy a staging directory if the user wants a cleaner source layout.',
+    meaning: 'The original source can be previewed, but mixed layout makes grouping choices easy to misread.',
+    whenSeen: 'organizationDecision.route is review-mixed-layout.',
+    recommendedNextStep: 'Run split_font_batch safe-preview with the suggested original-input args, or use copy-only organization when a stable staging tree is desired.',
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    mustInspectFields: DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+    nonIntuitiveBehavior: 'This is a route hint, not proof that mixed source folders already match the desired output structure.',
+  },
+  {
+    value: 'preview-original-input',
+    shortAnswer: 'The original input can be used directly for split_font_batch safe-preview; copy-only staging is optional.',
+    meaning: 'The current source layout is suitable enough to preview batch splitting without first copying a staging directory.',
+    whenSeen: 'organizationDecision.route is preview-original-layout.',
+    recommendedNextStep: 'Run split_font_batch with workflowPreset safe-preview using the suggested original-input args.',
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    mustInspectFields: DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+    nonIntuitiveBehavior: 'Direct preview is still no-write planning; reviewed write and output audit remain separate required steps.',
+  },
+  {
+    value: 'review-organization-decision',
+    shortAnswer: 'Review the organization decision before choosing direct preview, copy-only staging, or a rerun.',
+    meaning: 'Fallback mode for an organizationDecision route without a more specific directory-handling mode.',
+    whenSeen: 'organizationDecision.route is missing or not recognized by the current catalog.',
+    recommendedNextStep: 'Inspect organizationDecision, warnings, planActionSummary, and source safety fields before choosing the next tool.',
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    mustInspectFields: DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+    nonIntuitiveBehavior: 'Fallback modes require extra caution because the route may come from newer behavior than this client expected.',
+  },
+]);
+
+const DIRECTORY_HANDLING_SHORT_ANSWER_BY_MODE = Object.freeze(Object.fromEntries(
+  DIRECTORY_HANDLING_MODE_CATALOG_ENTRIES.map((entry) => [entry.value, entry.shortAnswer]),
+));
+
+function buildDirectoryHandlingModeCatalog() {
+  return Object.fromEntries(DIRECTORY_HANDLING_MODE_CATALOG_ENTRIES.map((entry) => [
+    entry.value,
+    {
+      ...entry,
+      mustInspectFields: [...entry.mustInspectFields],
+    },
+  ]));
+}
+
 const TOOL_RESPONSE_FIELD_CATALOG = {
   ok: {
     sourceTools: ALL_TOOL_NAMES,
@@ -973,6 +1126,16 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['organize_font_directory'],
     meaning: 'Short answer for how to treat the current source directory: preview original input, review mixed layout, use an organized copy-only output, rerun organization, or stop because no copyable fonts were found.',
     agentAction: 'Use this as the first answer to "what should I do with this directory?", then verify the referenced suggestedArgs, sourceSafetyDecision, organizationWarnings, and plan fields.',
+  },
+  'layoutDecision.directoryHandling.recommendedMode': {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Stable mode value inside layoutDecision.directoryHandling, such as preview-original-input, review-original-input-safe-preview, or preview-organized-output.',
+    agentAction: 'Look up the value in get_agent_guidance.directoryHandlingModeCatalog, then inspect the catalog mustInspectFields before continuing.',
+  },
+  directoryHandlingModeCatalog: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Machine-readable catalog for layoutDecision.directoryHandling.recommendedMode values, including meaning, whenSeen, next step, write behavior, source safety, required fields, and non-intuitive behavior.',
+    agentAction: 'Use it to interpret directoryHandling.recommendedMode without guessing from strings; treat the catalog as guidance and still verify current tool response fields.',
   },
   directoryWorkflowSummary: {
     sourceTools: ['organize_font_directory'],
@@ -2539,6 +2702,7 @@ export function getAgentGuidance(args = {}) {
       nonIntuitiveBehavior: 'A real organize run is copy-only. overwriteExisting:true can replace files in outputDir but still does not modify source files.',
     },
   ];
+  const directoryHandlingModeCatalog = buildDirectoryHandlingModeCatalog();
   const directoryWorkflowExamples = [
     {
       id: 'flat-vendor-dump',
@@ -2928,6 +3092,7 @@ export function getAgentGuidance(args = {}) {
     batchPolicyGuide: BATCH_POLICY_GUIDE,
     configurationRecipes,
     unsupportedFileCategoryCatalog: buildUnsupportedFileCategoryCatalog(),
+    directoryHandlingModeCatalog,
     directoryWorkflowDecisionMatrix,
     directoryWorkflowExamples,
     verificationChecklist,
@@ -3010,6 +3175,8 @@ export function getAgentGuidance(args = {}) {
       'planActionSummary',
       'layoutDecision',
       'layoutDecision.directoryHandling',
+      'layoutDecision.directoryHandling.recommendedMode',
+      'directoryHandlingModeCatalog',
       'organizationDecision',
       'directoryWorkflowSummary',
       'sourceLayoutMismatchSummary',
@@ -4984,30 +5151,7 @@ function buildDirectoryHandlingDecision({
     && Boolean(directOriginalInput.safePreviewArgs);
   const copyOnlyStagingNeed = copyOnlyStaging.need || null;
   const route = organizationDecision.route;
-  const modeByRoute = {
-    'rerun-with-higher-maxFiles': 'rerun-organization',
-    'rerun-with-font-parsing': 'rerun-organization-with-font-parsing',
-    'inspect-organization-errors': 'inspect-organization-errors',
-    'decide-on-invalid-fonts': 'resolve-invalid-font-policy',
-    'no-copyable-fonts': 'stop-no-copyable-fonts',
-    'preview-organized-output': 'preview-organized-output',
-    'review-existing-targets': 'inspect-organized-output',
-    'review-mixed-layout': 'review-original-input-safe-preview',
-    'preview-original-layout': 'preview-original-input',
-  };
-  const recommendedMode = modeByRoute[route] || 'review-organization-decision';
-  const shortAnswerByMode = {
-    'rerun-organization': 'The scan was truncated; rerun organize_font_directory with a higher maxFiles before deciding how to split.',
-    'rerun-organization-with-font-parsing': 'This was a structure-only pass; rerun organize_font_directory with font parsing before relying on metadata grouping or identity dedupe.',
-    'inspect-organization-errors': 'The organization run recorded errors; inspect them before choosing a split or staging route.',
-    'resolve-invalid-font-policy': 'Some supported-extension files could not be parsed; decide whether to preserve invalid font-like files before treating the route as ready.',
-    'stop-no-copyable-fonts': 'No copyable supported fonts were found for the current policy; do not split until the input or policy changes.',
-    'preview-organized-output': 'A copy-only staging directory has been written; run split_font_batch safe-preview on that organized output before any split write.',
-    'inspect-organized-output': 'No new files were copied; inspect the organized output or existing targets before using them as split input.',
-    'review-original-input-safe-preview': 'Mixed root and nested fonts were detected; safe-preview the original input and review grouping, or copy a staging directory if the user wants a cleaner source layout.',
-    'preview-original-input': 'The original input can be used directly for split_font_batch safe-preview; copy-only staging is optional.',
-    'review-organization-decision': 'Review the organization decision before choosing direct preview, copy-only staging, or a rerun.',
-  };
+  const recommendedMode = DIRECTORY_HANDLING_MODE_BY_ORGANIZATION_ROUTE[route] || 'review-organization-decision';
   const useOrganizedOutput = recommendedMode === 'preview-organized-output';
   const suggestedArgsField = useOrganizedOutput
     ? 'organizationDecision.safeBatchPreviewArgs'
@@ -5023,7 +5167,7 @@ function buildDirectoryHandlingDecision({
   return {
     summaryType: 'directory-handling-decision',
     recommendedMode,
-    shortAnswer: shortAnswerByMode[recommendedMode],
+    shortAnswer: DIRECTORY_HANDLING_SHORT_ANSWER_BY_MODE[recommendedMode],
     layoutKind: layout.layoutKind,
     recommendedBatchGroupBy: layout.recommendedBatchOptions?.batchGroupBy || null,
     originalInputPreviewStatus: directStatus,
@@ -5043,18 +5187,7 @@ function buildDirectoryHandlingDecision({
     nextInputDir: organizationDecision.nextInputDir || null,
     suggestedArgsField,
     safePreviewArgs,
-    mustInspectFields: [
-      'layoutDecision',
-      'layoutDecision.directoryHandling',
-      'sourceSafetyDecision',
-      'safetySummary',
-      'organizationDecision',
-      'sourceLayoutMismatchSummary',
-      'sourceLayoutMismatchSummary.decisionChecklist',
-      'recommendedNextActions',
-      'organizationWarnings',
-      'planActionSummary',
-    ],
+    mustInspectFields: [...DIRECTORY_HANDLING_MUST_INSPECT_FIELDS],
   };
 }
 
