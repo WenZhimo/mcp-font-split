@@ -1,5 +1,7 @@
 # mcp-font-split
 
+显式传入的无效配置会被拒绝，而不是静默回退。MCP schema 会先拦截非法参数；如果绕过 MCP 直接调用模块函数，则会抛出带 `details.summaryType: "configuration-error"` 的 `FontSplitConfigurationError`。需要默认行为时请省略该选项，而不是传入无效枚举、布尔或数字值。
+
 [English](./README.en.md) | [API 参考](./API.zh-CN.md) | [English API](./API.md) | [行为说明](./BEHAVIOR.zh-CN.md)
 
 > **AI 生成代码声明**

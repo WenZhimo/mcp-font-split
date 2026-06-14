@@ -15,6 +15,8 @@
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that wraps [cn-font-split](https://github.com/KonghaYao/cn-font-split) as agent-callable tools for font subsetting and web-font generation.
 
+Invalid explicit configuration values are rejected instead of silently falling back. MCP calls are guarded by the tool schema; direct module calls throw `FontSplitConfigurationError` with machine-readable `details.summaryType: "configuration-error"` when an enum, boolean, or numeric value is invalid. Omit an option to use its default.
+
 > [!WARNING]
 > Before using this tool, read the full behavior and risk notes in [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md). This wrapper contains policy choices around batch grouping, incremental skipping, WOFF normalization, fallback output, and metadata manifests.
 

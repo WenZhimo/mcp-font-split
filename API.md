@@ -2,6 +2,8 @@
 
 This server exposes seven MCP tools. All paths are resolved inside `FONT_SPLIT_ROOT`; if that environment variable is not set, paths are resolved from the process working directory. Response paths use `.` for the workspace root instead of an empty string, including suggested follow-up arguments.
 
+Invalid explicit configuration values are rejected instead of silently falling back. MCP calls are guarded by the tool schema; direct module calls that bypass the MCP schema throw `FontSplitConfigurationError` with `details.summaryType: "configuration-error"`, `details.option`, `details.received`, `details.allowedValues` or `details.expectedType`, `details.defaultWhenOmitted`, and `details.omitForDefaultBehavior: true`. To use defaults, omit the option rather than passing an invalid enum, boolean, or numeric value.
+
 ## `get_agent_guidance`
 
 Return machine-readable usage guidance for AI coding assistants.

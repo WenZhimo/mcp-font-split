@@ -3115,12 +3115,93 @@ function normalizeOptionalString(value) {
   return typeof value === 'string' && value.trim() !== '' ? value : undefined;
 }
 
-function normalizeOptionalNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+function buildConfigurationError({ optionName, received, allowedValues, expectedType, min, max, defaultWhenOmitted }) {
+  const allowedText = Array.isArray(allowedValues) && allowedValues.length > 0
+    ? ` one of: ${allowedValues.join(', ')}`
+    : ` a ${expectedType}`;
+  const rangeText = min !== undefined || max !== undefined
+    ? ` (${[
+      min !== undefined ? `min ${min}` : null,
+      max !== undefined ? `max ${max}` : null,
+    ].filter(Boolean).join(', ')})`
+    : '';
+  const error = new Error(`${optionName} must be${allowedText}${rangeText}. Omit it to use the documented default.`);
+  error.name = 'FontSplitConfigurationError';
+  error.details = {
+    summaryType: 'configuration-error',
+    option: optionName,
+    received,
+    ...(allowedValues ? { allowedValues } : {}),
+    expectedType,
+    ...(min !== undefined ? { min } : {}),
+    ...(max !== undefined ? { max } : {}),
+    defaultWhenOmitted,
+    omitForDefaultBehavior: true,
+    nonIntuitiveBehavior: 'Explicit invalid configuration values are rejected instead of silently falling back to defaults.',
+  };
+  return error;
 }
 
-function normalizeOptionalBoolean(value) {
-  return typeof value === 'boolean' ? value : undefined;
+function normalizeEnumOption(args, optionName, allowedValues, defaultValue) {
+  const value = args?.[optionName];
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (allowedValues.includes(value)) return value;
+  throw buildConfigurationError({
+    optionName,
+    received: value,
+    allowedValues,
+    expectedType: 'enum',
+    defaultWhenOmitted: defaultValue,
+  });
+}
+
+function normalizeBooleanOption(args, optionName, defaultValue) {
+  const value = args?.[optionName];
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (typeof value === 'boolean') return value;
+  throw buildConfigurationError({
+    optionName,
+    received: value,
+    allowedValues: [true, false],
+    expectedType: 'boolean',
+    defaultWhenOmitted: defaultValue,
+  });
+}
+
+function normalizePositiveNumberOption(args, optionName, defaultValue, { integer = false, max } = {}) {
+  const value = args?.[optionName];
+  if (value === undefined || value === null || value === '') return defaultValue;
+  const validNumber = typeof value === 'number'
+    && Number.isFinite(value)
+    && value > 0
+    && (!integer || Number.isInteger(value))
+    && (max === undefined || value <= max);
+  if (validNumber) return value;
+  throw buildConfigurationError({
+    optionName,
+    received: value,
+    expectedType: integer ? 'positive-integer' : 'positive-number',
+    min: integer ? 1 : undefined,
+    max,
+    defaultWhenOmitted: defaultValue,
+  });
+}
+
+function normalizeOptionalPositiveNumberOption(args, optionName, { integer = false } = {}) {
+  const value = args?.[optionName];
+  if (value === undefined || value === null || value === '') return undefined;
+  const validNumber = typeof value === 'number'
+    && Number.isFinite(value)
+    && value > 0
+    && (!integer || Number.isInteger(value));
+  if (validNumber) return value;
+  throw buildConfigurationError({
+    optionName,
+    received: value,
+    expectedType: integer ? 'positive-integer' : 'positive-number',
+    min: integer ? 1 : undefined,
+    defaultWhenOmitted: 'unset',
+  });
 }
 
 function getWorkflowPresetName(value) {
@@ -3132,7 +3213,7 @@ function dropUndefinedOptions(args = {}) {
 }
 
 function applyWorkflowPreset(args = {}, scope) {
-  const workflowPreset = getWorkflowPresetName(args.workflowPreset);
+  const workflowPreset = normalizeEnumOption(args, 'workflowPreset', WORKFLOW_PRESET_NAMES, null);
   const preset = workflowPreset ? WORKFLOW_PRESETS[workflowPreset] : null;
   const scopePreset = preset?.[scope] || {};
   const explicitArgs = dropUndefinedOptions({ ...args, workflowPreset: undefined });
@@ -3178,38 +3259,36 @@ function buildUnsupportedFileCategoryCatalog() {
 function normalizeProcessingOptions(args) {
   const smallGlyphActions = ['subset', 'single-woff2', 'copy-original'];
   return {
-    oversizedKernAction: args.oversizedKernAction === 'strip' ? 'strip' : 'preserve',
-    smallGlyphAction: smallGlyphActions.includes(args.smallGlyphAction) ? args.smallGlyphAction : 'subset',
-    smallGlyphThreshold: Number.isFinite(args.smallGlyphThreshold) && args.smallGlyphThreshold > 0
-      ? Math.floor(args.smallGlyphThreshold)
-      : 50,
-    splitFailureAction: args.splitFailureAction === 'single-woff2' ? 'single-woff2' : 'error',
+    oversizedKernAction: normalizeEnumOption(args, 'oversizedKernAction', ['preserve', 'strip'], 'preserve'),
+    smallGlyphAction: normalizeEnumOption(args, 'smallGlyphAction', smallGlyphActions, 'subset'),
+    smallGlyphThreshold: normalizePositiveNumberOption(args, 'smallGlyphThreshold', 50, { integer: true }),
+    splitFailureAction: normalizeEnumOption(args, 'splitFailureAction', ['error', 'single-woff2'], 'error'),
   };
 }
 
 function normalizeBatchOptions(args) {
   return {
     workflowPreset: getWorkflowPresetName(args.workflowPreset),
-    skipMode: ['manifest', 'force'].includes(args.skipMode) ? args.skipMode : 'manifest',
-    batchGroupBy: ['auto', 'source-dir', 'font-family'].includes(args.batchGroupBy) ? args.batchGroupBy : 'auto',
-    batchNamingMode: ['plain', 'numeric-suffix', 'source-suffix'].includes(args.batchNamingMode) ? args.batchNamingMode : 'numeric-suffix',
-    batchDedupeMode: ['none', 'same-path', 'font-identity'].includes(args.batchDedupeMode) ? args.batchDedupeMode : 'font-identity',
-    batchErrorMode: ['collect', 'fail-fast', 'fail-after'].includes(args.batchErrorMode) ? args.batchErrorMode : 'fail-after',
-    debugBatchDecisions: args.debugBatchDecisions === true,
+    skipMode: normalizeEnumOption(args, 'skipMode', ['manifest', 'force'], 'manifest'),
+    batchGroupBy: normalizeEnumOption(args, 'batchGroupBy', ['auto', 'source-dir', 'font-family'], 'auto'),
+    batchNamingMode: normalizeEnumOption(args, 'batchNamingMode', ['plain', 'numeric-suffix', 'source-suffix'], 'numeric-suffix'),
+    batchDedupeMode: normalizeEnumOption(args, 'batchDedupeMode', ['none', 'same-path', 'font-identity'], 'font-identity'),
+    batchErrorMode: normalizeEnumOption(args, 'batchErrorMode', ['collect', 'fail-fast', 'fail-after'], 'fail-after'),
+    debugBatchDecisions: normalizeBooleanOption(args, 'debugBatchDecisions', false),
   };
 }
 
 function normalizeOrganizationOptions(args) {
   return {
     workflowPreset: getWorkflowPresetName(args.workflowPreset),
-    dryRun: args.dryRun !== false,
-    includePlan: args.includePlan !== false,
-    parseFonts: args.parseFonts !== false,
-    batchGroupBy: ['auto', 'source-dir', 'font-family'].includes(args.batchGroupBy) ? args.batchGroupBy : 'auto',
-    batchNamingMode: ['plain', 'numeric-suffix', 'source-suffix'].includes(args.batchNamingMode) ? args.batchNamingMode : 'numeric-suffix',
-    batchDedupeMode: ['none', 'same-path', 'font-identity'].includes(args.batchDedupeMode) ? args.batchDedupeMode : 'font-identity',
-    copyInvalidFonts: args.copyInvalidFonts === true,
-    overwriteExisting: args.overwriteExisting === true,
+    dryRun: normalizeBooleanOption(args, 'dryRun', true),
+    includePlan: normalizeBooleanOption(args, 'includePlan', true),
+    parseFonts: normalizeBooleanOption(args, 'parseFonts', true),
+    batchGroupBy: normalizeEnumOption(args, 'batchGroupBy', ['auto', 'source-dir', 'font-family'], 'auto'),
+    batchNamingMode: normalizeEnumOption(args, 'batchNamingMode', ['plain', 'numeric-suffix', 'source-suffix'], 'numeric-suffix'),
+    batchDedupeMode: normalizeEnumOption(args, 'batchDedupeMode', ['none', 'same-path', 'font-identity'], 'font-identity'),
+    copyInvalidFonts: normalizeBooleanOption(args, 'copyInvalidFonts', false),
+    overwriteExisting: normalizeBooleanOption(args, 'overwriteExisting', false),
   };
 }
 
@@ -3247,10 +3326,12 @@ function buildEffectiveConfigSnapshot(args, processingOptions) {
   }
 
   const optionalNumbers = [
-    'chunkSize', 'chunkSizeTolerance', 'maxAllowSubsetsCount',
+    ['chunkSize', { integer: true }],
+    ['chunkSizeTolerance', { integer: false }],
+    ['maxAllowSubsetsCount', { integer: true }],
   ];
-  for (const key of optionalNumbers) {
-    const value = normalizeOptionalNumber(args[key]);
+  for (const [key, numericOptions] of optionalNumbers) {
+    const value = normalizeOptionalPositiveNumberOption(args, key, numericOptions);
     if (value !== undefined) snapshot[key] = value;
   }
 
@@ -3259,7 +3340,7 @@ function buildEffectiveConfigSnapshot(args, processingOptions) {
     'reduceMins', 'autoSubset', 'subsetRemainChars',
   ];
   for (const key of optionalBooleans) {
-    const value = normalizeOptionalBoolean(args[key]);
+    const value = normalizeBooleanOption(args, key, undefined);
     if (value !== undefined) snapshot[key] = value;
   }
 
@@ -5024,12 +5105,12 @@ function buildFontSplitConfig(input, outDir, args) {
   if (Array.isArray(args.subsets) && args.subsets.length > 0) config.subsets = args.subsets;
 
   const numericFields = [
-    ['chunkSize', 'chunkSize'],
-    ['chunkSizeTolerance', 'chunkSizeTolerance'],
-    ['maxAllowSubsetsCount', 'maxAllowSubsetsCount'],
+    ['chunkSize', 'chunkSize', { integer: true }],
+    ['chunkSizeTolerance', 'chunkSizeTolerance', { integer: false }],
+    ['maxAllowSubsetsCount', 'maxAllowSubsetsCount', { integer: true }],
   ];
-  for (const [argName, configName] of numericFields) {
-    const value = normalizeOptionalNumber(args[argName]);
+  for (const [argName, configName, numericOptions] of numericFields) {
+    const value = normalizeOptionalPositiveNumberOption(args, argName, numericOptions);
     if (value !== undefined) config[configName] = value;
   }
 
@@ -5044,7 +5125,7 @@ function buildFontSplitConfig(input, outDir, args) {
     ['subsetRemainChars', 'subsetRemainChars'],
   ];
   for (const [argName, configName] of booleanFields) {
-    const value = normalizeOptionalBoolean(args[argName]);
+    const value = normalizeBooleanOption(args, argName, undefined);
     if (value !== undefined) config[configName] = value;
   }
 
@@ -6134,14 +6215,15 @@ export async function splitFontBatch(args = {}) {
 
   const batchOptions = normalizeBatchOptions(effectiveArgs);
   const processingOptions = normalizeProcessingOptions(effectiveArgs);
-  const includeResults = effectiveArgs.includeResults !== false;
-  const dryRun = effectiveArgs.dryRun === true;
+  const includeResults = normalizeBooleanOption(effectiveArgs, 'includeResults', true);
+  const dryRun = normalizeBooleanOption(effectiveArgs, 'dryRun', false);
   const outputRoot = effectiveArgs.outputRoot || 'split-output';
   const outputRootName = path.basename(outputRoot);
   const resolvedOutputRoot = await resolveWorkspacePath(outputRoot);
   const outputTreeInsideInputTree = isInside(inputDir, resolvedOutputRoot);
 
-  const maxFiles = effectiveArgs.maxFiles || 5000;
+  const maxFiles = normalizePositiveNumberOption(effectiveArgs, 'maxFiles', 5000, { integer: true, max: 50000 });
+  const limit = normalizePositiveNumberOption(effectiveArgs, 'limit', 20, { integer: true, max: 50000 });
   const inputScan = await scanFilesRecursive(inputDir, {
     maxFiles,
     excludeDirs: [outputRootName],
@@ -6213,7 +6295,7 @@ export async function splitFontBatch(args = {}) {
 
   const deduplicatedCount = deduplicated.length;
   const skippedCount = fontFiles.length - deduplicatedCount;
-  const selected = deduplicated.slice(0, effectiveArgs.limit || 20);
+  const selected = deduplicated.slice(0, limit);
 
   const results = [];
   const planned = [];
@@ -6546,8 +6628,8 @@ export async function inspectFontInputs(args) {
   const stat = await fs.stat(inputDir);
   if (!stat.isDirectory()) throw new Error(`inputDir is not a directory: ${args.inputDir}`);
 
-  const maxFiles = args.maxFiles || 50000;
-  const includeFiles = args.includeFiles !== false;
+  const maxFiles = normalizePositiveNumberOption(args, 'maxFiles', 50000, { integer: true, max: 50000 });
+  const includeFiles = normalizeBooleanOption(args, 'includeFiles', true);
   const inputScan = await scanFilesRecursive(inputDir, { maxFiles });
   const allFiles = inputScan.files;
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
@@ -6620,7 +6702,7 @@ export async function organizeFontDirectory(args = {}) {
     throw new Error('outputDir must be different from inputDir.');
   }
 
-  const maxFiles = effectiveArgs.maxFiles || 50000;
+  const maxFiles = normalizePositiveNumberOption(effectiveArgs, 'maxFiles', 50000, { integer: true, max: 50000 });
   const scan = await scanFilesRecursive(inputDir, {
     maxFiles,
     excludeDirs: [path.basename(outputDir)],
@@ -6945,9 +7027,9 @@ export async function organizeFontDirectory(args = {}) {
 export async function inspectSplitOutput(args) {
   const outDir = await resolveWorkspacePath(args.outDir || 'split-output', { mustExist: true });
   const outDirRelative = toRelativeWorkspacePath(outDir);
-  const maxFiles = args.maxFiles || 200000;
-  const includeFiles = args.includeFiles !== false;
-  const includeFamilies = args.includeFamilies !== false;
+  const maxFiles = normalizePositiveNumberOption(args, 'maxFiles', 200000, { integer: true, max: 200000 });
+  const includeFiles = normalizeBooleanOption(args, 'includeFiles', true);
+  const includeFamilies = normalizeBooleanOption(args, 'includeFamilies', true);
   const outputSummary = await summarizeFilesDetailed(outDir, { maxFiles });
   const files = outputSummary.files;
   const byExtension = {};

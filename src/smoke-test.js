@@ -4548,6 +4548,86 @@ if (scenario === 'single') {
   await fs.mkdir(inputDir, { recursive: true });
   await fs.writeFile(path.join(inputDir, 'not-a-font.ttf'), 'not a real font');
 
+  const assertConfigurationError = async (context, action, expectedDetails) => {
+    let thrown = null;
+    try {
+      await action();
+    } catch (error) {
+      thrown = error;
+    }
+    if (
+      thrown?.name !== 'FontSplitConfigurationError'
+      || thrown.details?.summaryType !== 'configuration-error'
+      || thrown.details?.option !== expectedDetails.option
+      || thrown.details?.expectedType !== expectedDetails.expectedType
+      || thrown.details?.omitForDefaultBehavior !== true
+      || !thrown.details?.nonIntuitiveBehavior?.includes('rejected instead of silently falling back')
+    ) {
+      throw new Error(`${context}: expected FontSplitConfigurationError with machine-readable details.`);
+    }
+    return {
+      name: thrown.name,
+      option: thrown.details.option,
+      expectedType: thrown.details.expectedType,
+      received: thrown.details.received,
+    };
+  };
+
+  const invalidBatchDedupe = await assertConfigurationError('invalid direct batch dedupe option', () => splitFontBatch({
+    inputDir,
+    outputRoot,
+    dryRun: true,
+    batchDedupeMode: 'semantic',
+  }), {
+    option: 'batchDedupeMode',
+    expectedType: 'enum',
+  });
+
+  const invalidBatchLimit = await assertConfigurationError('invalid direct batch limit option', () => splitFontBatch({
+    inputDir,
+    outputRoot,
+    dryRun: true,
+    limit: 0,
+  }), {
+    option: 'limit',
+    expectedType: 'positive-integer',
+  });
+
+  const invalidBatchBoolean = await assertConfigurationError('invalid direct batch boolean option', () => splitFontBatch({
+    inputDir,
+    outputRoot,
+    dryRun: true,
+    includeResults: 'false',
+  }), {
+    option: 'includeResults',
+    expectedType: 'boolean',
+  });
+
+  const invalidOrganizationBoolean = await assertConfigurationError('invalid direct organization boolean option', () => organizeFontDirectory({
+    inputDir,
+    outputDir: `${outputRoot}-organized`,
+    parseFonts: 'no',
+  }), {
+    option: 'parseFonts',
+    expectedType: 'boolean',
+  });
+
+  const invalidInspectionLimit = await assertConfigurationError('invalid direct inspect maxFiles option', () => inspectFontInputs({
+    inputDir,
+    maxFiles: 0,
+  }), {
+    option: 'maxFiles',
+    expectedType: 'positive-integer',
+  });
+
+  const invalidSingleFontOption = await assertConfigurationError('invalid direct split option', () => splitFont({
+    fontPath: path.join(inputDir, 'not-a-font.ttf'),
+    smallGlyphAction: 'fallback',
+  }), {
+    option: 'smallGlyphAction',
+    expectedType: 'enum',
+  });
+
   let defaultThrew = false;
   try {
     await splitFontBatch({
@@ -4586,6 +4666,14 @@ if (scenario === 'single') {
       skipMode: overridden.skipMode,
       batchErrorMode: overridden.batchErrorMode,
       errorCount: overridden.errorCount,
+    },
+    invalidConfiguration: {
+      invalidBatchDedupe,
+      invalidBatchLimit,
+      invalidBatchBoolean,
+      invalidOrganizationBoolean,
+      invalidInspectionLimit,
+      invalidSingleFontOption,
     },
   }, null, 2));
 } else if (scenario === 'real-corpus-suite') {

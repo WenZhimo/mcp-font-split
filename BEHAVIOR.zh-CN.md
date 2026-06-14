@@ -5,6 +5,8 @@
 >
 > 这里写的是工具现在会怎么做，不是理想行为，也不是字体分割的一般原则。它包含正常功能、默认策略、可选 fallback、manifest 语义、批量跳过策略，以及可能违反用户直觉的地方。
 
+显式传入的无效配置不会触发“帮你猜一个默认值”的静默回退。MCP 调用会先被 schema 拦截；绕过 MCP schema 直接调用模块函数时，会抛出 `FontSplitConfigurationError`，并在 `details.summaryType: "configuration-error"`、`details.option`、`details.received`、`details.allowedValues` 或 `details.expectedType` 中说明问题。需要默认行为时应省略该字段。
+
 ---
 
 ## 1. 工具能力总览
