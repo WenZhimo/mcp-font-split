@@ -1544,6 +1544,7 @@ if (scenario === 'single') {
     || !defaultGuidance.guidanceView?.omittedSections?.includes('field-catalog')
     || Object.hasOwn(defaultGuidance, 'warningCodeCatalog')
     || Object.hasOwn(defaultGuidance, 'toolResponseFieldCatalog')
+    || !defaultGuidance.errorResponseCatalog?.configurationError
     || Object.hasOwn(defaultGuidance, 'directoryWorkflowExamples')
     || !defaultGuidance.safeInvocationTemplates?.length
     || defaultGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
@@ -1569,7 +1570,9 @@ if (scenario === 'single') {
   if (
     result.guidanceView?.detailLevel !== 'full'
     || !result.guidanceView?.sectionsIncluded?.includes('warning-catalog')
+    || !result.guidanceView?.sectionsIncluded?.includes('error-catalog')
     || !result.guidanceView?.availableSections?.includes('field-catalog')
+    || !result.guidanceView?.availableSections?.includes('error-catalog')
   ) {
     throw new Error('Expected explicit full guidance to expose the full guidance view.');
   }
@@ -1581,6 +1584,7 @@ if (scenario === 'single') {
     || !compactGuidance.guidanceView?.omittedSections?.includes('field-catalog')
     || Object.hasOwn(compactGuidance, 'warningCodeCatalog')
     || Object.hasOwn(compactGuidance, 'toolResponseFieldCatalog')
+    || !compactGuidance.errorResponseCatalog?.configurationError
     || Object.hasOwn(compactGuidance, 'directoryWorkflowExamples')
     || !compactGuidance.safeInvocationTemplates?.length
     || compactGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
@@ -1627,16 +1631,26 @@ if (scenario === 'single') {
   });
   assertSourceLayoutDecisionChecklistCompanionFields(result, 'agent-guidance full');
   assertSourceLayoutDecisionChecklistCompanionFields(compactGuidance, 'agent-guidance compact');
-  const catalogGuidance = getAgentGuidance({ sections: ['warning-catalog', 'field-catalog'] });
+  const catalogGuidance = getAgentGuidance({ sections: ['warning-catalog', 'field-catalog', 'error-catalog'] });
   if (
-    catalogGuidance.guidanceView?.sectionsIncluded?.length !== 2
+    catalogGuidance.guidanceView?.sectionsIncluded?.length !== 3
     || !catalogGuidance.warningCodeCatalog
     || !catalogGuidance.toolResponseFieldCatalog
+    || !catalogGuidance.errorResponseCatalog
     || Object.hasOwn(catalogGuidance, 'safeInvocationTemplates')
     || Object.hasOwn(catalogGuidance, 'localVerificationOutputGuide')
     || Object.hasOwn(catalogGuidance, 'directoryWorkflowDecisionMatrix')
   ) {
     throw new Error('Expected focused agent guidance sections to return only requested catalogs.');
+  }
+  if (
+    catalogGuidance.errorResponseCatalog.configurationError?.errorName !== 'FontSplitConfigurationError'
+    || catalogGuidance.errorResponseCatalog.configurationError?.detailsSummaryType !== 'configuration-error'
+    || !catalogGuidance.errorResponseCatalog.configurationError?.mcpResponseShape?.fields?.includes('details')
+    || !catalogGuidance.errorResponseCatalog.batchSplitError?.mcpResponseShape?.jsonTextWhenDetailsPresent
+    || !catalogGuidance.errorResponseCatalog.plainError?.mcpResponseShape?.plainTextWhenNoDetails
+  ) {
+    throw new Error('Expected errorResponseCatalog to describe structured MCP error payloads and configuration errors.');
   }
   if (!result.tools.some((tool) => tool.name === 'organize_font_directory')) {
     throw new Error('Expected agent guidance to describe the directory organization tool.');
@@ -1736,6 +1750,13 @@ if (scenario === 'single') {
   }
   if (!result.responseFieldsToCheck?.includes('toolResponseFieldCatalog')) {
     throw new Error('Expected agent guidance to recommend checking the tool response field catalog.');
+  }
+  if (
+    !result.responseFieldsToCheck?.includes('errorResponseCatalog')
+    || !result.toolResponseFieldCatalog?.errorResponseCatalog
+    || result.errorResponseCatalog?.configurationError?.detailsSummaryType !== 'configuration-error'
+  ) {
+    throw new Error('Expected agent guidance to describe structured MCP error responses.');
   }
   if (!result.responseFieldsToCheck?.includes('localVerificationOutputGuide')) {
     throw new Error('Expected agent guidance to recommend checking the local verification output guide.');
@@ -4044,11 +4065,33 @@ if (scenario === 'single') {
     throw new Error('Expected MCP error response to preserve structured details.');
   }
 
+  const configError = new Error('batchDedupeMode must be one of none, same-path, font-identity. Omit it to use the documented default.');
+  configError.name = 'FontSplitConfigurationError';
+  configError.details = {
+    summaryType: 'configuration-error',
+    optionName: 'batchDedupeMode',
+    received: 'semantic',
+    allowedValues: ['none', 'same-path', 'font-identity'],
+    defaultWhenOmitted: 'font-identity',
+    omitForDefaultBehavior: true,
+  };
+  const configuration = errorText(configError);
+  const parsedConfiguration = JSON.parse(configuration.content[0].text);
+  if (
+    configuration.isError !== true
+    || parsedConfiguration.name !== 'FontSplitConfigurationError'
+    || parsedConfiguration.details?.summaryType !== 'configuration-error'
+    || parsedConfiguration.details?.optionName !== 'batchDedupeMode'
+    || parsedConfiguration.details?.omitForDefaultBehavior !== true
+  ) {
+    throw new Error('Expected MCP configuration error response to preserve configuration-error details.');
+  }
+
   const plain = errorText(new Error('plain failure'));
   if (plain.content[0].text !== 'plain failure') {
     throw new Error('Expected plain MCP error response to stay concise.');
   }
-  console.log(JSON.stringify({ detailed: parsed, plain: plain.content[0].text }, null, 2));
+  console.log(JSON.stringify({ detailed: parsed, configuration: parsedConfiguration, plain: plain.content[0].text }, null, 2));
 } else if (scenario === 'mcp-schema') {
   const client = new Client({ name: 'mcp-schema-smoke', version: '0.0.0' });
   const transport = new StdioClientTransport({
@@ -4102,7 +4145,7 @@ if (scenario === 'single') {
     ) {
       throw new Error('Expected workflowPreset schema to omit redundant default preset; callers should omit workflowPreset for raw defaults.');
     }
-    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
@@ -4174,6 +4217,7 @@ if (scenario === 'single') {
       'directoryWorkflowDecisionMatrix',
       'safeInvocationTemplates',
       'localVerificationOutputGuide',
+      'errorResponseCatalog',
       'warningCodeCatalog',
       'toolResponseFieldCatalog',
       'workflowPresets',
@@ -4221,6 +4265,9 @@ if (scenario === 'single') {
     assertDocsContain('real corpus suite test scope', '`testScope`');
     assertDocsContain('real corpus ignored category coverage', '`coverageSummary.unsupportedFileCategoryCoverage`');
     assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
+    assertDocsContain('error response catalog', '`errorResponseCatalog`');
+    assertDocsContain('error catalog section', '`error-catalog`');
+    assertDocsContain('configuration error summary type', '`details.summaryType: "configuration-error"`');
     assertDocsContain('workflow-only quick start request', '`sections: ["workflow"]`');
     assertDocsContain('workflow quick start recommended call', '`workflowQuickStart.recommendedCallExample`');
     assertDocsContain('two-call layout preview example', '`two-call-layout-preview`');
@@ -4309,6 +4356,7 @@ if (scenario === 'single') {
     '`directoryWorkflowExamples[]`',
     '`safeInvocationTemplates[]`',
     '`localVerificationOutputGuide`',
+    '`errorResponseCatalog`',
     '`toolResponseFieldCatalog`',
     '`workflowPreset`',
     '`dryRun`',
@@ -4361,6 +4409,8 @@ if (scenario === 'single') {
     '`ok: true`',
     '`splitFailureAction`',
     '`smallGlyphAction`',
+    '`details.summaryType`',
+    '`configuration-error`',
   ]) {
     assertBehaviorContains(`high-risk behavior token ${token}`, token);
   }

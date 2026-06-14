@@ -26,7 +26,7 @@
 - 批量扫描并处理字体目录。
 - 在大批量处理前预检输入目录，先发现坏字体或身份解析问题。
 - 当源字体目录结构与预期批量分组不一致时，生成整理计划，或把字体非破坏性复制到更规整的暂存目录。
-- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南、安全调用模板、warning code 含义和响应字段含义选择安全工作流；默认返回紧凑指南，也可按 section 请求完整 catalog。
+- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南、安全调用模板、错误响应形态、warning code 含义和响应字段含义选择安全工作流；默认返回紧凑指南，也可按 section 请求完整 catalog。
 - 提供 `get_runtime_status`，让 agent 在处理前确认工作区、Node engine 兼容性、包版本和 WASM 是否可用。
 - 在输出目录中保留原字体副本。
 - 为每个处理过的字体写入 `split-meta.json`。
@@ -53,7 +53,7 @@
 关键默认行为：
 
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。工具响应和 `recommendedNextActions[].suggestedArgs` 中会用 `.` 表示工作区根目录，不会用空字符串表示根目录。
-- 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、必须检查的响应字段、完成验证清单，以及用于解读本地真实语料 smoke 输出的 `localVerificationOutputGuide`。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
+- 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、必须检查的响应字段、完成验证清单、`errorResponseCatalog`，以及用于解读本地真实语料 smoke 输出的 `localVerificationOutputGuide`。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
 - 对维护本包的 agent，`get_agent_guidance.verificationChecklist[]` 包含 `local-real-corpus-suite-passed`，会指向 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，作为影响功能行为的改动完成前的本机真实语料可靠性门禁。
 - `get_agent_guidance` 会返回 `configurationRecipes[]`，把常见意图映射成 preset-first 参数，例如保留全部源字体、按源目录分组、按字体 metadata 分组、快速结构扫描、copy-only 暂存整理或大库审查后写入。配方只是安全起点，仍必须运行预览/写入工具，检查列出的 `inspectFields`，并满足 `successCriteria`。
 - `get_agent_guidance` 会返回 `batchPolicyGuide`，这是批量策略自定义指南，覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个选项值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前的 `successCriteria`。
@@ -63,7 +63,8 @@
 - `get_agent_guidance` 包含 `recommendedWorkflowPlan`，这是当前 `workflow` 的有序路线图。它会引用安全模板 ID，把输入预检、目录形态决策、预览、审查后写入和输出审计串起来；每个步骤和决策点都会列出 `inspectFields` 与 `successCriteria`，但仍不替代实际工具响应检查。
 - `get_agent_guidance.nextToolDecisionSummary` 是更短的“下一步该调用哪个工具”索引：它会按 setup、单字体处理、输入预检、目录结构判断、copy-only 暂存、批量预览、审查后写入和输出审计给出首选工具与模板 ID。其 `workflowQuickStart` 会直接给出当前 `workflow` 推荐的第一条可复制调用，`quickStartCallExamples[]` 则由 `safeInvocationTemplates[]` 派生，用于给出最常见路线的最小调用参数；它只用于快速路由，不能替代实际工具响应字段和 `successCriteria`。
 - 当 agent 只想快速知道目录整理工作流的下一步时，可调用 `get_agent_guidance` 并传入 `workflow: "organize"` 与 `sections: ["workflow"]`，然后读取 `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`。对于目录结构不确定的来源，这个推荐首步应是 `organize_font_directory` 的 `workflowPreset: "safe-preview"`：不写文件、`sourceDestructive: false`，只生成整理/预览路线。
-- 需要 warning code 或响应字段的完整机器可读目录时，调用 `get_agent_guidance` 并设置 `detailLevel: "full"`，或只请求 `sections: ["warning-catalog", "field-catalog"]`。
+- `get_agent_guidance` 会返回 `errorResponseCatalog`，说明什么时候应把 MCP 错误文本当作 JSON 解析，以及如何解读带 `details.summaryType: "configuration-error"` 的 `FontSplitConfigurationError`、`BatchSplitError` 和普通非结构化错误。
+- 需要错误响应、warning code 或响应字段的完整机器可读目录时，调用 `get_agent_guidance` 并设置 `detailLevel: "full"`，或只请求 `sections: ["error-catalog", "warning-catalog", "field-catalog"]`。
 - 当安装或运行环境不确定时，使用 `get_runtime_status`；它会只读检查解析后的工作区、Node engine 兼容性、包版本、cn-font-split 运行时版本和 WASM 文件，并返回便于 agent 执行/提示的 `recommendedActions[]`。
 - 当源目录是扁平、混合或与预期 family 分组不一致时，先用 `organize_font_directory` 的默认 `dryRun: true` 生成整理计划。它对源目录非破坏：不会移动或删除源文件；真正执行时也只是复制选中的字体到 `outputDir`。如果不确定该直接对原目录做批量预览，还是先复制到暂存目录，调用 `get_agent_guidance` 并请求 `sections: ["examples"]`，查看 `source-layout-mismatch-comparison`。
 - 批量扫描会跳过依赖目录、已生成输出目录、`__MACOSX` 和 AppleDouble `._*` 资源叉文件。

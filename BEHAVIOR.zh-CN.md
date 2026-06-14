@@ -70,9 +70,10 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `safeInvocationTemplates[]`：常见工作流的安全起步调用模板
 - `nextToolDecisionSummary`：更短的“下一步该调用哪个工具”路由索引
 - `recommendedWorkflowPlan`：把安全模板编排成有序阶段的推荐路线图
+- `errorResponseCatalog`：解释结构化 MCP 错误和普通错误的响应形态
 - `guidanceView`：说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称
 
-当 agent 需要完整 warning code 目录、响应字段目录或示例时，应设置 `detailLevel: "full"`，或用 `sections` 精确请求，例如 `["warning-catalog", "field-catalog"]`。
+当 agent 需要完整错误响应目录、warning code 目录、响应字段目录或示例时，应设置 `detailLevel: "full"`，或用 `sections` 精确请求，例如 `["error-catalog", "warning-catalog", "field-catalog"]`。
 
 当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。响应里的 `verificationChecklist[]` 是给 agent 用的防误判清单；在向用户宣称完成前，应检查其中适用于当前工作流的项目。
 其中 `local-real-corpus-suite-passed` 是面向本包维护者的本地验证项：当改动会影响功能行为时，应在本机真实字体语料库上运行 `smoke:real-corpus-suite`，也就是 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`。它是代表性可靠性门禁，不是逐个字体目录人工验收，也不是运行时 MCP 工具调用。
@@ -87,6 +88,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 `nextToolDecisionSummary` 是更短的路由索引，用于回答 agent 最常见的第一问：“下一步该调用哪个工具？”它会把 setup 诊断、单字体处理、输入预检、目录结构判断、copy-only 暂存、批量预览、审查后写入和输出审计映射到首选工具，并尽量引用 `safeInvocationTemplates[]` 的模板 ID。其 `workflowQuickStart` 会针对当前 `workflow` 给出推荐的第一条可复制调用和常见备用调用；`quickStartCallExamples[]` 会从 `safeInvocationTemplates[]` 派生常见路线的最小占位参数，例如单字体处理、输入预检、目录规划、copy-only 暂存、批量预览、审查后写入和输出审计。它只是路线索引和起步参数，不是完成证明，也不能替代实际响应检查。继续前仍要检查引用模板或实际响应里的字段，并满足 `successCriteria`。
 如果 agent 只需要判断目录整理工作流的下一步，可以请求 `workflow: "organize"` 和 `sections: ["workflow"]`，然后读取 `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`；其中 `workflowQuickStart.recommendedCallExample` 是可复制的第一步调用对象。对于结构不确定的源目录，这个推荐调用应保持 `workflowPreset: "safe-preview"`、`writesFiles: false`、`sourceDestructive: false`，也就是只做 dry-run 路线判断；真正 copy-only 暂存必须来自用户意图或 dry-run 响应里的后续分支。
 `recommendedWorkflowPlan` 是当前 `workflow` 的有序路线图；它不会复制每个模板的参数，而是用 `templateId` 引用 `safeInvocationTemplates[]`，把输入预检、目录形态决策、批量预览、审查后写入和输出审计串成阶段。每个 `orderedSteps[]` 和 `decisionPoints[]` 条目都会包含 `inspectFields` 与 `successCriteria`。它用于降低 agent 漏掉审计步骤的风险，但不能替代每个阶段的响应字段检查和条件确认。
+`errorResponseCatalog` 会解释 MCP 错误文本何时是 JSON、何时只是普通文本。带 `details` 的错误会以 JSON 文本返回，并包含 `ok: false`、`name`、`error` 和 `details`；没有 `details` 的普通错误保持简短文本。`FontSplitConfigurationError` 的 `details.summaryType` 是 `configuration-error`，agent 应把它视为调用方配置错误：省略该字段以使用默认值，或改成允许值 / 正确类型，而不是用同一个无效值重试。
 `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，是运行时字段目录；它会解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`outputStructureDecision`、`auditStatus`、`recommendedNextActions` 等关键字段来自哪个工具、表示什么、agent 下一步应该检查什么。它用于降低 AI agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险。
 
 `get_runtime_status` 也是只读工具。它会检查：

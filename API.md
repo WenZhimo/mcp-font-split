@@ -14,9 +14,9 @@ Return machine-readable usage guidance for AI coding assistants.
 | `detailLevel` | `compact`, `full` | `compact` | Response size. `compact` keeps the workflow-critical sections and omits bulky catalogs/examples; `full` returns every guidance section. |
 | `sections` | array of section names | unset | Focused section filter. When set, it overrides the default section set from `detailLevel`. |
 
-The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available. By default the response is compact: it includes workspace path rules, supported extensions, default policies, `configurationRecipes[]`, `batchPolicyGuide`, `unsupportedFileCategoryCatalog`, recommended batch and organization options, response fields to inspect, a verification checklist, `localVerificationOutputGuide`, `directoryWorkflowDecisionMatrix[]`, `safeInvocationTemplates[]`, `nextToolDecisionSummary`, `recommendedWorkflowPlan`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available. By default the response is compact: it includes workspace path rules, supported extensions, default policies, `configurationRecipes[]`, `batchPolicyGuide`, `unsupportedFileCategoryCatalog`, recommended batch and organization options, response fields to inspect, a verification checklist, `errorResponseCatalog`, `localVerificationOutputGuide`, `directoryWorkflowDecisionMatrix[]`, `safeInvocationTemplates[]`, `nextToolDecisionSummary`, `recommendedWorkflowPlan`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
 
-Use `detailLevel: "full"` when the agent needs every catalog and example in one response. Use `sections` when it only needs specific data, for example `["warning-catalog", "field-catalog"]`. Available sections are reported in `guidanceView.availableSections`.
+Use `detailLevel: "full"` when the agent needs every catalog and example in one response. Use `sections` when it only needs specific data, for example `["error-catalog", "warning-catalog", "field-catalog"]`. Available sections are reported in `guidanceView.availableSections`.
 
 For a minimal routing response, request `workflow: "organize"` with `sections: ["workflow"]` and inspect `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`. The nested `workflowQuickStart.recommendedCallExample` object is the copyable first call. For an uncertain source directory, that recommended call is the no-write `organize_font_directory` safe preview (`workflowPreset: "safe-preview"`), with `writesFiles: false` and `sourceDestructive: false`. Use its `alternateCallExamples[]` only after the user asks for staging or the inspected response requires a different branch.
 
@@ -40,6 +40,8 @@ For a minimal routing response, request `workflow: "organize"` with `sections: [
 
 The real-corpus suite also reports `coverageSummary.unsupportedFileCategoryCoverage` and `coverageSummary.outputStructureAuditSummary`. Use the first to confirm ignored-file statistics covered extension/category summaries beyond a narrow `.zip`/`.txt` view, and use the second to confirm the representative single and batch write outputs passed `inspect_split_output` with `outputStructureDecision.status: "pass"` and `structureSummary.conforms: true`.
 
+`errorResponseCatalog` is returned by default and with `sections: ["error-catalog"]`. It explains MCP error response shapes: structured errors are returned as JSON text with `ok: false`, `name`, `error`, and `details`, while plain errors without `details` remain concise plain text. In particular, `FontSplitConfigurationError` uses `details.summaryType: "configuration-error"` and should be treated as a caller configuration failure rather than retried with the same invalid value.
+
 `warningCodeCatalog` is returned with `detailLevel: "full"` or `sections: ["warning-catalog"]`. It maps machine-readable warning codes from `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]` to their response sources, severity, and suggested agent action.
 
 `toolResponseFieldCatalog` is returned with `detailLevel: "full"` or `sections: ["field-catalog"]`. It maps important response field paths to the tools that emit them, their meaning, and the action an AI agent should take before reporting success. It is intended as a runtime companion to this API document, especially for fields whose meaning is easy to misread such as `ok`, `performedSplit`, `usedFallback`, `sourceDestructive`, `writesOutputTree`, `maxFilesHit`, and `recommendedNextActions`.
@@ -55,6 +57,7 @@ Guidance section names:
 | `directory-workflows` | Directory workflow decision matrix for flat, nested, mixed, noisy, and staging scenarios. |
 | `examples` | Concrete source-tree examples; returned in `full` detail or when explicitly requested. |
 | `verification` | Checklist items an agent should verify before reporting success. |
+| `error-catalog` | Error-response catalog for structured MCP errors such as `FontSplitConfigurationError` and `BatchSplitError`. |
 | `warning-catalog` | Warning-code catalog for `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]`. |
 | `field-catalog` | Response-field catalog mapping fields to meanings and agent actions. |
 | `safe-templates` | Copyable safe invocation templates for common workflows. |

@@ -14,9 +14,9 @@
 | `detailLevel` | `compact`, `full` | `compact` | 响应体量。`compact` 保留工作流关键 section，并默认省略较大的 catalog / 示例；`full` 返回全部指南 section。 |
 | `sections` | section 名称数组 | 不设置 | 聚焦返回指定 section。设置后会覆盖 `detailLevel` 的默认 section 集。 |
 
-响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchPolicyGuide`、`unsupportedFileCategoryCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchPolicyGuide`、`unsupportedFileCategoryCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
-当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["warning-catalog", "field-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
+当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["error-catalog", "warning-catalog", "field-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
 
 如果只需要最小路线响应，可用 `workflow: "organize"` 搭配 `sections: ["workflow"]`，然后检查 `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`。其中嵌套的 `workflowQuickStart.recommendedCallExample` 对象就是可复制的第一步调用。对于结构不确定的源目录，推荐调用应是无写入的 `organize_font_directory` safe preview（`workflowPreset: "safe-preview"`），并且 `writesFiles: false`、`sourceDestructive: false`。只有当用户明确需要暂存目录，或实际响应要求切换分支时，才使用其中的 `alternateCallExamples[]`。
 
@@ -40,6 +40,8 @@
 
 真实语料 suite 还会返回 `coverageSummary.unsupportedFileCategoryCoverage` 和 `coverageSummary.outputStructureAuditSummary`。前者用于确认忽略文件统计覆盖了扩展名/类别摘要，而不是只看 `.zip` / `.txt`；后者用于确认代表性单字体写入和批量写入都已经通过 `inspect_split_output`，且 `outputStructureDecision.status: "pass"`、`structureSummary.conforms: true`。
 
+`errorResponseCatalog` 默认返回，也可通过 `sections: ["error-catalog"]` 聚焦请求。它解释 MCP 错误响应形态：带结构化 `details` 的错误会以 JSON 文本返回，包含 `ok: false`、`name`、`error` 和 `details`；没有 `details` 的普通错误则保持简短纯文本。尤其是 `FontSplitConfigurationError` 会使用 `details.summaryType: "configuration-error"`，应被视为调用方配置错误，而不是用同一个无效值重试。
+
 `warningCodeCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["warning-catalog"]` 时返回，会把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的机器可读 warning code 映射到响应来源、严重度和建议 agent 动作。
 
 `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["field-catalog"]` 时返回，会把重要响应字段路径映射到产生这些字段的工具、字段含义，以及 AI agent 在宣称成功前应该采取的动作。它是本文档的运行时补充，尤其用于避免误读 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit` 和 `recommendedNextActions` 这类容易违反直觉的字段。
@@ -55,6 +57,7 @@
 | `directory-workflows` | 面向扁平、嵌套、混合、嘈杂和暂存目录场景的目录工作流决策表。 |
 | `examples` | 具体源目录示例；在 `full` 详情或显式请求时返回。 |
 | `verification` | agent 在宣称成功前应该验证的检查清单。 |
+| `error-catalog` | `FontSplitConfigurationError`、`BatchSplitError` 等结构化 MCP 错误的错误响应目录。 |
 | `warning-catalog` | `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 的 warning code 目录。 |
 | `field-catalog` | 把响应字段映射到含义和 agent 动作的字段目录。 |
 | `safe-templates` | 常见工作流的可复制安全调用模板。 |

@@ -198,6 +198,7 @@ const GUIDANCE_SECTION_NAMES = [
   'directory-workflows',
   'examples',
   'verification',
+  'error-catalog',
   'warning-catalog',
   'field-catalog',
   'safe-templates',
@@ -213,6 +214,7 @@ const GUIDANCE_COMPACT_SECTION_NAMES = [
   'directory-workflows',
   'safe-templates',
   'verification',
+  'error-catalog',
   'response-fields',
   'path-rules',
   'workflow',
@@ -225,6 +227,7 @@ const GUIDANCE_SECTION_FIELDS = {
   'directory-workflows': ['directoryWorkflowDecisionMatrix'],
   examples: ['directoryWorkflowExamples'],
   verification: ['verificationChecklist', 'localVerificationOutputGuide'],
+  'error-catalog': ['errorResponseCatalog'],
   'warning-catalog': ['warningCodeCatalog'],
   'field-catalog': ['toolResponseFieldCatalog'],
   'safe-templates': ['safeInvocationTemplates'],
@@ -569,6 +572,56 @@ const WARNING_CODE_CATALOG = {
   },
 };
 
+const ERROR_RESPONSE_CATALOG = {
+  configurationError: {
+    errorName: 'FontSplitConfigurationError',
+    detailsSummaryType: 'configuration-error',
+    emittedWhen: 'An explicit enum, boolean, or numeric option is invalid in a direct module call or any path that reaches the core validator.',
+    mcpResponseShape: {
+      isError: true,
+      contentType: 'text',
+      jsonTextWhenDetailsPresent: true,
+      fields: ['ok', 'error', 'name', 'details'],
+    },
+    detailsFields: [
+      'summaryType',
+      'optionName',
+      'received',
+      'allowedValues',
+      'expectedType',
+      'min',
+      'max',
+      'defaultWhenOmitted',
+      'omitForDefaultBehavior',
+    ],
+    agentAction: 'Treat this as caller configuration failure. Do not retry the same value; either omit the option for the documented default or choose one of the allowed values / expected types.',
+    nonIntuitiveBehavior: 'Invalid explicit values are not interpreted as a request for defaults.',
+  },
+  batchSplitError: {
+    errorName: 'BatchSplitError',
+    emittedWhen: 'split_font_batch uses fail-fast or fail-after and at least one selected font fails processing.',
+    mcpResponseShape: {
+      isError: true,
+      contentType: 'text',
+      jsonTextWhenDetailsPresent: true,
+      fields: ['ok', 'error', 'name', 'details'],
+    },
+    detailsFields: ['mode', 'errors', 'summary'],
+    agentAction: 'Parse the JSON text, inspect every details.errors[] entry and details.summary, then resolve or disclose failures before claiming batch success.',
+  },
+  plainError: {
+    errorName: 'Error',
+    emittedWhen: 'An error has no structured details attached.',
+    mcpResponseShape: {
+      isError: true,
+      contentType: 'text',
+      plainTextWhenNoDetails: true,
+      fields: ['error-message-text'],
+    },
+    agentAction: 'Treat the text as a failure message. If structured recovery is needed, reproduce through a path that attaches details or inspect logs/context.',
+  },
+};
+
 const ALL_TOOL_NAMES = [
   'get_agent_guidance',
   'get_runtime_status',
@@ -739,6 +792,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Catalog of important response fields, their source tools, meanings, and suggested agent actions.',
     agentAction: 'Use it as the runtime API map before interpreting tool responses.',
+  },
+  errorResponseCatalog: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Catalog of structured MCP error response shapes, including configuration errors, batch split errors, and plain unstructured errors.',
+    agentAction: 'Use it to decide whether to parse an MCP error text body as JSON and which details fields must be inspected before retrying or reporting failure.',
   },
   localVerificationOutputGuide: {
     sourceTools: ['get_agent_guidance'],
@@ -2820,6 +2878,7 @@ export function getAgentGuidance(args = {}) {
     directoryWorkflowExamples,
     verificationChecklist,
     localVerificationOutputGuide,
+    errorResponseCatalog: ERROR_RESPONSE_CATALOG,
     warningCodeCatalog: WARNING_CODE_CATALOG,
     toolResponseFieldCatalog: TOOL_RESPONSE_FIELD_CATALOG,
     safeInvocationTemplates: SAFE_INVOCATION_TEMPLATES,
@@ -2864,6 +2923,7 @@ export function getAgentGuidance(args = {}) {
       'warnings',
       'manifestPath',
       'guidanceView',
+      'errorResponseCatalog',
       'warningCodeCatalog',
       'safetySummary',
       'toolResponseFieldCatalog',
