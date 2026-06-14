@@ -2561,6 +2561,13 @@ if (scenario === 'single') {
     || !result.localVerificationOutputGuide?.nonIntuitiveBehavior?.some((item) => item.includes('Default suite output is compact'))
     || result.localVerificationOutputGuide?.evidenceFields?.countGuide !== 'corpusCountGuide'
     || result.localVerificationOutputGuide?.evidenceFields?.fullCorpusFontCount !== 'testScope.corpusScan.supportedFontCount'
+    || result.localVerificationOutputGuide?.completionReportGuide?.summaryType !== 'local-verification-completion-report-guide'
+    || !result.localVerificationOutputGuide?.completionReportGuide?.requiredClaims?.some((item) => item.id === 'full-corpus-count' && item.evidenceField === 'corpusCountGuide.fullCorpus.supportedFontCount')
+    || !result.localVerificationOutputGuide?.completionReportGuide?.requiredClaims?.some((item) => item.id === 'representative-output-audit' && item.evidenceField === 'coverageSummary.outputStructureAuditSummary')
+    || !result.localVerificationOutputGuide?.completionReportGuide?.forbiddenClaims?.some((item) => item.includes('every font'))
+    || !result.localVerificationOutputGuide?.completionReportGuide?.forbiddenClaims?.some((item) => item.includes('every directory'))
+    || !result.localVerificationOutputGuide?.completionReportGuide?.forbiddenClaims?.some((item) => item.includes('archives were extracted'))
+    || !result.localVerificationOutputGuide?.completionReportGuide?.conciseReportTemplate?.some((item) => item.includes('real-corpus suite'))
   ) {
     throw new Error('Expected localVerificationOutputGuide to explain real-corpus reliability gate output interpretation.');
   }
@@ -5412,6 +5419,7 @@ if (scenario === 'single') {
       'coverageSummary.outputStructureAuditSummary',
       'reliabilityGateDecision',
       'corpusCountGuide',
+      'completionReportGuide',
       'runSummaries',
       'omittedDetailFields',
       'debugBatchDecisions',
@@ -5424,6 +5432,9 @@ if (scenario === 'single') {
     assertDocsContain('compact check result', '`compact-check-result`');
     assertDocsContain('real corpus suite checklist id', '`local-real-corpus-suite-passed`');
     assertDocsContain('local verification output guide', '`localVerificationOutputGuide`');
+    assertDocsContain('local verification completion report guide', '`completionReportGuide`');
+    assertDocsContain('local verification forbidden claims', '`forbiddenClaims`');
+    assertDocsContain('local verification concise report template', '`conciseReportTemplate`');
     assertDocsContain('real corpus suite command', '`npm run smoke:real-corpus-suite -- <font-corpus-dir>`');
     assertDocsContain('real corpus reliability gate decision', '`reliabilityGateDecision`');
     assertDocsContain('real corpus suite test scope', '`testScope`');
@@ -5531,6 +5542,9 @@ if (scenario === 'single') {
     '`directoryWorkflowExamples[]`',
     '`safeInvocationTemplates[]`',
     '`localVerificationOutputGuide`',
+    '`completionReportGuide`',
+    '`forbiddenClaims[]`',
+    '`conciseReportTemplate[]`',
     '`errorResponseCatalog`',
     '`toolResponseFieldCatalog`',
     '`workflowPreset`',

@@ -2614,6 +2614,55 @@ export function getAgentGuidance(args = {}) {
       inputCountGuideCoverage: 'coverageSummary.functionalCoverage[id=input-count-guide]',
       outputStructureAudit: 'coverageSummary.outputStructureAuditSummary',
     },
+    completionReportGuide: {
+      summaryType: 'local-verification-completion-report-guide',
+      purpose: 'What an AI agent should report after local compact and real-corpus gates pass, without overstating the verification scope.',
+      requiredClaims: [
+        {
+          id: 'compact-check',
+          evidenceField: 'compact-check-result.ok',
+          reportAs: 'The standard syntax and smoke gate passed.',
+        },
+        {
+          id: 'real-corpus-gate',
+          evidenceField: 'reliabilityGateDecision.status',
+          reportAs: 'The representative real-corpus reliability gate passed.',
+        },
+        {
+          id: 'full-corpus-count',
+          evidenceField: 'corpusCountGuide.fullCorpus.supportedFontCount',
+          reportAs: 'The bounded full-root scan supported font count.',
+        },
+        {
+          id: 'ignored-file-coverage',
+          evidenceField: 'coverageSummary.unsupportedFileCategoryCoverage',
+          reportAs: 'Ignored-file category and extension coverage, including extensions beyond .zip/.txt.',
+        },
+        {
+          id: 'functional-coverage',
+          evidenceField: 'coverageSummary.functionalCoverage',
+          reportAs: 'Representative feature paths covered by the suite.',
+        },
+        {
+          id: 'representative-output-audit',
+          evidenceField: 'coverageSummary.outputStructureAuditSummary',
+          reportAs: 'Representative single-font and batch output structure audits passed.',
+        },
+      ],
+      forbiddenClaims: [
+        'Do not claim every font was manually inspected.',
+        'Do not claim every directory was accepted or individually audited.',
+        'Do not treat selectedTargetCount or fixedRegressionTargetCount as the full corpus font count.',
+        'Do not imply archives were extracted or validated; archives are only counted as ignored files.',
+        'Do not report ok:true alone as proof; cite reliabilityGateDecision.status and outputStructureAuditSummary.',
+      ],
+      conciseReportTemplate: [
+        'check:compact: ok=<compact-check-result.ok>, failedStepId=<compact-check-result.failedStepId>',
+        'real-corpus suite: status=<reliabilityGateDecision.status>, fullCorpusFonts=<corpusCountGuide.fullCorpus.supportedFontCount>, ignoredFiles=<corpusCountGuide.fullCorpus.unsupportedFileCount>',
+        'real-corpus sampling: fixedTargets=<corpusCountGuide.representativeTargets.fixedRegressionTargetCount>, selectedTargets=<corpusCountGuide.representativeTargets.selectedTargetCount>/<corpusCountGuide.representativeTargets.availableTargetCount>, perDirectoryAcceptanceAudit=false',
+        'real-corpus coverage: functionalCoverage=<covered>/<total>, outputAudit single=<coverageSummary.outputStructureAuditSummary.singleOutputStructureDecisionStatus>, batch=<coverageSummary.outputStructureAuditSummary.batchOutputStructureDecisionStatus>',
+      ],
+    },
   };
 
   const workflows = {
