@@ -1251,8 +1251,8 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   dedupeDecisionSummary: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
-    meaning: 'Compact explanation of the dedupe pass: requested/effective mode, selected representative count, skipped duplicate count, identity-key gaps, path fallback, and representative format priority.',
-    agentAction: 'Use this with skippedDuplicates before claiming semantic dedupe worked; if pathFallbackUsed or dedupeLimitedByParsing is true, disclose the limitation or rerun with parsing enabled.',
+    meaning: 'Compact explanation of the dedupe pass: requested/effective mode, selected representative count, skipped duplicate count, identity-key gaps, path fallback, representative format priority, and capped identity evidence.',
+    agentAction: 'Use this with skippedDuplicates and identityEvidenceSummary before claiming semantic dedupe worked; if pathFallbackUsed or dedupeLimitedByParsing is true, disclose the limitation or rerun with parsing enabled.',
   },
   configurationRecipes: {
     sourceTools: ['get_agent_guidance'],
@@ -2028,6 +2028,64 @@ function buildBatchPolicySummary({ appliesToTool, workflowPreset, values, effect
   };
 }
 
+function getDedupeIdentityBasis(identityKey, effectiveMode) {
+  if (effectiveMode === 'none') return 'not-applicable';
+  if (effectiveMode === 'same-path') return 'path-stem';
+  if (!identityKey) return 'missing';
+  if (String(identityKey).startsWith('path:')) return 'path-fallback';
+  return parseIdentityKey(identityKey)?.basis || 'unknown';
+}
+
+function buildDedupeIdentityEvidenceSummary({
+  effectiveMode,
+  identityEvidenceItems = [],
+  duplicateEvidenceItems = [],
+  maxExamples = 3,
+}) {
+  const basisCounts = new Map();
+  for (const item of identityEvidenceItems) {
+    const basis = getDedupeIdentityBasis(item.identityKey, effectiveMode);
+    basisCounts.set(basis, (basisCounts.get(basis) || 0) + 1);
+  }
+  const identityBasisCounts = [...basisCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([basis, count]) => ({ basis, count }));
+  const duplicateExamples = duplicateEvidenceItems.slice(0, maxExamples).map((item) => {
+    const identityBasis = getDedupeIdentityBasis(item.identityKey, effectiveMode);
+    return {
+      path: item.path,
+      duplicateOf: item.duplicateOf,
+      identityBasis,
+      ...(identityBasis !== 'path-stem' && identityBasis !== 'path-fallback' && item.identityKey
+        ? { identityKey: item.identityKey }
+        : {}),
+    };
+  });
+  const semanticBasisCount = identityBasisCounts
+    .filter((item) => !['not-applicable', 'path-stem', 'path-fallback', 'missing'].includes(item.basis))
+    .reduce((sum, item) => sum + item.count, 0);
+  const notes = [];
+  if (effectiveMode === 'none') {
+    notes.push('No identity evidence is produced because dedupe is disabled.');
+  } else if (effectiveMode === 'same-path') {
+    notes.push('Evidence is path/stem-level only and does not prove semantic font identity.');
+  } else {
+    notes.push('Identity evidence is compact: basis counts cover selected and duplicate inputs, while examples are capped.');
+    notes.push('Path fallback examples omit the raw identity key to avoid exposing resolved local paths.');
+  }
+
+  return {
+    summaryType: 'dedupe-identity-evidence',
+    available: effectiveMode !== 'none',
+    identityDedupeEvidenceAvailable: effectiveMode === 'font-identity' && semanticBasisCount > 0,
+    identityBasisCounts,
+    duplicateExampleCount: duplicateEvidenceItems.length,
+    duplicateExamples,
+    duplicateExamplesTruncated: duplicateEvidenceItems.length > duplicateExamples.length,
+    nonIntuitiveBehavior: notes,
+  };
+}
+
 function buildDedupeDecisionSummary({
   appliesToTool,
   requestedMode,
@@ -2038,6 +2096,8 @@ function buildDedupeDecisionSummary({
   identityKeyMissingCount = 0,
   pathFallbackCount = 0,
   dedupeLimitedByParsing = false,
+  identityEvidenceItems = [],
+  duplicateEvidenceItems = [],
 }) {
   const requestedIdentity = requestedMode === 'font-identity';
   const effectiveIdentity = effectiveMode === 'font-identity';
@@ -2081,6 +2141,11 @@ function buildDedupeDecisionSummary({
     pathFallbackUsed,
     identityDedupeAvailable: effectiveIdentity && !dedupeLimitedByParsing,
     representativePriority: FORMAT_PRIORITY_ORDER,
+    identityEvidenceSummary: buildDedupeIdentityEvidenceSummary({
+      effectiveMode,
+      identityEvidenceItems,
+      duplicateEvidenceItems,
+    }),
     nonIntuitiveBehavior: notes,
   };
 }
@@ -7341,6 +7406,8 @@ export async function splitFontBatch(args = {}) {
   let deduplicated;
   let identityKeyMissingCount = 0;
   let pathFallbackCount = 0;
+  const identityEvidenceItems = [];
+  const duplicateEvidenceItems = [];
   if (batchOptions.batchDedupeMode === 'none') {
     deduplicated = [...fontFiles];
   } else if (batchOptions.batchDedupeMode === 'same-path') {
@@ -7348,9 +7415,16 @@ export async function splitFontBatch(args = {}) {
     for (const file of fontFiles) {
       const ext = path.extname(file).toLowerCase();
       const base = file.slice(0, -ext.length);
+      const key = `path:${base}`;
+      identityEvidenceItems.push({ identityKey: key });
       const existing = byBaseName.get(base);
       if (!existing || compareBatchDedupeRepresentative(file, existing) < 0) {
         if (existing) {
+          duplicateEvidenceItems.push({
+            path: toRelativeWorkspacePath(existing),
+            duplicateOf: toRelativeWorkspacePath(file),
+            identityKey: key,
+          });
           logBatchDecision(batchOptions.debugBatchDecisions, 'dedupe-replace', {
             mode: batchOptions.batchDedupeMode,
             winner: toRelativeWorkspacePath(file),
@@ -7360,6 +7434,11 @@ export async function splitFontBatch(args = {}) {
         }
         byBaseName.set(base, file);
       } else {
+        duplicateEvidenceItems.push({
+          path: toRelativeWorkspacePath(file),
+          duplicateOf: toRelativeWorkspacePath(existing),
+          identityKey: key,
+        });
         logBatchDecision(batchOptions.debugBatchDecisions, 'dedupe-drop', {
           mode: batchOptions.batchDedupeMode,
           winner: toRelativeWorkspacePath(existing),
@@ -7379,9 +7458,15 @@ export async function splitFontBatch(args = {}) {
         pathFallbackCount++;
       }
       const key = identityKey || `path:${file.slice(0, -ext.length)}`;
+      identityEvidenceItems.push({ identityKey: key });
       const existing = byIdentity.get(key);
       if (!existing || compareBatchDedupeRepresentative(file, existing) < 0) {
         if (existing) {
+          duplicateEvidenceItems.push({
+            path: toRelativeWorkspacePath(existing),
+            duplicateOf: toRelativeWorkspacePath(file),
+            identityKey: key,
+          });
           logBatchDecision(batchOptions.debugBatchDecisions, 'dedupe-replace', {
             mode: batchOptions.batchDedupeMode,
             winner: toRelativeWorkspacePath(file),
@@ -7392,6 +7477,11 @@ export async function splitFontBatch(args = {}) {
         }
         byIdentity.set(key, file);
       } else {
+        duplicateEvidenceItems.push({
+          path: toRelativeWorkspacePath(file),
+          duplicateOf: toRelativeWorkspacePath(existing),
+          identityKey: key,
+        });
         logBatchDecision(batchOptions.debugBatchDecisions, 'dedupe-drop', {
           mode: batchOptions.batchDedupeMode,
           winner: toRelativeWorkspacePath(existing),
@@ -7415,6 +7505,8 @@ export async function splitFontBatch(args = {}) {
     skippedDuplicateCount: skippedCount,
     identityKeyMissingCount,
     pathFallbackCount,
+    identityEvidenceItems,
+    duplicateEvidenceItems,
   });
   const selected = deduplicated.slice(0, limit);
 
@@ -7927,6 +8019,10 @@ export async function organizeFontDirectory(args = {}) {
     identityKeyMissingCount,
     pathFallbackCount,
     dedupeLimitedByParsing: !options.parseFonts && options.batchDedupeMode === 'font-identity',
+    identityEvidenceItems: options.batchDedupeMode === 'none'
+      ? []
+      : validEntries.map((entry) => ({ identityKey: getOrganizationDedupeKey(entry, effectiveDedupeMode) })),
+    duplicateEvidenceItems: dedupe.duplicates,
   });
   const selectedEntries = [
     ...dedupe.selected,

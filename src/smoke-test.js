@@ -4081,8 +4081,14 @@ if (scenario === 'single') {
     || result.dedupeDecisionSummary?.skippedDuplicateCount !== 1
     || result.dedupeDecisionSummary?.identityKeyMissingCount !== 0
     || result.dedupeDecisionSummary?.pathFallbackUsed !== false
+    || result.dedupeDecisionSummary?.identityEvidenceSummary?.summaryType !== 'dedupe-identity-evidence'
+    || result.dedupeDecisionSummary?.identityEvidenceSummary?.identityDedupeEvidenceAvailable !== true
+    || !result.dedupeDecisionSummary?.identityEvidenceSummary?.identityBasisCounts?.some((item) => item.basis === 'family-subfamily' && item.count === 2)
+    || result.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExampleCount !== 1
+    || result.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExamples?.[0]?.identityBasis !== 'family-subfamily'
+    || !result.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExamples?.[0]?.identityKey?.includes('"family":"fixture sans"')
   ) {
-    throw new Error('Expected valid-font organization to expose a compact dedupeDecisionSummary.');
+    throw new Error('Expected valid-font organization to expose compact dedupeDecisionSummary identity evidence.');
   }
   assertBatchPolicySummary(result.batchPolicySummary, {
     context: 'organize-valid-font',
@@ -4939,8 +4945,14 @@ if (scenario === 'single') {
     || identityDedupe.dedupeDecisionSummary?.identityKeyMissingCount !== 0
     || identityDedupe.dedupeDecisionSummary?.pathFallbackUsed !== false
     || identityDedupe.dedupeDecisionSummary?.representativePriority?.[0] !== '.otf'
+    || identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.summaryType !== 'dedupe-identity-evidence'
+    || identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.identityDedupeEvidenceAvailable !== true
+    || !identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.identityBasisCounts?.some((item) => item.basis === 'family-subfamily' && item.count === 2)
+    || identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExampleCount !== 1
+    || identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExamples?.[0]?.identityBasis !== 'family-subfamily'
+    || !identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExamples?.[0]?.identityKey?.includes('"family":"fixture sans"')
   ) {
-    throw new Error('Expected font-identity batch dedupe to expose a compact dedupeDecisionSummary.');
+    throw new Error('Expected font-identity batch dedupe to expose compact dedupeDecisionSummary identity evidence.');
   }
   assertBatchPolicySummary(identityDedupe.batchPolicySummary, {
     context: 'batch-identity font-identity dry-run',
@@ -5617,6 +5629,7 @@ if (scenario === 'single') {
       'batchPolicyGuide',
       'batchPolicySummary',
       'dedupeDecisionSummary',
+      'identityEvidenceSummary',
       'layoutDecision',
       'layoutDecision.directoryHandling',
       'stagingDirectoryDecision',
@@ -5771,6 +5784,7 @@ if (scenario === 'single') {
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
     '`dedupeDecisionSummary`',
+    '`identityEvidenceSummary`',
     '`layoutDecision`',
     '`layoutDecision.directoryHandling`',
     '`stagingDirectoryDecision`',

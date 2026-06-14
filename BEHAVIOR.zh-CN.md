@@ -320,7 +320,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `same-path`：只对同一源路径 stem 的多格式文件去重；这是快速路径级策略，不会跨目录判断语义等价字体
 - `font-identity`：按归一化后的字体身份跨任意格式去重，保留优先级最高的代表。身份键优先使用 typographic family/subfamily，缺失时回退到 legacy family/subfamily，再回退到 full name 或 PostScript name；`glyphCount` 只作为诊断信息，不参与等价判定。
 
-`dedupeDecisionSummary` 是批量和目录整理响应里的紧凑去重结论。它会给出请求/实际去重模式、`keyStrategy`、`deduplicatedCount`、`skippedDuplicateCount`、`identityKeyMissingCount`、`pathFallbackUsed`、`dedupeLimitedByParsing` 和 `representativePriority`。当 `pathFallbackUsed` 或 `dedupeLimitedByParsing` 为 true 时，agent 不能把结果说成完整的语义 identity 去重；应说明已经回退到路径/stem，或建议用 `parseFonts: true` 重新预检。
+`dedupeDecisionSummary` 是批量和目录整理响应里的紧凑去重结论。它会给出请求/实际去重模式、`keyStrategy`、`deduplicatedCount`、`skippedDuplicateCount`、`identityKeyMissingCount`、`pathFallbackUsed`、`dedupeLimitedByParsing`、`representativePriority`，以及嵌套的 `identityEvidenceSummary`。`identityEvidenceSummary` 只给出 identity basis 计数和少量重复样例，用来低噪声解释“为什么这些输入被视为重复”；它不是完整 per-file 明细。当 `pathFallbackUsed` 或 `dedupeLimitedByParsing` 为 true 时，agent 不能把结果说成完整的语义 identity 去重；应说明已经回退到路径/stem，或建议用 `parseFonts: true` 重新预检。
 
 ### 4.10 `batchErrorMode`（批量专用）
 
