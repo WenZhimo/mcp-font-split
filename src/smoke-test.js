@@ -1816,6 +1816,19 @@ function assertDirectoryWorkflowSummary(summary, {
       throw new Error(`${context}: expected directoryWorkflowSummary.workflowSteps to include ${expectedStepId}.`);
     }
   }
+  const reviewStep = summary.workflowSteps.find((step) => step.id === 'review-source-layout');
+  for (const expectedField of [
+    'inputCountGuide',
+    'layoutDecision',
+    'layoutDecision.directoryHandling',
+    'directoryWorkflowSummary',
+    'sourceLayoutMismatchSummary.decisionChecklist',
+    'recommendedBatchPreviewArgs',
+  ]) {
+    if (!reviewStep?.inspectFields?.includes(expectedField)) {
+      throw new Error(`${context}: expected review-source-layout step to require ${expectedField}.`);
+    }
+  }
   for (const step of summary.workflowSteps) {
     if (!step.tool || typeof step.writesFiles !== 'boolean' || step.sourceDestructive !== false || !step.successCriteria) {
       throw new Error(`${context}: expected directoryWorkflowSummary step ${step.id} to include tool, writesFiles, sourceDestructive, and successCriteria.`);
