@@ -4220,6 +4220,8 @@ if (scenario === 'single') {
     const splitFontProps = tools.split_font?.inputSchema?.properties || {};
     const batchProps = tools.split_font_batch?.inputSchema?.properties || {};
     const organizeProps = tools.organize_font_directory?.inputSchema?.properties || {};
+    const guidanceSectionEnum = guidanceProps.sections?.items?.enum || [];
+    const coreGuidanceSections = getAgentGuidance({ detailLevel: 'full' }).guidanceView?.availableSections || [];
     const expectDescriptionIncludes = (toolName, phrases) => {
       const description = tools[toolName]?.description || '';
       for (const phrase of phrases) {
@@ -4241,6 +4243,11 @@ if (scenario === 'single') {
       if (!Object.hasOwn(guidanceProps, requiredGuidanceProp)) {
         throw new Error(`get_agent_guidance is missing ${requiredGuidanceProp}`);
       }
+    }
+    const missingGuidanceSections = coreGuidanceSections.filter((sectionName) => !guidanceSectionEnum.includes(sectionName));
+    const extraGuidanceSections = guidanceSectionEnum.filter((sectionName) => !coreGuidanceSections.includes(sectionName));
+    if (missingGuidanceSections.length > 0 || extraGuidanceSections.length > 0) {
+      throw new Error(`get_agent_guidance sections schema drift: missing ${missingGuidanceSections.join(', ') || '<none>'}; extra ${extraGuidanceSections.join(', ') || '<none>'}.`);
     }
     for (const requiredOrganizeProp of ['dryRun', 'outputDir', 'overwriteExisting', 'copyInvalidFonts']) {
       if (!Object.hasOwn(organizeProps, requiredOrganizeProp)) {

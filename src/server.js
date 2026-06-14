@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
+import { GUIDANCE_SECTION_NAMES, getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
 import { errorText, jsonText } from './mcp-response.js';
 
 const require = createRequire(import.meta.url);
@@ -62,7 +62,7 @@ server.registerTool(
     inputSchema: {
       workflow: z.enum(['overview', 'single', 'batch', 'inspect', 'organize']).optional().describe('Guidance focus. Default: overview.'),
       detailLevel: z.enum(['compact', 'full']).optional().describe('Response detail. compact keeps workflow essentials and omits bulky catalogs/examples unless requested; full returns all guidance sections. Default: compact.'),
-      sections: z.array(z.enum(['workspace', 'tools', 'defaults', 'recommendations', 'directory-workflows', 'examples', 'verification', 'warning-catalog', 'field-catalog', 'safe-templates', 'response-fields', 'path-rules', 'workflow'])).optional().describe('Optional focused guidance sections to return. When set, this overrides the detailLevel default section set.'),
+      sections: z.array(z.enum(GUIDANCE_SECTION_NAMES)).optional().describe('Optional focused guidance sections to return. When set, this overrides the detailLevel default section set.'),
     },
   },
   async (args) => {
