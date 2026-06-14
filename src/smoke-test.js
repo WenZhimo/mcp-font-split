@@ -5690,6 +5690,7 @@ if (scenario === 'single') {
     assertDocsContain('real corpus suite test scope', '`testScope`');
     assertDocsContain('real corpus ignored category coverage', '`coverageSummary.unsupportedFileCategoryCoverage`');
     assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
+    assertDocsContain('real corpus staging directory coverage id', '`staging-directory-decision`');
     assertDocsContain('source safety decision', '`sourceSafetyDecision`');
     assertDocsContain('directory handling decision', '`layoutDecision.directoryHandling`');
     assertDocsContain('staging directory decision', '`stagingDirectoryDecision`');
@@ -5788,6 +5789,7 @@ if (scenario === 'single') {
     '`humanSummary`',
     '`testScope`',
     '`functionalCoverage[]`',
+    '`staging-directory-decision`',
     '`coverageSummary.unsupportedFileCategoryCoverage`',
     '`coverageSummary.outputStructureAuditSummary`',
     '`runSummaries`',
