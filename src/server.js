@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { GUIDANCE_SECTION_NAMES, WORKFLOW_PRESET_NAMES, getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
+import { BATCH_DEDUPE_MODES, BATCH_ERROR_MODES, BATCH_GROUP_BY_MODES, BATCH_NAMING_MODES, GUIDANCE_SECTION_NAMES, SKIP_MODES, WORKFLOW_PRESET_NAMES, getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
 import { errorText, jsonText } from './mcp-response.js';
 
 const require = createRequire(import.meta.url);
@@ -41,11 +41,11 @@ const SplitFontOptions = {
 
 const BatchPolicyOptions = {
   workflowPreset: z.enum(WORKFLOW_PRESET_NAMES).optional().describe('Named configuration preset applied before explicit arguments. Omit workflowPreset to use raw tool defaults. safe-preview is no-write, reviewed-write is for after preview review, structure-first is fast/no-write, source-layout groups by source folders, metadata-family groups by font metadata, and preserve-all disables dedupe. Explicit options override preset values.'),
-  skipMode: z.enum(['manifest', 'force']).optional().describe('Batch incremental mode. Default: manifest. manifest compares source and effective options, and force always reprocesses.'),
-  batchGroupBy: z.enum(['auto', 'source-dir', 'font-family']).optional().describe('Batch family directory grouping mode. Default: auto. auto preserves directory-first behavior for nested inputs, source-dir groups by source directory, and font-family groups by internal font metadata.'),
-  batchNamingMode: z.enum(['plain', 'numeric-suffix', 'source-suffix']).optional().describe('Batch output naming mode. Default: numeric-suffix. plain keeps bare fontBaseName, numeric-suffix appends -1/-2 only on real conflicts, and source-suffix appends a source-derived suffix.'),
-  batchDedupeMode: z.enum(['none', 'same-path', 'font-identity']).optional().describe('Batch dedupe mode. Default: font-identity. none disables dedupe, same-path only dedupes multi-format files with the same source path stem, and font-identity dedupes equivalent fonts across formats.'),
-  batchErrorMode: z.enum(['collect', 'fail-fast', 'fail-after']).optional().describe('Batch error mode. Default: fail-after. collect returns ok:true with errors[], fail-fast throws on the first per-font error, and fail-after throws after processing selected fonts if any errors occurred.'),
+  skipMode: z.enum(SKIP_MODES).optional().describe('Batch incremental mode. Default: manifest. manifest compares source and effective options, and force always reprocesses.'),
+  batchGroupBy: z.enum(BATCH_GROUP_BY_MODES).optional().describe('Batch family directory grouping mode. Default: auto. auto preserves directory-first behavior for nested inputs, source-dir groups by source directory, and font-family groups by internal font metadata.'),
+  batchNamingMode: z.enum(BATCH_NAMING_MODES).optional().describe('Batch output naming mode. Default: numeric-suffix. plain keeps bare fontBaseName, numeric-suffix appends -1/-2 only on real conflicts, and source-suffix appends a source-derived suffix.'),
+  batchDedupeMode: z.enum(BATCH_DEDUPE_MODES).optional().describe('Batch dedupe mode. Default: font-identity. none disables dedupe, same-path only dedupes multi-format files with the same source path stem, and font-identity dedupes equivalent fonts across formats.'),
+  batchErrorMode: z.enum(BATCH_ERROR_MODES).optional().describe('Batch error mode. Default: fail-after. collect returns ok:true with errors[], fail-fast throws on the first per-font error, and fail-after throws after processing selected fonts if any errors occurred.'),
   debugBatchDecisions: z.boolean().optional().describe('Emit structured batch decision logs for dedupe, naming, skip, and error diagnosis. Default: false.'),
 };
 
@@ -164,9 +164,9 @@ server.registerTool(
       dryRun: z.boolean().optional().describe('Plan only without writing directories or files. Default: true. Set false only after reviewing plan[] and organizationWarnings[].'),
       includePlan: z.boolean().optional().describe('Include per-font plan[] entries. Default: true. Set false for compact summaries; directoryWorkflowSummary.planVisibility then explains which summary fields remain and how to rerun with includePlan:true before exact per-file review.'),
       parseFonts: z.boolean().optional().describe('Read font metadata for identity dedupe, glyph counts, invalid-font detection, and font-family grouping. Default: true. Set false for a faster structure-only plan when metadata parsing is expensive or noisy.'),
-      batchGroupBy: z.enum(['auto', 'source-dir', 'font-family']).optional().describe('How organized copy folders are grouped. Default: auto. Uses the same meanings as split_font_batch.'),
-      batchNamingMode: z.enum(['plain', 'numeric-suffix', 'source-suffix']).optional().describe('How copied font filenames avoid collisions. Default: numeric-suffix.'),
-      batchDedupeMode: z.enum(['none', 'same-path', 'font-identity']).optional().describe('How equivalent fonts are deduped before copy planning. Default: font-identity.'),
+      batchGroupBy: z.enum(BATCH_GROUP_BY_MODES).optional().describe('How organized copy folders are grouped. Default: auto. Uses the same meanings as split_font_batch.'),
+      batchNamingMode: z.enum(BATCH_NAMING_MODES).optional().describe('How copied font filenames avoid collisions. Default: numeric-suffix.'),
+      batchDedupeMode: z.enum(BATCH_DEDUPE_MODES).optional().describe('How equivalent fonts are deduped before copy planning. Default: font-identity.'),
       copyInvalidFonts: z.boolean().optional().describe('Copy files with supported font extensions even when metadata parsing fails. Default: false.'),
       overwriteExisting: z.boolean().optional().describe('Allow replacing matching files in outputDir. Default: false. Source files are still never modified.'),
     },

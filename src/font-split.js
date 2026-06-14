@@ -189,6 +189,11 @@ const WORKFLOW_PRESETS = {
   },
 };
 export const WORKFLOW_PRESET_NAMES = Object.keys(WORKFLOW_PRESETS);
+export const SKIP_MODES = ['manifest', 'force'];
+export const BATCH_GROUP_BY_MODES = ['auto', 'source-dir', 'font-family'];
+export const BATCH_NAMING_MODES = ['plain', 'numeric-suffix', 'source-suffix'];
+export const BATCH_DEDUPE_MODES = ['none', 'same-path', 'font-identity'];
+export const BATCH_ERROR_MODES = ['collect', 'fail-fast', 'fail-after'];
 const GUIDANCE_DETAIL_LEVELS = ['compact', 'full'];
 export const GUIDANCE_SECTION_NAMES = [
   'workspace',
@@ -3356,11 +3361,11 @@ function normalizeProcessingOptions(args) {
 function normalizeBatchOptions(args) {
   return {
     workflowPreset: getWorkflowPresetName(args.workflowPreset),
-    skipMode: normalizeEnumOption(args, 'skipMode', ['manifest', 'force'], 'manifest'),
-    batchGroupBy: normalizeEnumOption(args, 'batchGroupBy', ['auto', 'source-dir', 'font-family'], 'auto'),
-    batchNamingMode: normalizeEnumOption(args, 'batchNamingMode', ['plain', 'numeric-suffix', 'source-suffix'], 'numeric-suffix'),
-    batchDedupeMode: normalizeEnumOption(args, 'batchDedupeMode', ['none', 'same-path', 'font-identity'], 'font-identity'),
-    batchErrorMode: normalizeEnumOption(args, 'batchErrorMode', ['collect', 'fail-fast', 'fail-after'], 'fail-after'),
+    skipMode: normalizeEnumOption(args, 'skipMode', SKIP_MODES, 'manifest'),
+    batchGroupBy: normalizeEnumOption(args, 'batchGroupBy', BATCH_GROUP_BY_MODES, 'auto'),
+    batchNamingMode: normalizeEnumOption(args, 'batchNamingMode', BATCH_NAMING_MODES, 'numeric-suffix'),
+    batchDedupeMode: normalizeEnumOption(args, 'batchDedupeMode', BATCH_DEDUPE_MODES, 'font-identity'),
+    batchErrorMode: normalizeEnumOption(args, 'batchErrorMode', BATCH_ERROR_MODES, 'fail-after'),
     debugBatchDecisions: normalizeBooleanOption(args, 'debugBatchDecisions', false),
   };
 }
@@ -3371,9 +3376,9 @@ function normalizeOrganizationOptions(args) {
     dryRun: normalizeBooleanOption(args, 'dryRun', true),
     includePlan: normalizeBooleanOption(args, 'includePlan', true),
     parseFonts: normalizeBooleanOption(args, 'parseFonts', true),
-    batchGroupBy: normalizeEnumOption(args, 'batchGroupBy', ['auto', 'source-dir', 'font-family'], 'auto'),
-    batchNamingMode: normalizeEnumOption(args, 'batchNamingMode', ['plain', 'numeric-suffix', 'source-suffix'], 'numeric-suffix'),
-    batchDedupeMode: normalizeEnumOption(args, 'batchDedupeMode', ['none', 'same-path', 'font-identity'], 'font-identity'),
+    batchGroupBy: normalizeEnumOption(args, 'batchGroupBy', BATCH_GROUP_BY_MODES, 'auto'),
+    batchNamingMode: normalizeEnumOption(args, 'batchNamingMode', BATCH_NAMING_MODES, 'numeric-suffix'),
+    batchDedupeMode: normalizeEnumOption(args, 'batchDedupeMode', BATCH_DEDUPE_MODES, 'font-identity'),
     copyInvalidFonts: normalizeBooleanOption(args, 'copyInvalidFonts', false),
     overwriteExisting: normalizeBooleanOption(args, 'overwriteExisting', false),
   };
@@ -3394,13 +3399,13 @@ function buildEffectiveConfigSnapshot(args, processingOptions) {
     processingOptions,
   };
 
-  if (['plain', 'numeric-suffix', 'source-suffix'].includes(args.batchNamingMode)) {
+  if (BATCH_NAMING_MODES.includes(args.batchNamingMode)) {
     snapshot.batchNamingMode = args.batchNamingMode;
   }
-  if (['none', 'same-path', 'font-identity'].includes(args.batchDedupeMode)) {
+  if (BATCH_DEDUPE_MODES.includes(args.batchDedupeMode)) {
     snapshot.batchDedupeMode = args.batchDedupeMode;
   }
-  if (['collect', 'fail-fast', 'fail-after'].includes(args.batchErrorMode)) {
+  if (BATCH_ERROR_MODES.includes(args.batchErrorMode)) {
     snapshot.batchErrorMode = args.batchErrorMode;
   }
   const optionalStrings = [

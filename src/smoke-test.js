@@ -4,7 +4,20 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
+import {
+  BATCH_DEDUPE_MODES,
+  BATCH_ERROR_MODES,
+  BATCH_GROUP_BY_MODES,
+  BATCH_NAMING_MODES,
+  SKIP_MODES,
+  getAgentGuidance,
+  getRuntimeStatus,
+  inspectFontInputs,
+  inspectSplitOutput,
+  organizeFontDirectory,
+  splitFont,
+  splitFontBatch,
+} from './font-split.js';
 import { errorText } from './mcp-response.js';
 
 const execFileAsync = promisify(execFile);
@@ -4273,6 +4286,16 @@ if (scenario === 'single') {
     }
     assertEnumMatches('split_font_batch workflowPreset', getSchemaEnumValues(batchProps.workflowPreset), coreWorkflowPresetIds);
     assertEnumMatches('organize_font_directory workflowPreset', getSchemaEnumValues(organizeProps.workflowPreset), coreWorkflowPresetIds);
+    assertEnumMatches('split_font_batch skipMode', getSchemaEnumValues(batchProps.skipMode), SKIP_MODES);
+    for (const [optionName, expectedValues] of Object.entries({
+      batchGroupBy: BATCH_GROUP_BY_MODES,
+      batchNamingMode: BATCH_NAMING_MODES,
+      batchDedupeMode: BATCH_DEDUPE_MODES,
+    })) {
+      assertEnumMatches(`split_font_batch ${optionName}`, getSchemaEnumValues(batchProps[optionName]), expectedValues);
+      assertEnumMatches(`organize_font_directory ${optionName}`, getSchemaEnumValues(organizeProps[optionName]), expectedValues);
+    }
+    assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
     expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
