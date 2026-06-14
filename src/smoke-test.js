@@ -2932,7 +2932,7 @@ if (scenario === 'single') {
     'output-scan-truncated',
     'output-files-omitted',
     'output-families-omitted',
-    'legacy-output-detected',
+    'missing-manifests',
     'organization-dry-run',
     'organization-writes-output',
     'font-parsing-skipped',
@@ -5393,7 +5393,7 @@ if (scenario === 'single') {
     reasonCode: 'output-structure-issues',
   }, 'inspect-compact output audit');
   const compactWarningCodes = new Set((compact.inspectionWarnings || []).map((warning) => warning.code));
-  for (const expectedWarning of ['output-files-omitted', 'output-families-omitted', 'legacy-output-detected']) {
+  for (const expectedWarning of ['output-files-omitted', 'output-families-omitted', 'missing-manifests']) {
     if (!compactWarningCodes.has(expectedWarning)) {
       throw new Error(`Expected compact output inspection warning ${expectedWarning}.`);
     }
@@ -5815,6 +5815,7 @@ if (scenario === 'single') {
       'auditPassed',
       'auditBlockingReasons',
       'structureSummary',
+      'missingManifestCount',
       'maxFilesHit',
       'unsupportedFileDecision',
       'unsupportedFileSummary',
@@ -5904,6 +5905,18 @@ if (scenario === 'single') {
     for (const token of samePathLegacyTokens) {
       if (text.includes(token)) {
         throw new Error(`${label} should describe same-path as path/stem-level dedupe, not as old behavior: ${token}`);
+      }
+    }
+  }
+  for (const [label, text] of [
+    ['README.md', readmeZh],
+    ['README.en.md', readmeEn],
+    ['BEHAVIOR.zh-CN.md', behaviorDoc],
+    ['src/server.js', serverSource],
+  ]) {
+    for (const forbiddenTerm of ['legacyOutputCount', 'legacy-output-detected', 'legacy output inference']) {
+      if (text.includes(forbiddenTerm)) {
+        throw new Error(`${label} should use manifest-missing terminology instead of legacy output terminology: ${forbiddenTerm}`);
       }
     }
   }
@@ -5999,6 +6012,7 @@ if (scenario === 'single') {
     '`auditPassed`',
     '`auditBlockingReasons[]`',
     '`structureSummary`',
+    '`missingManifestCount`',
     '`maxFilesHit`',
     '`batchWarnings[]`',
     '`organizationWarnings[]`',
@@ -6029,7 +6043,7 @@ if (scenario === 'single') {
   for (const warningCode of [
     'input-scan-truncated',
     'output-structure-issues',
-    'legacy-output-detected',
+    'missing-manifests',
     'organization-dry-run',
     'organization-writes-output',
     'font-parsing-skipped',

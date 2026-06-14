@@ -384,9 +384,9 @@ Important result fields:
 | `auditPassed` | Boolean shortcut for `auditStatus === "pass"`. |
 | `auditBlockingReasons[]` | Machine-readable blockers such as `output-scan-truncated` or `output-structure-issues`; structure blockers include `issueCodes` from `structureSummary.issues[]`. |
 | `filesIncluded` / `familiesIncluded` | Whether `files[]` and `families[]` are present. |
-| `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, legacy output inference, and output structure issues. |
+| `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, missing manifests, and output structure issues. |
 | `structureSummary` | Machine-readable output-structure audit. After real batch writes, treat the output directory as complete only when `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false`. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
 | `fontEntryCount` | Number of detected per-font output entries. |
 | `manifestCount` | Number of entries with `split-meta.json`. |
-| `legacyOutputCount` | Number of entries inferred without manifest. |
+| `missingManifestCount` | Number of entries without `split-meta.json` manifests that were conservatively inferred from file structure. |
 | `families[]` | Structured family and font-entry inventory. |

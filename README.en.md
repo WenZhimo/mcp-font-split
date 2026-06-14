@@ -388,7 +388,7 @@ Treat `planActionSummary` as a compact overview, not approval to write files wit
 - `auditBlockingReasons[]` lists machine-readable blockers; structure blockers include `issueCodes` from `structureSummary.issues[]`.
 - `includeFiles: false` omits flat `files[]` while keeping summary counters.
 - `includeFamilies: false` omits structured `families[]` while keeping family and output-mode counters.
-- `inspectionWarningCount` and `inspectionWarnings[]` summarize truncation, omitted detail arrays, legacy output inference, and structure issues with machine-readable `code` values.
+- `inspectionWarningCount` and `inspectionWarnings[]` summarize truncation, omitted detail arrays, missing manifests, and structure issues with machine-readable `code` values.
 - `structureSummary` checks whether the output directory matches the documented structure; after real batch writes, call `inspect_split_output` and require `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false` before treating an output tree as free of stray files, missing manifests, or missing files required by the declared output mode.
 - `familyCount`
 - `fontEntryCount`
@@ -396,7 +396,7 @@ Treat `planActionSummary` as a compact overview, not approval to write files wit
 - `subsetOutputCount`
 - `singleWoff2OutputCount`
 - `copyOriginalOutputCount`
-- `legacyOutputCount`
+- `missingManifestCount`
 - `families[]`
 
 ## Examples

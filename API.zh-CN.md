@@ -384,9 +384,9 @@
 | `auditPassed` | `auditStatus === "pass"` 的布尔快捷字段。 |
 | `auditBlockingReasons[]` | 阻止审计通过的机器可读原因，例如 `output-scan-truncated` 或 `output-structure-issues`；结构问题会带上来自 `structureSummary.issues[]` 的 `issueCodes`。 |
 | `filesIncluded` / `familiesIncluded` | 响应中是否包含 `files[]` 和 `families[]`。 |
-| `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略、legacy 输出推断和输出结构问题等状态。 |
+| `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略、manifest 缺失和输出结构问题等状态。 |
 | `structureSummary` | 机器可读输出结构审计。真实批量写入后，只有 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为审计完成。`conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`。 |
 | `fontEntryCount` | 检测到的字体输出条目数量。 |
 | `manifestCount` | 带 `split-meta.json` 的条目数量。 |
-| `legacyOutputCount` | 没有 manifest、只能保守推断的旧输出数量。 |
+| `missingManifestCount` | 缺少 `split-meta.json` manifest、只能从文件结构保守推断的条目数量。 |
 | `families[]` | 结构化 family / font entry 清单。 |

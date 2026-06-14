@@ -810,19 +810,19 @@ split-meta.json
 - `subsetOutputCount`
 - `singleWoff2OutputCount`
 - `copyOriginalOutputCount`
-- `legacyOutputCount`
+- `missingManifestCount`
 - `structureSummary`
 - `families`
 
 如果有 manifest，检查结果优先使用 manifest 分类。
-如果没有 manifest，会使用文件结构做保守推断；无法判断时应视为 legacy / unknown 状态。
+如果没有 manifest，会使用文件结构做保守推断；无法判断时应视为 manifest-missing / unknown 状态。
 
 常见 `inspectionWarnings[].code`：
 
 - `output-scan-truncated`：输出扫描命中 `maxFiles`，不能把本次审计视为完整。
 - `output-files-omitted`：因为 `includeFiles: false` 省略了扁平 `files[]`。
 - `output-families-omitted`：因为 `includeFamilies: false` 省略了结构化 `families[]`。
-- `legacy-output-detected`：发现没有 `split-meta.json` 的旧输出，只能保守推断。
+- `missing-manifests`：发现缺少 `split-meta.json` 的输出条目，只能从文件结构保守推断。
 - `output-structure-issues`：`structureSummary` 发现结构问题，必须检查 `issues[]`。
 
 ---

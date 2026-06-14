@@ -530,10 +530,10 @@ const WARNING_CODE_CATALOG = {
     severity: 'info',
     suggestedAction: 'Rerun with includeFamilies:true if structured family output details are needed.',
   },
-  'legacy-output-detected': {
+  'missing-manifests': {
     sources: ['inspectionWarnings'],
     severity: 'warning',
-    suggestedAction: 'Treat manifest-free output as inferred; prefer manifest-backed output for strict audits.',
+    suggestedAction: 'Treat manifest-free output entries as conservatively inferred; rerun or regenerate output with split-meta.json manifests for strict audits.',
   },
   'output-structure-issues': {
     sources: ['inspectionWarnings'],
@@ -1339,10 +1339,10 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Number of output entries backed by split-meta.json manifests.',
     agentAction: 'Prefer manifest-backed counts for strict output audits.',
   },
-  legacyOutputCount: {
+  missingManifestCount: {
     sourceTools: ['inspect_split_output'],
-    meaning: 'Number of output entries inferred without manifests.',
-    agentAction: 'Treat these as less certain and consider rerunning processing with manifest output.',
+    meaning: 'Number of output entries that do not include split-meta.json manifests and were conservatively inferred from file structure.',
+    agentAction: 'Treat these as less certain and consider regenerating output with manifest-backed entries before strict audits.',
   },
   structureSummary: {
     sourceTools: ['inspect_split_output'],
@@ -1840,8 +1840,8 @@ const SAFE_INVOCATION_TEMPLATES = [
       includeFamilies: false,
     },
     customizableFields: ['outDir', 'maxFiles', 'includeFiles', 'includeFamilies'],
-    inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
-    nextStep: 'Require outputStructureDecision.status pass, auditStatus pass, and structureSummary.conforms true; if maxFilesHit is true or legacy/structure issues are detected, disclose uncertainty or rerun with more detail.',
+    inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
+    nextStep: 'Require outputStructureDecision.status pass, auditStatus pass, and structureSummary.conforms true; if maxFilesHit is true or manifest/structure issues are detected, disclose uncertainty or rerun with more detail.',
     successCriteria: 'Require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as valid.',
   },
 ];
@@ -2163,7 +2163,7 @@ function buildRecommendedWorkflowPlan(workflow) {
     writesFiles: false,
     sourceDestructive: false,
     goal: 'Audit the generated output directory before reporting completion.',
-    inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'manifestCount', 'legacyOutputCount'],
+    inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'manifestCount', 'missingManifestCount'],
     successCriteria: 'outputStructureDecision.status is pass, auditStatus is pass, auditPassed is true, structureSummary.conforms is true, maxFilesHit is false, and inspectionWarnings contain no action-required structure or truncation issues.',
   };
   const plans = {
@@ -2928,7 +2928,7 @@ export function getAgentGuidance(args = {}) {
       id: 'output-audited',
       appliesTo: ['overview', 'batch', 'inspect'],
       check: 'After batch processing, inspect the output directory and require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating the audit as complete.',
-      responseFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
+      responseFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
     },
     {
       id: 'local-compact-check-passed',
@@ -3688,7 +3688,7 @@ export function getAgentGuidance(args = {}) {
       'resultsIncluded',
       'planIncluded',
       'manifestCount',
-      'legacyOutputCount',
+      'missingManifestCount',
       'outputStructureDecision',
       'auditStatus',
       'auditPassed',
@@ -4384,7 +4384,7 @@ function buildInputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, inv
   return warnings;
 }
 
-function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, includeFamilies, legacyOutputCount, structureIssueCount }) {
+function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, includeFamilies, missingManifestCount, structureIssueCount }) {
   const warnings = [];
   const push = (code, message) => warnings.push({ code, message });
 
@@ -4397,8 +4397,8 @@ function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, in
   if (!includeFamilies) {
     push('output-families-omitted', 'Structured families[] entries are omitted because includeFamilies is false.');
   }
-  if (legacyOutputCount > 0) {
-    push('legacy-output-detected', `${legacyOutputCount} output entries were inferred without split-meta.json manifests.`);
+  if (missingManifestCount > 0) {
+    push('missing-manifests', `${missingManifestCount} output entries were inferred without split-meta.json manifests.`);
   }
   if (structureIssueCount > 0) {
     push('output-structure-issues', `${structureIssueCount} output structure issue(s) were detected; inspect structureSummary before treating the output as valid.`);
@@ -4473,7 +4473,7 @@ function buildOutputStructureDecision({
     manifestCoverageOk: structureSummary?.manifestCoverageOk === true,
     manifestCount: structureSummary?.manifestCount || 0,
     fontEntryCount: structureSummary?.fontEntryCount || 0,
-    legacyOutputCount: structureSummary?.legacyOutputCount || 0,
+    missingManifestCount: structureSummary?.missingManifestCount || 0,
     outputModeCounts: structureSummary?.outputModeCounts || {},
     evidenceFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
     passCriteria: 'Require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
@@ -4708,7 +4708,7 @@ function buildBatchNextActions({
       tool: 'inspect_split_output',
       reason: 'A real batch write can create or update output files; inspect the output directory before reporting completion.',
       suggestedArgs: buildBatchAuditArgs({ outputRoot }),
-      inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
+      inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
       successCriteria: 'Require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
     });
   }
@@ -6115,7 +6115,7 @@ function buildOutputStructureSummary({
   families,
   fontEntryCount,
   manifestCount,
-  legacyOutputCount,
+  missingManifestCount,
 }) {
   const classifiedPaths = new Set();
   const originalDepthCounts = {};
@@ -6216,7 +6216,7 @@ function buildOutputStructureSummary({
   pushIssue('unexpected-original-depth', 'Original font files were detected at unexpected path depths.', unexpectedOriginalDepthCount);
   pushIssue('unexpected-output-files', 'Files were found outside recognized family/font-entry output locations.', unexpectedFiles.length);
   pushIssue('unexpected-output-depth', 'Files were found at path depths outside the documented output structure.', depthIssueFiles.length);
-  pushIssue('missing-manifests', 'Some font entries do not include split-meta.json and were inferred as legacy output.', legacyOutputCount);
+  pushIssue('missing-manifests', 'Some font entries do not include split-meta.json and were conservatively inferred from file structure.', missingManifestCount);
   pushIssue('unknown-output-mode', 'Some font entries have an unknown output mode.', unknownOutputModeCount);
   pushIssue('web-output-missing', 'Some subset or single-WOFF2 entries are missing result.css or WOFF2 files.', webOutputMissingCount);
   pushIssue('copy-original-extra-output', 'Some copy-original entries unexpectedly contain generated CSS or WOFF2 files.', copyOriginalExtraOutputCount);
@@ -6228,7 +6228,7 @@ function buildOutputStructureSummary({
     familyCount: families.length,
     fontEntryCount,
     manifestCount,
-    legacyOutputCount,
+    missingManifestCount,
     manifestCoverageOk: manifestCount === fontEntryCount,
     classifiedFileCount: classifiedPaths.size,
     unexpectedFileCount: unexpectedFiles.length,
@@ -8560,7 +8560,7 @@ export async function inspectSplitOutput(args) {
   let subsetOutputCount = 0;
   let singleWoff2OutputCount = 0;
   let copyOriginalOutputCount = 0;
-  let legacyOutputCount = 0;
+  let missingManifestCount = 0;
 
   for (const [familyName, family] of [...familyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     const fontEntries = [];
@@ -8576,7 +8576,7 @@ export async function inspectSplitOutput(args) {
       const entry = buildFontEntryInspection(familyName, splitDirName, originalFiles, outputFiles, manifest);
       fontEntries.push(entry);
       fontEntryCount++;
-      if (entry.hasManifest) manifestCount++; else legacyOutputCount++;
+      if (entry.hasManifest) manifestCount++; else missingManifestCount++;
       if (entry.outputMode === 'subset') subsetOutputCount++;
       if (entry.outputMode === 'single-woff2') singleWoff2OutputCount++;
       if (entry.outputMode === 'copy-original') copyOriginalOutputCount++;
@@ -8595,7 +8595,7 @@ export async function inspectSplitOutput(args) {
     families,
     fontEntryCount,
     manifestCount,
-    legacyOutputCount,
+    missingManifestCount,
   });
 
   const inspectionWarnings = buildOutputInspectionWarnings({
@@ -8603,7 +8603,7 @@ export async function inspectSplitOutput(args) {
     maxFiles,
     includeFiles,
     includeFamilies,
-    legacyOutputCount,
+    missingManifestCount,
     structureIssueCount: structureSummary.issueCount,
   });
   const auditStatusSummary = buildOutputAuditStatus({
@@ -8637,7 +8637,7 @@ export async function inspectSplitOutput(args) {
     subsetOutputCount,
     singleWoff2OutputCount,
     copyOriginalOutputCount,
-    legacyOutputCount,
+    missingManifestCount,
     structureSummary,
     familiesIncluded: includeFamilies,
     ...(includeFiles ? { files } : {}),
