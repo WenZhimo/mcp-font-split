@@ -802,8 +802,23 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   localVerificationOutputGuide: {
     sourceTools: ['get_agent_guidance'],
-    meaning: 'Machine-readable guide for interpreting local maintenance smoke output, especially smoke:real-corpus-suite and its reliabilityGateDecision field.',
-    agentAction: 'Use this after running the local real-corpus suite to decide which output fields prove the representative reliability gate passed and which small counts are only target sampling counts.',
+    meaning: 'Machine-readable guide for interpreting local maintenance smoke output, including check:compact and smoke:real-corpus-suite.',
+    agentAction: 'Use this after running local maintenance gates to decide whether compact standard checks passed and which real-corpus output fields prove the representative reliability gate passed.',
+  },
+  'compact-check-result.ok': {
+    sourceTools: ['npm run check:compact'],
+    meaning: 'Boolean pass/fail result from the compact local syntax/smoke gate wrapper.',
+    agentAction: 'Require true before treating the standard local gate as passed; if false, inspect failedStepId and steps[].',
+  },
+  'compact-check-result.failedStepId': {
+    sourceTools: ['npm run check:compact'],
+    meaning: 'Identifier of the failed compact-check child step, or null when every step passed.',
+    agentAction: 'Use this to rerun the failing npm script directly or inspect the corresponding step tail.',
+  },
+  'compact-check-result.steps': {
+    sourceTools: ['npm run check:compact'],
+    meaning: 'Per-step compact check metadata, including ok, exitCode, elapsedMs, output byte counts, and stdout/stderr tails only for failing steps.',
+    agentAction: 'Use failed step tails for quick triage; rerun the failed npm script directly for full output.',
   },
   safeInvocationTemplates: {
     sourceTools: ['get_agent_guidance'],
@@ -2304,6 +2319,14 @@ export function getAgentGuidance(args = {}) {
       responseFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'legacyOutputCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
     },
     {
+      id: 'local-compact-check-passed',
+      appliesTo: ['overview', 'single', 'batch', 'inspect', 'organize'],
+      check: 'When maintaining this package, run npm run check:compact for the standard syntax and smoke gate with low-noise output before committing. It suppresses noisy child output on success and reports failed-step tails on failure.',
+      command: 'npm run check:compact',
+      jsonCommand: 'npm run --silent check:compact -- --json',
+      responseFields: ['compact-check-result.ok', 'compact-check-result.failedStepId', 'compact-check-result.steps'],
+    },
+    {
       id: 'local-real-corpus-suite-passed',
       appliesTo: ['overview', 'batch', 'organize'],
       check: 'When maintaining this package or changing functionality-affecting behavior, run npm run smoke:real-corpus-suite -- <font-corpus-dir> against a local real corpus before calling the change complete. This is a representative reliability gate, not a per-directory acceptance audit.',
@@ -2315,6 +2338,8 @@ export function getAgentGuidance(args = {}) {
   const localVerificationOutputGuide = {
     summaryType: 'local-verification-output-guide',
     purpose: 'How an AI agent should interpret local maintenance smoke output before claiming this package change is complete.',
+    standardCommand: 'npm run check:compact',
+    standardJsonCommand: 'npm run --silent check:compact -- --json',
     primaryCommand: 'npm run smoke:real-corpus-suite -- <font-corpus-dir>',
     verboseCommand: 'npm run smoke:real-corpus-suite -- <font-corpus-dir> --verbose',
     primaryDecisionField: 'reliabilityGateDecision',

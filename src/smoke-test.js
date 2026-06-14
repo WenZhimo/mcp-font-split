@@ -1766,6 +1766,8 @@ if (scenario === 'single') {
   }
   if (
     result.localVerificationOutputGuide?.summaryType !== 'local-verification-output-guide'
+    || result.localVerificationOutputGuide?.standardCommand !== 'npm run check:compact'
+    || result.localVerificationOutputGuide?.standardJsonCommand !== 'npm run --silent check:compact -- --json'
     || result.localVerificationOutputGuide?.primaryCommand !== 'npm run smoke:real-corpus-suite -- <font-corpus-dir>'
     || Object.hasOwn(result.localVerificationOutputGuide, 'aliasCommand')
     || result.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
@@ -1777,6 +1779,12 @@ if (scenario === 'single') {
     throw new Error('Expected localVerificationOutputGuide to explain real-corpus reliability gate output interpretation.');
   }
   const packageJson = JSON.parse(await fs.readFile('package.json', 'utf8'));
+  if (
+    packageJson.scripts?.['check:compact'] !== 'node scripts/run-check-compact.js'
+    || packageJson.scripts?.['smoke:check-compact'] !== 'node src/smoke-test.js check-compact'
+  ) {
+    throw new Error('Expected package scripts to expose check:compact and smoke:check-compact.');
+  }
   if (Object.hasOwn(packageJson.scripts || {}, 'smoke:real-corpus')) {
     throw new Error('Expected real-corpus smoke command to use the single canonical smoke:real-corpus-suite script.');
   }
@@ -2260,7 +2268,7 @@ if (scenario === 'single') {
   }
   assertObjectOmitsKeys(flatExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'flat-vendor-dump firstCall');
   const checklistIds = new Set((result.verificationChecklist || []).map((item) => item.id));
-  for (const requiredId of ['runtime-ready', 'layout-plan-reviewed', 'process-outcome-checked', 'fallback-disclosed', 'output-audited', 'local-real-corpus-suite-passed']) {
+  for (const requiredId of ['runtime-ready', 'layout-plan-reviewed', 'process-outcome-checked', 'fallback-disclosed', 'output-audited', 'local-compact-check-passed', 'local-real-corpus-suite-passed']) {
     if (!checklistIds.has(requiredId)) {
       throw new Error(`Expected agent guidance verification checklist to include ${requiredId}.`);
     }
@@ -2310,6 +2318,15 @@ if (scenario === 'single') {
     throw new Error('Expected output verification checklist to include compact outputStructureDecision, audit status fields, and structureSummary.');
   }
   const corpusSuiteChecklist = (result.verificationChecklist || []).find((item) => item.id === 'local-real-corpus-suite-passed');
+  const compactCheckChecklist = (result.verificationChecklist || []).find((item) => item.id === 'local-compact-check-passed');
+  if (
+    compactCheckChecklist?.command !== 'npm run check:compact'
+    || compactCheckChecklist?.jsonCommand !== 'npm run --silent check:compact -- --json'
+    || !compactCheckChecklist?.responseFields?.includes('compact-check-result.failedStepId')
+    || !compactCheckChecklist?.check?.includes('low-noise output')
+  ) {
+    throw new Error('Expected verification checklist to include the local compact check gate.');
+  }
   if (
     corpusSuiteChecklist?.command !== 'npm run smoke:real-corpus-suite -- <font-corpus-dir>'
     || corpusSuiteChecklist?.verboseCommand !== 'npm run smoke:real-corpus-suite -- <font-corpus-dir> --verbose'
@@ -3195,6 +3212,74 @@ if (scenario === 'single') {
   }
 
   console.log(JSON.stringify({ result, copiedInside, batchInside, batchInsideInspect }, null, 2));
+} else if (scenario === 'check-compact') {
+  console.log('Compact check smoke');
+  const parseCompactJson = (stdout, context) => {
+    try {
+      return JSON.parse(stdout);
+    } catch (error) {
+      throw new Error(`${context}: expected compact check output to be JSON. ${error.message}`);
+    }
+  };
+
+  const { stdout: passStdout, stderr: passStderr } = await execFileAsync(process.execPath, ['scripts/run-check-compact.js', '--self-test-pass', '--json'], {
+    cwd: process.cwd(),
+  });
+  if (passStderr.trim() !== '') {
+    throw new Error('compact check pass self-test: expected stderr to stay empty.');
+  }
+  const passResult = parseCompactJson(passStdout, 'compact check pass self-test');
+  if (
+    passResult.ok !== true
+    || passResult.summaryType !== 'compact-check-result'
+    || passResult.totalStepCount !== 2
+    || passResult.completedStepCount !== 2
+    || passResult.failedStepId !== null
+    || passResult.steps?.some((step) => step.ok !== true || Object.hasOwn(step, 'stdoutTail'))
+    || !passResult.nonIntuitiveBehavior?.includes('suppresses noisy child output')
+  ) {
+    throw new Error('compact check pass self-test: expected compact successful JSON summary without child output tails.');
+  }
+
+  let failStdout = '';
+  let failStderr = '';
+  try {
+    await execFileAsync(process.execPath, ['scripts/run-check-compact.js', '--self-test-fail', '--json'], {
+      cwd: process.cwd(),
+    });
+  } catch (error) {
+    failStdout = error.stdout || '';
+    failStderr = error.stderr || '';
+  }
+  if (failStderr.trim() !== '') {
+    throw new Error('compact check fail self-test: expected --json failures to keep stderr empty.');
+  }
+  const failResult = parseCompactJson(failStdout, 'compact check fail self-test');
+  const failedStep = failResult.steps?.find((step) => step.id === 'compact-check-self-test-fail');
+  if (
+    failResult.ok !== false
+    || failResult.summaryType !== 'compact-check-result'
+    || failResult.failedStepId !== 'compact-check-self-test-fail'
+    || failedStep?.ok !== false
+    || failedStep?.exitCode !== 3
+    || !failedStep?.stdoutTail?.includes('before failure')
+    || !failedStep?.stderrTail?.includes('synthetic failure')
+  ) {
+    throw new Error('compact check fail self-test: expected failing JSON summary to preserve stdout/stderr tails and failed step metadata.');
+  }
+
+  const { stdout: textStdout } = await execFileAsync(process.execPath, ['scripts/run-check-compact.js', '--self-test-pass'], {
+    cwd: process.cwd(),
+  });
+  if (
+    !textStdout.includes('mcp-font-split compact check')
+    || !textStdout.includes('compact-check-result')
+    || textStdout.includes('self-test pass')
+  ) {
+    throw new Error('compact check text self-test: expected concise text summary without child stdout spam.');
+  }
+
+  console.log(JSON.stringify({ passResult, failResult, textSummaryIncluded: true }, null, 2));
 } else if (scenario === 'batch-run-cli') {
   const inputDir = process.argv[3] || '.font-split-batch-run-cli';
   const outputRoot = process.argv[4] || '.font-split-batch-run-cli-output';
@@ -4281,6 +4366,9 @@ if (scenario === 'single') {
     ]) {
       assertDocsContainAny(`important field ${fieldName}`, [`\`${fieldName}\``, `\`${fieldName}[]\``]);
     }
+    assertDocsContain('compact check checklist id', '`local-compact-check-passed`');
+    assertDocsContain('compact check command', '`npm run check:compact`');
+    assertDocsContain('compact check result', '`compact-check-result`');
     assertDocsContain('real corpus suite checklist id', '`local-real-corpus-suite-passed`');
     assertDocsContain('local verification output guide', '`localVerificationOutputGuide`');
     assertDocsContain('real corpus suite command', '`npm run smoke:real-corpus-suite -- <font-corpus-dir>`');
@@ -4370,6 +4458,8 @@ if (scenario === 'single') {
     '`directoryWorkflowSummary.planVisibility`',
     '`unsupportedFileCategoryCatalog`',
     '`verificationChecklist[]`',
+    '`check:compact`',
+    '`compact-check-result`',
     '`smoke:real-corpus-suite`',
     '`reliabilityGateDecision`',
     '`humanSummary`',

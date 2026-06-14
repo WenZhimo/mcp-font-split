@@ -54,7 +54,7 @@
 
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。工具响应和 `recommendedNextActions[].suggestedArgs` 中会用 `.` 表示工作区根目录，不会用空字符串表示根目录。
 - 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、必须检查的响应字段、完成验证清单、`errorResponseCatalog`，以及用于解读本地真实语料 smoke 输出的 `localVerificationOutputGuide`。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
-- 对维护本包的 agent，`get_agent_guidance.verificationChecklist[]` 包含 `local-real-corpus-suite-passed`，会指向 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，作为影响功能行为的改动完成前的本机真实语料可靠性门禁。
+- 对维护本包的 agent，`get_agent_guidance.verificationChecklist[]` 包含 `local-compact-check-passed` 和 `local-real-corpus-suite-passed`：前者指向 `npm run check:compact`，用于低噪声读取普通本地门禁；后者指向 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，作为影响功能行为的改动完成前的本机真实语料可靠性门禁。
 - `get_agent_guidance` 会返回 `configurationRecipes[]`，把常见意图映射成 preset-first 参数，例如保留全部源字体、按源目录分组、按字体 metadata 分组、快速结构扫描、copy-only 暂存整理或大库审查后写入。配方只是安全起点，仍必须运行预览/写入工具，检查列出的 `inspectFields`，并满足 `successCriteria`。
 - `get_agent_guidance` 会返回 `batchPolicyGuide`，这是批量策略自定义指南，覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个选项值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前的 `successCriteria`。
 - `get_agent_guidance` 还会返回 `unsupportedFileCategoryCatalog`，解释 `unsupportedFileSummary.byCategory[]` 中 `archive`、`document`、`unsupported-font` 等分类的代表扩展名和处理行为；每个工具响应里的 `unsupportedFileDecision` 会给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则提供证据，压缩包只会被报告，不会被解压、复制或拆分。
@@ -574,6 +574,7 @@ npm run batch:run -- . split-output 50000 50000 --dry-run
 
 ```sh
 npm run check
+npm run check:compact
 npm run check:syntax
 npm run check:smoke
 npm run smoke
@@ -602,7 +603,7 @@ npm run smoke:inspect
 npm run smoke:small-copy-original
 ```
 
-`npm run check` 是推荐给 AI agent / CI 的入口。它会运行语法检查和一组能自造最小输入的 smoke 场景，不依赖真实字体库。
+`npm run check` 是推荐给 AI agent / CI 的入口。它会运行语法检查和一组能自造最小输入的 smoke 场景，不依赖真实字体库。需要低噪声输出时使用 `npm run check:compact`；它顺序运行同一组 syntax/smoke 门禁，成功时只打印步骤摘要和 `compact-check-result`，失败时返回失败步骤的 stdout/stderr 尾部。需要纯 JSON 给 agent 解析时使用 `npm run --silent check:compact -- --json`。
 
 `smoke:real-corpus-suite` 是功能改动告一段落时推荐的本机真实语料可靠性门禁，不包含在 `npm run check` 中。`get_agent_guidance.localVerificationOutputGuide` 是解读这个本地命令输出的机器可读伴随指南。suite 会顺序运行只读全库预览、`smoke:real-corpus-targets` 和 `smoke:real-corpus-integration`，覆盖全库 compact 扫描、代表性只读抽样、目录整理预览、源目录结构判断摘要、copy-only 写入、单字体拆分、批量写入和输出结构审计。默认输出为 compact，只打印每个子检查的成功状态、耗时、人类可读 `real-corpus suite summary` 和最终 JSON 总览；JSON 里的 `humanSummary` 会重复这组短摘要，便于 agent 直接读取。最终 JSON 还包含顶层 `reliabilityGateDecision`：先检查 `status`、`reliabilityGatePassed`、`blockingReasonCodes`、`fullCorpusFontCountField` 和 `targetCountsAreFullCorpusCounts`。`status: "pass"` 表示代表性功能链通过，不表示每个字体目录都已人工验收。最终总览里的 `testScope` 会把范围拆成 `corpusScan`（全库根扫描）、`targetSampling`（固定回归点 + 自适应代表性抽样）和 `representativeWriteAudit`（一个真实写入/审计样本），`coverageSummary` 会直接列出全库字体/忽略文件计数、抽样目标数量、已选目标、代表性写入审计状态，以及 `functionalCoverage[]` 功能覆盖清单；其中 `source-layout-mismatch-summary` 会确认真实语料路径实际检查了 `sourceLayoutMismatchSummary` 的布局匹配、直接预览和 copy-only 源安全语义。需要展开完整子检查输出时加 `--verbose`，或设置 `FONT_SPLIT_REAL_CORPUS_SUITE_VERBOSE=true`。它使用真实复杂语料证明功能链可靠，不是逐个字体目录人工验收。可选参数为 `<字体语料目录> [maxFiles] [targetLimit] [integrationLimit] [sampleCount] [--verbose]`。
 
