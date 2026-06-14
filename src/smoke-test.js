@@ -809,6 +809,60 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
   };
 }
 
+function buildRealCorpusCountGuide(coverageSummary, humanSummary) {
+  const corpusScan = coverageSummary.testScope?.corpusScan || {};
+  const targetSampling = coverageSummary.testScope?.targetSampling || {};
+  const writeAudit = coverageSummary.testScope?.representativeWriteAudit || {};
+  const supportedFontCount = corpusScan.supportedFontCount ?? coverageSummary.corpusSupportedFontCount;
+  const unsupportedFileCount = corpusScan.unsupportedFileCount ?? coverageSummary.corpusUnsupportedFileCount;
+  const fixedRegressionTargetCount = targetSampling.fixedRegressionTargetCount ?? humanSummary?.fixedRegressionTargetCount;
+  const selectedTargetCount = targetSampling.selectedTargetCount ?? humanSummary?.selectedTargetCount;
+  const availableTargetCount = targetSampling.availableTargetCount ?? humanSummary?.availableTargetCount;
+  return {
+    summaryType: 'real-corpus-count-guide',
+    purpose: 'Disambiguates full corpus counts from representative target counts in real-corpus suite output.',
+    directAnswer: `Full corpus scan counted ${supportedFontCount ?? 'unknown'} supported font files; target counts such as ${fixedRegressionTargetCount ?? 'fixed'} fixed regression targets and ${selectedTargetCount ?? 'selected'} selected representative targets are sampling counts, not full corpus counts.`,
+    fullCorpus: {
+      source: 'testScope.corpusScan',
+      scopeKind: corpusScan.scopeKind,
+      supportedFontCountField: 'testScope.corpusScan.supportedFontCount',
+      supportedFontCount,
+      unsupportedFileCountField: 'testScope.corpusScan.unsupportedFileCount',
+      unsupportedFileCount,
+      maxFilesHitField: 'testScope.corpusScan.maxFilesHit',
+      maxFilesHit: corpusScan.maxFilesHit,
+      meaning: 'Use these fields when answering how many supported font files or ignored/non-font files the bounded root scan saw.',
+    },
+    representativeTargets: {
+      source: 'testScope.targetSampling',
+      scopeKind: targetSampling.scopeKind,
+      fixedRegressionTargetCountField: 'testScope.targetSampling.fixedRegressionTargetCount',
+      fixedRegressionTargetCount,
+      selectedTargetCountField: 'testScope.targetSampling.selectedTargetCount',
+      selectedTargetCount,
+      availableTargetCountField: 'testScope.targetSampling.availableTargetCount',
+      availableTargetCount,
+      targetCountsAreFullCorpusCounts: false,
+      perDirectoryAcceptanceAudit: false,
+      meaning: 'Use these fields to understand which directories were sampled for representative regression coverage, not as full corpus totals.',
+    },
+    representativeWriteAudit: {
+      source: 'testScope.representativeWriteAudit',
+      sampleInputDirField: 'testScope.representativeWriteAudit.sampleInputDir',
+      sampleInputDir: writeAudit.sampleInputDir,
+      meaning: 'This is one bounded real write and output audit sample, not a per-directory write test.',
+    },
+    readOrder: [
+      'reliabilityGateDecision',
+      'corpusCountGuide.fullCorpus',
+      'corpusCountGuide.representativeTargets',
+      'coverageSummary.functionalCoverage',
+      'coverageSummary.outputStructureAuditSummary',
+    ],
+    nonIntuitiveBehavior: 'Small target counts are expected because this suite combines a full root scan with representative target sampling; they are not evidence that the full corpus scan only saw a few fonts.',
+  };
+}
+
 function buildCompactOutputStructureAuditSummary(summary = {}) {
   return {
     summaryType: summary.summaryType,
@@ -983,6 +1037,7 @@ function buildRealCorpusSuiteFinalOutput({
   sampleCount,
   reliabilityGateDecision,
   humanSummary,
+  corpusCountGuide,
   coverageSummary,
   runs,
 }) {
@@ -996,6 +1051,7 @@ function buildRealCorpusSuiteFinalOutput({
     integrationLimit,
     sampleCount,
     reliabilityGateDecision,
+    corpusCountGuide,
     humanSummary,
     testScope: coverageSummary.testScope,
     coverageSummary: verbose ? coverageSummary : buildCompactRealCorpusCoverageSummary(coverageSummary),
@@ -2294,12 +2350,14 @@ if (scenario === 'single') {
     || result.localVerificationOutputGuide?.primaryCommand !== 'npm run smoke:real-corpus-suite -- <font-corpus-dir>'
     || Object.hasOwn(result.localVerificationOutputGuide, 'aliasCommand')
     || result.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
+    || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('corpusCountGuide')
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('coverageSummary.outputStructureAuditSummary')
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('runSummaries')
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('omittedDetailFields')
     || !result.localVerificationOutputGuide?.passCriteria?.some((item) => item.includes('reliabilityGateDecision.status is pass'))
     || !result.localVerificationOutputGuide?.nonIntuitiveBehavior?.some((item) => item.includes('not a per-directory acceptance audit'))
     || !result.localVerificationOutputGuide?.nonIntuitiveBehavior?.some((item) => item.includes('Default suite output is compact'))
+    || result.localVerificationOutputGuide?.evidenceFields?.countGuide !== 'corpusCountGuide'
     || result.localVerificationOutputGuide?.evidenceFields?.fullCorpusFontCount !== 'testScope.corpusScan.supportedFontCount'
   ) {
     throw new Error('Expected localVerificationOutputGuide to explain real-corpus reliability gate output interpretation.');
@@ -5092,6 +5150,7 @@ if (scenario === 'single') {
       'coverageSummary.unsupportedFileCategoryCoverage',
       'coverageSummary.outputStructureAuditSummary',
       'reliabilityGateDecision',
+      'corpusCountGuide',
       'runSummaries',
       'omittedDetailFields',
       'debugBatchDecisions',
@@ -5199,6 +5258,7 @@ if (scenario === 'single') {
     '`compact-check-result`',
     '`smoke:real-corpus-suite`',
     '`reliabilityGateDecision`',
+    '`corpusCountGuide`',
     '`humanSummary`',
     '`testScope`',
     '`functionalCoverage[]`',
@@ -5647,6 +5707,7 @@ if (scenario === 'single') {
     sampleCount,
   });
   const humanSummary = buildRealCorpusSuiteHumanSummary(coverageSummary);
+  const corpusCountGuide = buildRealCorpusCountGuide(coverageSummary, humanSummary);
   const reliabilityGateDecision = buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary);
   if (
     coverageSummary.perDirectoryAcceptanceAudit !== false
@@ -5689,6 +5750,13 @@ if (scenario === 'single') {
     || humanSummary.singleStructureConforms !== true
     || humanSummary.batchStructureConforms !== true
     || humanSummary.perDirectoryAcceptanceAudit !== false
+    || corpusCountGuide.summaryType !== 'real-corpus-count-guide'
+    || corpusCountGuide.fullCorpus?.supportedFontCount !== coverageSummary.corpusSupportedFontCount
+    || corpusCountGuide.fullCorpus?.supportedFontCountField !== 'testScope.corpusScan.supportedFontCount'
+    || corpusCountGuide.representativeTargets?.targetCountsAreFullCorpusCounts !== false
+    || corpusCountGuide.representativeTargets?.perDirectoryAcceptanceAudit !== false
+    || corpusCountGuide.representativeTargets?.selectedTargetCount !== coverageSummary.selectedTargetCount
+    || !corpusCountGuide.directAnswer?.includes('not full corpus counts')
     || reliabilityGateDecision.summaryType !== 'real-corpus-reliability-gate-decision'
     || reliabilityGateDecision.status !== 'pass'
     || reliabilityGateDecision.reliabilityGatePassed !== true
@@ -5721,6 +5789,7 @@ if (scenario === 'single') {
     sampleCount,
     reliabilityGateDecision,
     humanSummary,
+    corpusCountGuide,
     coverageSummary,
     runs,
   });
@@ -5730,6 +5799,11 @@ if (scenario === 'single') {
     && (
       Object.hasOwn(finalOutput, 'runs')
       || finalOutput.outputMode !== 'compact'
+      || finalOutput.corpusCountGuide?.summaryType !== 'real-corpus-count-guide'
+      || finalOutput.corpusCountGuide?.fullCorpus?.supportedFontCountField !== 'testScope.corpusScan.supportedFontCount'
+      || finalOutput.corpusCountGuide?.representativeTargets?.targetCountsAreFullCorpusCounts !== false
+      || finalOutput.corpusCountGuide?.representativeTargets?.perDirectoryAcceptanceAudit !== false
+      || !finalOutput.corpusCountGuide?.directAnswer?.includes('Full corpus scan counted')
       || !Array.isArray(finalOutput.runSummaries)
       || finalOutput.runSummaries.length !== runs.length
       || finalOutput.runSummaries.some((run) => Object.hasOwn(run, 'summary'))

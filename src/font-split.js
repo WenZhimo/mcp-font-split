@@ -2532,6 +2532,7 @@ export function getAgentGuidance(args = {}) {
     primaryDecisionField: 'reliabilityGateDecision',
     requiredOutputFields: [
       'reliabilityGateDecision',
+      'corpusCountGuide',
       'humanSummary',
       'testScope',
       'coverageSummary.functionalCoverage',
@@ -2571,10 +2572,12 @@ export function getAgentGuidance(args = {}) {
       'This is not a per-font manual audit.',
       'Small numbers such as fixedRegressionTargetCount 4 or selectedTargetCount 10 are target sampling counts, not the full corpus font count.',
       'Use reliabilityGateDecision.fullCorpusFontCountField or testScope.corpusScan.supportedFontCount for the full bounded corpus font total.',
+      'Use corpusCountGuide for the shortest explanation of which counts are full-corpus counts and which are representative target counts.',
       'Default suite output is compact and omits child run details; use verboseCommand for full per-child summaries and evidence.',
       'Archive files are counted as ignored files; the suite does not prove archive extraction because archive extraction is outside this tool layer.',
     ],
     evidenceFields: {
+      countGuide: 'corpusCountGuide',
       fullCorpusFontCount: 'testScope.corpusScan.supportedFontCount',
       fixedRegressionTargets: 'testScope.targetSampling.fixedRegressionTargets',
       selectedTargets: 'testScope.targetSampling.selectedTargets',
