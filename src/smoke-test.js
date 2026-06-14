@@ -3225,10 +3225,12 @@ if (scenario === 'single') {
     !readmeText.includes('`default` 不是有效值')
     || !readmeText.includes('无效 preset 拒绝')
     || !readmeText.includes('BatchRunConfigurationError')
+    || !readmeText.includes('`errorType`')
     || !readmeText.includes('枚举型、布尔型或数字型')
     || !readmeEnText.includes('`default` is not valid')
     || !readmeEnText.includes('invalid preset rejection')
     || !readmeEnText.includes('BatchRunConfigurationError')
+    || !readmeEnText.includes('`errorType`')
     || !readmeEnText.includes('enum-like, boolean, or numeric')
   ) {
     throw new Error('Expected README docs to describe batch:run invalid configuration rejection.');
@@ -3299,8 +3301,10 @@ if (scenario === 'single') {
   if (
     invalidPreset.ok !== false
     || invalidPreset.name !== 'BatchRunConfigurationError'
+    || invalidPreset.errorType !== 'configuration-error'
     || invalidPreset.options?.workflowPreset !== null
     || invalidPreset.options?.requestedWorkflowPreset !== 'default'
+    || invalidPreset.details?.summaryType !== 'configuration-error'
     || invalidPreset.details?.option !== 'FONT_SPLIT_WORKFLOW_PRESET'
     || invalidPreset.details?.received !== 'default'
     || invalidPreset.details?.allowedValues?.includes('default')
@@ -3331,8 +3335,10 @@ if (scenario === 'single') {
   if (
     invalidDedupe.ok !== false
     || invalidDedupe.name !== 'BatchRunConfigurationError'
+    || invalidDedupe.errorType !== 'configuration-error'
     || invalidDedupe.options?.workflowPreset !== 'reviewed-write'
     || invalidDedupe.options?.requestedBatchDedupeMode !== 'semantic'
+    || invalidDedupe.details?.summaryType !== 'configuration-error'
     || invalidDedupe.details?.option !== 'FONT_SPLIT_BATCH_DEDUPE_MODE'
     || invalidDedupe.details?.received !== 'semantic'
     || !invalidDedupe.details?.allowedValues?.includes('font-identity')
@@ -3364,8 +3370,10 @@ if (scenario === 'single') {
   if (
     invalidBoolean.ok !== false
     || invalidBoolean.name !== 'BatchRunConfigurationError'
+    || invalidBoolean.errorType !== 'configuration-error'
     || invalidBoolean.options?.requestedIncludeResults !== 'maybe'
     || Object.hasOwn(invalidBoolean.options || {}, 'includeResults')
+    || invalidBoolean.details?.summaryType !== 'configuration-error'
     || invalidBoolean.details?.option !== 'FONT_SPLIT_INCLUDE_RESULTS'
     || invalidBoolean.details?.source !== 'env'
     || invalidBoolean.details?.expectedType !== 'boolean'
@@ -3396,8 +3404,10 @@ if (scenario === 'single') {
   if (
     invalidLimitEnv.ok !== false
     || invalidLimitEnv.name !== 'BatchRunConfigurationError'
+    || invalidLimitEnv.errorType !== 'configuration-error'
     || invalidLimitEnv.options?.limit !== null
     || invalidLimitEnv.options?.requestedLimit !== 'zero'
+    || invalidLimitEnv.details?.summaryType !== 'configuration-error'
     || invalidLimitEnv.details?.option !== 'FONT_SPLIT_LIMIT'
     || invalidLimitEnv.details?.source !== 'env'
     || invalidLimitEnv.details?.targetField !== 'limit'
@@ -3423,8 +3433,10 @@ if (scenario === 'single') {
   if (
     invalidPositionalLimit.ok !== false
     || invalidPositionalLimit.name !== 'BatchRunConfigurationError'
+    || invalidPositionalLimit.errorType !== 'configuration-error'
     || invalidPositionalLimit.options?.limit !== null
     || invalidPositionalLimit.options?.requestedLimit !== 'zero'
+    || invalidPositionalLimit.details?.summaryType !== 'configuration-error'
     || invalidPositionalLimit.details?.option !== 'limit'
     || invalidPositionalLimit.details?.source !== 'positional'
     || invalidPositionalLimit.details?.targetField !== 'limit'
@@ -3470,6 +3482,7 @@ if (scenario === 'single') {
     || jsonFailure.runner?.outputMode !== 'json'
     || jsonFailure.options?.workflowPreset !== 'structure-first'
     || jsonFailure.name !== 'BatchSplitError'
+    || jsonFailure.errorType !== 'batch-split-error'
     || jsonFailure.details?.summary?.workflowPreset !== 'structure-first'
     || jsonFailure.details?.summary?.errorCount !== 1
   ) {
@@ -3509,6 +3522,7 @@ if (scenario === 'single') {
     || jsonSummaryFailure.runner?.outputMode !== 'json-summary'
     || Object.hasOwn(jsonSummaryFailure, 'details')
     || jsonSummaryFailure.name !== 'BatchSplitError'
+    || jsonSummaryFailure.errorType !== 'batch-split-error'
     || jsonSummaryFailure.summary?.workflowPreset !== 'structure-first'
     || jsonSummaryFailure.summary?.errorCount !== 1
     || jsonSummaryFailure.errors?.length !== 1

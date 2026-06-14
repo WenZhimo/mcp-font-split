@@ -276,7 +276,7 @@ fonts/
 - `fail-fast`：遇到第一个单字体错误就抛错。
 - `fail-after`：继续处理选中的字体，最后如果存在任何单字体错误则抛错。
 
-当 `fail-fast` 或 `fail-after` 通过 MCP 抛错时，错误文本是 JSON，包含 `ok: false`、`name`、`error` 和 `details`；AI agent 应解析它来恢复 `details.errors[]` 和 `details.summary`。
+当 `fail-fast` 或 `fail-after` 通过 MCP 抛错时，错误文本是 JSON，包含 `ok: false`、`name`、`errorType`、`error` 和 `details`；AI agent 应优先按 `errorType: "batch-split-error"` 路由，再解析 `details.errors[]` 和 `details.summary`。
 
 ## 如何解释返回结果
 
@@ -568,7 +568,7 @@ npm run batch:run -- . split-output 50000 50000 --dry-run
 
 `batch:run` 是给 agent 和维护者使用的安全批量辅助入口。默认真实运行使用 `workflowPreset: "reviewed-write"`；带 `--dry-run` 或 `FONT_SPLIT_DRY_RUN=true` 时使用 `workflowPreset: "safe-preview"`。位置参数依次是 `inputDir`、`outputRoot`、`limit` 和 `maxFiles`；也可以用 `FONT_SPLIT_INPUT_DIR`、`FONT_SPLIT_OUTPUT_ROOT`、`FONT_SPLIT_LIMIT`、`FONT_SPLIT_MAX_FILES` 和 `FONT_SPLIT_WORKFLOW_PRESET` 提供相同配置。`FONT_SPLIT_WORKFLOW_PRESET` 只接受 `safe-preview`、`reviewed-write`、`structure-first`、`source-layout`、`metadata-family`、`preserve-all`；`default` 不是有效值，需要默认行为时不要设置这个环境变量。环境变量覆盖项只有显式设置时才会覆盖 preset 默认值，包括 `FONT_SPLIT_DRY_RUN`、`FONT_SPLIT_INCLUDE_RESULTS`、`FONT_SPLIT_SKIP_MODE`、`FONT_SPLIT_BATCH_GROUP_BY`、`FONT_SPLIT_BATCH_NAMING_MODE`、`FONT_SPLIT_BATCH_DEDUPE_MODE`、`FONT_SPLIT_BATCH_ERROR_MODE`、`FONT_SPLIT_SPLIT_FAILURE_ACTION` 和 `FONT_SPLIT_CHUNK_SIZE`。这些枚举型、布尔型或数字型配置如果填了无效值，会以 `BatchRunConfigurationError` 失败并返回允许值或期望类型，而不是静默回退；位置参数里的 `limit` / `maxFiles` 也必须是正整数。它会在控制台摘要里打印 `batchWarnings[]` 的 code/message；`npm run smoke:batch-run` 会验证 `--dry-run`、`FONT_SPLIT_WORKFLOW_PRESET`、无效 preset 拒绝、无效环境变量拒绝、无效数字位置参数拒绝和 `FONT_SPLIT_INCLUDE_RESULTS` 的覆盖行为。
 
-需要给 agent 或脚本稳定解析时，使用 `--json` 或 `FONT_SPLIT_JSON=true`。JSON 模式不会输出进度条或人类摘要；成功时 stdout 是 `{ ok: true, runner, options, result }`，失败时 stdout 是 `{ ok: false, runner, options, name, error, details? }` 且进程退出码仍为非零。大批量运行只需要判断状态、计数、warning、error 和后续动作时，可使用 `--json-summary` 或 `FONT_SPLIT_JSON_SUMMARY=true`；它会省略可能很大的 `planned[]` / `results[]` 明细，返回 `{ ok, runner, options, summary }` 或紧凑错误摘要。
+需要给 agent 或脚本稳定解析时，使用 `--json` 或 `FONT_SPLIT_JSON=true`。JSON 模式不会输出进度条或人类摘要；成功时 stdout 是 `{ ok: true, runner, options, result }`，失败时 stdout 是 `{ ok: false, runner, options, name, errorType, error, details? }` 且进程退出码仍为非零。`errorType` 是最短路由字段：配置错误使用 `configuration-error`，批量处理错误使用 `batch-split-error`。大批量运行只需要判断状态、计数、warning、error 和后续动作时，可使用 `--json-summary` 或 `FONT_SPLIT_JSON_SUMMARY=true`；它会省略可能很大的 `planned[]` / `results[]` 明细，返回 `{ ok, runner, options, summary }` 或带 `errorType` 的紧凑错误摘要。
 
 ### Smoke 检查
 

@@ -19,7 +19,7 @@ function errorNameToType(name) {
   return kebab ? `${kebab}-error` : null;
 }
 
-function inferErrorType(error) {
+export function inferErrorType(error) {
   const details = error && typeof error === 'object' && Object.hasOwn(error, 'details') ? error.details : null;
   if (details && typeof details === 'object' && typeof details.summaryType === 'string' && details.summaryType.trim()) {
     return details.summaryType;

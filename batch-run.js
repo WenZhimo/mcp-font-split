@@ -1,4 +1,5 @@
 import { splitFontBatch } from './src/font-split.js';
+import { inferErrorType } from './src/mcp-response.js';
 
 const WORKFLOW_PRESETS = ['safe-preview', 'reviewed-write', 'structure-first', 'source-layout', 'metadata-family', 'preserve-all'];
 const BOOLEAN_TRUE_VALUES = ['1', 'true', 'yes', 'on'];
@@ -39,6 +40,7 @@ function buildInvalidWorkflowPresetError(value, fallback) {
   const error = new Error(`FONT_SPLIT_WORKFLOW_PRESET must be one of: ${WORKFLOW_PRESETS.join(', ')}. Omit it to use batch-run's ${fallback} default.`);
   error.name = 'BatchRunConfigurationError';
   error.details = {
+    summaryType: 'configuration-error',
     option: 'FONT_SPLIT_WORKFLOW_PRESET',
     received: value,
     allowedValues: WORKFLOW_PRESETS,
@@ -55,6 +57,7 @@ function buildInvalidBooleanEnvError(name, value, requestedField) {
   const error = new Error(`${name} must be one of: ${allowedValues.join(', ')}. Omit it to leave the option unset and use CLI/preset defaults.`);
   error.name = 'BatchRunConfigurationError';
   error.details = {
+    summaryType: 'configuration-error',
     option: name,
     source: 'env',
     received: value,
@@ -71,6 +74,7 @@ function buildInvalidPositiveIntegerError({ name, value, requestedField, targetF
   const error = new Error(`${name} must be a positive integer. Omit it to use ${defaultWhenOmitted}.`);
   error.name = 'BatchRunConfigurationError';
   error.details = {
+    summaryType: 'configuration-error',
     option: name,
     source,
     received: value,
@@ -89,6 +93,7 @@ function buildInvalidEnumEnvError(name, value, allowedValues, requestedField) {
   const error = new Error(`${name} must be one of: ${allowedValues.join(', ')}. Omit it to leave the option unset and use preset/tool defaults.`);
   error.name = 'BatchRunConfigurationError';
   error.details = {
+    summaryType: 'configuration-error',
     option: name,
     received: value,
     allowedValues,
@@ -213,6 +218,7 @@ function buildBatchRunSummary({ ok, startedAt, batchOptions, result, error, summ
   const elapsedMs = Date.now() - startedAt;
   const errorName = error instanceof Error ? error.name : 'Error';
   const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorType = inferErrorType(error);
   const outputMode = summaryOnly ? 'json-summary' : 'json';
   return {
     ok,
@@ -225,6 +231,7 @@ function buildBatchRunSummary({ ok, startedAt, batchOptions, result, error, summ
     ...(result ? (summaryOnly ? { summary: buildCompactBatchResult(result) } : { result }) : {}),
     ...(error ? {
       name: errorName,
+      ...(errorType ? { errorType } : {}),
       error: errorMessage,
       ...(summaryOnly && error.details?.summary ? { summary: buildCompactBatchResult(error.details.summary) } : {}),
       ...(summaryOnly && error.details?.errors ? {
