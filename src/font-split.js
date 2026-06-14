@@ -966,8 +966,13 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   layoutDecision: {
     sourceTools: ['organize_font_directory'],
-    meaning: 'Top-level compact route summary for directory organization responses, including detected layout, preferred route, source-safety signals, direct original-input preview readiness, and copy-only staging status.',
-    agentAction: 'Use it as a first-pass routing index only; then inspect safetySummary, sourceLayoutMismatchSummary, organizationDecision, warnings, plan visibility, and output audits before writing or reporting success.',
+    meaning: 'Top-level compact route summary for directory organization responses, including detected layout, preferred route, directoryHandling, source-safety signals, direct original-input preview readiness, and copy-only staging status.',
+    agentAction: 'Use it as a first-pass routing index only; start with layoutDecision.directoryHandling, then inspect safetySummary, sourceLayoutMismatchSummary, organizationDecision, warnings, plan visibility, and output audits before writing or reporting success.',
+  },
+  'layoutDecision.directoryHandling': {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Short answer for how to treat the current source directory: preview original input, review mixed layout, use an organized copy-only output, rerun organization, or stop because no copyable fonts were found.',
+    agentAction: 'Use this as the first answer to "what should I do with this directory?", then verify the referenced suggestedArgs, sourceSafetyDecision, organizationWarnings, and plan fields.',
   },
   directoryWorkflowSummary: {
     sourceTools: ['organize_font_directory'],
@@ -3004,6 +3009,7 @@ export function getAgentGuidance(args = {}) {
       'organizationManifestPath',
       'planActionSummary',
       'layoutDecision',
+      'layoutDecision.directoryHandling',
       'organizationDecision',
       'directoryWorkflowSummary',
       'sourceLayoutMismatchSummary',
@@ -4889,6 +4895,7 @@ function buildDirectoryWorkflowSummary({
     availableSummaryFields: [
       'planActionSummary',
       'layoutDecision',
+      'layoutDecision.directoryHandling',
       'organizationDecision',
       'directoryWorkflowSummary',
       'sourceLayoutMismatchSummary',
@@ -4965,6 +4972,92 @@ function buildDirectoryWorkflowSummary({
   });
 }
 
+function buildDirectoryHandlingDecision({
+  layout,
+  safetySummary,
+  organizationDecision,
+  directOriginalInput,
+  copyOnlyStaging,
+}) {
+  const directStatus = directOriginalInput.status || null;
+  const originalInputPreviewRunnable = ['safe-preview-available', 'review-required'].includes(directStatus)
+    && Boolean(directOriginalInput.safePreviewArgs);
+  const copyOnlyStagingNeed = copyOnlyStaging.need || null;
+  const route = organizationDecision.route;
+  const modeByRoute = {
+    'rerun-with-higher-maxFiles': 'rerun-organization',
+    'rerun-with-font-parsing': 'rerun-organization-with-font-parsing',
+    'inspect-organization-errors': 'inspect-organization-errors',
+    'decide-on-invalid-fonts': 'resolve-invalid-font-policy',
+    'no-copyable-fonts': 'stop-no-copyable-fonts',
+    'preview-organized-output': 'preview-organized-output',
+    'review-existing-targets': 'inspect-organized-output',
+    'review-mixed-layout': 'review-original-input-safe-preview',
+    'preview-original-layout': 'preview-original-input',
+  };
+  const recommendedMode = modeByRoute[route] || 'review-organization-decision';
+  const shortAnswerByMode = {
+    'rerun-organization': 'The scan was truncated; rerun organize_font_directory with a higher maxFiles before deciding how to split.',
+    'rerun-organization-with-font-parsing': 'This was a structure-only pass; rerun organize_font_directory with font parsing before relying on metadata grouping or identity dedupe.',
+    'inspect-organization-errors': 'The organization run recorded errors; inspect them before choosing a split or staging route.',
+    'resolve-invalid-font-policy': 'Some supported-extension files could not be parsed; decide whether to preserve invalid font-like files before treating the route as ready.',
+    'stop-no-copyable-fonts': 'No copyable supported fonts were found for the current policy; do not split until the input or policy changes.',
+    'preview-organized-output': 'A copy-only staging directory has been written; run split_font_batch safe-preview on that organized output before any split write.',
+    'inspect-organized-output': 'No new files were copied; inspect the organized output or existing targets before using them as split input.',
+    'review-original-input-safe-preview': 'Mixed root and nested fonts were detected; safe-preview the original input and review grouping, or copy a staging directory if the user wants a cleaner source layout.',
+    'preview-original-input': 'The original input can be used directly for split_font_batch safe-preview; copy-only staging is optional.',
+    'review-organization-decision': 'Review the organization decision before choosing direct preview, copy-only staging, or a rerun.',
+  };
+  const useOrganizedOutput = recommendedMode === 'preview-organized-output';
+  const suggestedArgsField = useOrganizedOutput
+    ? 'organizationDecision.safeBatchPreviewArgs'
+    : originalInputPreviewRunnable
+      ? 'layoutDecision.directOriginalInput.safePreviewArgs'
+      : null;
+  const safePreviewArgs = useOrganizedOutput
+    ? organizationDecision.safeBatchPreviewArgs || null
+    : originalInputPreviewRunnable
+      ? directOriginalInput.safePreviewArgs || null
+      : null;
+
+  return {
+    summaryType: 'directory-handling-decision',
+    recommendedMode,
+    shortAnswer: shortAnswerByMode[recommendedMode],
+    layoutKind: layout.layoutKind,
+    recommendedBatchGroupBy: layout.recommendedBatchOptions?.batchGroupBy || null,
+    originalInputPreviewStatus: directStatus,
+    originalInputPreviewRunnable,
+    copyOnlyStagingNeed,
+    helperTool: 'organize_font_directory',
+    helperToolDefaultMode: 'dry-run-plan-only',
+    helperToolWriteMode: 'copy-only-outputDir',
+    sourceDestructive: false,
+    sourceFilesPreserved: true,
+    copyOnlyStagingIsDestructive: false,
+    copyOnlyStagingWritesWhen: 'only when organize_font_directory is called with dryRun:false',
+    writesSourceTree: safetySummary.writesSourceTree,
+    writesOutputTree: safetySummary.writesOutputTree,
+    outputTreeInsideInputTree: safetySummary.outputTreeInsideInputTree,
+    nextTool: organizationDecision.nextTool || (originalInputPreviewRunnable ? 'split_font_batch' : null),
+    nextInputDir: organizationDecision.nextInputDir || null,
+    suggestedArgsField,
+    safePreviewArgs,
+    mustInspectFields: [
+      'layoutDecision',
+      'layoutDecision.directoryHandling',
+      'sourceSafetyDecision',
+      'safetySummary',
+      'organizationDecision',
+      'sourceLayoutMismatchSummary',
+      'sourceLayoutMismatchSummary.decisionChecklist',
+      'recommendedNextActions',
+      'organizationWarnings',
+      'planActionSummary',
+    ],
+  };
+}
+
 function buildLayoutDecision({
   layout,
   safetySummary,
@@ -4974,12 +5067,21 @@ function buildLayoutDecision({
   const sourceLayoutMismatchSummary = directoryWorkflowSummary.sourceLayoutMismatchSummary;
   const directOriginalInput = sourceLayoutMismatchSummary.directOriginalInput || {};
   const copyOnlyStaging = sourceLayoutMismatchSummary.copyOnlyStaging || {};
+  const directoryHandling = buildDirectoryHandlingDecision({
+    layout,
+    safetySummary,
+    organizationDecision,
+    directOriginalInput,
+    copyOnlyStaging,
+  });
   return {
     summaryType: 'layout-decision',
     appliesToTool: 'organize_font_directory',
+    shortAnswer: directoryHandling.shortAnswer,
     layoutKind: layout.layoutKind,
     recommendedBatchGroupBy: layout.recommendedBatchOptions?.batchGroupBy || null,
     route: organizationDecision.route,
+    directoryHandling,
     recommendedNextActionId: organizationDecision.preferredNextActionId || organizationDecision.optionalStagingActionId || null,
     nextTool: organizationDecision.nextTool || null,
     nextInputDir: organizationDecision.nextInputDir || null,
@@ -5012,6 +5114,7 @@ function buildLayoutDecision({
       'safetySummary',
       'layout',
       'layoutDecision',
+      'layoutDecision.directoryHandling',
       'organizationDecision',
       'sourceLayoutMismatchSummary',
       'sourceLayoutMismatchSummary.decisionChecklist',

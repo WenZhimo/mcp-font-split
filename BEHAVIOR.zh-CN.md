@@ -725,7 +725,8 @@ split-meta.json
 | `effectiveBatchDedupeMode` | 实际执行的整理去重策略 |
 | `dedupeLimitedByParsing` | 是否因跳过解析而无法执行真实 identity 去重 |
 | `batchPolicySummary` | 本次整理调用采用的分组、命名和去重策略摘要；若 `parseFonts: false` 导致 identity 去重降级，`effectiveValues.batchDedupeMode` 会显示实际回退值 |
-| `layoutDecision` | 顶层紧凑路线摘要，汇总检测布局、推荐分组、主线路由、源安全信号、原目录安全预览状态和 copy-only 暂存状态；它是路线索引，不是成功证明 |
+| `layoutDecision` | 顶层紧凑路线摘要，汇总 `shortAnswer`、检测布局、推荐分组、主线路由、源安全信号、原目录安全预览状态和 copy-only 暂存状态；它是路线索引，不是成功证明 |
+| `layoutDecision.directoryHandling` | 第一层目录处理答案；用 `recommendedMode` 和 `shortAnswer` 直接说明应预览原目录、复核 mixed 布局、使用 copy-only 整理输出、重跑整理，还是因为没有可复制字体而停止 |
 | `directoryWorkflowSummary` | 本次整理响应里的目录工作流导航摘要，覆盖布局复核、安全批量预览、可选 copy-only 暂存、reviewed 批量写入和输出审计步骤 |
 | `sourceLayoutMismatchSummary` | 源目录结构判断摘要，直接说明当前布局与推荐分组是否匹配、能否直接对原目录做安全预览、copy-only 暂存是不需要/可选/已经写出、暂存为什么不破坏源文件，并通过 `sourceLayoutMismatchSummary.decisionChecklist` 给出更短的 agent 决策清单 |
 | `directoryWorkflowSummary.planVisibility` | 说明本次响应是否包含详细 `plan[]`；当 `includePlan: false` 时，列出仍可用于压缩判断的摘要字段，并提供需要逐文件审查时的 `rerunWithPlanArgs` |
@@ -751,7 +752,7 @@ split-meta.json
 - `output-inside-input`：批量或整理输出目录位于输入目录内，后续扫描需要排除它，或明确把该输出目录作为下一步输入。
 - `font-parsing-skipped`：`parseFonts: false`，本次只做结构优先计划，没有读取字体元数据。
 
-`layoutDecision` 是最短的顶层路线索引，用于快速回答“当前布局是什么、推荐走哪条路、原目录能否先安全预览、是否需要 copy-only 暂存”。`organizationDecision` 会把复杂的整理响应压缩成主线路由，例如 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output`。`directoryWorkflowSummary` 则把当前安全状态、布局复核原因、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示放在一起；`sourceLayoutMismatchSummary` 专门回答“原目录可否直接预览、是否需要 copy-only 暂存、暂存是否破坏源文件”，其中 `sourceLayoutMismatchSummary.decisionChecklist` 进一步集中列出源安全、直接预览、暂存、plan 可见性、warning 和输出审计检查。它们都只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility` 和可用时的 `plan[]`。
+`layoutDecision` 是最短的顶层路线索引，用于快速回答“当前布局是什么、推荐走哪条路、原目录能否先安全预览、是否需要 copy-only 暂存”。其中的 `layoutDecision.directoryHandling` 是更短的目录处理答案：它会用 `recommendedMode` 和 `shortAnswer` 说明应该直接预览原目录、复核 mixed 布局、使用已经写出的 copy-only 整理目录、重跑整理，还是停止等待输入/策略变化。`organizationDecision` 会把复杂的整理响应压缩成主线路由，例如 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output`。`directoryWorkflowSummary` 则把当前安全状态、布局复核原因、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示放在一起；`sourceLayoutMismatchSummary` 专门回答“原目录可否直接预览、是否需要 copy-only 暂存、暂存是否破坏源文件”，其中 `sourceLayoutMismatchSummary.decisionChecklist` 进一步集中列出源安全、直接预览、暂存、plan 可见性、warning 和输出审计检查。它们都只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility` 和可用时的 `plan[]`。
 
 目录路由相关的 `inspectFields`、`mustInspectFields` 和 `responseFields` 只要列出 `sourceLayoutMismatchSummary`，也会同时列出 `sourceLayoutMismatchSummary.decisionChecklist`。这避免 agent 只检查父摘要而漏掉嵌套决策清单。
 

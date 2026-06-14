@@ -189,9 +189,11 @@ function summarizeLayoutDecision(decision) {
   return {
     summaryType: decision.summaryType,
     appliesToTool: decision.appliesToTool,
+    shortAnswer: decision.shortAnswer,
     layoutKind: decision.layoutKind,
     recommendedBatchGroupBy: decision.recommendedBatchGroupBy,
     route: decision.route,
+    directoryHandling: decision.directoryHandling,
     recommendedNextActionId: decision.recommendedNextActionId,
     nextTool: decision.nextTool,
     nextInputDir: decision.nextInputDir,
@@ -218,8 +220,22 @@ function layoutDecisionCovered(summary) {
     summary
     && summary.summaryType === 'layout-decision'
     && summary.appliesToTool === 'organize_font_directory'
+    && typeof summary.shortAnswer === 'string'
+    && summary.shortAnswer.length > 0
     && typeof summary.layoutKind === 'string'
     && typeof summary.route === 'string'
+    && summary.directoryHandling?.summaryType === 'directory-handling-decision'
+    && typeof summary.directoryHandling?.recommendedMode === 'string'
+    && typeof summary.directoryHandling?.shortAnswer === 'string'
+    && summary.directoryHandling?.helperTool === 'organize_font_directory'
+    && summary.directoryHandling?.helperToolDefaultMode === 'dry-run-plan-only'
+    && summary.directoryHandling?.helperToolWriteMode === 'copy-only-outputDir'
+    && summary.directoryHandling?.sourceDestructive === false
+    && summary.directoryHandling?.sourceFilesPreserved === true
+    && summary.directoryHandling?.copyOnlyStagingIsDestructive === false
+    && Array.isArray(summary.directoryHandling?.mustInspectFields)
+    && summary.directoryHandling.mustInspectFields.includes('layoutDecision')
+    && summary.directoryHandling.mustInspectFields.includes('sourceSafetyDecision')
     && typeof summary.operationMode === 'string'
     && summary.sourceDestructive === false
     && summary.sourceFilesPreserved === true
@@ -1626,6 +1642,7 @@ function assertLayoutDecision(decision, {
   expectedOperationMode,
   expectedDirectStatus = null,
   expectedStagingNeed = null,
+  expectedRecommendedMode = null,
 }) {
   if (
     !decision
@@ -1634,6 +1651,20 @@ function assertLayoutDecision(decision, {
     || decision.layoutKind !== expectedLayoutKind
     || decision.route !== expectedRoute
     || decision.operationMode !== expectedOperationMode
+    || typeof decision.shortAnswer !== 'string'
+    || decision.shortAnswer.trim() === ''
+    || decision.directoryHandling?.summaryType !== 'directory-handling-decision'
+    || typeof decision.directoryHandling?.recommendedMode !== 'string'
+    || typeof decision.directoryHandling?.shortAnswer !== 'string'
+    || decision.directoryHandling.shortAnswer.trim() === ''
+    || decision.directoryHandling?.helperTool !== 'organize_font_directory'
+    || decision.directoryHandling?.helperToolDefaultMode !== 'dry-run-plan-only'
+    || decision.directoryHandling?.helperToolWriteMode !== 'copy-only-outputDir'
+    || decision.directoryHandling?.sourceDestructive !== false
+    || decision.directoryHandling?.sourceFilesPreserved !== true
+    || decision.directoryHandling?.copyOnlyStagingIsDestructive !== false
+    || !decision.directoryHandling?.mustInspectFields?.includes('layoutDecision')
+    || !decision.directoryHandling?.mustInspectFields?.includes('sourceSafetyDecision')
     || decision.sourceDestructive !== false
     || decision.sourceFilesPreserved !== true
     || !decision.recommendedNextActionId
@@ -1652,6 +1683,15 @@ function assertLayoutDecision(decision, {
   }
   if (expectedStagingNeed && decision.copyOnlyStaging?.need !== expectedStagingNeed) {
     throw new Error(`${context}: expected layoutDecision copyOnlyStaging need ${expectedStagingNeed}.`);
+  }
+  if (expectedRecommendedMode && decision.directoryHandling.recommendedMode !== expectedRecommendedMode) {
+    throw new Error(`${context}: expected layoutDecision.directoryHandling recommendedMode ${expectedRecommendedMode}.`);
+  }
+  if (expectedDirectStatus && decision.directoryHandling.originalInputPreviewStatus !== expectedDirectStatus) {
+    throw new Error(`${context}: expected layoutDecision.directoryHandling original input preview status ${expectedDirectStatus}.`);
+  }
+  if (expectedStagingNeed && decision.directoryHandling.copyOnlyStagingNeed !== expectedStagingNeed) {
+    throw new Error(`${context}: expected layoutDecision.directoryHandling copy-only staging need ${expectedStagingNeed}.`);
   }
   if (
     decision.copyOnlyStaging?.sourceDestructive !== false
@@ -3093,6 +3133,7 @@ if (scenario === 'single') {
     expectedOperationMode: 'plan-only',
     expectedDirectStatus: 'available-after-invalid-font-decision',
     expectedStagingNeed: 'defer-until-review',
+    expectedRecommendedMode: 'resolve-invalid-font-policy',
   });
   if (
     result.sourceLayoutMismatchSummary?.summaryType !== 'source-layout-mismatch'
@@ -3198,6 +3239,7 @@ if (scenario === 'single') {
     expectedOperationMode: 'plan-only',
     expectedDirectStatus: 'available-after-invalid-font-decision',
     expectedStagingNeed: 'defer-until-review',
+    expectedRecommendedMode: 'resolve-invalid-font-policy',
   });
   if (
     compact.directoryWorkflowSummary?.planVisibility?.planIncluded !== false
@@ -3294,6 +3336,7 @@ if (scenario === 'single') {
     expectedOperationMode: 'copy-only',
     expectedDirectStatus: 'use-organized-output',
     expectedStagingNeed: 'already-written-copy-only',
+    expectedRecommendedMode: 'preview-organized-output',
   });
   if (!copied.organizationWarnings?.some((warning) => warning.code === 'organization-writes-output')) {
     throw new Error('Expected organization copy warning.');
@@ -4889,7 +4932,7 @@ if (scenario === 'single') {
     expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
-    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
+    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'layoutDecision.directoryHandling', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
     expectDescriptionIncludes('inspect_split_output', ['outputStructureDecision', 'auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
@@ -4950,6 +4993,7 @@ if (scenario === 'single') {
       'batchPolicyGuide',
       'batchPolicySummary',
       'layoutDecision',
+      'layoutDecision.directoryHandling',
       'directoryWorkflowSummary',
       'sourceLayoutMismatchSummary',
       'sourceLayoutMismatchSummary.decisionChecklist',
@@ -5014,6 +5058,7 @@ if (scenario === 'single') {
     assertDocsContain('real corpus ignored category coverage', '`coverageSummary.unsupportedFileCategoryCoverage`');
     assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
     assertDocsContain('source safety decision', '`sourceSafetyDecision`');
+    assertDocsContain('directory handling decision', '`layoutDecision.directoryHandling`');
     assertDocsContain('error response catalog', '`errorResponseCatalog`');
     assertDocsContain('error catalog section', '`error-catalog`');
     assertDocsContain('error type field', '`errorType`');
@@ -5090,6 +5135,7 @@ if (scenario === 'single') {
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
     '`layoutDecision`',
+    '`layoutDecision.directoryHandling`',
     '`directoryWorkflowSummary`',
     '`sourceLayoutMismatchSummary`',
     '`sourceLayoutMismatchSummary.decisionChecklist`',
