@@ -58,6 +58,7 @@
 - `get_agent_guidance` 会返回 `configurationRecipes[]`，把常见意图映射成 preset-first 参数，例如保留全部源字体、按源目录分组、按字体 metadata 分组、快速结构扫描、copy-only 暂存整理或大库审查后写入。配方只是安全起点，仍必须运行预览/写入工具，检查列出的 `inspectFields`，并满足 `successCriteria`。
 - `get_agent_guidance` 会返回 `batchPolicyGuide`，这是批量策略自定义指南，覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个选项值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前的 `successCriteria`。
 - `get_agent_guidance` 还会返回 `unsupportedFileCategoryCatalog`，解释 `unsupportedFileSummary.byCategory[]` 中 `archive`、`document`、`unsupported-font` 等分类的代表扩展名和处理行为；每个工具响应里的 `unsupportedFileDecision` 会给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则提供证据，压缩包只会被报告，不会被解压、复制或拆分。
+- 输入扫描类工具会返回 `inputCountGuide`，用一个紧凑对象解释扫描文件数、支持字体数、忽略文件数、`maxFilesHit` 是否导致计数不完整、文件明细是否被故意省略，以及非字体文件的处理方式。把真实语料计数当作完整结论前应先看它。
 - `get_agent_guidance` 还会返回 `directoryHandlingModeCatalog`，解释每个 `layoutDecision.directoryHandling.recommendedMode` 取值，包括它何时出现、下一步建议、是否会在复核前写文件、源目录安全性、必须检查的字段和容易误解的行为。
 - `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。决策表和 `directoryWorkflowExamples[]` 示例也会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖参数，并提供必须检查的字段和 `successCriteria`；完整示例里还包含 flat/nested/mixed/output-inside-input 的 `sourceLayoutMismatchSummary` 对照。
 - `get_agent_guidance` 包含 `safeInvocationTemplates[]`，提供运行时检查、单字体处理、输入预检、目录不匹配整理计划、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和紧凑输出审计等可复制起步调用。每个模板都会声明是否写文件、是否可能修改源文件、必须检查的 `inspectFields` 和继续前要满足的 `successCriteria`；模板会尽量保持最小参数，`workflowPreset` 已提供的默认项可从 `workflowPresets[]` 查看。
@@ -294,6 +295,7 @@ fonts/
 
 `inspect_font_inputs` 是不写输出的输入预检：
 
+- `inputCountGuide`：解释扫描计数、`maxFilesHit`、`filesIncluded` 和非字体文件处理方式的紧凑指南
 - `supportedFontCount`、`validFontCount`、`invalidFontCount`
 - `unsupportedFileDecision`：从 `unsupportedFileSummary` 派生的快速判断，直接说明是否有忽略文件、是否包含压缩包、是否存在 `.zip` / `.txt` 之外的噪声，以及这些文件是否会被解压、复制或拆分
 - `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`
@@ -306,7 +308,7 @@ fonts/
 `split_font_batch` 还会返回聚合统计，例如：
 
 - `resultsIncluded`：是否包含每个字体的 `results[]` 详情
-- `scannedFileCount`、`maxFiles`、`maxFilesHit`
+- `inputCountGuide`、`scannedFileCount`、`maxFiles`、`maxFilesHit`
 - `unsupportedFileDecision`：快速判断忽略文件是否存在、是否包含压缩包或更复杂的非字体噪声，以及“不解压、不复制、不拆分”的处理结论
 - `unsupportedFileSummary`：所有已扫描但被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；压缩包会归入 `archive` 并保持忽略
 - `dryRun`、`plannedCount`、`wouldProcessCount`、`planIncluded`
@@ -350,6 +352,7 @@ fonts/
 - `directoryWorkflowSummary`：本次响应里的目录工作流导航摘要，用来串起布局复核、安全批量预览、可选 copy-only 暂存、reviewed 批量写入和必须执行的输出审计。它会重复源目录安全信号、路线选择、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示。
 - `sourceLayoutMismatchSummary`：直接回答“当前源目录结构和推荐批量分组是否匹配、能否直接对原目录做安全预览、copy-only 暂存是不需要/可选/已经写出、为什么暂存不会破坏源文件”等常见判断。其中的 `sourceLayoutMismatchSummary.decisionChecklist` 是更短的 agent 决策清单，用于集中检查源安全、直接预览是否就绪、copy-only 暂存需求、plan 可见性、warning 复核和写入后的输出审计。任何目录路由相关的 `inspectFields` / `mustInspectFields` / `responseFields` 只要列出 `sourceLayoutMismatchSummary`，也会同时列出 `sourceLayoutMismatchSummary.decisionChecklist`。
 - `directoryWorkflowSummary.planVisibility`：说明本次响应是否包含详细 `plan[]`。当 `includePlan: false` 时，`plan[]` 会被省略，但 `planActionSummary`、`layoutDecision`、`layoutDecision.directoryHandling`、`organizationDecision`、`sourceLayoutMismatchSummary`、`recommendedNextActions[]`、`organizationWarnings[]`、`layout`、`safetySummary` 和 `batchPolicySummary` 仍可用于大目录 triage；如果写入前需要确认每个文件的目标路径，应按其中的 `rerunWithPlanArgs` 重新 dry-run。
+- `inputCountGuide`：在信任整理计划前，解释源目录扫描计数、计数完整性和非字体文件处理方式
 - `unsupportedFileDecision`：快速判断忽略文件是否存在、是否包含压缩包或更复杂的非字体噪声，以及这些文件是否会被解压、复制或拆分
 - `unsupportedFileSummary`：所有被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；源目录混有压缩包、图片、文档或生成产物时优先看它
 - `layout.layoutKind`：`empty`、`flat`、`nested` 或 `mixed`
@@ -609,7 +612,7 @@ npm run smoke:small-copy-original
 
 `npm run check` 是推荐给 AI agent / CI 的入口。它会运行语法检查和一组能自造最小输入的 smoke 场景，不依赖真实字体库。需要低噪声输出时使用 `npm run check:compact`；它顺序运行同一组 syntax/smoke 门禁，成功时只打印步骤摘要和 `compact-check-result`，失败时返回失败步骤的 stdout/stderr 尾部。需要纯 JSON 给 agent 解析时使用 `npm run --silent check:compact -- --json`。
 
-`smoke:real-corpus-suite` 是功能改动告一段落时推荐的本机真实语料可靠性门禁，不包含在 `npm run check` 中。`get_agent_guidance.localVerificationOutputGuide` 是解读这个本地命令输出的机器可读伴随指南。suite 会顺序运行只读全库预览、`smoke:real-corpus-targets` 和 `smoke:real-corpus-integration`，覆盖全库 compact 扫描、代表性只读抽样、目录整理预览、源安全结论、源目录结构判断摘要、copy-only 写入、单字体拆分、批量写入和输出结构审计。默认输出为 compact，只打印每个子检查的成功状态、耗时、人类可读 `real-corpus suite summary` 和低噪声最终 JSON；JSON 里的 `humanSummary` 会重复这组短摘要，便于 agent 直接读取。最终 JSON 还包含顶层 `reliabilityGateDecision` 和 `corpusCountGuide`：先检查 `reliabilityGateDecision.status`、`reliabilityGatePassed`、`blockingReasonCodes`、`fullCorpusFontCountField` 和 `targetCountsAreFullCorpusCounts`，再用 `corpusCountGuide.fullCorpus` / `corpusCountGuide.representativeTargets` 区分“全库扫描数量”和“代表性抽样目标数量”。`status: "pass"` 表示代表性功能链通过，不表示每个字体目录都已人工验收。最终总览里的 `testScope` 会把范围拆成 `corpusScan`（全库根扫描）、`targetSampling`（固定回归点 + 自适应代表性抽样）和 `representativeWriteAudit`（一个真实写入/审计样本），`coverageSummary` 会直接列出全库字体/忽略文件计数、抽样目标数量、已选目标、代表性写入审计状态，以及省略大证据的 `functionalCoverage[]` 功能覆盖清单；其中 `source-safety-decision`、`source-layout-mismatch-summary` 和 `layout-decision-route-summary` 会确认真实语料路径实际检查了 `sourceSafetyDecision`、`sourceLayoutMismatchSummary` 与 `layoutDecision` 的源文件保留、布局匹配、直接预览、路线摘要和 copy-only 源安全语义。默认 JSON 只保留 `runSummaries[]`，并通过 `omittedDetailFields` 标明省略了子检查详情和大块 evidence；需要展开完整子检查输出时加 `--verbose`，或设置 `FONT_SPLIT_REAL_CORPUS_SUITE_VERBOSE=true`。它使用真实复杂语料证明功能链可靠，不是逐个字体目录人工验收。可选参数为 `<字体语料目录> [maxFiles] [targetLimit] [integrationLimit] [sampleCount] [--verbose]`。
+`smoke:real-corpus-suite` 是功能改动告一段落时推荐的本机真实语料可靠性门禁，不包含在 `npm run check` 中。`get_agent_guidance.localVerificationOutputGuide` 是解读这个本地命令输出的机器可读伴随指南。suite 会顺序运行只读全库预览、`smoke:real-corpus-targets` 和 `smoke:real-corpus-integration`，覆盖全库 compact 扫描、代表性只读抽样、目录整理预览、源安全结论、源目录结构判断摘要、copy-only 写入、单字体拆分、批量写入和输出结构审计。默认输出为 compact，只打印每个子检查的成功状态、耗时、人类可读 `real-corpus suite summary` 和低噪声最终 JSON；JSON 里的 `humanSummary` 会重复这组短摘要，便于 agent 直接读取。最终 JSON 还包含顶层 `reliabilityGateDecision` 和 `corpusCountGuide`：先检查 `reliabilityGateDecision.status`、`reliabilityGatePassed`、`blockingReasonCodes`、`fullCorpusFontCountField` 和 `targetCountsAreFullCorpusCounts`，再用 `corpusCountGuide.fullCorpus` / `corpusCountGuide.representativeTargets` 区分“全库扫描数量”和“代表性抽样目标数量”。`status: "pass"` 表示代表性功能链通过，不表示每个字体目录都已人工验收。最终总览里的 `testScope` 会把范围拆成 `corpusScan`（全库根扫描）、`targetSampling`（固定回归点 + 自适应代表性抽样）和 `representativeWriteAudit`（一个真实写入/审计样本），`coverageSummary` 会直接列出全库字体/忽略文件计数、抽样目标数量、已选目标、代表性写入审计状态，以及省略大证据的 `functionalCoverage[]` 功能覆盖清单；其中 `input-count-guide`、`source-safety-decision`、`source-layout-mismatch-summary` 和 `layout-decision-route-summary` 会确认真实语料路径实际检查了 `inputCountGuide`、`sourceSafetyDecision`、`sourceLayoutMismatchSummary` 与 `layoutDecision` 的计数完整性、源文件保留、布局匹配、直接预览、路线摘要和 copy-only 源安全语义。默认 JSON 只保留 `runSummaries[]`，并通过 `omittedDetailFields` 标明省略了子检查详情和大块 evidence；需要展开完整子检查输出时加 `--verbose`，或设置 `FONT_SPLIT_REAL_CORPUS_SUITE_VERBOSE=true`。它使用真实复杂语料证明功能链可靠，不是逐个字体目录人工验收。可选参数为 `<字体语料目录> [maxFiles] [targetLimit] [integrationLimit] [sampleCount] [--verbose]`。
 
 `coverageSummary.unsupportedFileCategoryCoverage` 会把忽略文件覆盖面单独列出，包括类别数、扩展名数，以及 `.zip` / `.txt` 之外的扩展名类型数；`coverageSummary.outputStructureAuditSummary` 会单独列出代表性单字体写入和批量写入的 `outputStructureDecision`、`auditStatus`、`auditPassed` 与 `structureSummary.conforms`。这两个字段用于快速确认“忽略统计不是只看压缩包/文本文件”和“输出目录结构已经被审计”。
 

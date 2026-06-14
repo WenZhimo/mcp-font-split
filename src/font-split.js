@@ -862,6 +862,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Compact machine-readable triage of ignored non-font files derived from unsupportedFileSummary.',
     agentAction: 'Use this first to see whether ignored files exist, whether archive files or non-.zip/.txt noise are present, and whether the tool will extract, copy, or split those files; use unsupportedFileSummary for exact evidence.',
   },
+  inputCountGuide: {
+    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
+    meaning: 'Compact machine-readable guide for interpreting source scan counts, maxFiles truncation, omitted file details, and unsupported-file handling.',
+    agentAction: 'Check this before treating count fields as complete; if countCompleteness is truncated, rerun with a higher maxFiles before reporting corpus totals.',
+  },
   'unsupportedFileSummary.total': {
     sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
     meaning: 'Total number of scanned files ignored because their extensions are not supported font formats.',
@@ -1423,7 +1428,7 @@ const SAFE_INVOCATION_TEMPLATES = [
       includeFiles: false,
     },
     customizableFields: ['inputDir', 'maxFiles', 'includeFiles'],
-    inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
+    inspectFields: ['inputCountGuide', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
     nextStep: 'If maxFilesHit is true or invalid fonts are found, resolve that before relying on batch counts.',
     successCriteria: 'Require maxFilesHit false before trusting counts, and resolve or disclose invalid fonts, missing identities, and relevant inspectionWarnings.',
   },
@@ -1763,7 +1768,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Count supported fonts and ignored non-font files without writing output.',
-          inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
+          inspectFields: ['inputCountGuide', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
           successCriteria: 'maxFilesHit is false, or the caller intentionally accepts a bounded summary.',
         },
         {
@@ -1873,7 +1878,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Understand source size, ignored files, invalid fonts, and scan truncation before batch processing.',
-          inspectFields: ['maxFilesHit', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
+          inspectFields: ['inputCountGuide', 'maxFilesHit', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
           successCriteria: 'The source scan is complete enough for the requested batch scope.',
         },
         {
@@ -1929,7 +1934,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Inspect source font inputs without writing output.',
-          inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary'],
+          inspectFields: ['inputCountGuide', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary'],
           successCriteria: 'maxFilesHit is false, or truncation is disclosed.',
         },
         auditStep,
@@ -1975,7 +1980,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Inspect the staging output as the next source directory.',
-          inspectFields: ['supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'maxFilesHit', 'inspectionWarnings'],
+          inspectFields: ['inputCountGuide', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'maxFilesHit', 'inspectionWarnings'],
           successCriteria: 'The staging directory contains the expected supported fonts.',
         },
         {
@@ -2196,7 +2201,7 @@ function buildNextToolDecisionSummary(workflow) {
       templateId: 'source-preflight-compact',
       writesFiles: false,
       sourceDestructive: false,
-      inspectFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
+      inspectFields: ['inputCountGuide', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
       continueWhen: 'maxFilesHit is false or truncation is intentionally accepted; ignored files and invalid fonts are reviewed.',
       nextRouteAfterSuccess: 'layout-uncertain-or-staging-wanted',
     },
@@ -2472,8 +2477,8 @@ export function getAgentGuidance(args = {}) {
     {
       id: 'input-scan-complete',
       appliesTo: ['overview', 'batch', 'inspect', 'organize'],
-      check: 'Before trusting a source scan, inspect maxFilesHit and inspectionWarnings; rerun with a higher maxFiles when truncated.',
-      responseFields: ['maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
+      check: 'Before trusting a source scan, inspect inputCountGuide, maxFilesHit, and inspectionWarnings; rerun with a higher maxFiles when truncated.',
+      responseFields: ['inputCountGuide', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
     },
     {
       id: 'layout-plan-reviewed',
@@ -2547,6 +2552,7 @@ export function getAgentGuidance(args = {}) {
       'reliabilityGateDecision.blockingReasonCodes is empty',
       'reliabilityGateDecision.targetCountsAreFullCorpusCounts is false',
       'testScope.corpusScan.maxFilesHit is false',
+      'coverageSummary.functionalCoverage includes input-count-guide as covered',
       'coverageSummary.functionalCoverage entries are all covered',
       'coverageSummary.outputStructureAuditSummary single and batch outputStructureDecision.status are pass',
     ],
@@ -2573,6 +2579,7 @@ export function getAgentGuidance(args = {}) {
       'Small numbers such as fixedRegressionTargetCount 4 or selectedTargetCount 10 are target sampling counts, not the full corpus font count.',
       'Use reliabilityGateDecision.fullCorpusFontCountField or testScope.corpusScan.supportedFontCount for the full bounded corpus font total.',
       'Use corpusCountGuide for the shortest explanation of which counts are full-corpus counts and which are representative target counts.',
+      'Use coverageSummary.functionalCoverage input-count-guide to confirm inputCountGuide was checked across inspect, organize, and batch paths.',
       'Default suite output is compact and omits child run details; use verboseCommand for full per-child summaries and evidence.',
       'Archive files are counted as ignored files; the suite does not prove archive extraction because archive extraction is outside this tool layer.',
     ],
@@ -2583,6 +2590,7 @@ export function getAgentGuidance(args = {}) {
       selectedTargets: 'testScope.targetSampling.selectedTargets',
       representativeWriteAudit: 'testScope.representativeWriteAudit',
       ignoredFileCoverage: 'coverageSummary.unsupportedFileCategoryCoverage',
+      inputCountGuideCoverage: 'coverageSummary.functionalCoverage[id=input-count-guide]',
       outputStructureAudit: 'coverageSummary.outputStructureAuditSummary',
     },
   };
@@ -2652,7 +2660,7 @@ export function getAgentGuidance(args = {}) {
       followUpOptions: {
         workflowPreset: 'reviewed-write',
       },
-      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'inputCountGuide', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errorCount', 'errors'],
       successCriteria: 'Start with safe-preview dryRun true and sourceDestructive false; proceed to reviewed-write only after planned paths, warnings, maxFilesHit, and errors are acceptable, then audit output.',
       nonIntuitiveBehavior: 'split_font_batch dryRun defaults to false, so agents should set dryRun:true explicitly for planning.',
     },
@@ -2670,7 +2678,7 @@ export function getAgentGuidance(args = {}) {
         inputDir: '<original-inputDir-or-organized-outputDir>',
         workflowPreset: 'safe-preview',
       },
-      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'inputCountGuide', 'layout', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'planActionSummary', 'plan'],
       successCriteria: 'The organization pass must remain no-write and sourceDestructive false; choose original input or organized output only after reviewing layout, warnings, plan summary, and recommendedBatchPreviewArgs.',
       nonIntuitiveBehavior: 'organize_font_directory defaults to dryRun:true and never moves or deletes source files; dryRun:false copies into outputDir only.',
     },
@@ -2731,7 +2739,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'layout.layoutKind', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'inputCountGuide', 'layout.layoutKind', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
       successCriteria: 'Use the example only if actual layout is flat or equivalent; continue after organization preview is no-write, source-safe, and recommendedBatchPreviewArgs/grouping have been reviewed.',
     },
     {
@@ -2761,7 +2769,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'not-needed-unless-staging',
       },
-      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'inputCountGuide', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'Use direct source-dir batch only after safe-preview confirms dryRun true, sourceDestructive false, maxFilesHit false, acceptable planned paths/warnings, and no blocking errors.',
     },
     {
@@ -2790,7 +2798,7 @@ export function getAgentGuidance(args = {}) {
         defaultWritesFiles: false,
         realOrganizerMode: 'copy-only',
       },
-      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'layout.layoutKind', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileDecision', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
+      mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'inputCountGuide', 'layout.layoutKind', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'recommendedBatchOptions', 'recommendedBatchPreviewArgs', 'unsupportedFileDecision', 'unsupportedFileSummary', 'sourceDestructive', 'writesSourceTree', 'outputTreeInsideInputTree', 'planActionSummary'],
       successCriteria: 'Use organization preview first; proceed only after mixed-layout warnings, planActionSummary, and recommendedBatchPreviewArgs are reviewed and sourceDestructive remains false.',
     },
     {
@@ -3125,6 +3133,7 @@ export function getAgentGuidance(args = {}) {
       'batchErrorMode',
       'configurationRecipes',
       'unsupportedFileCategoryCatalog',
+      'inputCountGuide',
       'supportedFontCount',
       'unsupportedFileDecision',
       'unsupportedFileSummary',
@@ -3387,6 +3396,84 @@ function buildUnsupportedFileDecision(summary = {}) {
     nonIntuitiveBehavior: archiveCount > 0
       ? 'Archive files are counted for awareness only; this tool does not extract archives, copy them during organization, or split them in batch processing.'
       : 'Unsupported files are counted for awareness only; this tool does not copy them during organization or split them in batch processing.',
+  };
+}
+
+function buildInputCountGuide({
+  appliesToTool,
+  scannedFileCount,
+  supportedFontCount,
+  unsupportedFileCount,
+  maxFiles,
+  maxFilesHit,
+  filesIncluded,
+  supportedFieldName = 'supportedFontCount',
+  unsupportedFieldName = 'unsupportedFileCount',
+  unsupportedFileSummary,
+  unsupportedFileDecision,
+} = {}) {
+  const countCompleteness = maxFilesHit ? 'truncated' : 'complete-for-scanned-root';
+  const fileDetailsVisibility = filesIncluded === true
+    ? 'included'
+    : filesIncluded === false
+      ? 'omitted-by-request'
+      : 'not-returned-by-this-tool';
+  const handling = unsupportedFileDecision?.handlingSummary || unsupportedFileSummary?.handlingSummary || {};
+  const unsupportedFilesIgnored = handling.unsupportedFilesIgnored !== false;
+  const unsupportedFilesCopiedByOrganization = handling.unsupportedFilesCopiedByOrganization === true;
+  const unsupportedFilesSplitByBatch = handling.unsupportedFilesSplitByBatch === true;
+  const archivesExtracted = handling.archivesExtracted === true;
+  const mustInspectFields = [
+    'inputCountGuide',
+    'scannedFileCount',
+    supportedFieldName,
+    unsupportedFieldName,
+    'maxFilesHit',
+    'unsupportedFileDecision',
+    'unsupportedFileSummary',
+  ];
+  if (filesIncluded !== undefined) mustInspectFields.push('filesIncluded');
+  const fileDetailsBehavior = fileDetailsVisibility === 'included'
+    ? 'filesIncluded true means supported-font inspection entries are included; unsupported files remain summarized in unsupportedFileSummary.'
+    : fileDetailsVisibility === 'omitted-by-request'
+      ? 'filesIncluded false means per-file detail was intentionally omitted; it does not mean no files exist.'
+      : 'This tool does not return per-file inspection entries, so fileDetailsVisibility does not mean files are absent.';
+  const nonIntuitiveBehavior = [
+    fileDetailsBehavior,
+    'maxFilesHit true means scanned counts are truncated and should not be used as complete corpus totals.',
+    'Unsupported files are counted and reported for context, but they are not extracted, copied by organization, or split by batch processing.',
+    'Archive files are counted as unsupported files; archive extraction is outside this tool layer.',
+  ];
+
+  return {
+    summaryType: 'input-count-guide',
+    appliesToTool,
+    scannedFileCount,
+    supportedFontCount,
+    supportedFieldName,
+    unsupportedFileCount,
+    unsupportedFieldName,
+    maxFiles,
+    maxFilesHit,
+    countCompleteness,
+    filesIncluded: filesIncluded === undefined ? null : filesIncluded,
+    fileDetailsVisibility,
+    unsupportedFilesHandling: {
+      unsupportedFilesIgnored,
+      unsupportedFilesCopiedByOrganization,
+      unsupportedFilesSplitByBatch,
+      archivesExtracted,
+    },
+    unsupportedFileCategoryCount: unsupportedFileDecision?.categoryCount ?? unsupportedFileSummary?.byCategory?.length ?? 0,
+    unsupportedFileExtensionCount: unsupportedFileDecision?.extensionCount ?? unsupportedFileSummary?.byExtension?.length ?? 0,
+    mustInspectFields,
+    recommendedAction: maxFilesHit
+      ? 'rerun-with-higher-maxFiles-before-trusting-counts'
+      : 'continue',
+    directAnswer: maxFilesHit
+      ? `The scan returned ${scannedFileCount} files but maxFilesHit true means more source files existed beyond maxFiles ${maxFiles}; counts are incomplete.`
+      : `The scan counted ${scannedFileCount} files under the scanned root: ${supportedFontCount} supported font files and ${unsupportedFileCount} unsupported files.`,
+    nonIntuitiveBehavior,
   };
 }
 
@@ -4104,7 +4191,7 @@ function buildBatchNextActions({
         effectiveArgs,
         batchOptions,
       }),
-      inspectFields: ['batchDecision', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'batchWarnings', 'discoveredFontCount', 'deduplicatedCount', 'selectedFontCount'],
+      inspectFields: ['inputCountGuide', 'batchDecision', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'batchWarnings', 'discoveredFontCount', 'deduplicatedCount', 'selectedFontCount'],
       successCriteria: 'Rerun with a higher maxFiles value and require maxFilesHit false before trusting batch counts, dedupe results, or planned output paths.',
     });
   }
@@ -4306,7 +4393,7 @@ function buildOrganizationNextActions({
         optionOverrides: { includePlan: true },
         extraArgs: { maxFiles: '<higher-than-current>' },
       }),
-      inspectFields: ['organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'maxFilesHit', 'layout', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
+      inspectFields: ['inputCountGuide', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'maxFilesHit', 'layout', 'unsupportedFileDecision', 'unsupportedFileSummary', 'organizationWarnings', 'planActionSummary', 'plan'],
       successCriteria: 'Rerun with a higher maxFiles value and require maxFilesHit false before trusting layout, warning, or copy-plan counts.',
     });
   }
@@ -4439,7 +4526,7 @@ function buildOrganizationNextActions({
         inputDir: outputDirRelative,
         includeFiles: false,
       },
-      inspectFields: ['supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
+      inspectFields: ['inputCountGuide', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
       successCriteria: 'The staging inspection should complete without scan truncation and show the expected supported fonts before using the staging directory for splitting.',
     });
     push({
@@ -6727,6 +6814,18 @@ export async function splitFontBatch(args = {}) {
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
   const unsupportedFileSummary = buildUnsupportedFileSummary(allFiles);
   const unsupportedFileDecision = buildUnsupportedFileDecision(unsupportedFileSummary);
+  const inputCountGuide = buildInputCountGuide({
+    appliesToTool: 'split_font_batch',
+    scannedFileCount: allFiles.length,
+    supportedFontCount: fontFiles.length,
+    unsupportedFileCount: unsupportedFileSummary.total,
+    maxFiles,
+    maxFilesHit: inputScan.truncated,
+    supportedFieldName: 'discoveredFontCount',
+    unsupportedFieldName: 'unsupportedFileSummary.total',
+    unsupportedFileSummary,
+    unsupportedFileDecision,
+  });
 
   let deduplicated;
   if (batchOptions.batchDedupeMode === 'none') {
@@ -6986,6 +7085,7 @@ export async function splitFontBatch(args = {}) {
             outputTreeInsideInputTree: fastFailSafetySummary.outputTreeInsideInputTree,
             mayOverwriteOutputTree: fastFailSafetySummary.mayOverwriteOutputTree,
             dryRun,
+            inputCountGuide,
             discoveredFontCount: fontFiles.length,
             deduplicatedCount,
             selectedFontCount: selected.length,
@@ -7097,6 +7197,7 @@ export async function splitFontBatch(args = {}) {
     scannedFileCount: allFiles.length,
     maxFiles,
     maxFilesHit: inputScan.truncated,
+    inputCountGuide,
     unsupportedFileDecision,
     unsupportedFileSummary,
     discoveredFontCount: fontFiles.length,
@@ -7149,6 +7250,17 @@ export async function inspectFontInputs(args) {
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
   const unsupportedFileSummary = buildUnsupportedFileSummary(allFiles);
   const unsupportedFileDecision = buildUnsupportedFileDecision(unsupportedFileSummary);
+  const inputCountGuide = buildInputCountGuide({
+    appliesToTool: 'inspect_font_inputs',
+    scannedFileCount: allFiles.length,
+    supportedFontCount: fontFiles.length,
+    unsupportedFileCount: allFiles.length - fontFiles.length,
+    maxFiles,
+    maxFilesHit: inputScan.truncated,
+    filesIncluded: includeFiles,
+    unsupportedFileSummary,
+    unsupportedFileDecision,
+  });
   const entries = [];
   const byExtension = {};
   const byStatus = {};
@@ -7180,6 +7292,7 @@ export async function inspectFontInputs(args) {
     scannedFileCount: allFiles.length,
     supportedFontCount: fontFiles.length,
     unsupportedFileCount: allFiles.length - fontFiles.length,
+    inputCountGuide,
     unsupportedFileDecision,
     unsupportedFileSummary,
     validFontCount: entries.length - invalidFonts.length,
@@ -7225,6 +7338,18 @@ export async function organizeFontDirectory(args = {}) {
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
   const unsupportedFileSummary = buildUnsupportedFileSummary(allFiles);
   const unsupportedFileDecision = buildUnsupportedFileDecision(unsupportedFileSummary);
+  const inputCountGuide = buildInputCountGuide({
+    appliesToTool: 'organize_font_directory',
+    scannedFileCount: allFiles.length,
+    supportedFontCount: fontFiles.length,
+    unsupportedFileCount: unsupportedFileSummary.total,
+    maxFiles,
+    maxFilesHit: scan.truncated,
+    supportedFieldName: 'supportedFontCount',
+    unsupportedFieldName: 'unsupportedFileCount',
+    unsupportedFileSummary,
+    unsupportedFileDecision,
+  });
   const layout = buildDirectoryLayoutSummary({ inputDir, allFiles, fontFiles });
   const entries = [];
 
@@ -7483,6 +7608,7 @@ export async function organizeFontDirectory(args = {}) {
     maxFilesHit: scan.truncated,
     scannedFileCount: allFiles.length,
     supportedFontCount: fontFiles.length,
+    inputCountGuide,
     parsedFontMetadata: options.parseFonts,
     unparsedFontCount: options.parseFonts ? 0 : entries.length,
     validFontCount: options.parseFonts ? validEntries.length : null,
