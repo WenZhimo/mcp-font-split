@@ -188,7 +188,7 @@ const WORKFLOW_PRESETS = {
     },
   },
 };
-const WORKFLOW_PRESET_NAMES = Object.keys(WORKFLOW_PRESETS);
+export const WORKFLOW_PRESET_NAMES = Object.keys(WORKFLOW_PRESETS);
 const GUIDANCE_DETAIL_LEVELS = ['compact', 'full'];
 export const GUIDANCE_SECTION_NAMES = [
   'workspace',

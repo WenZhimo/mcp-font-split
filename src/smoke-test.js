@@ -4221,7 +4221,17 @@ if (scenario === 'single') {
     const batchProps = tools.split_font_batch?.inputSchema?.properties || {};
     const organizeProps = tools.organize_font_directory?.inputSchema?.properties || {};
     const guidanceSectionEnum = guidanceProps.sections?.items?.enum || [];
-    const coreGuidanceSections = getAgentGuidance({ detailLevel: 'full' }).guidanceView?.availableSections || [];
+    const fullCoreGuidance = getAgentGuidance({ detailLevel: 'full' });
+    const coreGuidanceSections = fullCoreGuidance.guidanceView?.availableSections || [];
+    const coreWorkflowPresetIds = (fullCoreGuidance.workflowPresets || []).map((preset) => preset.id);
+    const getSchemaEnumValues = (schema) => schema?.enum || schema?.items?.enum || [];
+    const assertEnumMatches = (label, actualValues, expectedValues) => {
+      const missingValues = expectedValues.filter((value) => !actualValues.includes(value));
+      const extraValues = actualValues.filter((value) => !expectedValues.includes(value));
+      if (missingValues.length > 0 || extraValues.length > 0) {
+        throw new Error(`${label} schema drift: missing ${missingValues.join(', ') || '<none>'}; extra ${extraValues.join(', ') || '<none>'}.`);
+      }
+    };
     const expectDescriptionIncludes = (toolName, phrases) => {
       const description = tools[toolName]?.description || '';
       for (const phrase of phrases) {
@@ -4244,11 +4254,7 @@ if (scenario === 'single') {
         throw new Error(`get_agent_guidance is missing ${requiredGuidanceProp}`);
       }
     }
-    const missingGuidanceSections = coreGuidanceSections.filter((sectionName) => !guidanceSectionEnum.includes(sectionName));
-    const extraGuidanceSections = guidanceSectionEnum.filter((sectionName) => !coreGuidanceSections.includes(sectionName));
-    if (missingGuidanceSections.length > 0 || extraGuidanceSections.length > 0) {
-      throw new Error(`get_agent_guidance sections schema drift: missing ${missingGuidanceSections.join(', ') || '<none>'}; extra ${extraGuidanceSections.join(', ') || '<none>'}.`);
-    }
+    assertEnumMatches('get_agent_guidance sections', guidanceSectionEnum, coreGuidanceSections);
     for (const requiredOrganizeProp of ['dryRun', 'outputDir', 'overwriteExisting', 'copyInvalidFonts']) {
       if (!Object.hasOwn(organizeProps, requiredOrganizeProp)) {
         throw new Error(`organize_font_directory is missing ${requiredOrganizeProp}`);
@@ -4265,6 +4271,8 @@ if (scenario === 'single') {
     ) {
       throw new Error('Expected workflowPreset schema to omit redundant default preset; callers should omit workflowPreset for raw defaults.');
     }
+    assertEnumMatches('split_font_batch workflowPreset', getSchemaEnumValues(batchProps.workflowPreset), coreWorkflowPresetIds);
+    assertEnumMatches('organize_font_directory workflowPreset', getSchemaEnumValues(organizeProps.workflowPreset), coreWorkflowPresetIds);
     expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
