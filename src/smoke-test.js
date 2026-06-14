@@ -631,6 +631,58 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
   };
 }
 
+function buildCompactOutputStructureAuditSummary(summary = {}) {
+  return {
+    summaryType: summary.summaryType,
+    sampleInputDir: summary.sampleInputDir,
+    outputRoot: summary.outputRoot,
+    singleOutputStructureDecisionStatus: summary.singleOutputStructureDecision?.status,
+    singleAuditStatus: summary.singleAuditStatus,
+    singleAuditPassed: summary.singleAuditPassed,
+    singleStructureConforms: summary.singleStructureConforms,
+    singleStructureLayoutKind: summary.singleStructureLayoutKind,
+    singleManifestCoverageOk: summary.singleManifestCoverageOk,
+    singleStructureIssueCount: summary.singleStructureIssueCount,
+    batchOutputStructureDecisionStatus: summary.batchOutputStructureDecision?.status,
+    batchAuditStatus: summary.batchAuditStatus,
+    batchAuditPassed: summary.batchAuditPassed,
+    batchStructureConforms: summary.batchStructureConforms,
+    batchStructureLayoutKind: summary.batchStructureLayoutKind,
+    batchManifestCoverageOk: summary.batchManifestCoverageOk,
+    batchStructureIssueCount: summary.batchStructureIssueCount,
+  };
+}
+
+function buildCompactRealCorpusCoverageSummary(coverageSummary = {}) {
+  return {
+    summaryType: 'real-corpus-suite-compact-coverage',
+    testStrategy: coverageSummary.testStrategy,
+    perDirectoryAcceptanceAudit: coverageSummary.perDirectoryAcceptanceAudit,
+    corpusSupportedFontCount: coverageSummary.corpusSupportedFontCount,
+    corpusUnsupportedFileCount: coverageSummary.corpusUnsupportedFileCount,
+    corpusMaxFilesHit: coverageSummary.corpusMaxFilesHit,
+    selectedTargetCount: coverageSummary.selectedTargetCount,
+    availableTargetCount: coverageSummary.availableTargetCount,
+    selectedTargets: coverageSummary.selectedTargets,
+    fixedRegressionTargets: coverageSummary.fixedRegressionTargets,
+    representativeWriteSample: coverageSummary.testScope?.representativeWriteAudit?.sampleInputDir,
+    unsupportedFileCategoryCoverage: coverageSummary.unsupportedFileCategoryCoverage,
+    outputStructureAuditSummary: buildCompactOutputStructureAuditSummary(coverageSummary.outputStructureAuditSummary),
+    functionalCoverage: (coverageSummary.functionalCoverage || []).map((item) => ({
+      id: item.id,
+      covered: item.covered,
+      toolPaths: item.toolPaths,
+      evidenceOmitted: true,
+    })),
+    omittedDetailFields: [
+      'coverageSummary.functionalCoverage[].evidence',
+      'coverageSummary.outputStructureAuditSummary.singleOutputStructureDecision',
+      'coverageSummary.outputStructureAuditSummary.batchOutputStructureDecision',
+    ],
+    detailHint: 'Rerun with --verbose to include full per-child summaries and coverage evidence.',
+  };
+}
+
 function buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary) {
   const functionalCoverage = coverageSummary.functionalCoverage || [];
   const uncoveredFunctionalCoverageIds = functionalCoverage
@@ -731,6 +783,61 @@ function printRealCorpusSuiteHumanSummary(humanSummary) {
   for (const line of humanSummary.lines || []) {
     console.log(line);
   }
+}
+
+function summarizeRealCorpusSuiteRun(run = {}) {
+  return {
+    scenario: run.scenario,
+    ok: run.ok,
+    elapsedMs: run.elapsedMs,
+    stdoutBytes: run.stdoutBytes,
+    stderrBytes: run.stderrBytes,
+    outputIncluded: run.outputIncluded,
+  };
+}
+
+function buildRealCorpusSuiteFinalOutput({
+  verbose,
+  corpusRoot,
+  maxFiles,
+  targetLimit,
+  integrationLimit,
+  sampleCount,
+  reliabilityGateDecision,
+  humanSummary,
+  coverageSummary,
+  runs,
+}) {
+  const output = {
+    ok: true,
+    purpose: 'Representative reliability gate over a local real font corpus; not a per-directory acceptance audit.',
+    outputMode: verbose ? 'verbose' : 'compact',
+    corpusRoot,
+    maxFiles,
+    targetLimit,
+    integrationLimit,
+    sampleCount,
+    reliabilityGateDecision,
+    humanSummary,
+    testScope: coverageSummary.testScope,
+    coverageSummary: verbose ? coverageSummary : buildCompactRealCorpusCoverageSummary(coverageSummary),
+    runSummaries: (runs || []).map(summarizeRealCorpusSuiteRun),
+  };
+
+  if (verbose) {
+    output.runs = runs;
+    output.omittedDetailFields = [];
+  } else {
+    output.omittedDetailFields = [
+      'runs',
+      'coverageSummary.functionalCoverage[].evidence',
+      'coverageSummary.outputStructureAuditSummary.singleOutputStructureDecision',
+      'coverageSummary.outputStructureAuditSummary.batchOutputStructureDecision',
+    ];
+    output.verboseCommandHint = 'Rerun the same command with --verbose to include child run summaries and detailed coverage evidence.';
+  }
+
+  return output;
 }
 
 async function runSmokeSubprocess(args, label, { verbose = false } = {}) {
@@ -1927,8 +2034,11 @@ if (scenario === 'single') {
     || Object.hasOwn(result.localVerificationOutputGuide, 'aliasCommand')
     || result.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('coverageSummary.outputStructureAuditSummary')
+    || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('runSummaries')
+    || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('omittedDetailFields')
     || !result.localVerificationOutputGuide?.passCriteria?.some((item) => item.includes('reliabilityGateDecision.status is pass'))
     || !result.localVerificationOutputGuide?.nonIntuitiveBehavior?.some((item) => item.includes('not a per-directory acceptance audit'))
+    || !result.localVerificationOutputGuide?.nonIntuitiveBehavior?.some((item) => item.includes('Default suite output is compact'))
     || result.localVerificationOutputGuide?.evidenceFields?.fullCorpusFontCount !== 'testScope.corpusScan.supportedFontCount'
   ) {
     throw new Error('Expected localVerificationOutputGuide to explain real-corpus reliability gate output interpretation.');
@@ -4597,6 +4707,8 @@ if (scenario === 'single') {
       'coverageSummary.unsupportedFileCategoryCoverage',
       'coverageSummary.outputStructureAuditSummary',
       'reliabilityGateDecision',
+      'runSummaries',
+      'omittedDetailFields',
       'debugBatchDecisions',
       'humanSummary',
     ]) {
@@ -4704,6 +4816,8 @@ if (scenario === 'single') {
     '`functionalCoverage[]`',
     '`coverageSummary.unsupportedFileCategoryCoverage`',
     '`coverageSummary.outputStructureAuditSummary`',
+    '`runSummaries`',
+    '`omittedDetailFields`',
     '`directoryWorkflowDecisionMatrix[]`',
     '`directoryWorkflowExamples[]`',
     '`safeInvocationTemplates[]`',
@@ -5199,10 +5313,8 @@ if (scenario === 'single') {
   }
 
   printRealCorpusSuiteHumanSummary(humanSummary);
-  console.log(JSON.stringify({
-    ok: true,
-    purpose: 'Representative reliability gate over a local real font corpus; not a per-directory acceptance audit.',
-    outputMode: verbose ? 'verbose' : 'compact',
+  const finalOutput = buildRealCorpusSuiteFinalOutput({
+    verbose,
     corpusRoot,
     maxFiles,
     targetLimit,
@@ -5210,10 +5322,39 @@ if (scenario === 'single') {
     sampleCount,
     reliabilityGateDecision,
     humanSummary,
-    testScope: coverageSummary.testScope,
     coverageSummary,
     runs,
-  }, null, 2));
+  });
+  const finalOutputJson = JSON.stringify(finalOutput, null, 2);
+  if (
+    !verbose
+    && (
+      Object.hasOwn(finalOutput, 'runs')
+      || finalOutput.outputMode !== 'compact'
+      || !Array.isArray(finalOutput.runSummaries)
+      || finalOutput.runSummaries.length !== runs.length
+      || finalOutput.runSummaries.some((run) => Object.hasOwn(run, 'summary'))
+      || finalOutput.coverageSummary?.summaryType !== 'real-corpus-suite-compact-coverage'
+      || finalOutput.coverageSummary?.functionalCoverage?.some((item) => Object.hasOwn(item, 'evidence') || item.evidenceOmitted !== true)
+      || !finalOutput.omittedDetailFields?.includes('runs')
+      || !finalOutput.verboseCommandHint?.includes('--verbose')
+      || Buffer.byteLength(finalOutputJson, 'utf8') > 50000
+    )
+  ) {
+    throw new Error('Expected real-corpus-suite compact output to omit child run details and large evidence while retaining decision fields.');
+  }
+  if (
+    verbose
+    && (
+      finalOutput.outputMode !== 'verbose'
+      || !Array.isArray(finalOutput.runs)
+      || finalOutput.runs.length !== runs.length
+      || finalOutput.coverageSummary?.summaryType === 'real-corpus-suite-compact-coverage'
+    )
+  ) {
+    throw new Error('Expected real-corpus-suite verbose output to retain full child runs and detailed coverage.');
+  }
+  console.log(finalOutputJson);
 } else if (scenario === 'real-corpus-readonly') {
   const corpusRoot = path.resolve(process.argv[3] || process.env.FONT_SPLIT_REAL_CORPUS_DIR || path.join(process.cwd(), '..'));
   const requestedInputDir = process.argv[4] || null;

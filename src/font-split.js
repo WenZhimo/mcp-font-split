@@ -2364,6 +2364,8 @@ export function getAgentGuidance(args = {}) {
       'coverageSummary.functionalCoverage',
       'coverageSummary.unsupportedFileCategoryCoverage',
       'coverageSummary.outputStructureAuditSummary',
+      'runSummaries',
+      'omittedDetailFields',
     ],
     passCriteria: [
       'reliabilityGateDecision.status is pass',
@@ -2388,7 +2390,7 @@ export function getAgentGuidance(args = {}) {
       {
         status: 'action-required',
         meaning: 'At least one required coverage, audit, fixed target, or scope check failed.',
-        agentAction: 'Inspect blockingReasonCodes, uncoveredFunctionalCoverageIds, coverageSummary, and child runs before fixing or rerunning.',
+        agentAction: 'Inspect blockingReasonCodes, uncoveredFunctionalCoverageIds, compact coverageSummary, and runSummaries first; rerun with --verbose when child run details or full evidence are needed.',
       },
     ],
     nonIntuitiveBehavior: [
@@ -2396,6 +2398,7 @@ export function getAgentGuidance(args = {}) {
       'This is not a per-font manual audit.',
       'Small numbers such as fixedRegressionTargetCount 4 or selectedTargetCount 10 are target sampling counts, not the full corpus font count.',
       'Use reliabilityGateDecision.fullCorpusFontCountField or testScope.corpusScan.supportedFontCount for the full bounded corpus font total.',
+      'Default suite output is compact and omits child run details; use verboseCommand for full per-child summaries and evidence.',
       'Archive files are counted as ignored files; the suite does not prove archive extraction because archive extraction is outside this tool layer.',
     ],
     evidenceFields: {
