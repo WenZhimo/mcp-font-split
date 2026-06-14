@@ -221,7 +221,7 @@ Batch responses include `sourceSafetyDecision`, `safetySummary`, `sourceDestruct
 
 Batch dedupe priority is `.otf`, `.ttf`, `.woff2`, `.ttc`, `.otc`, `.woff`.
 
-`font-identity` compares normalized font identity across formats. It uses typographic family/subfamily when available, then legacy family/subfamily, then full name or PostScript name. `glyphCount` is diagnostic only and does not split otherwise equivalent OTF/TTF/WOFF inputs.
+`font-identity` compares normalized font identity across formats. It first uses OpenType name IDs 16/17 (typographic family/subfamily), falls back to name IDs 1/2 (family/subfamily) when a complete typographic pair is not available, then falls back to name ID 4 (full name), name ID 6 (PostScript name), or family-only. `identityBasis` reports which source was used, and `glyphCount` is diagnostic only; glyph count does not split otherwise equivalent OTF/TTF/WOFF inputs.
 If identity extraction fails for a file, batch dedupe falls back to that file's path stem so scanning can continue and the processing phase can report the actual per-font error.
 
 `dedupeDecisionSummary` is the compact agent-facing explanation of the dedupe pass. It reports requested/effective mode, `keyStrategy`, `deduplicatedCount`, `skippedDuplicateCount`, `identityKeyMissingCount`, `pathFallbackUsed`, `dedupeLimitedByParsing`, `representativePriority`, and capped `identityEvidenceSummary` basis counts plus duplicate examples. If `pathFallbackUsed` or `dedupeLimitedByParsing` is true, do not claim semantic identity dedupe was fully available.

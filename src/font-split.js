@@ -6464,17 +6464,30 @@ function extractFontIdentity(buffer) {
   const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   const magic = view.getUint32(0);
   if (magic === 0x774F4646 || magic === 0x774F4632) {
+    const family = normalizeIdentityName(readFontFamilyNameFromWoff(buffer));
     return {
-      family: normalizeIdentityName(readFontFamilyNameFromWoff(buffer)),
+      family,
       subfamily: null,
+      typographicFamily: null,
+      typographicSubfamily: null,
+      opentypeFamily: family,
+      opentypeSubfamily: null,
       fullName: null,
       postscriptName: null,
     };
   }
   const records = readFontNameRecords(buffer);
+  const typographicFamily = normalizeIdentityName(records.get(16));
+  const typographicSubfamily = normalizeIdentityName(records.get(17));
+  const opentypeFamily = normalizeIdentityName(records.get(1));
+  const opentypeSubfamily = normalizeIdentityName(records.get(2));
   return {
-    family: normalizeIdentityName(records.get(16) || records.get(1)),
-    subfamily: normalizeIdentityName(records.get(17) || records.get(2)),
+    family: typographicFamily || opentypeFamily,
+    subfamily: typographicSubfamily || opentypeSubfamily,
+    typographicFamily,
+    typographicSubfamily,
+    opentypeFamily,
+    opentypeSubfamily,
     fullName: normalizeIdentityName(records.get(4)),
     postscriptName: normalizeIdentityName(records.get(6)),
   };
@@ -6482,29 +6495,48 @@ function extractFontIdentity(buffer) {
 
 function buildFontIdentityKey(buffer) {
   const identity = extractFontIdentity(buffer);
-  if (identity.family && identity.subfamily) {
+  if (identity.typographicFamily && identity.typographicSubfamily) {
     return stableStringify({
-      basis: 'family-subfamily',
-      family: identity.family,
-      subfamily: identity.subfamily,
+      basis: 'typographic-family-subfamily',
+      family: identity.typographicFamily,
+      subfamily: identity.typographicSubfamily,
+      nameIds: [16, 17],
+    });
+  }
+  if (identity.opentypeFamily && identity.opentypeSubfamily) {
+    return stableStringify({
+      basis: 'opentype-family-subfamily',
+      family: identity.opentypeFamily,
+      subfamily: identity.opentypeSubfamily,
+      nameIds: [1, 2],
     });
   }
   if (identity.fullName) {
     return stableStringify({
       basis: 'full-name',
       fullName: identity.fullName,
+      nameIds: [4],
     });
   }
   if (identity.postscriptName) {
     return stableStringify({
       basis: 'postscript-name',
       postscriptName: identity.postscriptName,
+      nameIds: [6],
     });
   }
-  if (identity.family) {
+  if (identity.typographicFamily) {
     return stableStringify({
-      basis: 'family',
-      family: identity.family,
+      basis: 'typographic-family',
+      family: identity.typographicFamily,
+      nameIds: [16],
+    });
+  }
+  if (identity.opentypeFamily) {
+    return stableStringify({
+      basis: 'opentype-family',
+      family: identity.opentypeFamily,
+      nameIds: [1],
     });
   }
   return null;

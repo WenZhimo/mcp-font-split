@@ -221,7 +221,7 @@
 
 批量格式代表优先级为：`.otf`、`.ttf`、`.woff2`、`.ttc`、`.otc`、`.woff`。
 
-`font-identity` 会跨格式比较归一化后的字体身份。身份键优先使用 typographic family/subfamily，再回退到 legacy family/subfamily，再回退到 full name 或 PostScript name。`glyphCount` 只用于诊断，不参与等价判定，因此不会把等价的 OTF/TTF/WOFF 输入拆开。
+`font-identity` 会跨格式比较归一化后的字体身份。身份键优先使用 OpenType name IDs 16/17（typographic family/subfamily），缺失完整 typographic 成对字段时回退到 name IDs 1/2（family/subfamily），再回退到 name ID 4（full name）、name ID 6（PostScript name）或 family-only。`identityBasis` 会标明实际来源；`glyphCount` 只用于诊断，不参与等价判定，因此不会把等价的 OTF/TTF/WOFF 输入拆开。
 如果某个文件的身份解析失败，批量去重会回退到该文件的路径 stem，保证扫描继续进行，并把真正的单字体错误留到处理阶段报告。
 
 `dedupeDecisionSummary` 是面向 agent 的紧凑去重解释。它会报告请求/实际去重模式、`keyStrategy`、`deduplicatedCount`、`skippedDuplicateCount`、`identityKeyMissingCount`、`pathFallbackUsed`、`dedupeLimitedByParsing`、`representativePriority`，以及 capped `identityEvidenceSummary` identity basis 计数和重复样例。如果 `pathFallbackUsed` 或 `dedupeLimitedByParsing` 为 true，就不要宣称语义 identity 去重已经完整可用。

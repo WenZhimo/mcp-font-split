@@ -272,7 +272,7 @@ fonts/
 
 - `none`：完全不去重。
 - `same-path`：只对同一源路径 stem 的多格式文件去重；它是快速路径级策略，不会跨目录判断语义等价字体。
-- `font-identity`：按归一化后的字体身份跨格式去重，保留优先级最高的代表。身份键优先使用 typographic family/subfamily，缺失时回退到 legacy family/subfamily，再回退到 full name 或 PostScript name；`glyphCount` 只作为诊断信息，不会把等价的 OTF/TTF/WOFF 输入拆开。
+- `font-identity`：按归一化后的字体身份跨格式去重，保留优先级最高的代表。身份键优先使用 OpenType name IDs 16/17（typographic family/subfamily），缺失成对字段时回退到 name IDs 1/2（family/subfamily），再回退到 name ID 4（full name）、name ID 6（PostScript name）或 family-only；`glyphCount` 只作为诊断信息，不会把等价的 OTF/TTF/WOFF 输入拆开。`identityBasis` 会显示实际采用的来源，例如 `typographic-family-subfamily` 或 `opentype-family-subfamily`。
 - 如果身份解析失败，去重会回退到基于路径的 key，并把真实错误留给处理阶段和 `batchErrorMode`。
 
 查看 `dedupeDecisionSummary` 可以快速理解本次去重：它会报告请求/实际模式、key 策略、跳过重复数、缺失 identity key 数量、是否路径回退、是否因跳过解析而受限、代表格式优先级，以及 `identityEvidenceSummary` 中的 identity basis 计数和少量重复样例。如果 `pathFallbackUsed` 或 `dedupeLimitedByParsing` 为 true，应说明语义 identity 去重受到限制。

@@ -1494,7 +1494,22 @@ function buildNameTable(records) {
 }
 
 // Minimal sfnt fixture for organizer metadata parsing; it is not meant for real splitting/rendering.
-function buildMinimalTtf({ familyName = 'Fixture Sans', subfamilyName = 'Regular', glyphCount = 3 } = {}) {
+function buildMinimalTtf({
+  familyName = 'Fixture Sans',
+  subfamilyName = 'Regular',
+  glyphCount = 3,
+  typographicFamilyName = familyName,
+  typographicSubfamilyName = subfamilyName,
+} = {}) {
+  const nameRecords = [
+    [1, familyName],
+    [2, subfamilyName],
+    [4, `${familyName} ${subfamilyName}`],
+    [6, `${familyName.replace(/\s+/g, '')}-${subfamilyName.replace(/\s+/g, '')}`],
+  ];
+  if (typographicFamilyName) nameRecords.push([16, typographicFamilyName]);
+  if (typographicSubfamilyName) nameRecords.push([17, typographicSubfamilyName]);
+
   const tables = [
     {
       tag: 'maxp',
@@ -1502,14 +1517,7 @@ function buildMinimalTtf({ familyName = 'Fixture Sans', subfamilyName = 'Regular
     },
     {
       tag: 'name',
-      data: buildNameTable([
-        [1, familyName],
-        [2, subfamilyName],
-        [4, `${familyName} ${subfamilyName}`],
-        [6, `${familyName.replace(/\s+/g, '')}-${subfamilyName.replace(/\s+/g, '')}`],
-        [16, familyName],
-        [17, subfamilyName],
-      ]),
+      data: buildNameTable(nameRecords),
     },
   ].sort((a, b) => a.tag.localeCompare(b.tag));
 
@@ -4197,7 +4205,7 @@ if (scenario === 'single') {
   if (inspection.validFontCount !== 2 || inspection.invalidFontCount !== 0 || inspection.files?.[0]?.glyphCount !== 3) {
     throw new Error('Expected generated fixture fonts to parse as valid inputs with glyph counts.');
   }
-  if (!inspection.files?.every((file) => file.identityBasis === 'family-subfamily')) {
+  if (!inspection.files?.every((file) => file.identityBasis === 'typographic-family-subfamily')) {
     throw new Error('Expected generated fixture fonts to expose family/subfamily identity.');
   }
 
@@ -4224,9 +4232,9 @@ if (scenario === 'single') {
     || result.dedupeDecisionSummary?.pathFallbackUsed !== false
     || result.dedupeDecisionSummary?.identityEvidenceSummary?.summaryType !== 'dedupe-identity-evidence'
     || result.dedupeDecisionSummary?.identityEvidenceSummary?.identityDedupeEvidenceAvailable !== true
-    || !result.dedupeDecisionSummary?.identityEvidenceSummary?.identityBasisCounts?.some((item) => item.basis === 'family-subfamily' && item.count === 2)
+    || !result.dedupeDecisionSummary?.identityEvidenceSummary?.identityBasisCounts?.some((item) => item.basis === 'typographic-family-subfamily' && item.count === 2)
     || result.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExampleCount !== 1
-    || result.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExamples?.[0]?.identityBasis !== 'family-subfamily'
+    || result.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExamples?.[0]?.identityBasis !== 'typographic-family-subfamily'
     || !result.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExamples?.[0]?.identityKey?.includes('"family":"fixture sans"')
   ) {
     throw new Error('Expected valid-font organization to expose compact dedupeDecisionSummary identity evidence.');
@@ -5036,11 +5044,15 @@ if (scenario === 'single') {
   const outputRoot = process.argv[4] || '.font-split-batch-identity-output';
   const ttfPath = path.join(inputDir, 'Ttf', 'FixtureSans-Regular.ttf');
   const otfPath = path.join(inputDir, 'Otf', 'FixtureSans-Regular.otf');
+  const fallbackInputDir = `${inputDir}-fallback`;
+  const fallbackPath = path.join(fallbackInputDir, 'MixedNames', 'OpenPair-Regular.ttf');
   console.log('Batch identity dedupe smoke:', inputDir, '->', outputRoot);
   await fs.rm(inputDir, { recursive: true, force: true });
+  await fs.rm(fallbackInputDir, { recursive: true, force: true });
   await fs.rm(outputRoot, { recursive: true, force: true });
   await fs.mkdir(path.dirname(ttfPath), { recursive: true });
   await fs.mkdir(path.dirname(otfPath), { recursive: true });
+  await fs.mkdir(path.dirname(fallbackPath), { recursive: true });
   await fs.writeFile(ttfPath, buildMinimalTtf({
     familyName: 'Fixture Sans',
     subfamilyName: 'Regular',
@@ -5050,6 +5062,13 @@ if (scenario === 'single') {
     familyName: 'Fixture Sans',
     subfamilyName: 'Regular',
     glyphCount: 5,
+  }));
+  await fs.writeFile(fallbackPath, buildMinimalTtf({
+    familyName: 'Open Pair',
+    subfamilyName: 'Regular',
+    glyphCount: 3,
+    typographicFamilyName: 'Typographic Only',
+    typographicSubfamilyName: null,
   }));
 
   const inspection = await inspectFontInputs({
@@ -5061,6 +5080,21 @@ if (scenario === 'single') {
   const glyphCounts = new Set((inspection.files || []).map((file) => file.glyphCount));
   if (inspection.validFontCount !== 2 || identityKeys.size !== 1 || glyphCounts.size !== 2) {
     throw new Error('Expected fixture fonts to share identity while exposing different glyph counts.');
+  }
+
+  const fallbackInspection = await inspectFontInputs({
+    inputDir: fallbackInputDir,
+    includeFiles: true,
+    maxFiles: 10,
+  });
+  const fallbackFile = fallbackInspection.files?.[0];
+  if (
+    fallbackInspection.validFontCount !== 1
+    || fallbackFile?.identityBasis !== 'opentype-family-subfamily'
+    || !fallbackFile?.identityKey?.includes('"family":"open pair"')
+    || fallbackFile?.identityKey?.includes('typographic only')
+  ) {
+    throw new Error('Expected font identity to use paired OpenType name IDs 1/2 instead of mixing typographic family with OpenType subfamily.');
   }
 
   const identityDedupe = await splitFontBatch({
@@ -5090,9 +5124,9 @@ if (scenario === 'single') {
     || identityDedupe.dedupeDecisionSummary?.representativePriority?.[0] !== '.otf'
     || identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.summaryType !== 'dedupe-identity-evidence'
     || identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.identityDedupeEvidenceAvailable !== true
-    || !identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.identityBasisCounts?.some((item) => item.basis === 'family-subfamily' && item.count === 2)
+    || !identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.identityBasisCounts?.some((item) => item.basis === 'typographic-family-subfamily' && item.count === 2)
     || identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExampleCount !== 1
-    || identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExamples?.[0]?.identityBasis !== 'family-subfamily'
+    || identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExamples?.[0]?.identityBasis !== 'typographic-family-subfamily'
     || !identityDedupe.dedupeDecisionSummary?.identityEvidenceSummary?.duplicateExamples?.[0]?.identityKey?.includes('"family":"fixture sans"')
   ) {
     throw new Error('Expected font-identity batch dedupe to expose compact dedupeDecisionSummary identity evidence.');
@@ -5922,6 +5956,26 @@ if (scenario === 'single') {
   }
   if (!readmeZh.includes('路径/stem 级') || !readmeEn.includes('path/stem-level') || !serverSource.includes('same source path stem')) {
     throw new Error('Expected same-path documentation and schema descriptions to explain path/stem-level dedupe semantics.');
+  }
+
+  for (const [label, text] of [
+    ['README.md', readmeZh],
+    ['README.en.md', readmeEn],
+    ['BEHAVIOR.zh-CN.md', behaviorDoc],
+  ]) {
+    if (text.includes('legacy family/subfamily')) {
+      throw new Error(`${label} should describe identity fallback as OpenType name IDs 1/2, not legacy family/subfamily.`);
+    }
+  }
+  if (
+    !readmeZh.includes('OpenType name IDs 16/17')
+    || !readmeZh.includes('name IDs 1/2')
+    || !readmeEn.includes('OpenType name IDs 16/17')
+    || !readmeEn.includes('name IDs 1/2')
+    || !behaviorDoc.includes('OpenType name IDs 16/17')
+    || !behaviorDoc.includes('name IDs 1/2')
+  ) {
+    throw new Error('Expected README and behavior docs to explain paired OpenType name ID fallback for font-identity.');
   }
 
   for (const tool of guidance.tools || []) {
