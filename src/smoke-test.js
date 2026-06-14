@@ -228,6 +228,52 @@ function inputCountGuideCovered(summary, { appliesToTool, fileDetailsVisibility 
   );
 }
 
+function summarizeInputDirectoryDecision(decision) {
+  if (!decision || typeof decision !== 'object') return null;
+  return {
+    summaryType: decision.summaryType,
+    appliesToTool: decision.appliesToTool,
+    recommendedMode: decision.recommendedMode,
+    preferredNextTool: decision.preferredNextTool,
+    preferredNextActionId: decision.preferredNextActionId,
+    writesFilesBeforeReview: decision.writesFilesBeforeReview,
+    sourceDestructive: decision.sourceDestructive,
+    sourceFilesPreserved: decision.sourceFilesPreserved,
+    layoutKind: decision.layoutKind,
+    directoryStructureRisk: decision.directoryStructureRisk,
+    recommendedBatchGroupBy: decision.recommendedBatchGroupBy,
+    safeBatchPreviewWorkflowPreset: decision.safeBatchPreviewArgs?.workflowPreset,
+    safeOrganizationPreviewWorkflowPreset: decision.safeOrganizationPreviewArgs?.workflowPreset,
+    suggestedArgsWorkflowPreset: decision.suggestedArgs?.workflowPreset,
+    mustInspectFields: decision.mustInspectFields,
+    nonIntuitiveBehaviorCount: decision.nonIntuitiveBehavior?.length,
+    evidence: decision.evidence,
+  };
+}
+
+function inputDirectoryDecisionCovered(summary) {
+  return Boolean(
+    summary
+    && summary.summaryType === 'input-directory-decision'
+    && summary.appliesToTool === 'inspect_font_inputs'
+    && typeof summary.recommendedMode === 'string'
+    && summary.writesFilesBeforeReview === false
+    && summary.sourceDestructive === false
+    && summary.sourceFilesPreserved === true
+    && typeof summary.layoutKind === 'string'
+    && typeof summary.recommendedBatchGroupBy === 'string'
+    && summary.safeBatchPreviewWorkflowPreset === 'safe-preview'
+    && summary.safeOrganizationPreviewWorkflowPreset === 'safe-preview'
+    && Array.isArray(summary.mustInspectFields)
+    && summary.mustInspectFields.includes('inputDirectoryDecision')
+    && summary.mustInspectFields.includes('layout')
+    && summary.mustInspectFields.includes('recommendedBatchPreviewArgs')
+    && summary.mustInspectFields.includes('unsupportedFileDecision')
+    && Number.isInteger(summary.evidence?.supportedFontCount)
+    && Number.isInteger(summary.evidence?.unsupportedFileCount)
+  );
+}
+
 function summarizeLayoutDecision(decision) {
   if (!decision || typeof decision !== 'object') return null;
   return {
@@ -395,6 +441,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       corpusSupportedFontCount: result.corpus?.supportedFontCount,
       corpusUnsupportedFileCount: result.corpus?.unsupportedFileSummary?.total,
       corpusInputCountGuide: result.corpus?.inputCountGuide,
+      corpusInputDirectoryDecision: result.corpus?.inputDirectoryDecision,
       corpusUnsupportedFileDecision: result.corpus?.unsupportedFileDecision,
       corpusUnsupportedByExtension: result.corpus?.unsupportedFileSummary?.byExtension,
       corpusUnsupportedByCategory: result.corpus?.unsupportedFileSummary?.byCategory,
@@ -405,6 +452,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       sampleSupportedFontCount: result.inspection?.supportedFontCount,
       sampleUnsupportedFileCount: result.inspection?.unsupportedFileSummary?.total,
       sampleInputCountGuide: result.inspection?.inputCountGuide,
+      sampleInputDirectoryDecision: result.inspection?.inputDirectoryDecision,
       sampleUnsupportedFileDecision: result.inspection?.unsupportedFileDecision,
       organizationInputCountGuide: result.organization?.inputCountGuide,
       layoutDecision: result.organization?.layoutDecision,
@@ -582,6 +630,10 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     batchStructureLayoutKind: integration.batchStructureLayoutKind,
     batchManifestCoverageOk: integration.batchManifestCoverageOk,
     batchStructureIssueCount: integration.batchStructureIssueCount,
+  };
+  const inputDirectoryDecisionEvidence = {
+    corpus: readonly.corpusInputDirectoryDecision,
+    sample: readonly.sampleInputDirectoryDecision,
   };
   const selectedTargets = targets.selectedTargets || [];
   const targetSourceLayoutMismatchSummaries = targets.targetSourceLayoutMismatchSummaries || [];
@@ -793,6 +845,16 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
       ),
       toolPaths: ['inspect_font_inputs', 'organize_font_directory', 'split_font_batch'],
       evidence: inputCountGuideEvidence,
+    },
+    {
+      id: 'input-directory-decision',
+      covered: Boolean(
+        readonlyRun.ok
+        && inputDirectoryDecisionCovered(readonly.corpusInputDirectoryDecision)
+        && inputDirectoryDecisionCovered(readonly.sampleInputDirectoryDecision)
+      ),
+      toolPaths: ['inspect_font_inputs'],
+      evidence: inputDirectoryDecisionEvidence,
     },
     {
       id: 'unsupported-noise-classification',
@@ -2636,6 +2698,9 @@ if (scenario === 'single') {
   }
   for (const fieldName of [
     'inputCountGuide',
+    'inputDirectoryDecision',
+    'layout',
+    'layout.layoutKind',
     'unsupportedFileDecision',
     'unsupportedFileSummary.total',
     'unsupportedFileSummary.byExtension',
@@ -2890,7 +2955,7 @@ if (scenario === 'single') {
     }
   }
   const templateIds = new Set((result.safeInvocationTemplates || []).map((item) => item.id));
-  for (const requiredTemplate of ['runtime-diagnostic', 'directory-mismatch-plan', 'structure-first-large-directory', 'copy-organized-staging', 'batch-dry-run-preview', 'batch-process-reviewed-plan', 'output-audit-compact']) {
+  for (const requiredTemplate of ['runtime-diagnostic', 'source-preflight-compact', 'directory-mismatch-plan', 'structure-first-large-directory', 'copy-organized-staging', 'batch-dry-run-preview', 'batch-process-reviewed-plan', 'output-audit-compact']) {
     if (!templateIds.has(requiredTemplate)) {
       throw new Error(`Expected safeInvocationTemplates to include ${requiredTemplate}.`);
     }
@@ -2898,6 +2963,19 @@ if (scenario === 'single') {
   assertGuidanceItemsHaveCompletionProof(result.safeInvocationTemplates || [], {
     collectionName: 'safeInvocationTemplates',
   });
+  const sourcePreflightTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'source-preflight-compact');
+  if (
+    sourcePreflightTemplate?.tool !== 'inspect_font_inputs'
+    || sourcePreflightTemplate?.writesFiles !== false
+    || sourcePreflightTemplate?.sourceDestructive !== false
+    || !sourcePreflightTemplate.inspectFields?.includes('inputCountGuide')
+    || !sourcePreflightTemplate.inspectFields?.includes('inputDirectoryDecision')
+    || !sourcePreflightTemplate.inspectFields?.includes('layout')
+    || !sourcePreflightTemplate.inspectFields?.includes('recommendedBatchPreviewArgs')
+    || !sourcePreflightTemplate.successCriteria?.includes('inputDirectoryDecision')
+  ) {
+    throw new Error('Expected source preflight template to expose inputDirectoryDecision, layout, and safe preview args.');
+  }
   const mismatchTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'directory-mismatch-plan');
   if (
     mismatchTemplate?.tool !== 'organize_font_directory'
@@ -3000,6 +3078,7 @@ if (scenario === 'single') {
   const workflowPlan = result.recommendedWorkflowPlan;
   if (
     workflowPlan?.id !== 'batch-workflow'
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'source-preflight-compact' && step.writesFiles === false && step.inspectFields?.includes('inputDirectoryDecision'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-dry-run-preview' && step.writesFiles === false && step.inspectFields?.includes('batchDecision'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true && step.inspectFields?.includes('batchDecision') && step.inspectFields?.includes('dedupeDecisionSummary'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'directory-mismatch-plan' && step.inspectFields?.includes('organizationDecision'))
@@ -3493,6 +3572,59 @@ if (scenario === 'single') {
     || result.unsupportedFileDecision?.recommendedAction !== 'inspect-unsupportedFileSummary-before-writing'
   ) {
     throw new Error('Expected input inspection to expose compact unsupportedFileDecision triage.');
+  }
+  assertSafeRecommendedBatchPreviewArgs(result.recommendedBatchPreviewArgs, {
+    inputDir,
+    batchGroupBy: 'font-family',
+  }, 'font-inputs invalid-root');
+  if (
+    result.layout?.layoutKind !== 'flat'
+    || result.layout?.recommendedBatchOptions?.batchGroupBy !== 'font-family'
+    || result.inputDirectoryDecision?.summaryType !== 'input-directory-decision'
+    || result.inputDirectoryDecision?.appliesToTool !== 'inspect_font_inputs'
+    || result.inputDirectoryDecision?.recommendedMode !== 'review-invalid-fonts'
+    || result.inputDirectoryDecision?.preferredNextTool !== 'inspect_font_inputs'
+    || result.inputDirectoryDecision?.writesFilesBeforeReview !== false
+    || result.inputDirectoryDecision?.sourceDestructive !== false
+    || result.inputDirectoryDecision?.safeBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || result.inputDirectoryDecision?.safeOrganizationPreviewArgs?.workflowPreset !== 'safe-preview'
+    || result.inputDirectoryDecision?.evidence?.hasArchives !== true
+    || !result.inputDirectoryDecision?.mustInspectFields?.includes('recommendedBatchPreviewArgs')
+    || !result.inputDirectoryDecision?.nonIntuitiveBehavior?.some((item) => item.includes('never writes output'))
+  ) {
+    throw new Error('Expected input inspection to expose inputDirectoryDecision for invalid-font triage.');
+  }
+  const layoutDir = `${inputDir}-layout`;
+  await fs.rm(layoutDir, { recursive: true, force: true });
+  await fs.mkdir(path.join(layoutDir, 'Nested'), { recursive: true });
+  const layoutFixtureFont = buildMinimalTtf({
+    familyName: 'Layout Fixture',
+    subfamilyName: 'Regular',
+    glyphCount: 4,
+  });
+  await fs.writeFile(path.join(layoutDir, 'Root-Regular.ttf'), layoutFixtureFont);
+  await fs.writeFile(path.join(layoutDir, 'Nested', 'Nested-Regular.ttf'), layoutFixtureFont);
+  const mixedLayout = await inspectFontInputs({
+    inputDir: layoutDir,
+    maxFiles: 20,
+    includeFiles: false,
+  });
+  assertSafeRecommendedBatchPreviewArgs(mixedLayout.recommendedBatchPreviewArgs, {
+    inputDir: layoutDir,
+    batchGroupBy: 'source-dir',
+  }, 'font-inputs mixed-layout');
+  if (
+    mixedLayout.layout?.layoutKind !== 'mixed'
+    || mixedLayout.inputDirectoryDecision?.recommendedMode !== 'organize-safe-preview-first'
+    || mixedLayout.inputDirectoryDecision?.preferredNextTool !== 'organize_font_directory'
+    || mixedLayout.inputDirectoryDecision?.directoryStructureRisk !== 'high'
+    || mixedLayout.inputDirectoryDecision?.safeOrganizationPreviewArgs?.inputDir !== layoutDir
+    || mixedLayout.inputDirectoryDecision?.safeOrganizationPreviewArgs?.workflowPreset !== 'safe-preview'
+    || mixedLayout.inputDirectoryDecision?.suggestedArgs?.workflowPreset !== 'safe-preview'
+    || mixedLayout.inputDirectoryDecision?.evidence?.rootFontCount !== 1
+    || mixedLayout.inputDirectoryDecision?.evidence?.nestedFontCount !== 1
+  ) {
+    throw new Error('Expected mixed input inspection to recommend non-destructive organization safe-preview first.');
   }
   const truncated = await inspectFontInputs({
     inputDir,
@@ -5568,6 +5700,7 @@ if (scenario === 'single') {
     expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
+    expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'without writing output', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'layoutDecision.directoryHandling', 'stagingDirectoryDecision', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
     expectDescriptionIncludes('inspect_split_output', ['outputStructureDecision', 'auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
@@ -5653,6 +5786,7 @@ if (scenario === 'single') {
       'sourceSafetyDecision',
       'safetySummary',
       'inputCountGuide',
+      'inputDirectoryDecision',
       'batchGroupBy',
       'batchNamingMode',
       'batchDedupeMode',
@@ -5703,6 +5837,7 @@ if (scenario === 'single') {
     assertDocsContain('real corpus suite test scope', '`testScope`');
     assertDocsContain('real corpus ignored category coverage', '`coverageSummary.unsupportedFileCategoryCoverage`');
     assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
+    assertDocsContain('real corpus input directory decision coverage id', '`input-directory-decision`');
     assertDocsContain('real corpus staging directory coverage id', '`staging-directory-decision`');
     assertDocsContain('source safety decision', '`sourceSafetyDecision`');
     assertDocsContain('directory handling decision', '`layoutDecision.directoryHandling`');
@@ -5803,6 +5938,7 @@ if (scenario === 'single') {
     '`humanSummary`',
     '`testScope`',
     '`functionalCoverage[]`',
+    '`input-directory-decision`',
     '`staging-directory-decision`',
     '`coverageSummary.unsupportedFileCategoryCoverage`',
     '`coverageSummary.outputStructureAuditSummary`',
@@ -5825,6 +5961,7 @@ if (scenario === 'single') {
     '`copyInvalidFonts`',
     '`overwriteExisting`',
     '`safetySummary`',
+    '`inputDirectoryDecision`',
     '`sourceDestructive`',
     '`writesSourceTree`',
     '`writesOutputTree`',
@@ -6426,6 +6563,19 @@ if (scenario === 'single') {
   })) {
     throw new Error('Expected real corpus root inspection to expose inputCountGuide.');
   }
+  if (
+    corpusInspection.layout?.layoutKind === undefined
+    || corpusInspection.recommendedBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || corpusInspection.inputDirectoryDecision?.summaryType !== 'input-directory-decision'
+    || corpusInspection.inputDirectoryDecision?.appliesToTool !== 'inspect_font_inputs'
+    || corpusInspection.inputDirectoryDecision?.writesFilesBeforeReview !== false
+    || corpusInspection.inputDirectoryDecision?.sourceDestructive !== false
+    || corpusInspection.inputDirectoryDecision?.safeBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || corpusInspection.inputDirectoryDecision?.safeOrganizationPreviewArgs?.workflowPreset !== 'safe-preview'
+    || !corpusInspection.inputDirectoryDecision?.mustInspectFields?.includes('recommendedBatchPreviewArgs')
+  ) {
+    throw new Error('Expected real corpus root inspection to expose inputDirectoryDecision, layout, and safe preview args.');
+  }
 
   const inspection = await inspectFontInputs({
     inputDir: sample.inputDir,
@@ -6447,6 +6597,18 @@ if (scenario === 'single') {
     fileDetailsVisibility: 'omitted-by-request',
   })) {
     throw new Error('Expected real corpus sample inspection to expose inputCountGuide.');
+  }
+  if (
+    inspection.layout?.layoutKind === undefined
+    || inspection.recommendedBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || inspection.inputDirectoryDecision?.summaryType !== 'input-directory-decision'
+    || inspection.inputDirectoryDecision?.appliesToTool !== 'inspect_font_inputs'
+    || inspection.inputDirectoryDecision?.writesFilesBeforeReview !== false
+    || inspection.inputDirectoryDecision?.sourceDestructive !== false
+    || inspection.inputDirectoryDecision?.safeBatchPreviewArgs?.workflowPreset !== 'safe-preview'
+    || inspection.inputDirectoryDecision?.safeOrganizationPreviewArgs?.workflowPreset !== 'safe-preview'
+  ) {
+    throw new Error('Expected real corpus sample inspection to expose inputDirectoryDecision, layout, and safe preview args.');
   }
   const unsupportedExtensions = new Set((inspection.unsupportedFileSummary?.byExtension || []).map((item) => item.extension));
   for (const extension of sample.summary.unsupportedExtensions) {
@@ -6563,6 +6725,9 @@ if (scenario === 'single') {
     corpus: {
       supportedFontCount: corpusInspection.supportedFontCount,
       inputCountGuide: summarizeInputCountGuide(corpusInspection.inputCountGuide),
+      inputDirectoryDecision: summarizeInputDirectoryDecision(corpusInspection.inputDirectoryDecision),
+      layout: corpusInspection.layout,
+      recommendedBatchPreviewArgs: corpusInspection.recommendedBatchPreviewArgs,
       unsupportedFileDecision: corpusInspection.unsupportedFileDecision,
       unsupportedFileSummary: corpusInspection.unsupportedFileSummary,
       maxFilesHit: corpusInspection.maxFilesHit,
@@ -6572,6 +6737,9 @@ if (scenario === 'single') {
     inspection: {
       supportedFontCount: inspection.supportedFontCount,
       inputCountGuide: summarizeInputCountGuide(inspection.inputCountGuide),
+      inputDirectoryDecision: summarizeInputDirectoryDecision(inspection.inputDirectoryDecision),
+      layout: inspection.layout,
+      recommendedBatchPreviewArgs: inspection.recommendedBatchPreviewArgs,
       unsupportedFileDecision: inspection.unsupportedFileDecision,
       unsupportedFileSummary: inspection.unsupportedFileSummary,
       maxFilesHit: inspection.maxFilesHit,

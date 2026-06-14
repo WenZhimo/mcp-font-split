@@ -135,7 +135,7 @@ server.registerTool(
   'inspect_font_inputs',
   {
     title: 'Inspect input fonts before splitting',
-    description: 'Call this before large batch runs to scan supported font files, validate basic font metadata parsing, and report identity keys, glyph counts, and invalid font-like files without writing output.',
+    description: 'Call this before large batch runs to scan supported font files, validate basic font metadata parsing, report identity keys, glyph counts, invalid font-like files, layout, recommendedBatchPreviewArgs, and inputDirectoryDecision without writing output. inputDirectoryDecision gives a first-pass route for direct safe batch preview versus non-destructive organize_font_directory safe-preview.',
     inputSchema: {
       inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
       maxFiles: z.number().int().positive().max(50000).optional().describe('Maximum source files to scan. Defaults to 50000.'),

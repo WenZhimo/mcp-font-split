@@ -1059,6 +1059,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'True when a scan stopped at maxFiles before covering all files.',
     agentAction: 'Rerun with a higher maxFiles before trusting counts, plans, or audits.',
   },
+  inputDirectoryDecision: {
+    sourceTools: ['inspect_font_inputs'],
+    meaning: 'Compact first-pass route after input inspection: whether to rerun the scan, review invalid fonts, preview batch splitting directly, or run a non-destructive organization preview first.',
+    agentAction: 'Use this as a no-write triage hint only. Inspect layout, recommendedBatchPreviewArgs, unsupported file summaries, and inspectionWarnings before splitting or organizing.',
+  },
   dryRun: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Whether the call only planned work instead of writing output.',
@@ -1265,17 +1270,17 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     agentAction: 'Use it to interpret noisy real corpus summaries without assuming ignored archives, images, docs, or unsupported font-adjacent files are processed.',
   },
   recommendedBatchPreviewArgs: {
-    sourceTools: ['organize_font_directory'],
+    sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
     meaning: 'Copyable no-write split_font_batch preview arguments for the detected layout. It includes inputDir, workflowPreset safe-preview, and only layout-specific overrides.',
     agentAction: 'Use this before writing batch output, then inspect safetySummary, batchWarnings, maxFilesHit, unsupportedFileDecision, unsupportedFileSummary, skippedDuplicates, and errors.',
   },
   layout: {
-    sourceTools: ['organize_font_directory'],
+    sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
     meaning: 'Detected source directory shape and recommended batch grouping.',
     agentAction: 'Use it when the source directory may not match the desired family grouping.',
   },
   'layout.layoutKind': {
-    sourceTools: ['organize_font_directory'],
+    sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
     meaning: 'Detected source layout kind: empty, flat, nested, or mixed.',
     agentAction: 'Use flat or mixed as a signal to dry-run organization before direct batch splitting.',
   },
@@ -1721,9 +1726,9 @@ const SAFE_INVOCATION_TEMPLATES = [
       includeFiles: false,
     },
     customizableFields: ['inputDir', 'maxFiles', 'includeFiles'],
-    inspectFields: ['inputCountGuide', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
-    nextStep: 'If maxFilesHit is true or invalid fonts are found, resolve that before relying on batch counts.',
-    successCriteria: 'Require maxFilesHit false before trusting counts, and resolve or disclose invalid fonts, missing identities, and relevant inspectionWarnings.',
+    inspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'layout', 'recommendedBatchPreviewArgs', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
+    nextStep: 'Use inputDirectoryDecision to choose between rerun, invalid-font review, direct batch safe-preview, or non-destructive organization safe-preview.',
+    successCriteria: 'Require maxFilesHit false before trusting counts, resolve or disclose invalid fonts and missing identities, then follow inputDirectoryDecision before any write.',
   },
   {
     id: 'single-font-process',
@@ -2183,7 +2188,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Count supported fonts and ignored non-font files without writing output.',
-          inspectFields: ['inputCountGuide', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
+          inspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'layout', 'recommendedBatchPreviewArgs', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
           successCriteria: 'maxFilesHit is false, or the caller intentionally accepts a bounded summary.',
         },
         {
@@ -2293,7 +2298,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Understand source size, ignored files, invalid fonts, and scan truncation before batch processing.',
-          inspectFields: ['inputCountGuide', 'maxFilesHit', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
+          inspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'layout', 'recommendedBatchPreviewArgs', 'maxFilesHit', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
           successCriteria: 'The source scan is complete enough for the requested batch scope.',
         },
         {
@@ -2616,7 +2621,7 @@ function buildNextToolDecisionSummary(workflow) {
       templateId: 'source-preflight-compact',
       writesFiles: false,
       sourceDestructive: false,
-      inspectFields: ['inputCountGuide', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
+      inspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'layout', 'recommendedBatchPreviewArgs', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
       continueWhen: 'maxFilesHit is false or truncation is intentionally accepted; ignored files and invalid fonts are reviewed.',
       nextRouteAfterSuccess: 'layout-uncertain-or-staging-wanted',
     },
@@ -3599,6 +3604,7 @@ export function getAgentGuidance(args = {}) {
       'configurationRecipes',
       'unsupportedFileCategoryCatalog',
       'inputCountGuide',
+      'inputDirectoryDecision',
       'supportedFontCount',
       'unsupportedFileDecision',
       'unsupportedFileSummary',
@@ -4994,7 +5000,7 @@ function buildOrganizationNextActions({
         inputDir: outputDirRelative,
         includeFiles: false,
       },
-      inspectFields: ['inputCountGuide', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
+      inspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'layout', 'recommendedBatchPreviewArgs', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
       successCriteria: 'The staging inspection should complete without scan truncation and show the expected supported fonts before using the staging directory for splitting.',
     });
     push({
@@ -6751,6 +6757,127 @@ function buildDirectoryLayoutSummary({ inputDir, allFiles, fontFiles }) {
   };
 }
 
+function buildInputDirectoryDecision({
+  inputDirRelative,
+  layout,
+  maxFiles,
+  maxFilesHit,
+  supportedFontCount,
+  invalidFontCount,
+  unsupportedFileDecision,
+  recommendedBatchPreviewArgs,
+}) {
+  const safeOrganizationPreviewArgs = {
+    inputDir: inputDirRelative,
+    outputDir: 'organized-fonts',
+    workflowPreset: 'safe-preview',
+  };
+  const baseMustInspectFields = [
+    'inputCountGuide',
+    'inputDirectoryDecision',
+    'layout',
+    'recommendedBatchPreviewArgs',
+    'unsupportedFileDecision',
+    'unsupportedFileSummary',
+    'inspectionWarnings',
+    'maxFilesHit',
+  ];
+  let recommendedMode;
+  let preferredNextTool;
+  let preferredNextActionId;
+  let suggestedArgs;
+  let directoryStructureRisk;
+  let shortAnswer;
+  let successCriteria;
+
+  if (maxFilesHit) {
+    recommendedMode = 'rerun-input-scan';
+    preferredNextTool = 'inspect_font_inputs';
+    preferredNextActionId = 'rerun-with-higher-maxFiles';
+    suggestedArgs = {
+      inputDir: inputDirRelative,
+      maxFiles: '<higher-than-current>',
+      includeFiles: false,
+    };
+    directoryStructureRisk = 'unknown-until-complete-scan';
+    shortAnswer = 'The input scan was truncated; rerun with a higher maxFiles before trusting layout or counts.';
+    successCriteria = 'Rerun input inspection until maxFilesHit is false before choosing a batch or organization route.';
+  } else if (supportedFontCount === 0) {
+    recommendedMode = 'no-supported-fonts';
+    preferredNextTool = null;
+    preferredNextActionId = null;
+    suggestedArgs = null;
+    directoryStructureRisk = 'none';
+    shortAnswer = 'No supported font files were found in the scanned input directory.';
+    successCriteria = 'Stop or choose a different inputDir; ignored files are reported but not extracted, copied, or split.';
+  } else if (invalidFontCount > 0) {
+    recommendedMode = 'review-invalid-fonts';
+    preferredNextTool = 'inspect_font_inputs';
+    preferredNextActionId = 'review-invalid-fonts';
+    suggestedArgs = null;
+    directoryStructureRisk = layout.layoutKind === 'mixed' ? 'high' : 'medium';
+    shortAnswer = 'Supported-extension files were found, but at least one could not be parsed as a valid font; review invalidFonts before batch writing.';
+    successCriteria = 'Review invalidFonts and decide whether to fix, remove, ignore, or preserve invalid font-like files before a real batch write.';
+  } else if (layout.layoutKind === 'mixed') {
+    recommendedMode = 'organize-safe-preview-first';
+    preferredNextTool = 'organize_font_directory';
+    preferredNextActionId = 'preview-organization-layout';
+    suggestedArgs = safeOrganizationPreviewArgs;
+    directoryStructureRisk = 'high';
+    shortAnswer = 'Fonts appear both at the input root and in nested folders; run a no-write organization preview before choosing direct batch output or copy-only staging.';
+    successCriteria = 'Run organize_font_directory safe-preview, inspect sourceLayoutMismatchSummary, layoutDecision, organizationWarnings, and recommendedBatchPreviewArgs, then choose original input or copy-only staging.';
+  } else {
+    recommendedMode = 'batch-safe-preview-first';
+    preferredNextTool = 'split_font_batch';
+    preferredNextActionId = 'preview-batch-split-original-layout';
+    suggestedArgs = recommendedBatchPreviewArgs;
+    directoryStructureRisk = layout.layoutKind === 'nested' ? 'medium' : 'low';
+    shortAnswer = 'The input layout can be previewed directly with split_font_batch safe-preview; copy-only organization is optional if the user wants a cleaner staging tree.';
+    successCriteria = 'Run split_font_batch safe-preview, inspect planned paths, batchWarnings, dedupeDecisionSummary, maxFilesHit, unsupported file summaries, and errors before any reviewed write.';
+  }
+
+  const nonIntuitiveBehavior = [
+    'inspect_font_inputs never writes output; this decision is routing guidance, not proof that splitting or organization succeeded.',
+    'recommendedBatchPreviewArgs is safe-preview only; a later reviewed-write call is still required to create split output.',
+    'safeOrganizationPreviewArgs is also no-write; organize_font_directory only copies files when rerun with dryRun:false or workflowPreset reviewed-write.',
+  ];
+  if (unsupportedFileDecision?.hasArchives) {
+    nonIntuitiveBehavior.push('Archive files are reported for awareness but are not extracted, copied, or split.');
+  }
+
+  return {
+    summaryType: 'input-directory-decision',
+    appliesToTool: 'inspect_font_inputs',
+    recommendedMode,
+    preferredNextTool,
+    preferredNextActionId,
+    shortAnswer,
+    writesFilesBeforeReview: false,
+    sourceDestructive: false,
+    sourceFilesPreserved: true,
+    layoutKind: layout.layoutKind,
+    directoryStructureRisk,
+    recommendedBatchGroupBy: layout.recommendedBatchOptions.batchGroupBy,
+    safeBatchPreviewArgs: recommendedBatchPreviewArgs,
+    safeOrganizationPreviewArgs,
+    suggestedArgs,
+    mustInspectFields: baseMustInspectFields,
+    successCriteria,
+    nonIntuitiveBehavior,
+    evidence: {
+      maxFiles,
+      maxFilesHit,
+      supportedFontCount,
+      invalidFontCount,
+      unsupportedFileCount: unsupportedFileDecision?.totalUnsupportedFileCount ?? 0,
+      hasArchives: unsupportedFileDecision?.hasArchives === true,
+      topLevelDirectoryCount: layout.topLevelDirectoryCount,
+      rootFontCount: layout.rootFontCount,
+      nestedFontCount: layout.nestedFontCount,
+    },
+  };
+}
+
 function getOrganizationDedupeKey(entry, dedupeMode) {
   if (dedupeMode === 'none') return `unique:${entry.file}`;
   const ext = path.extname(entry.file).toLowerCase();
@@ -7869,8 +7996,14 @@ export async function inspectFontInputs(args) {
   const inputScan = await scanFilesRecursive(inputDir, { maxFiles });
   const allFiles = inputScan.files;
   const fontFiles = allFiles.filter((file) => FONT_EXTENSIONS.has(path.extname(file).toLowerCase()));
+  const inputDirRelative = toRelativeWorkspacePath(inputDir);
   const unsupportedFileSummary = buildUnsupportedFileSummary(allFiles);
   const unsupportedFileDecision = buildUnsupportedFileDecision(unsupportedFileSummary);
+  const layout = buildDirectoryLayoutSummary({ inputDir, allFiles, fontFiles });
+  const recommendedBatchPreviewArgs = buildSuggestedBatchPreviewArgs({
+    inputDir: inputDirRelative,
+    recommendedBatchOptions: layout.recommendedBatchOptions,
+  });
   const inputCountGuide = buildInputCountGuide({
     appliesToTool: 'inspect_font_inputs',
     scannedFileCount: allFiles.length,
@@ -7906,10 +8039,20 @@ export async function inspectFontInputs(args) {
     invalidFontCount: invalidFonts.length,
     missingIdentityCount: missingIdentity.length,
   });
+  const inputDirectoryDecision = buildInputDirectoryDecision({
+    inputDirRelative,
+    layout,
+    maxFiles,
+    maxFilesHit: inputScan.truncated,
+    supportedFontCount: fontFiles.length,
+    invalidFontCount: invalidFonts.length,
+    unsupportedFileDecision,
+    recommendedBatchPreviewArgs,
+  });
 
   return {
     ok: true,
-    inputDir: toRelativeWorkspacePath(inputDir),
+    inputDir: inputDirRelative,
     scannedFileCount: allFiles.length,
     supportedFontCount: fontFiles.length,
     unsupportedFileCount: allFiles.length - fontFiles.length,
@@ -7922,6 +8065,9 @@ export async function inspectFontInputs(args) {
     maxFiles,
     maxFilesHit: inputScan.truncated,
     filesIncluded: includeFiles,
+    layout,
+    recommendedBatchPreviewArgs,
+    inputDirectoryDecision,
     inspectionWarningCount: inspectionWarnings.length,
     inspectionWarnings,
     byExtension,
