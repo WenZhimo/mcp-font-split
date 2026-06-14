@@ -575,13 +575,14 @@ const WARNING_CODE_CATALOG = {
 const ERROR_RESPONSE_CATALOG = {
   configurationError: {
     errorName: 'FontSplitConfigurationError',
+    errorType: 'configuration-error',
     detailsSummaryType: 'configuration-error',
     emittedWhen: 'An explicit enum, boolean, or numeric option is invalid in a direct module call or any path that reaches the core validator.',
     mcpResponseShape: {
       isError: true,
       contentType: 'text',
       jsonTextWhenDetailsPresent: true,
-      fields: ['ok', 'error', 'name', 'details'],
+      fields: ['ok', 'error', 'name', 'errorType', 'details'],
     },
     detailsFields: [
       'summaryType',
@@ -599,12 +600,13 @@ const ERROR_RESPONSE_CATALOG = {
   },
   batchSplitError: {
     errorName: 'BatchSplitError',
+    errorType: 'batch-split-error',
     emittedWhen: 'split_font_batch uses fail-fast or fail-after and at least one selected font fails processing.',
     mcpResponseShape: {
       isError: true,
       contentType: 'text',
       jsonTextWhenDetailsPresent: true,
-      fields: ['ok', 'error', 'name', 'details'],
+      fields: ['ok', 'error', 'name', 'errorType', 'details'],
     },
     detailsFields: ['mode', 'errors', 'summary'],
     agentAction: 'Parse the JSON text, inspect every details.errors[] entry and details.summary, then resolve or disclose failures before claiming batch success.',

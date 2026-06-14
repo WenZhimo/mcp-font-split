@@ -1645,8 +1645,11 @@ if (scenario === 'single') {
   }
   if (
     catalogGuidance.errorResponseCatalog.configurationError?.errorName !== 'FontSplitConfigurationError'
+    || catalogGuidance.errorResponseCatalog.configurationError?.errorType !== 'configuration-error'
     || catalogGuidance.errorResponseCatalog.configurationError?.detailsSummaryType !== 'configuration-error'
+    || !catalogGuidance.errorResponseCatalog.configurationError?.mcpResponseShape?.fields?.includes('errorType')
     || !catalogGuidance.errorResponseCatalog.configurationError?.mcpResponseShape?.fields?.includes('details')
+    || catalogGuidance.errorResponseCatalog.batchSplitError?.errorType !== 'batch-split-error'
     || !catalogGuidance.errorResponseCatalog.batchSplitError?.mcpResponseShape?.jsonTextWhenDetailsPresent
     || !catalogGuidance.errorResponseCatalog.plainError?.mcpResponseShape?.plainTextWhenNoDetails
   ) {
@@ -4061,7 +4064,12 @@ if (scenario === 'single') {
   };
   const detailed = errorText(detailedError);
   const parsed = JSON.parse(detailed.content[0].text);
-  if (detailed.isError !== true || parsed.name !== 'BatchSplitError' || parsed.details?.errors?.[0]?.file !== 'bad.ttf') {
+  if (
+    detailed.isError !== true
+    || parsed.name !== 'BatchSplitError'
+    || parsed.errorType !== 'batch-split-error'
+    || parsed.details?.errors?.[0]?.file !== 'bad.ttf'
+  ) {
     throw new Error('Expected MCP error response to preserve structured details.');
   }
 
@@ -4080,6 +4088,7 @@ if (scenario === 'single') {
   if (
     configuration.isError !== true
     || parsedConfiguration.name !== 'FontSplitConfigurationError'
+    || parsedConfiguration.errorType !== 'configuration-error'
     || parsedConfiguration.details?.summaryType !== 'configuration-error'
     || parsedConfiguration.details?.optionName !== 'batchDedupeMode'
     || parsedConfiguration.details?.omitForDefaultBehavior !== true
@@ -4267,6 +4276,8 @@ if (scenario === 'single') {
     assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
     assertDocsContain('error response catalog', '`errorResponseCatalog`');
     assertDocsContain('error catalog section', '`error-catalog`');
+    assertDocsContain('error type field', '`errorType`');
+    assertDocsContain('batch split error type', '`errorType: "batch-split-error"`');
     assertDocsContain('configuration error summary type', '`details.summaryType: "configuration-error"`');
     assertDocsContain('workflow-only quick start request', '`sections: ["workflow"]`');
     assertDocsContain('workflow quick start recommended call', '`workflowQuickStart.recommendedCallExample`');
@@ -4410,6 +4421,8 @@ if (scenario === 'single') {
     '`splitFailureAction`',
     '`smallGlyphAction`',
     '`details.summaryType`',
+    '`errorType`',
+    '`batch-split-error`',
     '`configuration-error`',
   ]) {
     assertBehaviorContains(`high-risk behavior token ${token}`, token);

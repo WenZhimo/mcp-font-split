@@ -40,7 +40,7 @@
 
 真实语料 suite 还会返回 `coverageSummary.unsupportedFileCategoryCoverage` 和 `coverageSummary.outputStructureAuditSummary`。前者用于确认忽略文件统计覆盖了扩展名/类别摘要，而不是只看 `.zip` / `.txt`；后者用于确认代表性单字体写入和批量写入都已经通过 `inspect_split_output`，且 `outputStructureDecision.status: "pass"`、`structureSummary.conforms: true`。
 
-`errorResponseCatalog` 默认返回，也可通过 `sections: ["error-catalog"]` 聚焦请求。它解释 MCP 错误响应形态：带结构化 `details` 的错误会以 JSON 文本返回，包含 `ok: false`、`name`、`error` 和 `details`；没有 `details` 的普通错误则保持简短纯文本。尤其是 `FontSplitConfigurationError` 会使用 `details.summaryType: "configuration-error"`，应被视为调用方配置错误，而不是用同一个无效值重试。
+`errorResponseCatalog` 默认返回，也可通过 `sections: ["error-catalog"]` 聚焦请求。它解释 MCP 错误响应形态：带结构化 `details` 的错误会以 JSON 文本返回，包含 `ok: false`、`name`、`errorType`、`error` 和 `details`；没有 `details` 的普通错误则保持简短纯文本。`errorType` 是最短路由字段：`FontSplitConfigurationError` 会从 `details.summaryType` 得到 `errorType: "configuration-error"`，`BatchSplitError` 会使用 `errorType: "batch-split-error"`。配置错误应被视为调用方配置错误，而不是用同一个无效值重试。
 
 `warningCodeCatalog` 在 `detailLevel: "full"` 或请求 `sections: ["warning-catalog"]` 时返回，会把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的机器可读 warning code 映射到响应来源、严重度和建议 agent 动作。
 
