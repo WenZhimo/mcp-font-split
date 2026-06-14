@@ -3214,6 +3214,11 @@ if (scenario === 'single') {
   console.log(JSON.stringify({ result, copiedInside, batchInside, batchInsideInspect }, null, 2));
 } else if (scenario === 'check-compact') {
   console.log('Compact check smoke');
+  const packageJson = JSON.parse(await fs.readFile('package.json', 'utf8'));
+  if (!packageJson.scripts?.['check:syntax']?.includes('scripts/run-check-compact.js')) {
+    throw new Error('compact check smoke: expected check:syntax to syntax-check scripts/run-check-compact.js.');
+  }
+
   const parseCompactJson = (stdout, context) => {
     try {
       return JSON.parse(stdout);
