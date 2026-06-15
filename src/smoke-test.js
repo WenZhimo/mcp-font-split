@@ -2603,6 +2603,8 @@ if (scenario === 'single') {
     || compactGuidance.toolOptionCatalog?.summaryType !== 'tool-option-catalog'
     || !compactGuidance.fontIdentityBasisCatalog?.['typographic-family-subfamily']
     || !compactGuidance.fontIdentityBasisCatalog?.['opentype-family-subfamily']
+    || !compactGuidance.outputStructureCatalog?.layoutKinds?.['family-tree']
+    || !compactGuidance.outputStructureCatalog?.issueCodes?.['missing-manifests']
     || !compactGuidance.unsupportedFileCategoryCatalog?.archive
     || compactGuidance.guidanceView.availableSections.length !== new Set(compactGuidance.guidanceView.availableSections).size
     || compactGuidance.guidanceView.sectionsIncluded.length !== new Set(compactGuidance.guidanceView.sectionsIncluded).size
@@ -2812,6 +2814,34 @@ if (scenario === 'single') {
     || !result.toolResponseFieldCatalog?.['dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts']
   ) {
     throw new Error('Expected full guidance to expose fontIdentityBasisCatalog and response-field catalog entries.');
+  }
+  if (!result.responseFieldsToCheck?.includes('outputStructureCatalog')) {
+    throw new Error('Expected agent guidance to recommend checking the output structure catalog.');
+  }
+  const outputCatalogGuidance = getAgentGuidance({ sections: ['output-catalog'] });
+  if (
+    outputCatalogGuidance.guidanceView?.sectionsIncluded?.length !== 1
+    || outputCatalogGuidance.guidanceView.sectionsIncluded[0] !== 'output-catalog'
+    || !outputCatalogGuidance.outputStructureCatalog?.layoutKinds?.['single-family']
+    || !outputCatalogGuidance.outputStructureCatalog?.layoutKinds?.['family-tree']
+    || !outputCatalogGuidance.outputStructureCatalog?.issueCodes?.['unexpected-output-files']
+    || !outputCatalogGuidance.outputStructureCatalog?.issueCodes?.['web-output-missing']
+    || !outputCatalogGuidance.outputStructureCatalog?.auditStatuses?.pass
+    || Object.hasOwn(outputCatalogGuidance, 'toolOptionCatalog')
+    || Object.hasOwn(outputCatalogGuidance, 'toolResponseFieldCatalog')
+    || Object.hasOwn(outputCatalogGuidance, 'safeInvocationTemplates')
+  ) {
+    throw new Error('Expected focused output-catalog guidance to explain output structure audit values without unrelated sections.');
+  }
+  if (
+    !result.outputStructureCatalog?.outputModes?.subset
+    || !result.outputStructureCatalog?.outputModes?.['single-woff2']
+    || !result.outputStructureCatalog?.outputModes?.['copy-original']
+    || !result.toolResponseFieldCatalog?.outputStructureCatalog
+    || !result.toolResponseFieldCatalog?.['structureSummary.layoutKind']
+    || !result.toolResponseFieldCatalog?.['structureSummary.issues[].code']
+  ) {
+    throw new Error('Expected full guidance to expose outputStructureCatalog and response-field catalog entries.');
   }
   if (
     !result.responseFieldsToCheck?.includes('errorResponseCatalog')
@@ -3192,6 +3222,7 @@ if (scenario === 'single') {
     batchErrorMode: 'split_font_batch',
     configurationRecipes: 'get_agent_guidance',
     unsupportedFileCategoryCatalog: 'get_agent_guidance',
+    outputStructureCatalog: 'get_agent_guidance',
     recommendedBatchOptions: 'organize_font_directory',
     recommendedBatchPreviewArgs: 'organize_font_directory',
     layoutDecision: 'organize_font_directory',
@@ -3213,6 +3244,8 @@ if (scenario === 'single') {
     'unsupportedFileSummary.examplesTruncated': 'inspect_font_inputs',
     outputStructureDecision: 'inspect_split_output',
     structureSummary: 'inspect_split_output',
+    'structureSummary.layoutKind': 'inspect_split_output',
+    'structureSummary.issues[].code': 'inspect_split_output',
     auditStatus: 'inspect_split_output',
     auditPassed: 'inspect_split_output',
     auditBlockingReasons: 'inspect_split_output',
@@ -5771,7 +5804,7 @@ if (scenario === 'single') {
       assertEnumMatches(`organize_font_directory ${optionName}`, getSchemaEnumValues(organizeProps[optionName]), expectedValues);
     }
     assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
-    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'without writing output', 'organize_font_directory safe-preview', 'maxFiles', 'preserves']);
@@ -5840,6 +5873,7 @@ if (scenario === 'single') {
       'fontIdentityBasisCatalog',
       'identityBasis',
       'dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts',
+      'outputStructureCatalog',
       'layoutDecision',
       'layoutDecision.directoryHandling',
       'stagingDirectoryDecision',
@@ -5881,6 +5915,8 @@ if (scenario === 'single') {
       'auditPassed',
       'auditBlockingReasons',
       'structureSummary',
+      'structureSummary.layoutKind',
+      'structureSummary.issues[].code',
       'missingManifestCount',
       'maxFilesHit',
       'unsupportedFileDecision',
@@ -5925,6 +5961,8 @@ if (scenario === 'single') {
     assertDocsContain('error catalog section', '`error-catalog`');
     assertDocsContain('identity catalog section', '`identity-catalog`');
     assertDocsContain('identity catalog focused request', '`sections: ["identity-catalog"]`');
+    assertDocsContain('output catalog section', '`output-catalog`');
+    assertDocsContain('output catalog focused request', '`sections: ["output-catalog"]`');
     assertDocsContain('error type field', '`errorType`');
     assertDocsContain('batch split error type', '`errorType: "batch-split-error"`');
     assertDocsContain('configuration error summary type', '`details.summaryType: "configuration-error"`');
@@ -6037,6 +6075,10 @@ if (scenario === 'single') {
     '`identityBasis`',
     '`dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts`',
     '`identity-catalog`',
+    '`outputStructureCatalog`',
+    '`structureSummary.layoutKind`',
+    '`structureSummary.issues[].code`',
+    '`output-catalog`',
     '`layoutDecision`',
     '`layoutDecision.directoryHandling`',
     '`stagingDirectoryDecision`',

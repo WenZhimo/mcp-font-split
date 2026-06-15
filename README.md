@@ -26,7 +26,7 @@
 - 批量扫描并处理字体目录。
 - 在大批量处理前预检输入目录，先发现坏字体或身份解析问题。
 - 当源字体目录结构与预期批量分组不一致时，生成整理计划，或把字体非破坏性复制到更规整的暂存目录。
-- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南、安全调用模板、工具选项目录、字体 identity basis 目录、错误响应形态、warning code 含义和响应字段含义选择安全工作流；默认返回紧凑指南，也可按 section 请求完整 catalog。
+- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南、安全调用模板、工具选项目录、字体 identity basis 目录、输出结构审计目录、错误响应形态、warning code 含义和响应字段含义选择安全工作流；默认返回紧凑指南，也可按 section 请求完整 catalog。
 - 提供 `get_runtime_status`，让 agent 在处理前确认工作区、Node engine 兼容性、包版本和 WASM 是否可用。
 - 在输出目录中保留原字体副本。
 - 为每个处理过的字体写入 `split-meta.json`。
@@ -37,7 +37,7 @@
 
 | 工具 | 说明 |
 |------|------|
-| `get_agent_guidance` | 返回面向 AI agent 的工作流指南、路径规则、默认策略、工具选项目录、`fontIdentityBasisCatalog`、需要检查的响应字段和完成验证清单；默认紧凑，可用 `detailLevel` / `sections` 请求完整 catalog 或指定 section，例如 `sections: ["identity-catalog"]`。 |
+| `get_agent_guidance` | 返回面向 AI agent 的工作流指南、路径规则、默认策略、工具选项目录、`fontIdentityBasisCatalog`、`outputStructureCatalog`、需要检查的响应字段和完成验证清单；默认紧凑，可用 `detailLevel` / `sections` 请求完整 catalog 或指定 section，例如 `sections: ["identity-catalog"]` 或 `sections: ["output-catalog"]`。 |
 | `get_runtime_status` | 返回工作区、Node engine 兼容性、包版本、平台、cn-font-split 运行时和 WASM 可用性的只读诊断信息。 |
 | `split_font` | 处理单个字体。根据参数，结果可能是真正分片、单 WOFF2 fallback，或 copy-original 元数据登记。 |
 | `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count、坏字体清单、目录布局和第一步路线建议。 |
@@ -53,12 +53,13 @@
 关键默认行为：
 
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。工具响应和 `recommendedNextActions[].suggestedArgs` 中会用 `.` 表示工作区根目录，不会用空字符串表示根目录。
-- 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、`toolOptionCatalog` 工具选项目录、必须检查的响应字段、完成验证清单、`errorResponseCatalog`，以及用于解读本地真实语料 smoke 输出的 `localVerificationOutputGuide`。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
+- 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、`toolOptionCatalog` 工具选项目录、`outputStructureCatalog` 输出结构审计目录、必须检查的响应字段、完成验证清单、`errorResponseCatalog`，以及用于解读本地真实语料 smoke 输出的 `localVerificationOutputGuide`。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
 - 对维护本包的 agent，`get_agent_guidance.verificationChecklist[]` 包含 `local-compact-check-passed` 和 `local-real-corpus-suite-passed`：前者指向 `npm run check:compact`，用于低噪声读取普通本地门禁；后者指向 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，作为影响功能行为的改动完成前的本机真实语料可靠性门禁。
 - `get_agent_guidance` 会返回 `configurationRecipes[]`，把常见意图映射成 preset-first 参数，例如保留全部源字体、按源目录分组、按字体 metadata 分组、快速结构扫描、copy-only 暂存整理或大库审查后写入。配方只是安全起点，仍必须运行预览/写入工具，检查列出的 `inspectFields`，并满足 `successCriteria`。
 - `get_agent_guidance` 会返回 `batchPolicyGuide`，这是批量策略自定义指南，覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个选项值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前的 `successCriteria`。
 - `get_agent_guidance` 默认还会返回 `toolOptionCatalog`，这是高影响输入参数的机器可读目录。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的默认值、允许值、安全写入语义、非直觉行为，以及改写参数后应检查哪些响应字段；只想看它时可请求 `sections: ["option-catalog"]`。
 - `get_agent_guidance` 默认还会返回 `fontIdentityBasisCatalog`，解释 `identityBasis` 和 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 里的取值、OpenType name ID 来源、可信度，以及是否能支撑语义字体等价判断；只想看这部分时可请求 `sections: ["identity-catalog"]`。
+- `get_agent_guidance` 默认还会返回 `outputStructureCatalog`，解释 `inspect_split_output` 的审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式和容易误读的通过条件；只想看这部分时可请求 `sections: ["output-catalog"]`。解释输出审计前先看它，不要把 `ok: true` 当成输出结构已经通过。
 - `get_agent_guidance` 还会返回 `unsupportedFileCategoryCatalog`，解释 `unsupportedFileSummary.byCategory[]` 中 `archive`、`document`、`unsupported-font` 等分类的代表扩展名和处理行为；每个工具响应里的 `unsupportedFileDecision` 会给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则提供证据，压缩包只会被报告，不会被解压、复制或拆分。
 - 输入扫描类工具会返回 `inputCountGuide`，用一个紧凑对象解释扫描文件数、支持字体数、忽略文件数、`maxFilesHit` 是否导致计数不完整、文件明细是否被故意省略，以及非字体文件的处理方式。把真实语料计数当作完整结论前应先看它。
 - `inspect_font_inputs` 还会返回 `inputDirectoryDecision`、`layout` 和 `recommendedBatchPreviewArgs`。这是无写入的第一步 triage：它会提示应调高 `maxFiles`、先处理坏字体、直接做 `split_font_batch` safe-preview，还是先做非破坏性的 `organize_font_directory` safe-preview；它不是整理计划或拆分成功证明。返回的安全预览参数会通过 `recommendedBatchPreviewArgs.maxFiles` 保留本次扫描上限，复制下一步调用时不会意外退回默认值。
@@ -382,6 +383,7 @@ fonts/
 
 `inspect_split_output` 保留基础文件统计，并增加结构化输出清单：
 
+- 解释审计状态、布局或 issue code 时，优先查 `get_agent_guidance.outputStructureCatalog`。其中 `layoutKinds` 解释 `structureSummary.layoutKind`，`issueCodes` 解释 `structureSummary.issues[].code`，`outputModes` 解释 `subset`、`single-woff2` 和 `copy-original` 的必需文件差异。
 - `maxFiles` 可以调整输出扫描上限；默认是 `200000`，避免大型批量输出在检查时被截断。
 - `maxFilesHit` 只有当 `maxFiles` 之外确实还有更多输出文件时才为 true。
 - `outputStructureDecision` 是从 `auditStatus`、`auditBlockingReasons`、`maxFilesHit` 和 `structureSummary` 派生的快速判断；先看 `status`、`recommendedAction`、`blockingReasonCodes` 和 `issueCodes`。
@@ -392,6 +394,7 @@ fonts/
 - `includeFamilies: false` 会省略结构化 `families[]`，但保留 family 和输出模式计数。
 - `inspectionWarningCount` 和 `inspectionWarnings[]` 会用机器可读 `code` 汇总截断、详情数组省略、manifest 缺失和结构问题等状态。
 - `structureSummary` 检查输出目录是否符合文档化结构；真实批量写入后应调用 `inspect_split_output`，只有 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才表示没有发现杂项文件、manifest 缺失或输出模式文件缺失等结构问题。
+- `copy-original` 条目只要求 `split-meta.json`；它故意不生成 CSS 或 WOFF2，因此不能把这类缺失直接视为结构失败。
 - `familyCount`
 - `fontEntryCount`
 - `manifestCount`

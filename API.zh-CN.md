@@ -14,9 +14,9 @@
 | `detailLevel` | `compact`, `full` | `compact` | 响应体量。`compact` 保留工作流关键 section，并默认省略较大的 catalog / 示例；`full` 返回全部指南 section。 |
 | `sections` | section 名称数组 | 不设置 | 聚焦返回指定 section。设置后会覆盖 `detailLevel` 的默认 section 集。 |
 
-响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchPolicyGuide`、`toolOptionCatalog`、`fontIdentityBasisCatalog`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchPolicyGuide`、`toolOptionCatalog`、`fontIdentityBasisCatalog`、`outputStructureCatalog`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
-当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog", "identity-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
+当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog", "identity-catalog", "output-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
 
 如果只需要最小路线响应，可用 `workflow: "organize"` 搭配 `sections: ["workflow"]`，然后检查 `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`。其中嵌套的 `workflowQuickStart.recommendedCallExample` 对象就是可复制的第一步调用。对于结构不确定的源目录，推荐调用应是无写入的 `organize_font_directory` safe preview（`workflowPreset: "safe-preview"`），并且 `writesFiles: false`、`sourceDestructive: false`。只有当用户明确需要暂存目录，或实际响应要求切换分支时，才使用其中的 `alternateCallExamples[]`。
 
@@ -27,6 +27,8 @@
 `toolOptionCatalog` 默认返回，也可通过 `sections: ["option-catalog"]` 聚焦请求。它是高影响工具输入参数的机器可读目录，包含原始默认值、preset-first 自定义路线、允许值、写入/源安全行为、响应体量控制、非直觉行为，以及改写参数后必须检查的响应字段。修改 `dryRun`、`includeResults`、`maxFiles`、`batchGroupBy`、`batchNamingMode`、`batchDedupeMode`、`parseFonts`、`smallGlyphAction`、`splitFailureAction` 或 `includeFiles` 前应先看它。
 
 `fontIdentityBasisCatalog` 默认返回，也可通过 `sections: ["identity-catalog"]` 聚焦请求。它解释 `inspect_font_inputs` 中 `identityBasis` 的取值，以及去重响应里 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 汇总的 basis。每个条目都会说明采用的 OpenType name ID、置信度、是否能作为语义 identity 证据，以及 agent 可以怎样解释重复决策。
+
+`outputStructureCatalog` 默认返回，也可通过 `sections: ["output-catalog"]` 聚焦请求。它解释 `inspect_split_output` 的审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式、通过条件和非直觉行为，例如 `ok:true` 不代表结构通过、`includeFiles:false` / `includeFamilies:false` 只省略数组不省略审计，以及 `copy-original` 本来就没有 CSS/WOFF2 输出。
 
 `unsupportedFileCategoryCatalog` 会解释 `unsupportedFileSummary.byCategory[]` 使用的分类，包括代表性扩展名、分类含义和处理行为。工具响应也会提供用于快速判断的 `unsupportedFileDecision`，以及作为证据的 `unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary`，agent 不必再次查 guidance 也能解释它们。尤其是 `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
 
@@ -60,6 +62,8 @@
 
 `fontIdentityBasisCatalog` 是 identity 侧的配套目录。解释 `identityBasis` 或 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 前应先看它；路径级、缺失或低置信度 family-only basis 不应被报告成完整语义去重证据。
 
+`outputStructureCatalog` 是输出审计侧的配套目录。解释 `outputStructureDecision`、`structureSummary.layoutKind` 或 `structureSummary.issues[].code` 前应先看它；`ok:true` 只表示检查调用完成，不表示输出目录结构已经通过。
+
 指南 section 名称：
 
 | Section | 内容 |
@@ -67,7 +71,7 @@
 | `workspace` | 工作区根目录和路径基准信息。 |
 | `tools` | 工具清单，以及每个工具适合在什么时候调用。 |
 | `defaults` | 重要默认策略和支持的字体扩展名。 |
-| `recommendations` | 推荐的批量、检查和目录整理参数，以及 `workflowPresets[]`、`batchPolicyGuide`、`configurationRecipes[]`、`fontIdentityBasisCatalog` 和 `unsupportedFileCategoryCatalog`。 |
+| `recommendations` | 推荐的批量、检查和目录整理参数，以及 `workflowPresets[]`、`batchPolicyGuide`、`configurationRecipes[]`、`fontIdentityBasisCatalog`、`outputStructureCatalog` 和 `unsupportedFileCategoryCatalog`。 |
 | `directory-workflows` | 面向扁平、嵌套、混合、嘈杂和暂存目录场景的目录工作流决策表。 |
 | `examples` | 具体源目录示例；在 `full` 详情或显式请求时返回。 |
 | `verification` | agent 在宣称成功前应该验证的检查清单。 |
@@ -76,6 +80,7 @@
 | `field-catalog` | 把响应字段映射到含义和 agent 动作的字段目录。 |
 | `option-catalog` | 把高影响工具输入参数映射到默认值、允许值、安全行为、非直觉行为和必查响应字段的选项目录。 |
 | `identity-catalog` | 字体 identity basis 目录，把 `identityBasis` 取值映射到 OpenType name ID 来源、置信度、语义 identity 状态和 agent 动作。 |
+| `output-catalog` | 输出结构审计目录，把审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式、通过条件和非直觉审计行为映射成可解释条目。 |
 | `safe-templates` | 常见工作流的可复制安全调用模板。 |
 | `response-fields` | agent 应检查的响应字段短清单。 |
 | `path-rules` | 路径限制和相对路径规则。 |
@@ -391,6 +396,8 @@
 | `filesIncluded` / `familiesIncluded` | 响应中是否包含 `files[]` 和 `families[]`。 |
 | `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略、manifest 缺失和输出结构问题等状态。 |
 | `structureSummary` | 机器可读输出结构审计。真实批量写入后，只有 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为审计完成。`conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`。 |
+| `structureSummary.layoutKind` | 检测到的输出布局，例如 `single-family`、`family-tree`、`mixed`、`empty` 或 `unknown`；判断 `outDir` 是否指向正确层级前，应先查 `outputStructureCatalog.layoutKinds`。 |
+| `structureSummary.issues[].code` | 机器可读结构问题代码，例如 `missing-manifests`、`unexpected-output-files` 或 `web-output-missing`；解释审计结果前，应先查 `outputStructureCatalog.issueCodes`。 |
 | `fontEntryCount` | 检测到的字体输出条目数量。 |
 | `manifestCount` | 带 `split-meta.json` 的条目数量。 |
 | `missingManifestCount` | 缺少 `split-meta.json` manifest、只能从文件结构保守推断的条目数量。 |
