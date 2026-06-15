@@ -3606,7 +3606,7 @@ if (scenario === 'single') {
   assertObjectOmitsKeys(stagingDecision?.recommendedOptions, ['dryRun', 'includePlan', 'parseFonts', 'overwriteExisting'], 'user-wants-clean-staging-directory recommendedOptions');
   assertObjectOmitsKeys(stagingDecision?.followUpOptions, ['dryRun', 'includePlan', 'parseFonts', 'overwriteExisting'], 'user-wants-clean-staging-directory followUpOptions');
   const exampleIds = new Set((result.directoryWorkflowExamples || []).map((item) => item.id));
-  for (const requiredExample of ['flat-vendor-dump', 'archive-per-family-folders', 'mixed-root-and-nested-fonts', 'source-layout-mismatch-comparison', 'large-noisy-first-pass']) {
+  for (const requiredExample of ['flat-vendor-dump', 'archive-per-family-folders', 'mixed-root-and-nested-fonts', 'source-layout-mismatch-comparison', 'copy-only-staging-to-audited-split', 'large-noisy-first-pass']) {
     if (!exampleIds.has(requiredExample)) {
       throw new Error(`Expected agent guidance examples to include ${requiredExample}.`);
     }
@@ -3671,6 +3671,32 @@ if (scenario === 'single') {
   }
   assertDirectoryRouteInspectFields(mismatchComparisonExample?.mustInspectFields, 'directoryWorkflowExamples.source-layout-mismatch-comparison', 'mustInspectFields');
   assertObjectOmitsKeys(mismatchComparisonExample?.firstCall, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode'], 'source-layout-mismatch-comparison firstCall');
+  const stagingRouteExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'copy-only-staging-to-audited-split');
+  const stagingRouteStepIds = new Set((stagingRouteExample?.workflowSteps || []).map((item) => item.id));
+  const stagingWriteStep = (stagingRouteExample?.workflowSteps || []).find((item) => item.id === 'write-copy-only-staging');
+  const stagedBatchPreviewStep = (stagingRouteExample?.workflowSteps || []).find((item) => item.id === 'preview-staged-batch');
+  const batchWriteStep = (stagingRouteExample?.workflowSteps || []).find((item) => item.id === 'write-reviewed-batch');
+  const outputAuditStep = (stagingRouteExample?.workflowSteps || []).find((item) => item.id === 'audit-split-output');
+  if (
+    stagingRouteExample?.firstCall?.workflowPreset !== 'safe-preview'
+    || stagingRouteExample?.firstCall?.outputDir !== '<organized-output-dir>'
+    || !['preview-organization-plan', 'review-organization-plan', 'write-copy-only-staging', 'preview-staged-batch', 'write-reviewed-batch', 'audit-split-output'].every((stepId) => stagingRouteStepIds.has(stepId))
+    || stagingWriteStep?.tool !== 'organize_font_directory'
+    || stagingWriteStep?.args?.workflowPreset !== 'reviewed-write'
+    || stagedBatchPreviewStep?.tool !== 'split_font_batch'
+    || stagedBatchPreviewStep?.argsSource !== 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs'
+    || stagedBatchPreviewStep?.writesFiles !== false
+    || batchWriteStep?.tool !== 'split_font_batch'
+    || batchWriteStep?.args?.workflowPreset !== 'reviewed-write'
+    || outputAuditStep?.tool !== 'inspect_split_output'
+    || !stagingRouteExample.mustInspectFields?.includes('sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs')
+    || !stagingRouteExample.mustInspectFields?.includes('outputStructureDecision')
+    || !stagingRouteExample.successCriteria?.includes('sourceDestructive false')
+    || !stagingRouteExample.successCriteria?.includes('inspect_split_output')
+  ) {
+    throw new Error('Expected copy-only staging example to expose a complete source-safe staging-to-audited-split workflow.');
+  }
+  assertDirectoryRouteInspectFields(stagingRouteExample?.mustInspectFields, 'directoryWorkflowExamples.copy-only-staging-to-audited-split', 'mustInspectFields');
   const flatExample = (result.directoryWorkflowExamples || []).find((item) => item.id === 'flat-vendor-dump');
   if (
     flatExample?.firstCall?.workflowPreset !== 'safe-preview'
@@ -6319,6 +6345,7 @@ if (scenario === 'single') {
     assertDocsContain('recommendedBatchPreviewArgs spread example', '...organization.recommendedBatchPreviewArgs');
     assertDocsContain('recommendedBatchOptions not complete call warning', '`recommendedBatchOptions`');
     assertDocsContain('copy-only reviewed-write route', '`workflowPreset: "reviewed-write"`');
+    assertDocsContain('copy-only staging full route example', '`copy-only-staging-to-audited-split`');
 
     console.log(JSON.stringify({
       ok: true,
@@ -6458,6 +6485,7 @@ if (scenario === 'single') {
     '`omittedDetailFields`',
     '`directoryWorkflowDecisionMatrix[]`',
     '`directoryWorkflowExamples[]`',
+    '`copy-only-staging-to-audited-split`',
     '`safeInvocationTemplates[]`',
     '`localVerificationOutputGuide`',
     '`completionReportGuide`',
