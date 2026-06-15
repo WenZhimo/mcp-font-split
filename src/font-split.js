@@ -1469,6 +1469,16 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Machine-readable checklist inside sourceLayoutMismatchSummary for source safety, direct preview readiness, copy-only staging need, plan visibility, warnings, and required output audit.',
     agentAction: 'Inspect splitWriteReadiness, copyOnlyStagingReadiness, and items[] before writing; treat pass/ready signals as routing guidance, then satisfy the referenced evidence fields and successCriteria.',
   },
+  'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs': {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Copyable split_font_batch safe-preview arguments for the organized staging directory after a copy-only organization write has already produced outputDir.',
+    agentAction: 'When copyOnlyStaging.need is already-written-copy-only, copy these args to split_font_batch before any reviewed batch write; verify maxFiles, sourceSafetyDecision, batchWarnings, and planned output.',
+  },
+  'sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs': {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Checklist-item-local safe-preview arguments. The copy-only-staging item exposes these when the next safe step is previewing an already-written organized output directory.',
+    agentAction: 'Prefer the item suggestedArgsField to locate the canonical args, then run the preview and satisfy the item evidenceFields and successCriteria before writing.',
+  },
   planVisibility: {
     sourceTools: ['organize_font_directory'],
     meaning: 'Explains whether the organizer response includes detailed plan[] entries or only compact summary fields.',
@@ -4010,6 +4020,8 @@ export function getAgentGuidance(args = {}) {
       'directoryWorkflowSummary',
       'sourceLayoutMismatchSummary',
       'sourceLayoutMismatchSummary.decisionChecklist',
+      'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs',
+      'sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs',
       'planVisibility',
       'plan',
       'sourceDestructive',
@@ -5607,6 +5619,9 @@ function buildSourceLayoutDecisionChecklist({
   const directPreviewCanRun = directStatus !== 'not-applicable'
     && directStatus !== 'use-organized-output'
     && !directPreviewBlocked;
+  const copyOnlyStagingSafePreviewArgs = stagingNeed === 'already-written-copy-only'
+    ? organizationDecision.safeBatchPreviewArgs || null
+    : null;
 
   return {
     summaryType: 'source-layout-decision-checklist',
@@ -5651,13 +5666,20 @@ function buildSourceLayoutDecisionChecklist({
         requiredBeforeSplitWrite: false,
         nextTool: copyOnlyStagingStatus === 'optional'
           ? 'organize_font_directory'
+          : copyOnlyStagingSafePreviewArgs
+            ? 'split_font_batch'
+            : null,
+        suggestedArgsField: copyOnlyStagingSafePreviewArgs
+          ? 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs'
           : null,
         outputDir: outputDirRelative,
         sourceDestructive: false,
+        safePreviewArgs: copyOnlyStagingSafePreviewArgs,
         evidenceFields: [
           'sourceLayoutMismatchSummary.copyOnlyStaging.need',
           'sourceLayoutMismatchSummary.copyOnlyStaging.outputDir',
           'sourceLayoutMismatchSummary.copyOnlyStaging.sourceDestructive',
+          'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs',
         ],
       },
       {
@@ -5803,6 +5825,9 @@ function buildSourceLayoutMismatchSummary({
     stagingNeed = 'not-required-for-splitting';
     stagingReason = 'The original input can be previewed directly; staging is only for users who want a cleaner copied directory.';
   }
+  const copyOnlyStagingSafePreviewArgs = stagingNeed === 'already-written-copy-only'
+    ? organizationDecision.safeBatchPreviewArgs || null
+    : null;
 
   const decisionChecklist = buildSourceLayoutDecisionChecklist({
     options,
@@ -5854,6 +5879,10 @@ function buildSourceLayoutMismatchSummary({
           ? 'preview-batch-split-organized-output'
           : null
       ),
+      suggestedArgsField: copyOnlyStagingSafePreviewArgs
+        ? 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs'
+        : null,
+      safePreviewArgs: copyOnlyStagingSafePreviewArgs,
       reason: stagingReason,
     },
     decisionChecklist,
@@ -6237,6 +6266,8 @@ function buildLayoutDecision({
       sourceFilesMovedDeletedOrRewritten: false,
       writeBehavior: copyOnlyStaging.writeBehavior || null,
       nextActionId: copyOnlyStaging.nextActionId || null,
+      suggestedArgsField: copyOnlyStaging.suggestedArgsField || null,
+      safePreviewArgs: copyOnlyStaging.safePreviewArgs || null,
       reason: copyOnlyStaging.reason || null,
     },
     mustInspectFields: [
