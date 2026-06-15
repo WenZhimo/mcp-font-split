@@ -26,7 +26,7 @@
 - 批量扫描并处理字体目录。
 - 在大批量处理前预检输入目录，先发现坏字体或身份解析问题。
 - 当源字体目录结构与预期批量分组不一致时，生成整理计划，或把字体非破坏性复制到更规整的暂存目录。
-- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南、安全调用模板、工具选项目录、字体 identity basis 目录、输出结构审计目录、错误响应形态、warning code 含义和响应字段含义选择安全工作流；默认返回紧凑指南，也可按 section 请求完整 catalog。
+- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南、安全调用模板、工具安全速查表、工具选项目录、字体 identity basis 目录、输出结构审计目录、错误响应形态、warning code 含义和响应字段含义选择安全工作流；默认返回紧凑指南，也可按 section 请求完整 catalog。
 - 提供 `get_runtime_status`，让 agent 在处理前确认工作区、Node engine 兼容性、包版本和 WASM 是否可用。
 - 在输出目录中保留原字体副本。
 - 为每个处理过的字体写入 `split-meta.json`。
@@ -37,7 +37,7 @@
 
 | 工具 | 说明 |
 |------|------|
-| `get_agent_guidance` | 返回面向 AI agent 的工作流指南、路径规则、默认策略、工具选项目录、`fontIdentityBasisCatalog`、`outputStructureCatalog`、需要检查的响应字段和完成验证清单；默认紧凑，可用 `detailLevel` / `sections` 请求完整 catalog 或指定 section，例如 `sections: ["identity-catalog"]` 或 `sections: ["output-catalog"]`。 |
+| `get_agent_guidance` | 返回面向 AI agent 的工作流指南、路径规则、默认策略、`toolSafetyQuickReference`、工具选项目录、`fontIdentityBasisCatalog`、`outputStructureCatalog`、需要检查的响应字段和完成验证清单；默认紧凑，可用 `detailLevel` / `sections` 请求完整 catalog 或指定 section，例如 `sections: ["identity-catalog"]` 或 `sections: ["output-catalog"]`。 |
 | `get_runtime_status` | 返回工作区、Node engine 兼容性、包版本、平台、cn-font-split 运行时和 WASM 可用性的只读诊断信息。 |
 | `split_font` | 处理单个字体。根据参数，结果可能是真正分片、单 WOFF2 fallback，或 copy-original 元数据登记。 |
 | `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count、坏字体清单、目录布局和第一步路线建议。 |
@@ -53,12 +53,13 @@
 关键默认行为：
 
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。工具响应和 `recommendedNextActions[].suggestedArgs` 中会用 `.` 表示工作区根目录，不会用空字符串表示根目录。
-- 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、`toolOptionCatalog` 工具选项目录、`outputStructureCatalog` 输出结构审计目录、必须检查的响应字段、完成验证清单、`errorResponseCatalog`，以及用于解读本地真实语料 smoke 输出的 `localVerificationOutputGuide`。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
+- 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、`toolSafetyQuickReference` 工具安全速查表、`toolOptionCatalog` 工具选项目录、`outputStructureCatalog` 输出结构审计目录、必须检查的响应字段、完成验证清单、`errorResponseCatalog`，以及用于解读本地真实语料 smoke 输出的 `localVerificationOutputGuide`。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
 - `get_agent_guidance` 会返回 `projectStatusNotice`，把“仍在完善中、尚未正式发布”变成机器可读策略：接口、默认值、响应字段和目录整理策略都可能变化；自动化时应以当前代码、实时 MCP schema、`get_agent_guidance` 和当前 API 文档为准，不需要为了未发布字段保留前向兼容冗余。
 - 对维护本包的 agent，`get_agent_guidance.verificationChecklist[]` 包含 `local-compact-check-passed` 和 `local-real-corpus-suite-passed`：前者指向 `npm run check:compact`，用于低噪声读取普通本地门禁；后者指向 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，作为影响功能行为的改动完成前的本机真实语料可靠性门禁。
 - `get_agent_guidance` 会返回 `configurationRecipes[]`，把常见意图映射成 preset-first 参数，例如保留全部源字体、按源目录分组、按字体 metadata 分组、快速结构扫描、copy-only 暂存整理或大库审查后写入。配方只是安全起点，仍必须运行预览/写入工具，检查列出的 `inspectFields`，并满足 `successCriteria`。
 - `get_agent_guidance` 会返回 `batchCustomizationQuickReference[]`，这是比 `batchPolicyGuide` 更短的批量自定义速查表：把“保留每个源字体”“按源目录/metadata 分组”“使用裸名或来源后缀”“收集错误”等用户意图映射到最小 `overrideArgs`、可复制的 `safe-preview` / `reviewed-write` 参数、必须检查的字段和非直觉行为。
 - `get_agent_guidance` 会返回 `directoryOrganizationQuickAnswer`，直接回答“有没有目录整理工具、会不会破坏源目录”。答案是：使用 `organize_font_directory`；默认 `workflowPreset: "safe-preview"` 只做无写入计划；审查后 `reviewed-write` 也只是 copy-only 写入 `outputDir`，不会移动、删除或重写源字体，且该 `outputDir` 是源目录式暂存，不是最终拆分输出。
+- `get_agent_guidance` 会返回 `toolSafetyQuickReference`，用一张紧凑表汇总 7 个公开工具的 `defaultWritesFiles`、`sourceDestructive`、`sourceFilesMovedDeletedOrRewritten`、写入范围、源文件是否需要备份，以及实际调用后必须检查的响应字段。它用于快速回答“哪个工具会写文件、是否会移动/删除/重写源字体”；写入类工具完成后仍要检查实际响应里的 `sourceSafetyDecision`、`safetySummary` 和输出审计结果。
 - `get_agent_guidance` 会返回 `batchPolicyGuide`，这是批量策略自定义指南，覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个选项值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前的 `successCriteria`。
 - `get_agent_guidance` 默认还会返回 `toolOptionCatalog`，这是高影响输入参数的机器可读目录。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的默认值、允许值、安全写入语义、非直觉行为，以及改写参数后应检查哪些响应字段；只想看它时可请求 `sections: ["option-catalog"]`。
 - `get_agent_guidance` 默认还会返回 `fontIdentityBasisCatalog`，解释 `identityBasis` 和 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 里的取值、OpenType name ID 来源、可信度，以及是否能支撑语义字体等价判断；只想看这部分时可请求 `sections: ["identity-catalog"]`。

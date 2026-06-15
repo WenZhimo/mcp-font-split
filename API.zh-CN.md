@@ -14,7 +14,7 @@
 | `detailLevel` | `compact`, `full` | `compact` | 响应体量。`compact` 保留工作流关键 section，并默认省略较大的 catalog / 示例；`full` 返回全部指南 section。 |
 | `sections` | section 名称数组 | 不设置 | 聚焦返回指定 section。设置后会覆盖 `detailLevel` 的默认 section 集。 |
 
-响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、`projectStatusNotice`、默认策略、`configurationRecipes[]`、`batchCustomizationQuickReference[]`、`directoryOrganizationQuickAnswer`、`batchPolicyGuide`、`toolOptionCatalog`、`fontIdentityBasisCatalog`、`outputStructureCatalog`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、`projectStatusNotice`、默认策略、`configurationRecipes[]`、`batchCustomizationQuickReference[]`、`toolSafetyQuickReference`、`directoryOrganizationQuickAnswer`、`batchPolicyGuide`、`toolOptionCatalog`、`fontIdentityBasisCatalog`、`outputStructureCatalog`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
 当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog", "identity-catalog", "output-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
 
@@ -27,6 +27,8 @@
 `batchCustomizationQuickReference[]` 是常见批量自定义的紧凑入口。它会把用户意图映射成最小 `overrideArgs`、带 `workflowPreset: "safe-preview"` 的可复制 `previewArgs`、带 `workflowPreset: "reviewed-write"` 的 `writeArgsAfterReview`、必须检查的 `inspectFields`、`successCriteria` 和非直觉行为。常见覆盖先看它；如果用户要求更细的取舍，再查 `batchPolicyGuide` 的逐值说明。
 
 `directoryOrganizationQuickAnswer` 是源目录结构不匹配问题的紧凑答案。它直接说明辅助工具是 `organize_font_directory`，第一步应使用 `workflowPreset: "safe-preview"`，审查后的写入也是 copy-only 到 `outputDir`，源字体不会被移动、删除或重写，并且整理出的 `outputDir` 是源目录式暂存，不是最终拆分输出。当用户只是问“有没有目录整理工具”或“会不会破坏源目录”时，先看它；需要更细路线时再看 `directoryWorkflowDecisionMatrix[]`。
+
+`toolSafetyQuickReference` 是全部公开工具的紧凑安全速查表。每个条目会汇总 `defaultWritesFiles`、`sourceDestructive`、`sourceFilesMovedDeletedOrRewritten`、写入范围、是否需要源文件备份、相关 safe-preview 参数和 `mustInspectFields`。选择工具或回答写入安全问题前先看它；写入类工具实际运行后，仍要检查真实响应里的 `sourceSafetyDecision`、`safetySummary`、`outputStructureDecision` 和相关审计字段。
 
 `batchPolicyGuide` 是批量策略选项的机器可读自定义指南。它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`；每个策略值都会包含 `useWhen`、`avoidWhen`、`inspectFields` 和 `successCriteria`。当用户要求偏离默认 preset 的行为时，先参考它选择最小显式覆盖，然后先预览再写入。
 
@@ -77,7 +79,7 @@
 | Section | 内容 |
 |---------|------|
 | `workspace` | 工作区根目录和路径基准信息。 |
-| `tools` | 工具清单，以及每个工具适合在什么时候调用。 |
+| `tools` | 工具清单、`toolSafetyQuickReference`，以及每个工具适合在什么时候调用。 |
 | `defaults` | `projectStatusNotice`、重要默认策略和支持的字体扩展名。 |
 | `recommendations` | 推荐的批量、检查和目录整理参数，以及 `workflowPresets[]`、`batchCustomizationQuickReference[]`、`batchPolicyGuide`、`configurationRecipes[]`、`fontIdentityBasisCatalog`、`outputStructureCatalog` 和 `unsupportedFileCategoryCatalog`。 |
 | `directory-workflows` | `directoryOrganizationQuickAnswer`，以及面向扁平、嵌套、混合、嘈杂和暂存目录场景的目录工作流决策数据。 |

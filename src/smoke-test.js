@@ -2721,6 +2721,7 @@ if (scenario === 'single') {
     || !defaultGuidance.errorResponseCatalog?.configurationError
     || Object.hasOwn(defaultGuidance, 'directoryWorkflowExamples')
     || defaultGuidance.projectStatusNotice?.summaryType !== 'project-status-notice'
+    || defaultGuidance.toolSafetyQuickReference?.summaryType !== 'tool-safety-quick-reference'
     || !defaultGuidance.safeInvocationTemplates?.length
     || defaultGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !defaultGuidance.directoryHandlingModeCatalog?.['preview-original-input']
@@ -2768,6 +2769,7 @@ if (scenario === 'single') {
     || !compactGuidance.errorResponseCatalog?.configurationError
     || Object.hasOwn(compactGuidance, 'directoryWorkflowExamples')
     || compactGuidance.projectStatusNotice?.summaryType !== 'project-status-notice'
+    || compactGuidance.toolSafetyQuickReference?.summaryType !== 'tool-safety-quick-reference'
     || !compactGuidance.safeInvocationTemplates?.length
     || compactGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !compactGuidance.directoryHandlingModeCatalog?.['preview-organized-output']
@@ -2907,6 +2909,41 @@ if (scenario === 'single') {
     || !result.toolResponseFieldCatalog?.directoryOrganizationQuickAnswer?.agentAction?.includes('safe-preview')
   ) {
     throw new Error('Expected agent guidance to expose directoryOrganizationQuickAnswer as the compact directory safety answer.');
+  }
+  if (
+    !result.responseFieldsToCheck?.includes('toolSafetyQuickReference')
+    || result.toolResponseFieldCatalog?.toolSafetyQuickReference?.sourceTools?.[0] !== 'get_agent_guidance'
+    || !result.toolResponseFieldCatalog?.toolSafetyQuickReference?.agentAction?.includes('source-destructive')
+  ) {
+    throw new Error('Expected agent guidance to expose toolSafetyQuickReference as the compact per-tool safety answer.');
+  }
+  const toolSafetyQuickReference = result.toolSafetyQuickReference || {};
+  const safetyEntryByTool = new Map((toolSafetyQuickReference.tools || []).map((item) => [item.tool, item]));
+  const organizerSafety = safetyEntryByTool.get('organize_font_directory');
+  const batchSafety = safetyEntryByTool.get('split_font_batch');
+  const singleSafety = safetyEntryByTool.get('split_font');
+  const inspectSafety = safetyEntryByTool.get('inspect_font_inputs');
+  if (
+    toolSafetyQuickReference.summaryType !== 'tool-safety-quick-reference'
+    || safetyEntryByTool.size !== 7
+    || inspectSafety?.defaultWritesFiles !== false
+    || inspectSafety?.sourceDestructive !== false
+    || organizerSafety?.defaultWritesFiles !== false
+    || organizerSafety?.reviewedWriteMode !== 'copy-only-outputDir'
+    || organizerSafety?.sourceDestructive !== false
+    || organizerSafety?.sourceFilesMovedDeletedOrRewritten !== false
+    || organizerSafety?.sourceBackupRequired !== false
+    || !organizerSafety?.mustInspectFields?.includes('sourceSafetyDecision')
+    || !organizerSafety?.mustInspectFields?.includes('safetySummary')
+    || batchSafety?.defaultWritesFiles !== true
+    || batchSafety?.safePreviewArgs?.workflowPreset !== 'safe-preview'
+    || batchSafety?.sourceDestructive !== false
+    || batchSafety?.outputAuditRequiredAfterWrite !== true
+    || singleSafety?.defaultWritesFiles !== true
+    || singleSafety?.sourceDestructive !== false
+    || !toolSafetyQuickReference.nonIntuitiveBehavior?.some((item) => item.includes('writesSourceTree true'))
+  ) {
+    throw new Error('Expected toolSafetyQuickReference to summarize per-tool write and source safety behavior.');
   }
   if (
     !result.responseFieldsToCheck?.includes('configurationTrace')
@@ -3476,6 +3513,7 @@ if (scenario === 'single') {
     batchDedupeMode: 'split_font_batch',
     batchErrorMode: 'split_font_batch',
     configurationRecipes: 'get_agent_guidance',
+    toolSafetyQuickReference: 'get_agent_guidance',
     unsupportedFileCategoryCatalog: 'get_agent_guidance',
     outputStructureCatalog: 'get_agent_guidance',
     recommendedBatchOptions: 'organize_font_directory',
@@ -6274,7 +6312,7 @@ if (scenario === 'single') {
       assertEnumMatches(`organize_font_directory ${optionName}`, getSchemaEnumValues(organizeProps[optionName]), expectedValues);
     }
     assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
-    expectDescriptionIncludes('get_agent_guidance', ['projectStatusNotice', 'nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchCustomizationQuickReference', 'directoryOrganizationQuickAnswer', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['projectStatusNotice', 'toolSafetyQuickReference', 'nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchCustomizationQuickReference', 'directoryOrganizationQuickAnswer', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'recommendedNextActions[].suggestedArgsField', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'without writing output', 'organize_font_directory safe-preview', 'maxFiles', 'preserves']);
@@ -6332,6 +6370,7 @@ if (scenario === 'single') {
     for (const fieldName of [
       'guidanceView',
       'projectStatusNotice',
+      'toolSafetyQuickReference',
       'recommendedWorkflowPlan',
       'nextToolDecisionSummary',
       'workflowQuickStart',
@@ -6427,6 +6466,9 @@ if (scenario === 'single') {
     assertDocsContain('local verification completion report guide', '`completionReportGuide`');
     assertDocsContain('local verification forbidden claims', '`forbiddenClaims`');
     assertDocsContain('local verification concise report template', '`conciseReportTemplate`');
+    assertDocsContain('tool safety quick reference', '`toolSafetyQuickReference`');
+    assertDocsContain('tool safety moved/deleted/rewrite field', '`sourceFilesMovedDeletedOrRewritten`');
+    assertDocsContain('tool safety default write field', '`defaultWritesFiles`');
     assertDocsContain('real corpus suite command', '`npm run smoke:real-corpus-suite -- <font-corpus-dir>`');
     assertDocsContain('real corpus reliability gate decision', '`reliabilityGateDecision`');
     assertDocsContain('real corpus suite test scope', '`testScope`');
@@ -6543,6 +6585,7 @@ if (scenario === 'single') {
     '`FONT_SPLIT_ROOT`',
     '`guidanceView`',
     '`projectStatusNotice`',
+    '`toolSafetyQuickReference`',
     '`recommendedWorkflowPlan`',
     '`nextToolDecisionSummary`',
     '`workflowQuickStart`',
