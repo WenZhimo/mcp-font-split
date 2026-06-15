@@ -256,6 +256,26 @@ const GUIDANCE_SECTION_FIELDS = {
   'path-rules': ['pathRules'],
   workflow: ['recommendedWorkflow', 'nextToolDecisionSummary', 'recommendedWorkflowPlan'],
 };
+const RAW_BATCH_OPTION_DEFAULTS = {
+  dryRun: false,
+  includeResults: true,
+  skipMode: 'manifest',
+  batchGroupBy: 'auto',
+  batchNamingMode: 'numeric-suffix',
+  batchDedupeMode: 'font-identity',
+  batchErrorMode: 'fail-after',
+  splitFailureAction: 'error',
+};
+const RAW_ORGANIZATION_OPTION_DEFAULTS = {
+  dryRun: true,
+  includePlan: true,
+  parseFonts: true,
+  batchGroupBy: 'auto',
+  batchNamingMode: 'numeric-suffix',
+  batchDedupeMode: 'font-identity',
+  copyInvalidFonts: false,
+  overwriteExisting: false,
+};
 let wasmRuntimePromise;
 let wasmPath;
 
@@ -1518,6 +1538,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Compact echo of the batch-related policies selected for this call, linked to the relevant batchPolicyGuide success criteria.',
     agentAction: 'Use this first to explain the effective grouping, naming, dedupe, and error policy for the response; then inspect the listed fields and satisfy policySuccessCriteria.',
+  },
+  configurationTrace: {
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
+    meaning: 'Machine-readable provenance for high-impact configuration values: raw tool default, workflowPreset default, or explicit argument.',
+    agentAction: 'Inspect this when explaining why a preset behaved a certain way or whether an explicit option overrode the preset. Undefined explicit values are ignored and do not erase preset defaults.',
   },
   dedupeDecisionSummary: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
@@ -3904,6 +3929,7 @@ export function getAgentGuidance(args = {}) {
       'workflowPreset',
       'batchPolicyGuide',
       'batchPolicySummary',
+      'configurationTrace',
       'batchGroupBy',
       'batchNamingMode',
       'batchDedupeMode',
@@ -4380,11 +4406,70 @@ function applyWorkflowPreset(args = {}, scope) {
   const explicitArgs = dropUndefinedOptions({ ...args, workflowPreset: undefined });
   return {
     workflowPreset,
+    presetDefaults: scopePreset,
+    explicitArgs,
     args: {
       ...scopePreset,
       ...explicitArgs,
       workflowPreset,
     },
+  };
+}
+
+function buildConfigurationTrace({
+  appliesToTool,
+  workflowPreset,
+  rawDefaults,
+  presetDefaults = {},
+  explicitArgs = {},
+  effectiveValues = {},
+}) {
+  const fieldNames = Object.keys(rawDefaults);
+  const fields = fieldNames.map((optionName) => {
+    const hasPresetDefault = Object.hasOwn(presetDefaults, optionName);
+    const hasExplicitValue = Object.hasOwn(explicitArgs, optionName);
+    const rawDefault = rawDefaults[optionName];
+    const presetDefault = presetDefaults[optionName];
+    const explicitValue = explicitArgs[optionName];
+    const effectiveValue = effectiveValues[optionName];
+    const source = hasExplicitValue
+      ? 'explicit-argument'
+      : hasPresetDefault
+        ? 'workflow-preset'
+        : 'raw-default';
+    return {
+      optionName,
+      source,
+      rawDefault,
+      ...(hasPresetDefault ? { presetDefault } : {}),
+      ...(hasExplicitValue ? { explicitValue } : {}),
+      effectiveValue,
+      presetOverridden: hasExplicitValue && hasPresetDefault && !Object.is(explicitValue, presetDefault),
+      changedFromRawDefault: !Object.is(effectiveValue, rawDefault),
+    };
+  });
+  const explicitOverrideFields = fields
+    .filter((field) => field.source === 'explicit-argument')
+    .map((field) => field.optionName);
+  const presetDefaultFields = fields
+    .filter((field) => field.source === 'workflow-preset')
+    .map((field) => field.optionName);
+  return {
+    summaryType: 'configuration-trace',
+    appliesToTool,
+    workflowPreset,
+    presetApplied: Boolean(workflowPreset),
+    explicitOptionsOverridePreset: true,
+    rawDefaultSource: 'raw-tool-defaults',
+    presetDefaultSource: workflowPreset ? `workflowPreset:${workflowPreset}` : null,
+    optionCount: fields.length,
+    explicitOverrideCount: explicitOverrideFields.length,
+    presetDefaultCount: presetDefaultFields.length,
+    explicitOverrideFields,
+    presetDefaultFields,
+    effectiveValues: Object.fromEntries(fields.map((field) => [field.optionName, field.effectiveValue])),
+    fields,
+    nonIntuitiveBehavior: 'workflowPreset values are applied before explicit arguments; explicit arguments with undefined are ignored and do not erase preset defaults.',
   };
 }
 
@@ -8266,6 +8351,23 @@ export async function splitFontBatch(args = {}) {
       'outputTreeInsideInputTree',
     ],
   });
+  const configurationTrace = buildConfigurationTrace({
+    appliesToTool: 'split_font_batch',
+    workflowPreset: batchOptions.workflowPreset,
+    rawDefaults: RAW_BATCH_OPTION_DEFAULTS,
+    presetDefaults: presetContext.presetDefaults,
+    explicitArgs: presetContext.explicitArgs,
+    effectiveValues: {
+      dryRun,
+      includeResults,
+      skipMode: batchOptions.skipMode,
+      batchGroupBy: batchOptions.batchGroupBy,
+      batchNamingMode: batchOptions.batchNamingMode,
+      batchDedupeMode: batchOptions.batchDedupeMode,
+      batchErrorMode: batchOptions.batchErrorMode,
+      splitFailureAction: processingOptions.splitFailureAction,
+    },
+  });
 
   const response = {
     ok: true,
@@ -8286,6 +8388,7 @@ export async function splitFontBatch(args = {}) {
     batchNamingMode: batchOptions.batchNamingMode,
     batchDedupeMode: batchOptions.batchDedupeMode,
     batchErrorMode: batchOptions.batchErrorMode,
+    configurationTrace,
     batchPolicySummary,
     scannedFileCount: allFiles.length,
     maxFiles,
@@ -8716,6 +8819,23 @@ export async function organizeFontDirectory(args = {}) {
       ? ['Identity dedupe is limited because parseFonts is false; rerun with parseFonts true before trusting semantic dedupe.']
       : [],
   });
+  const configurationTrace = buildConfigurationTrace({
+    appliesToTool: 'organize_font_directory',
+    workflowPreset: options.workflowPreset,
+    rawDefaults: RAW_ORGANIZATION_OPTION_DEFAULTS,
+    presetDefaults: presetContext.presetDefaults,
+    explicitArgs: presetContext.explicitArgs,
+    effectiveValues: {
+      dryRun: options.dryRun,
+      includePlan: options.includePlan,
+      parseFonts: options.parseFonts,
+      batchGroupBy: options.batchGroupBy,
+      batchNamingMode: options.batchNamingMode,
+      batchDedupeMode: options.batchDedupeMode,
+      copyInvalidFonts: options.copyInvalidFonts,
+      overwriteExisting: options.overwriteExisting,
+    },
+  });
   const directoryWorkflowSummary = buildDirectoryWorkflowSummary({
     options,
     inputDirRelative,
@@ -8795,6 +8915,7 @@ export async function organizeFontDirectory(args = {}) {
     batchGroupBy: options.batchGroupBy,
     batchNamingMode: options.batchNamingMode,
     batchDedupeMode: options.batchDedupeMode,
+    configurationTrace,
     batchPolicySummary,
     copyInvalidFonts: options.copyInvalidFonts,
     overwriteExisting: options.overwriteExisting,

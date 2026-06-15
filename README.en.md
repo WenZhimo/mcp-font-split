@@ -256,6 +256,8 @@ Use this only to learn the directory shape quickly. Because font parsing is skip
 
 Presets are starting points, not locked configurations. Omit `workflowPreset` when you want raw tool defaults. For example, `{"workflowPreset":"safe-preview","batchDedupeMode":"none"}` keeps the no-write preview behavior but disables dedupe.
 
+Batch and organization responses include `configurationTrace`, which explains whether each high-impact configuration value came from the raw tool default, the `workflowPreset` default, or an explicit argument in the same call. It also lists `explicitOverrideFields[]` and `presetDefaultFields[]`; when an agent needs to explain why a safe-preview option was enabled/disabled or whether an explicit value overrode the preset, inspect this field first.
+
 In batch mode, the output directory key is the bare `fontBaseName` unless another source has already claimed it. In that case the tool allocates a stable numeric suffix and reuses it on later reruns by manifest source matching.
 
 `batchGroupBy` details:

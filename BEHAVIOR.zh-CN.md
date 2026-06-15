@@ -387,7 +387,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 预设只是起点，不是锁定配置。工具会先展开 `workflowPreset`，再应用同一次调用中显式传入的参数；因此显式参数总是覆盖预设。例如 `workflowPreset: "safe-preview"` 加 `batchDedupeMode: "none"` 会保留无写入预览，但关闭去重。
 
-响应会回显实际使用的 `workflowPreset`。批量响应还会回显 `batchNamingMode` 和 `batchDedupeMode`，用于确认预设和显式覆盖后的最终策略。
+响应会回显实际使用的 `workflowPreset`。批量响应还会回显 `batchNamingMode` 和 `batchDedupeMode`，用于确认预设和显式覆盖后的最终策略。批量和目录整理响应还会返回 `configurationTrace`：它会逐项说明高影响配置来自原始工具默认值、`workflowPreset` 默认值还是显式参数，并给出 `explicitOverrideFields[]`、`presetDefaultFields[]` 和最终 `effectiveValue`。当 agent 需要解释配置来源、确认显式参数是否覆盖预设，或确认 `undefined` 没有擦除预设默认值时，应优先检查这个字段。
 
 ---
 

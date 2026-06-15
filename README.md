@@ -256,6 +256,8 @@ fonts/
 
 预设只是起点，不是锁定配置；需要原始工具默认值时直接省略 `workflowPreset`。例如 `{"workflowPreset":"safe-preview","batchDedupeMode":"none"}` 会保留无写入预览，但覆盖为不去重。
 
+批量和目录整理响应都会返回 `configurationTrace`，逐项说明高影响配置值来自原始工具默认值、`workflowPreset` 默认值，还是同一次调用里的显式参数。它也会列出 `explicitOverrideFields[]` 和 `presetDefaultFields[]`；当 agent 需要解释“为什么 safe-preview 仍然关闭/开启了某个选项”或“某个显式参数是否覆盖了预设”时，应先看这个字段。
+
 在批量模式下，输出目录 key 默认就是裸 `fontBaseName`；只有当该名字已经被别的源文件占用时，工具才会分配稳定的数字后缀，并在后续 rerun 中通过 manifest 复用。
 
 `batchGroupBy` 说明：

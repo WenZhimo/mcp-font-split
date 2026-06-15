@@ -60,6 +60,8 @@
 
 `toolOptionCatalog` 是输入侧的配套目录。它说明哪些选项会改变安全性、输出形态、响应体量、去重/命名语义或审计紧凑程度，并特别标出非直觉默认值，例如原始 `split_font_batch.dryRun: false`、`organize_font_directory.dryRun: true`、`parseFonts: false` 会限制 identity 去重，以及 `includeResults: false` / `includeFiles: false` 会产生紧凑响应。
 
+`configurationTrace` 会由 `split_font_batch` 和 `organize_font_directory` 返回。它记录高影响选项的来源（`raw-default`、`workflow-preset` 或 `explicit-argument`）、`rawDefault`、可选 `presetDefault`、可选 `explicitValue`、最终 `effectiveValue`，以及 `explicitOverrideFields[]` 和 `presetDefaultFields[]`。当 agent 需要解释预设行为，或确认同一次调用里的显式参数是否覆盖了预设时，应先检查它；显式传入 `undefined` 不会擦除预设默认值。
+
 `fontIdentityBasisCatalog` 是 identity 侧的配套目录。解释 `identityBasis` 或 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 前应先看它；路径级、缺失或低置信度 family-only basis 不应被报告成完整语义去重证据。
 
 `outputStructureCatalog` 是输出审计侧的配套目录。解释 `outputStructureDecision`、`structureSummary.layoutKind` 或 `structureSummary.issues[].code` 前应先看它；`ok:true` 只表示检查调用完成，不表示输出目录结构已经通过。

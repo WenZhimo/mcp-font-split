@@ -1963,6 +1963,42 @@ function assertBatchPolicySummary(summary, { context, appliesToTool, expectedVal
   }
 }
 
+function assertConfigurationTrace(trace, {
+  context,
+  appliesToTool,
+  workflowPreset,
+  expectedSources = {},
+  expectedEffectiveValues = {},
+  expectedExplicitOverrideFields = [],
+}) {
+  if (
+    !trace
+    || trace.summaryType !== 'configuration-trace'
+    || trace.appliesToTool !== appliesToTool
+    || trace.workflowPreset !== workflowPreset
+    || !Array.isArray(trace.fields)
+    || !Array.isArray(trace.explicitOverrideFields)
+  ) {
+    throw new Error(`${context}: expected configurationTrace to summarize configuration source for ${appliesToTool}.`);
+  }
+  const fieldsByName = Object.fromEntries(trace.fields.map((field) => [field.optionName, field]));
+  for (const [optionName, source] of Object.entries(expectedSources)) {
+    if (fieldsByName[optionName]?.source !== source) {
+      throw new Error(`${context}: expected configurationTrace ${optionName} source to be ${source}.`);
+    }
+  }
+  for (const [optionName, value] of Object.entries(expectedEffectiveValues)) {
+    if (!Object.is(fieldsByName[optionName]?.effectiveValue, value)) {
+      throw new Error(`${context}: expected configurationTrace ${optionName} effectiveValue to be ${value}.`);
+    }
+  }
+  for (const optionName of expectedExplicitOverrideFields) {
+    if (!trace.explicitOverrideFields.includes(optionName)) {
+      throw new Error(`${context}: expected configurationTrace explicitOverrideFields to include ${optionName}.`);
+    }
+  }
+}
+
 function assertSourceSafetyDecision(decision, {
   context,
   appliesToTool,
@@ -2746,6 +2782,13 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('configurationRecipes')) {
     throw new Error('Expected agent guidance to recommend checking configuration recipes.');
   }
+  if (
+    !result.responseFieldsToCheck?.includes('configurationTrace')
+    || result.toolResponseFieldCatalog?.configurationTrace?.sourceTools?.[0] !== 'split_font_batch'
+    || !result.toolResponseFieldCatalog?.configurationTrace?.agentAction?.includes('overrode the preset')
+  ) {
+    throw new Error('Expected agent guidance to explain configurationTrace for preset and explicit override provenance.');
+  }
   if (!result.responseFieldsToCheck?.includes('unsupportedFileCategoryCatalog')) {
     throw new Error('Expected agent guidance to recommend checking unsupportedFileCategoryCatalog.');
   }
@@ -3265,6 +3308,7 @@ if (scenario === 'single') {
     workflowPreset: 'split_font_batch',
     batchPolicyGuide: 'get_agent_guidance',
     batchPolicySummary: 'split_font_batch',
+    configurationTrace: 'split_font_batch',
     batchGroupBy: 'split_font_batch',
     batchNamingMode: 'split_font_batch',
     batchDedupeMode: 'split_font_batch',
@@ -5355,6 +5399,22 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected omitted workflowPreset to use raw defaults and report workflowPreset null.');
   }
+  assertConfigurationTrace(rawDefaultPreview.configurationTrace, {
+    context: 'workflow-presets raw batch defaults',
+    appliesToTool: 'split_font_batch',
+    workflowPreset: null,
+    expectedSources: {
+      dryRun: 'explicit-argument',
+      includeResults: 'explicit-argument',
+      batchDedupeMode: 'raw-default',
+    },
+    expectedEffectiveValues: {
+      dryRun: true,
+      includeResults: true,
+      batchDedupeMode: 'font-identity',
+    },
+    expectedExplicitOverrideFields: ['dryRun', 'includeResults'],
+  });
 
   const safePreview = await splitFontBatch({
     inputDir,
@@ -5387,6 +5447,21 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected safe-preview preset to apply no-write safe batch defaults.');
   }
+  assertConfigurationTrace(safePreview.configurationTrace, {
+    context: 'workflow-presets safe-preview batch',
+    appliesToTool: 'split_font_batch',
+    workflowPreset: 'safe-preview',
+    expectedSources: {
+      dryRun: 'workflow-preset',
+      includeResults: 'workflow-preset',
+      batchDedupeMode: 'workflow-preset',
+    },
+    expectedEffectiveValues: {
+      dryRun: true,
+      includeResults: true,
+      batchDedupeMode: 'font-identity',
+    },
+  });
   if (await fsExists(outputRoot)) {
     throw new Error('Expected safe-preview preset not to create outputRoot.');
   }
@@ -5452,6 +5527,21 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected explicit batch arguments to override structure-first preset defaults.');
   }
+  assertConfigurationTrace(structureFirstBatchOverride.configurationTrace, {
+    context: 'workflow-presets structure-first batch override',
+    appliesToTool: 'split_font_batch',
+    workflowPreset: 'structure-first',
+    expectedSources: {
+      dryRun: 'workflow-preset',
+      includeResults: 'explicit-argument',
+      batchDedupeMode: 'explicit-argument',
+    },
+    expectedEffectiveValues: {
+      includeResults: true,
+      batchDedupeMode: 'font-identity',
+    },
+    expectedExplicitOverrideFields: ['includeResults', 'batchDedupeMode'],
+  });
 
   const undefinedOverridePreview = await splitFontBatch({
     inputDir,
@@ -5466,6 +5556,19 @@ if (scenario === 'single') {
   if (undefinedOverridePreview.dryRun !== true || undefinedOverridePreview.resultsIncluded !== true) {
     throw new Error('Expected undefined explicit values not to erase workflowPreset defaults.');
   }
+  assertConfigurationTrace(undefinedOverridePreview.configurationTrace, {
+    context: 'workflow-presets undefined batch override',
+    appliesToTool: 'split_font_batch',
+    workflowPreset: 'safe-preview',
+    expectedSources: {
+      dryRun: 'workflow-preset',
+      includeResults: 'workflow-preset',
+    },
+    expectedEffectiveValues: {
+      dryRun: true,
+      includeResults: true,
+    },
+  });
 
   const structureFirst = await organizeFontDirectory({
     inputDir,
@@ -5483,6 +5586,23 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected structure-first preset to apply no-write metadata-free organization defaults.');
   }
+  assertConfigurationTrace(structureFirst.configurationTrace, {
+    context: 'workflow-presets structure-first organization',
+    appliesToTool: 'organize_font_directory',
+    workflowPreset: 'structure-first',
+    expectedSources: {
+      dryRun: 'workflow-preset',
+      parseFonts: 'workflow-preset',
+      includePlan: 'workflow-preset',
+      batchDedupeMode: 'workflow-preset',
+    },
+    expectedEffectiveValues: {
+      dryRun: true,
+      parseFonts: false,
+      includePlan: false,
+      batchDedupeMode: 'font-identity',
+    },
+  });
 
   const explicitOverride = await organizeFontDirectory({
     inputDir,
@@ -5500,6 +5620,23 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected explicit organization arguments to override workflowPreset defaults.');
   }
+  assertConfigurationTrace(explicitOverride.configurationTrace, {
+    context: 'workflow-presets explicit organization override',
+    appliesToTool: 'organize_font_directory',
+    workflowPreset: 'structure-first',
+    expectedSources: {
+      dryRun: 'workflow-preset',
+      parseFonts: 'explicit-argument',
+      includePlan: 'explicit-argument',
+      batchDedupeMode: 'workflow-preset',
+    },
+    expectedEffectiveValues: {
+      parseFonts: true,
+      includePlan: true,
+      batchDedupeMode: 'font-identity',
+    },
+    expectedExplicitOverrideFields: ['parseFonts', 'includePlan'],
+  });
 
   console.log(JSON.stringify({
     safePreview,
@@ -5917,6 +6054,7 @@ if (scenario === 'single') {
       'configurationRecipes',
       'batchPolicyGuide',
       'batchPolicySummary',
+      'configurationTrace',
       'dedupeDecisionSummary',
       'identityEvidenceSummary',
       'fontIdentityBasisCatalog',
@@ -6119,6 +6257,7 @@ if (scenario === 'single') {
     '`toolOptionCatalog`',
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
+    '`configurationTrace`',
     '`dedupeDecisionSummary`',
     '`identityEvidenceSummary`',
     '`fontIdentityBasisCatalog`',
