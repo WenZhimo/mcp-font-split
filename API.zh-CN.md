@@ -14,11 +14,13 @@
 | `detailLevel` | `compact`, `full` | `compact` | 响应体量。`compact` 保留工作流关键 section，并默认省略较大的 catalog / 示例；`full` 返回全部指南 section。 |
 | `sections` | section 名称数组 | 不设置 | 聚焦返回指定 section。设置后会覆盖 `detailLevel` 的默认 section 集。 |
 
-响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchCustomizationQuickReference[]`、`directoryOrganizationQuickAnswer`、`batchPolicyGuide`、`toolOptionCatalog`、`fontIdentityBasisCatalog`、`outputStructureCatalog`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、`projectStatusNotice`、默认策略、`configurationRecipes[]`、`batchCustomizationQuickReference[]`、`directoryOrganizationQuickAnswer`、`batchPolicyGuide`、`toolOptionCatalog`、`fontIdentityBasisCatalog`、`outputStructureCatalog`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
 当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog", "identity-catalog", "output-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
 
 如果只需要最小路线响应，可用 `workflow: "organize"` 搭配 `sections: ["workflow"]`，然后检查 `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`。其中嵌套的 `workflowQuickStart.recommendedCallExample` 对象就是可复制的第一步调用。对于结构不确定的源目录，推荐调用应是无写入的 `organize_font_directory` safe preview（`workflowPreset: "safe-preview"`），并且 `writesFiles: false`、`sourceDestructive: false`。只有当用户明确需要暂存目录，或实际响应要求切换分支时，才使用其中的 `alternateCallExamples[]`。
+
+`projectStatusNotice` 会用机器可读形式记录预发布变更策略。它说明项目仍在完善中、`formalRelease` 为 false、响应字段/默认值/目录策略可能变化；如果未发布字段的前向兼容垫片增加噪声或和当前行为冲突，应移除。agent 应把当前仓库代码、实时 MCP schema、`get_agent_guidance`、`API.md` / `API.zh-CN.md` 和 `BEHAVIOR.zh-CN.md` 当作权威来源。
 
 `configurationRecipes[]` 会把常见用户意图映射成 preset-first 调用和取舍说明。当前覆盖默认安全批量、保留每个源字体、按源目录分组、按字体 metadata 分组、快速结构优先扫描、copy-only 暂存整理，以及大库审查后写入。每个配方都会包含 `inspectFields` 和 `successCriteria`。配方只是指南，不是成功证明；agent 仍必须实际运行预览/写入工具，检查这些字段，并满足对应条件。
 
@@ -76,7 +78,7 @@
 |---------|------|
 | `workspace` | 工作区根目录和路径基准信息。 |
 | `tools` | 工具清单，以及每个工具适合在什么时候调用。 |
-| `defaults` | 重要默认策略和支持的字体扩展名。 |
+| `defaults` | `projectStatusNotice`、重要默认策略和支持的字体扩展名。 |
 | `recommendations` | 推荐的批量、检查和目录整理参数，以及 `workflowPresets[]`、`batchCustomizationQuickReference[]`、`batchPolicyGuide`、`configurationRecipes[]`、`fontIdentityBasisCatalog`、`outputStructureCatalog` 和 `unsupportedFileCategoryCatalog`。 |
 | `directory-workflows` | `directoryOrganizationQuickAnswer`，以及面向扁平、嵌套、混合、嘈杂和暂存目录场景的目录工作流决策数据。 |
 | `examples` | 具体源目录示例；在 `full` 详情或显式请求时返回。 |

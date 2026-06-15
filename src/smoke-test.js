@@ -2720,6 +2720,7 @@ if (scenario === 'single') {
     || Object.hasOwn(defaultGuidance, 'toolResponseFieldCatalog')
     || !defaultGuidance.errorResponseCatalog?.configurationError
     || Object.hasOwn(defaultGuidance, 'directoryWorkflowExamples')
+    || defaultGuidance.projectStatusNotice?.summaryType !== 'project-status-notice'
     || !defaultGuidance.safeInvocationTemplates?.length
     || defaultGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !defaultGuidance.directoryHandlingModeCatalog?.['preview-original-input']
@@ -2766,6 +2767,7 @@ if (scenario === 'single') {
     || Object.hasOwn(compactGuidance, 'toolResponseFieldCatalog')
     || !compactGuidance.errorResponseCatalog?.configurationError
     || Object.hasOwn(compactGuidance, 'directoryWorkflowExamples')
+    || compactGuidance.projectStatusNotice?.summaryType !== 'project-status-notice'
     || !compactGuidance.safeInvocationTemplates?.length
     || compactGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !compactGuidance.directoryHandlingModeCatalog?.['preview-organized-output']
@@ -2867,6 +2869,24 @@ if (scenario === 'single') {
   }
   if (!result.responseFieldsToCheck?.includes('cnFontSplit.runtimeVersion')) {
     throw new Error('Expected agent guidance to recommend checking cn-font-split runtime details.');
+  }
+  if (
+    !result.responseFieldsToCheck?.includes('projectStatusNotice')
+    || result.toolResponseFieldCatalog?.projectStatusNotice?.sourceTools?.[0] !== 'get_agent_guidance'
+    || !result.toolResponseFieldCatalog?.projectStatusNotice?.agentAction?.includes('current')
+  ) {
+    throw new Error('Expected agent guidance to expose projectStatusNotice as the pre-release change policy.');
+  }
+  if (
+    result.projectStatusNotice?.summaryType !== 'project-status-notice'
+    || result.projectStatusNotice?.formalRelease !== false
+    || result.projectStatusNotice?.forwardCompatibilityPolicy?.required !== false
+    || result.projectStatusNotice?.forwardCompatibilityPolicy?.removeUnreleasedCompatibilityCruft !== true
+    || !result.projectStatusNotice?.authoritativeSources?.includes('get_agent_guidance')
+    || !result.projectStatusNotice?.authoritativeSources?.includes('API.md / API.zh-CN.md')
+    || !result.projectStatusNotice?.nonIntuitiveBehavior?.some((item) => item.includes('may change'))
+  ) {
+    throw new Error('Expected projectStatusNotice to describe pre-release status, current-source authority, and no forward-compatibility requirement.');
   }
   if (!result.responseFieldsToCheck?.includes('workflowPresets') || !result.responseFieldsToCheck?.includes('workflowPreset')) {
     throw new Error('Expected agent guidance to recommend checking workflow preset fields.');
@@ -3438,6 +3458,7 @@ if (scenario === 'single') {
   const expectedFieldCatalogEntries = {
     workflowPresets: 'get_agent_guidance',
     workflowPreset: 'split_font_batch',
+    projectStatusNotice: 'get_agent_guidance',
     batchPolicyGuide: 'get_agent_guidance',
     batchCustomizationQuickReference: 'get_agent_guidance',
     batchPolicySummary: 'split_font_batch',
@@ -6241,7 +6262,7 @@ if (scenario === 'single') {
       assertEnumMatches(`organize_font_directory ${optionName}`, getSchemaEnumValues(organizeProps[optionName]), expectedValues);
     }
     assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
-    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchCustomizationQuickReference', 'directoryOrganizationQuickAnswer', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['projectStatusNotice', 'nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchCustomizationQuickReference', 'directoryOrganizationQuickAnswer', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'recommendedNextActions[].suggestedArgsField', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'without writing output', 'organize_font_directory safe-preview', 'maxFiles', 'preserves']);
@@ -6298,6 +6319,7 @@ if (scenario === 'single') {
     }
     for (const fieldName of [
       'guidanceView',
+      'projectStatusNotice',
       'recommendedWorkflowPlan',
       'nextToolDecisionSummary',
       'workflowQuickStart',
@@ -6508,6 +6530,7 @@ if (scenario === 'single') {
   for (const token of [
     '`FONT_SPLIT_ROOT`',
     '`guidanceView`',
+    '`projectStatusNotice`',
     '`recommendedWorkflowPlan`',
     '`nextToolDecisionSummary`',
     '`workflowQuickStart`',

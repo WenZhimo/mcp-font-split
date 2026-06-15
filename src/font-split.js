@@ -240,7 +240,7 @@ const GUIDANCE_COMPACT_SECTION_NAMES = [
 const GUIDANCE_SECTION_FIELDS = {
   workspace: ['workspace'],
   tools: ['tools', 'supportedExtensions'],
-  defaults: ['defaultPolicies'],
+  defaults: ['projectStatusNotice', 'defaultPolicies'],
   recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets', 'batchCustomizationQuickReference', 'batchPolicyGuide', 'configurationRecipes', 'unsupportedFileCategoryCatalog', 'fontIdentityBasisCatalog', 'outputStructureCatalog'],
   'directory-workflows': ['directoryOrganizationQuickAnswer', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix'],
   examples: ['directoryWorkflowExamples'],
@@ -1103,6 +1103,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Summary of get_agent_guidance response shaping, including detailLevel, included sections, omitted sections, and available sections.',
     agentAction: 'Use this to decide whether to request full guidance or additional sections before relying on omitted catalogs or examples.',
+  },
+  projectStatusNotice: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Machine-readable pre-release status and change policy for this package.',
+    agentAction: 'Use current repository code, current get_agent_guidance, live MCP schema, and current API docs as authoritative; do not preserve stale behavior solely for forward compatibility before formal release.',
   },
   wasm: {
     sourceTools: ['get_runtime_status'],
@@ -2598,6 +2603,35 @@ function buildBatchCustomizationQuickReference() {
       nonIntuitiveBehavior: 'collect can return ok:true with errors[], so ok:true alone is not proof that the batch fully succeeded.',
     },
   ];
+}
+
+function buildProjectStatusNotice() {
+  return {
+    summaryType: 'project-status-notice',
+    status: 'actively-being-refined',
+    formalRelease: false,
+    stability: 'pre-release',
+    directAnswer: 'This project is still being refined and has not been formally released; interfaces, defaults, response fields, directory-organization policy, and docs may change.',
+    authoritativeSources: [
+      'current repository code',
+      'get_agent_guidance',
+      'live MCP tool schema',
+      'API.md / API.zh-CN.md',
+      'BEHAVIOR.zh-CN.md',
+    ],
+    forwardCompatibilityPolicy: {
+      required: false,
+      reason: 'The package is not formally released yet.',
+      removeUnreleasedCompatibilityCruft: true,
+      avoidPreservingStaleBehavior: true,
+    },
+    agentAction: 'Use current code, live schema, get_agent_guidance, and current docs as authoritative. When improving this package before formal release, prefer clear current behavior over preserving stale compatibility fields.',
+    nonIntuitiveBehavior: [
+      'Pre-release response fields and defaults may change when that makes the tool easier to understand or safer for agents.',
+      'Compatibility shims for unreleased fields should be removed when they add noise or contradict current behavior.',
+      'After updating the package, rerun get_agent_guidance instead of relying on older conversation memory.',
+    ],
+  };
 }
 
 function buildDirectoryOrganizationQuickAnswer() {
@@ -4156,6 +4190,7 @@ export function getAgentGuidance(args = {}) {
       { name: 'inspect_split_output', useWhen: 'Audit generated output structure and manifests.' },
     ],
     supportedExtensions: [...FONT_EXTENSIONS],
+    projectStatusNotice: buildProjectStatusNotice(),
     defaultPolicies: {
       batchNamingMode: 'numeric-suffix',
       batchDedupeMode: 'font-identity',
@@ -4220,6 +4255,7 @@ export function getAgentGuidance(args = {}) {
       'cnFontSplit.packageVersion',
       'cnFontSplit.runtimeVersion',
       'recommendedActions',
+      'projectStatusNotice',
       'workflowPresets',
       'workflowPreset',
       'batchCustomizationQuickReference',

@@ -54,6 +54,7 @@
 
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。工具响应和 `recommendedNextActions[].suggestedArgs` 中会用 `.` 表示工作区根目录，不会用空字符串表示根目录。
 - 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、`toolOptionCatalog` 工具选项目录、`outputStructureCatalog` 输出结构审计目录、必须检查的响应字段、完成验证清单、`errorResponseCatalog`，以及用于解读本地真实语料 smoke 输出的 `localVerificationOutputGuide`。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
+- `get_agent_guidance` 会返回 `projectStatusNotice`，把“仍在完善中、尚未正式发布”变成机器可读策略：接口、默认值、响应字段和目录整理策略都可能变化；自动化时应以当前代码、实时 MCP schema、`get_agent_guidance` 和当前 API 文档为准，不需要为了未发布字段保留前向兼容冗余。
 - 对维护本包的 agent，`get_agent_guidance.verificationChecklist[]` 包含 `local-compact-check-passed` 和 `local-real-corpus-suite-passed`：前者指向 `npm run check:compact`，用于低噪声读取普通本地门禁；后者指向 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，作为影响功能行为的改动完成前的本机真实语料可靠性门禁。
 - `get_agent_guidance` 会返回 `configurationRecipes[]`，把常见意图映射成 preset-first 参数，例如保留全部源字体、按源目录分组、按字体 metadata 分组、快速结构扫描、copy-only 暂存整理或大库审查后写入。配方只是安全起点，仍必须运行预览/写入工具，检查列出的 `inspectFields`，并满足 `successCriteria`。
 - `get_agent_guidance` 会返回 `batchCustomizationQuickReference[]`，这是比 `batchPolicyGuide` 更短的批量自定义速查表：把“保留每个源字体”“按源目录/metadata 分组”“使用裸名或来源后缀”“收集错误”等用户意图映射到最小 `overrideArgs`、可复制的 `safe-preview` / `reviewed-write` 参数、必须检查的字段和非直觉行为。
