@@ -43,7 +43,7 @@
 | `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count、坏字体清单、目录布局和第一步路线建议。 |
 | `split_font_batch` | 扫描目录、按 `batchDedupeMode` 去重、按家族目录分组，并处理每个选中的字体。 |
 | `organize_font_directory` | 生成目录整理计划，或把源字体复制整理到暂存目录。默认 `dryRun: true`；不会移动或删除源文件。 |
-| `inspect_split_output` | 汇总输出目录，并优先使用 `split-meta.json` 对 family/font 条目做结构化分类。 |
+| `inspect_split_output` | 汇总输出目录，先用 `outputRoleDecision` 判断目录角色，再优先使用 `split-meta.json` 对 family/font 条目做结构化分类。 |
 
 ## 重要行为摘要
 
@@ -63,7 +63,7 @@
 - `get_agent_guidance` 会返回 `batchPolicyGuide`，这是批量策略自定义指南，覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个选项值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前的 `successCriteria`。
 - `get_agent_guidance` 默认还会返回 `toolOptionCatalog`，这是高影响输入参数的机器可读目录。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的默认值、允许值、安全写入语义、非直觉行为，以及改写参数后应检查哪些响应字段；只想看它时可请求 `sections: ["option-catalog"]`。
 - `get_agent_guidance` 默认还会返回 `fontIdentityBasisCatalog`，解释 `identityBasis` 和 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 里的取值、OpenType name ID 来源、可信度，以及是否能支撑语义字体等价判断；只想看这部分时可请求 `sections: ["identity-catalog"]`。
-- `get_agent_guidance` 默认还会返回 `outputStructureCatalog`，解释 `inspect_split_output` 的审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式和容易误读的通过条件；只想看这部分时可请求 `sections: ["output-catalog"]`。解释输出审计前先看它，不要把 `ok: true` 当成输出结构已经通过。
+- `get_agent_guidance` 默认还会返回 `outputStructureCatalog`，解释 `inspect_split_output` 的 `outputRoleDecision`、审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式和容易误读的通过条件；只想看这部分时可请求 `sections: ["output-catalog"]`。解释输出审计前先看它，不要把 `ok: true` 当成输出结构已经通过。
 - `get_agent_guidance` 还会返回 `unsupportedFileCategoryCatalog`，解释 `unsupportedFileSummary.byCategory[]` 中 `archive`、`document`、`unsupported-font` 等分类的代表扩展名和处理行为；每个工具响应里的 `unsupportedFileDecision` 会给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则提供证据，压缩包只会被报告，不会被解压、复制或拆分。
 - 输入扫描类工具会返回 `inputCountGuide`，用一个紧凑对象解释扫描文件数、支持字体数、忽略文件数、`maxFilesHit` 是否导致计数不完整、文件明细是否被故意省略，以及非字体文件的处理方式。把真实语料计数当作完整结论前应先看它。
 - `inspect_font_inputs` 还会返回 `inputDirectoryDecision`、`layout` 和 `recommendedBatchPreviewArgs`。这是无写入的第一步 triage：它会提示应调高 `maxFiles`、先处理坏字体、直接做 `split_font_batch` safe-preview，还是先做非破坏性的 `organize_font_directory` safe-preview；它不是整理计划或拆分成功证明。返回的安全预览参数会通过 `recommendedBatchPreviewArgs.maxFiles` 保留本次扫描上限，复制下一步调用时不会意外退回默认值。
@@ -145,7 +145,7 @@ organized-fonts/
 ```
 
 这个暂存目录不是拆分结果，也不包含 CSS。它只是一个 copy-only 的整理辅助输出，用于在后续 `split_font_batch` 前准备更稳定的源目录。
-整理响应还会包含 `stagingDirectoryDecision`，明确把 `outputDir` 标记为源目录式暂存（`isSplitOutput: false`），并提示先用 `inspect_font_inputs` 检查暂存目录，再用 `split_font_batch` 做 safe-preview；只有后续真正生成拆分输出后，才用 `inspect_split_output` 审计输出结构。
+整理响应还会包含 `stagingDirectoryDecision`，明确把 `outputDir` 标记为源目录式暂存（`isSplitOutput: false`），并提示先用 `inspect_font_inputs` 检查暂存目录，再用 `split_font_batch` 做 safe-preview；只有后续真正生成拆分输出后，才用 `inspect_split_output` 审计输出结构。如果误把包含 `font-organization-manifest.json` 的暂存目录传给 `inspect_split_output`，响应里的 `outputRoleDecision.isSplitOutput` 会是 `false`，`auditStatus` 会变成 `action-required`，并给出 `organized-staging-not-split-output` 警告。
 
 ## 常见源目录形态
 
@@ -392,14 +392,15 @@ fonts/
 - 解释审计状态、布局或 issue code 时，优先查 `get_agent_guidance.outputStructureCatalog`。其中 `layoutKinds` 解释 `structureSummary.layoutKind`，`issueCodes` 解释 `structureSummary.issues[].code`，`outputModes` 解释 `subset`、`single-woff2` 和 `copy-original` 的必需文件差异。
 - `maxFiles` 可以调整输出扫描上限；默认是 `200000`，避免大型批量输出在检查时被截断。
 - `maxFilesHit` 只有当 `maxFiles` 之外确实还有更多输出文件时才为 true。
-- `outputStructureDecision` 是从 `auditStatus`、`auditBlockingReasons`、`maxFilesHit` 和 `structureSummary` 派生的快速判断；先看 `status`、`recommendedAction`、`blockingReasonCodes` 和 `issueCodes`。
+- `outputRoleDecision` 是第一层目录角色判断。若 `outDir` 含有 `font-organization-manifest.json`，会被判定为 `organized-font-source-staging`，`auditAppliesToThisDirectory: false`，推荐先对该目录运行 `inspect_font_inputs`，再运行 `split_font_batch` safe-preview；不要把它当作拆分输出审计通过。
+- `outputStructureDecision` 是从 `outputRoleDecision`、`auditStatus`、`auditBlockingReasons`、`maxFilesHit` 和 `structureSummary` 派生的快速判断；先看 `status`、`recommendedAction`、`blockingReasonCodes` 和 `issueCodes`。
 - `auditStatus` 是紧凑审计门禁，取值为 `pass`、`action-required` 或 `incomplete`；真实输出审计只有在它为 `pass` 时才应视为完成。
 - `auditPassed` 是 `auditStatus === "pass"` 的布尔快捷字段。
 - `auditBlockingReasons[]` 会列出阻止审计通过的机器可读原因；结构问题会带上来自 `structureSummary.issues[]` 的 `issueCodes`。
 - `includeFiles: false` 会省略扁平 `files[]`，但保留摘要计数。
 - `includeFamilies: false` 会省略结构化 `families[]`，但保留 family 和输出模式计数。
-- `inspectionWarningCount` 和 `inspectionWarnings[]` 会用机器可读 `code` 汇总截断、详情数组省略、manifest 缺失和结构问题等状态。
-- `structureSummary` 检查输出目录是否符合文档化结构；真实批量写入后应调用 `inspect_split_output`，只有 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才表示没有发现杂项文件、manifest 缺失或输出模式文件缺失等结构问题。
+- `inspectionWarningCount` 和 `inspectionWarnings[]` 会用机器可读 `code` 汇总截断、详情数组省略、manifest 缺失、结构问题和暂存目录误用等状态。
+- `structureSummary` 检查输出目录是否符合文档化结构；真实批量写入后应调用 `inspect_split_output`，只有 `outputRoleDecision.auditAppliesToThisDirectory !== false`、`outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才表示没有发现杂项文件、manifest 缺失或输出模式文件缺失等结构问题。
 - `copy-original` 条目只要求 `split-meta.json`；它故意不生成 CSS 或 WOFF2，因此不能把这类缺失直接视为结构失败。
 - `familyCount`
 - `fontEntryCount`

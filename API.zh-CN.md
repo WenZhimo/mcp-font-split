@@ -36,7 +36,7 @@
 
 `fontIdentityBasisCatalog` 默认返回，也可通过 `sections: ["identity-catalog"]` 聚焦请求。它解释 `inspect_font_inputs` 中 `identityBasis` 的取值，以及去重响应里 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 汇总的 basis。每个条目都会说明采用的 OpenType name ID、置信度、是否能作为语义 identity 证据，以及 agent 可以怎样解释重复决策。
 
-`outputStructureCatalog` 默认返回，也可通过 `sections: ["output-catalog"]` 聚焦请求。它解释 `inspect_split_output` 的审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式、通过条件和非直觉行为，例如 `ok:true` 不代表结构通过、`includeFiles:false` / `includeFamilies:false` 只省略数组不省略审计，以及 `copy-original` 本来就没有 CSS/WOFF2 输出。
+`outputStructureCatalog` 默认返回，也可通过 `sections: ["output-catalog"]` 聚焦请求。它解释 `inspect_split_output` 的 `outputRoleDecision`、审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式、通过条件和非直觉行为，例如 `ok:true` 不代表结构通过、整理暂存目录不是生成后的拆分输出、`includeFiles:false` / `includeFamilies:false` 只省略数组不省略审计，以及 `copy-original` 本来就没有 CSS/WOFF2 输出。
 
 `unsupportedFileCategoryCatalog` 会解释 `unsupportedFileSummary.byCategory[]` 使用的分类，包括代表性扩展名、分类含义和处理行为。工具响应也会提供用于快速判断的 `unsupportedFileDecision`，以及作为证据的 `unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary`，agent 不必再次查 guidance 也能解释它们。尤其是 `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
 
@@ -72,7 +72,7 @@
 
 `fontIdentityBasisCatalog` 是 identity 侧的配套目录。解释 `identityBasis` 或 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 前应先看它；路径级、缺失或低置信度 family-only basis 不应被报告成完整语义去重证据。
 
-`outputStructureCatalog` 是输出审计侧的配套目录。解释 `outputStructureDecision`、`structureSummary.layoutKind` 或 `structureSummary.issues[].code` 前应先看它；`ok:true` 只表示检查调用完成，不表示输出目录结构已经通过。
+`outputStructureCatalog` 是输出审计侧的配套目录。解释 `outputRoleDecision`、`outputStructureDecision`、`structureSummary.layoutKind` 或 `structureSummary.issues[].code` 前应先看它；`ok:true` 只表示检查调用完成，不表示输出目录结构已经通过。
 
 指南 section 名称：
 
@@ -399,13 +399,14 @@
 |------|------|
 | `familyCount` | 检测到的 family 目录数量。 |
 | `maxFilesHit` | 只有当 `maxFiles` 之外确实还存在更多输出文件时才为 `true`。 |
-| `outputStructureDecision` | 从 `auditStatus`、`auditBlockingReasons`、`maxFilesHit` 和 `structureSummary` 派生的快速机器可读判断。先看 `status`、`recommendedAction`、`blockingReasonCodes` 和 `issueCodes`；精确证据再看 `structureSummary`。 |
+| `outputRoleDecision` | `inspect_split_output` 的第一层目录角色判断。如果 `outDir` 包含 `font-organization-manifest.json`，会被判定为整理暂存（`detectedRole: "organized-font-source-staging"`、`isSplitOutput: false`、`auditAppliesToThisDirectory: false`），不是生成后的拆分输出；此时应使用 `suggestedInspectInputArgs` 和 `suggestedBatchPreviewArgs`，不要把输出审计当作通过。 |
+| `outputStructureDecision` | 从 `outputRoleDecision`、`auditStatus`、`auditBlockingReasons`、`maxFilesHit` 和 `structureSummary` 派生的快速机器可读判断。先看 `status`、`recommendedAction`、`blockingReasonCodes` 和 `issueCodes`；精确证据再看 `structureSummary`。 |
 | `auditStatus` | 紧凑审计门禁：`pass`、`action-required` 或 `incomplete`。真实输出审计只有在它为 `pass` 时才应视为完成。 |
 | `auditPassed` | `auditStatus === "pass"` 的布尔快捷字段。 |
-| `auditBlockingReasons[]` | 阻止审计通过的机器可读原因，例如 `output-scan-truncated` 或 `output-structure-issues`；结构问题会带上来自 `structureSummary.issues[]` 的 `issueCodes`。 |
+| `auditBlockingReasons[]` | 阻止审计通过的机器可读原因，例如 `not-split-output`、`output-scan-truncated` 或 `output-structure-issues`；结构问题会带上来自 `structureSummary.issues[]` 的 `issueCodes`。 |
 | `filesIncluded` / `familiesIncluded` | 响应中是否包含 `files[]` 和 `families[]`。 |
-| `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略、manifest 缺失和输出结构问题等状态。 |
-| `structureSummary` | 机器可读输出结构审计。真实批量写入后，只有 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为审计完成。`conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`。 |
+| `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略、manifest 缺失、输出结构问题，以及 `organized-staging-not-split-output` 这类整理暂存目录误用。 |
+| `structureSummary` | 机器可读输出结构审计。真实批量写入后，只有 `outputRoleDecision.auditAppliesToThisDirectory !== false`、`outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为审计完成。`conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`。 |
 | `structureSummary.layoutKind` | 检测到的输出布局，例如 `single-family`、`family-tree`、`mixed`、`empty` 或 `unknown`；判断 `outDir` 是否指向正确层级前，应先查 `outputStructureCatalog.layoutKinds`。 |
 | `structureSummary.issues[].code` | 机器可读结构问题代码，例如 `missing-manifests`、`unexpected-output-files` 或 `web-output-missing`；解释审计结果前，应先查 `outputStructureCatalog.issueCodes`。 |
 | `fontEntryCount` | 检测到的字体输出条目数量。 |

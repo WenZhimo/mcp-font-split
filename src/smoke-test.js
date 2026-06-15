@@ -2923,6 +2923,7 @@ if (scenario === 'single') {
   const batchSafety = safetyEntryByTool.get('split_font_batch');
   const singleSafety = safetyEntryByTool.get('split_font');
   const inspectSafety = safetyEntryByTool.get('inspect_font_inputs');
+  const outputInspectSafety = safetyEntryByTool.get('inspect_split_output');
   if (
     toolSafetyQuickReference.summaryType !== 'tool-safety-quick-reference'
     || safetyEntryByTool.size !== 7
@@ -2941,6 +2942,7 @@ if (scenario === 'single') {
     || batchSafety?.outputAuditRequiredAfterWrite !== true
     || singleSafety?.defaultWritesFiles !== true
     || singleSafety?.sourceDestructive !== false
+    || !outputInspectSafety?.mustInspectFields?.includes('outputRoleDecision')
     || !toolSafetyQuickReference.nonIntuitiveBehavior?.some((item) => item.includes('writesSourceTree true'))
   ) {
     throw new Error('Expected toolSafetyQuickReference to summarize per-tool write and source safety behavior.');
@@ -3000,12 +3002,13 @@ if (scenario === 'single') {
     throw new Error('Expected agent guidance to recommend checking inspection warnings.');
   }
   if (
-    !result.responseFieldsToCheck?.includes('outputStructureDecision')
+    !result.responseFieldsToCheck?.includes('outputRoleDecision')
+    || !result.responseFieldsToCheck?.includes('outputStructureDecision')
     || !result.responseFieldsToCheck?.includes('auditStatus')
     || !result.responseFieldsToCheck?.includes('auditPassed')
     || !result.responseFieldsToCheck?.includes('auditBlockingReasons')
   ) {
-    throw new Error('Expected agent guidance to tell agents to check compact output structure decision and audit status fields.');
+    throw new Error('Expected agent guidance to tell agents to check output role, compact output structure decision, and audit status fields.');
   }
   if (!result.responseFieldsToCheck?.includes('organizationWarnings')) {
     throw new Error('Expected agent guidance to recommend checking organization warnings.');
@@ -3408,15 +3411,17 @@ if (scenario === 'single') {
   assertTemplateOmitsArgs(batchProcessTemplate, ['dryRun', 'includeResults', 'skipMode', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'], 'batch-process-reviewed-plan');
   const outputAuditTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'output-audit-compact');
   if (
-    !outputAuditTemplate?.inspectFields?.includes('outputStructureDecision')
+    !outputAuditTemplate?.inspectFields?.includes('outputRoleDecision')
+    || !outputAuditTemplate?.inspectFields?.includes('outputStructureDecision')
     || !outputAuditTemplate?.inspectFields?.includes('auditStatus')
     || !outputAuditTemplate?.inspectFields?.includes('auditPassed')
     || !outputAuditTemplate?.inspectFields?.includes('auditBlockingReasons')
     || !outputAuditTemplate?.inspectFields?.includes('structureSummary')
+    || !outputAuditTemplate?.successCriteria?.includes('outputRoleDecision.auditAppliesToThisDirectory')
     || !outputAuditTemplate?.successCriteria?.includes('outputStructureDecision.status pass')
     || !outputAuditTemplate?.successCriteria?.includes('auditStatus pass')
   ) {
-    throw new Error('Expected output audit template to require compact outputStructureDecision, audit status, and structureSummary inspection.');
+    throw new Error('Expected output audit template to require outputRoleDecision, compact outputStructureDecision, audit status, and structureSummary inspection.');
   }
   const workflowGuidances = {};
   for (const workflowName of GUIDANCE_WORKFLOWS) {
@@ -3437,7 +3442,7 @@ if (scenario === 'single') {
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-dry-run-preview' && step.writesFiles === false && step.inspectFields?.includes('batchDecision'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true && step.inspectFields?.includes('batchDecision') && step.inspectFields?.includes('dedupeDecisionSummary'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'directory-mismatch-plan' && step.inspectFields?.includes('organizationDecision'))
-    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('outputStructureDecision') && step.inspectFields?.includes('auditStatus') && step.inspectFields?.includes('structureSummary'))
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('outputRoleDecision') && step.inspectFields?.includes('outputStructureDecision') && step.inspectFields?.includes('auditStatus') && step.inspectFields?.includes('structureSummary'))
   ) {
     throw new Error('Expected batch recommendedWorkflowPlan to order preview, reviewed write, output audit, and route-decision checks.');
   }
@@ -6177,6 +6182,47 @@ if (scenario === 'single') {
   }
 
   console.log(JSON.stringify({ clean, noisy, wrongDepth, batchWrite, batchInspect }, null, 2));
+} else if (scenario === 'inspect-organized-staging') {
+  const outDir = process.argv[3] || 'font-split-mcp/.font-split-inspect-organized-staging';
+  console.log('Organized staging inspection smoke:', outDir);
+  await fs.rm(outDir, { recursive: true, force: true });
+  await fs.mkdir(path.join(outDir, 'FamilyA'), { recursive: true });
+  await fs.writeFile(
+    path.join(outDir, 'FamilyA', 'FixtureSans-Regular.ttf'),
+    buildMinimalTtf({ familyName: 'Fixture Sans', subfamilyName: 'Regular', glyphCount: 5 }),
+  );
+  await fs.writeFile(path.join(outDir, 'font-organization-manifest.json'), JSON.stringify({
+    manifestVersion: 1,
+    toolVersion: '0.0.0',
+    result: {
+      operationMode: 'copy-only',
+      sourceDestructive: false,
+      outputDirRole: 'organized-font-source-staging',
+      isSplitOutput: false,
+    },
+  }, null, 2));
+
+  const stagingAudit = await inspectSplitOutput({
+    outDir,
+    includeFiles: false,
+    includeFamilies: false,
+  });
+  if (
+    stagingAudit.outputRoleDecision?.summaryType !== 'output-role-decision'
+    || stagingAudit.outputRoleDecision?.detectedRole !== 'organized-font-source-staging'
+    || stagingAudit.outputRoleDecision?.isSplitOutput !== false
+    || stagingAudit.outputRoleDecision?.recommendedAction !== 'inspect-staging-as-input-then-batch-preview'
+    || stagingAudit.outputRoleDecision?.organizationManifestPath !== `${outDir}/font-organization-manifest.json`
+    || stagingAudit.auditStatus === 'pass'
+    || stagingAudit.outputStructureDecision?.status === 'pass'
+    || stagingAudit.outputStructureDecision?.recommendedAction !== 'inspect-staging-as-input-then-batch-preview'
+    || !stagingAudit.outputStructureDecision?.blockingReasonCodes?.includes('not-split-output')
+    || !stagingAudit.inspectionWarnings?.some((warning) => warning.code === 'organized-staging-not-split-output')
+    || !stagingAudit.auditBlockingReasons?.some((reason) => reason.code === 'not-split-output')
+  ) {
+    throw new Error('Expected organized staging output to be flagged as source staging, not split output.');
+  }
+  console.log(JSON.stringify(stagingAudit, null, 2));
 } else if (scenario === 'mcp-error') {
   const detailedError = new Error('batch failed');
   detailedError.name = 'BatchSplitError';
@@ -6317,7 +6363,7 @@ if (scenario === 'single') {
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'recommendedNextActions[].suggestedArgsField', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'without writing output', 'organize_font_directory safe-preview', 'maxFiles', 'preserves']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'layoutDecision.directoryHandling', 'stagingDirectoryDecision', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'directoryWorkflowSummary.workflowSteps[].suggestedArgsField', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs', 'sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs', 'recommendedBatchPreviewArgs', 'recommendedNextActions', 'recommendedNextActions[].suggestedArgsField', 'suggestedArgs.maxFiles', 'maxFiles', 'preserves', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
-    expectDescriptionIncludes('inspect_split_output', ['outputStructureDecision', 'auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
+    expectDescriptionIncludes('inspect_split_output', ['outputRoleDecision', 'font-organization-manifest.json', 'organize_font_directory staging', 'inspect_font_inputs', 'split_font_batch safe-preview', 'outputStructureDecision', 'auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
       guidancePropertyCount: Object.keys(guidanceProps).length,
@@ -6428,6 +6474,7 @@ if (scenario === 'single') {
       'writesOutputTree',
       'outputTreeInsideInputTree',
       'mayOverwriteOutputTree',
+      'outputRoleDecision',
       'outputStructureDecision',
       'auditStatus',
       'auditPassed',
@@ -6679,6 +6726,7 @@ if (scenario === 'single') {
     '`unsupportedFileSummary.categoryDetails[]`',
     '`unsupportedFileSummary.handlingSummary`',
     '`unsupportedFileSummary.examples[]`',
+    '`outputRoleDecision`',
     '`outputStructureDecision`',
     '`auditStatus`',
     '`auditPassed`',
@@ -6723,6 +6771,7 @@ if (scenario === 'single') {
     'unsupported-files-ignored',
     'duplicate-fonts-skipped',
     'output-inside-input',
+    'organized-staging-not-split-output',
   ]) {
     assertBehaviorContains(`warning code ${warningCode}`, `\`${warningCode}\``);
   }
@@ -6734,8 +6783,8 @@ if (scenario === 'single') {
     ok: true,
     toolCount: guidance.tools?.length || 0,
     documentedWorkflowPresetCount: guidance.workflowPresets?.length || 0,
-    checkedHighRiskTokenCount: 47,
-    checkedWarningCodeCount: 10,
+    checkedHighRiskTokenCount: 48,
+    checkedWarningCodeCount: 11,
     checkedDebugEventCount: 5,
   }, null, 2));
 } else if (scenario === 'batch-compact') {

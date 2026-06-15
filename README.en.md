@@ -43,7 +43,7 @@ Invalid explicit configuration values are rejected instead of silently falling b
 | `inspect_font_inputs` | Scan input fonts without writing output; reports parse status, identity keys, glyph counts, invalid font-like files, source layout, and the first route recommendation. |
 | `split_font_batch` | Scan a directory, deduplicate according to `batchDedupeMode`, group fonts into family directories, and process each selected font. |
 | `organize_font_directory` | Plan or copy-organize source fonts into a staging directory. Defaults to `dryRun: true`; never moves or deletes source files. |
-| `inspect_split_output` | Summarize output files and classify family/font entries using `split-meta.json` when available. |
+| `inspect_split_output` | Summarize output files, check `outputRoleDecision` for the directory role first, and classify family/font entries using `split-meta.json` when available. |
 
 ## Important behavior summary
 
@@ -63,7 +63,7 @@ Key defaults and policy choices:
 - `get_agent_guidance` returns `batchPolicyGuide`, a batch customization guide for `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, and `batchErrorMode`. Each option value explains when to use it, when to avoid it, which fields to inspect, and which `successCriteria` must be satisfied before continuing.
 - `get_agent_guidance` also returns `toolOptionCatalog` by default. This machine-readable catalog covers high-impact inputs for `split_font_batch`, `organize_font_directory`, `split_font`, `inspect_font_inputs`, and `inspect_split_output`, including defaults, allowed values, safety/write behavior, non-intuitive behavior, and response fields to inspect after an override. Request `sections: ["option-catalog"]` when that is the only needed section.
 - `get_agent_guidance` also returns `fontIdentityBasisCatalog` by default. It explains the values used by `identityBasis` and `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts`, including OpenType name ID sources, confidence, and whether the basis supports semantic font-equivalence claims. Request `sections: ["identity-catalog"]` when that is the only needed section.
-- `get_agent_guidance` also returns `outputStructureCatalog` by default. It explains `inspect_split_output` audit statuses, `structureSummary.layoutKind`, `structureSummary.issues[].code`, output modes, and easy-to-misread pass criteria. Request `sections: ["output-catalog"]` when that is the only needed section. Check it before explaining output audits, and do not treat `ok: true` as proof that the output tree structure passed.
+- `get_agent_guidance` also returns `outputStructureCatalog` by default. It explains `inspect_split_output` `outputRoleDecision`, audit statuses, `structureSummary.layoutKind`, `structureSummary.issues[].code`, output modes, and easy-to-misread pass criteria. Request `sections: ["output-catalog"]` when that is the only needed section. Check it before explaining output audits, and do not treat `ok: true` as proof that the output tree structure passed.
 - `get_agent_guidance` also returns `unsupportedFileCategoryCatalog`, which explains the representative extensions and handling behavior behind `unsupportedFileSummary.byCategory[]` categories such as `archive`, `document`, and `unsupported-font`; each tool response also includes quick triage in `unsupportedFileDecision` plus evidence in `unsupportedFileSummary.categoryDetails[]` and `unsupportedFileSummary.handlingSummary`, so archives are reported but not extracted, copied, or split.
 - Source-scan tools return `inputCountGuide`, a compact explanation of scanned file counts, supported versus ignored files, `maxFilesHit` completeness, omitted file details, and unsupported-file handling. Use it before treating real-corpus counts as complete.
 - `inspect_font_inputs` also returns `inputDirectoryDecision`, `layout`, and `recommendedBatchPreviewArgs`. This is no-write first-step triage: it tells agents whether to raise `maxFiles`, review invalid fonts, run `split_font_batch` safe-preview directly, or run non-destructive `organize_font_directory` safe-preview first. It is not an organization plan or proof that splitting succeeded. Returned safe-preview args preserve the current scan cap as `recommendedBatchPreviewArgs.maxFiles`, so a copied follow-up call does not silently fall back to the default.
@@ -145,7 +145,7 @@ organized-fonts/
 ```
 
 This staging layout is not a split result and does not contain CSS. It is a copy-only helper for preparing a source directory before a later `split_font_batch` run.
-The organizer response also includes `stagingDirectoryDecision`, which explicitly labels `outputDir` as source-like staging (`isSplitOutput: false`) and points agents to `inspect_font_inputs`, then `split_font_batch` safe-preview, and only later `inspect_split_output` after generated split output exists.
+The organizer response also includes `stagingDirectoryDecision`, which explicitly labels `outputDir` as source-like staging (`isSplitOutput: false`) and points agents to `inspect_font_inputs`, then `split_font_batch` safe-preview, and only later `inspect_split_output` after generated split output exists. If a staging directory containing `font-organization-manifest.json` is accidentally passed to `inspect_split_output`, the response sets `outputRoleDecision.isSplitOutput` to `false`, changes `auditStatus` to `action-required`, and emits the `organized-staging-not-split-output` warning.
 
 ## Common Source Layouts
 
@@ -392,14 +392,15 @@ Treat `planActionSummary` as a compact overview, not approval to write files wit
 - When explaining audit statuses, layouts, or issue codes, look up `get_agent_guidance.outputStructureCatalog` first. Its `layoutKinds` explain `structureSummary.layoutKind`, `issueCodes` explain `structureSummary.issues[].code`, and `outputModes` explain required-file differences for `subset`, `single-woff2`, and `copy-original`.
 - `maxFiles` can raise or lower the output scan cap; it defaults to `200000` so large batch outputs are not truncated during inspection.
 - `maxFilesHit` is true only when more output files exist beyond `maxFiles`.
-- `outputStructureDecision` is the quick decision route derived from `auditStatus`, `auditBlockingReasons`, `maxFilesHit`, and `structureSummary`; inspect `status`, `recommendedAction`, `blockingReasonCodes`, and `issueCodes` first.
+- `outputRoleDecision` is the first directory-role decision. If `outDir` contains `font-organization-manifest.json`, it is classified as `organized-font-source-staging` with `auditAppliesToThisDirectory: false`; inspect that directory with `inspect_font_inputs`, then run `split_font_batch` safe-preview instead of treating it as a passed split-output audit.
+- `outputStructureDecision` is the quick decision route derived from `outputRoleDecision`, `auditStatus`, `auditBlockingReasons`, `maxFilesHit`, and `structureSummary`; inspect `status`, `recommendedAction`, `blockingReasonCodes`, and `issueCodes` first.
 - `auditStatus` is the compact audit gate: `pass`, `action-required`, or `incomplete`. Treat a real output audit as complete only when it is `pass`.
 - `auditPassed` is a boolean shortcut for `auditStatus === "pass"`.
 - `auditBlockingReasons[]` lists machine-readable blockers; structure blockers include `issueCodes` from `structureSummary.issues[]`.
 - `includeFiles: false` omits flat `files[]` while keeping summary counters.
 - `includeFamilies: false` omits structured `families[]` while keeping family and output-mode counters.
-- `inspectionWarningCount` and `inspectionWarnings[]` summarize truncation, omitted detail arrays, missing manifests, and structure issues with machine-readable `code` values.
-- `structureSummary` checks whether the output directory matches the documented structure; after real batch writes, call `inspect_split_output` and require `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false` before treating an output tree as free of stray files, missing manifests, or missing files required by the declared output mode.
+- `inspectionWarningCount` and `inspectionWarnings[]` summarize truncation, omitted detail arrays, missing manifests, structure issues, and staging-directory misuse with machine-readable `code` values.
+- `structureSummary` checks whether the output directory matches the documented structure; after real batch writes, call `inspect_split_output` and require `outputRoleDecision.auditAppliesToThisDirectory !== false`, `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false` before treating an output tree as free of stray files, missing manifests, or missing files required by the declared output mode.
 - `copy-original` entries require only `split-meta.json`; they intentionally do not generate CSS or WOFF2 files, so those missing files are not automatically structure failures for that mode.
 - `familyCount`
 - `fontEntryCount`

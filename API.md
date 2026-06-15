@@ -38,7 +38,7 @@ For a minimal routing response, request `workflow: "organize"` with `sections: [
 
 `fontIdentityBasisCatalog` is returned by default and with `sections: ["identity-catalog"]`. It explains the values emitted as `identityBasis` by `inspect_font_inputs` and summarized as `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` by dedupe responses. Each entry identifies the OpenType name IDs used, confidence, whether the basis is semantic identity evidence, and how strongly agents may describe duplicate decisions.
 
-`outputStructureCatalog` is returned by default and with `sections: ["output-catalog"]`. It explains `inspect_split_output` audit statuses, `structureSummary.layoutKind`, `structureSummary.issues[].code`, output modes, pass criteria, and non-intuitive behavior such as `ok:true` not proving structural success, `includeFiles:false` / `includeFamilies:false` omitting arrays while preserving the audit, and `copy-original` intentionally lacking CSS/WOFF2 output.
+`outputStructureCatalog` is returned by default and with `sections: ["output-catalog"]`. It explains `inspect_split_output` `outputRoleDecision`, audit statuses, `structureSummary.layoutKind`, `structureSummary.issues[].code`, output modes, pass criteria, and non-intuitive behavior such as `ok:true` not proving structural success, organizer staging not being generated split output, `includeFiles:false` / `includeFamilies:false` omitting arrays while preserving the audit, and `copy-original` intentionally lacking CSS/WOFF2 output.
 
 `unsupportedFileCategoryCatalog` explains the categories used by `unsupportedFileSummary.byCategory[]`, including representative extensions, category meaning, and handling behavior. Tool responses also include `unsupportedFileDecision` for quick triage, plus `unsupportedFileSummary.categoryDetails[]` and `unsupportedFileSummary.handlingSummary` for evidence, so agents can interpret the current scan without a second guidance lookup. In particular, `archive` files are reported for awareness but are not extracted, copied, or split.
 
@@ -72,7 +72,7 @@ The real-corpus suite also exposes `staging-directory-decision` in `coverageSumm
 
 `fontIdentityBasisCatalog` is the companion identity-side catalog. Use it before interpreting `identityBasis` or `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts`; path-only, missing, or low-confidence family-only bases should not be reported as complete semantic dedupe proof.
 
-`outputStructureCatalog` is the companion output-audit catalog. Use it before interpreting `outputStructureDecision`, `structureSummary.layoutKind`, or `structureSummary.issues[].code`; `ok:true` only means the inspection call completed, not that the output tree passed.
+`outputStructureCatalog` is the companion output-audit catalog. Use it before interpreting `outputRoleDecision`, `outputStructureDecision`, `structureSummary.layoutKind`, or `structureSummary.issues[].code`; `ok:true` only means the inspection call completed, not that the output tree passed.
 
 Guidance section names:
 
@@ -399,13 +399,14 @@ Important result fields:
 |-------|---------|
 | `familyCount` | Number of detected family directories. |
 | `maxFilesHit` | `true` only when more output files existed beyond `maxFiles`. |
-| `outputStructureDecision` | Quick machine-readable route derived from `auditStatus`, `auditBlockingReasons`, `maxFilesHit`, and `structureSummary`. Check `status`, `recommendedAction`, `blockingReasonCodes`, and `issueCodes` first; use `structureSummary` for exact evidence. |
+| `outputRoleDecision` | First-pass directory-role decision for `inspect_split_output`. If `outDir` contains `font-organization-manifest.json`, it is organizer staging (`detectedRole: "organized-font-source-staging"`, `isSplitOutput: false`, `auditAppliesToThisDirectory: false`) rather than generated split output; use `suggestedInspectInputArgs` and `suggestedBatchPreviewArgs` instead of treating the output audit as passed. |
+| `outputStructureDecision` | Quick machine-readable route derived from `outputRoleDecision`, `auditStatus`, `auditBlockingReasons`, `maxFilesHit`, and `structureSummary`. Check `status`, `recommendedAction`, `blockingReasonCodes`, and `issueCodes` first; use `structureSummary` for exact evidence. |
 | `auditStatus` | Compact audit gate: `pass`, `action-required`, or `incomplete`. Treat real output audits as complete only when this is `pass`. |
 | `auditPassed` | Boolean shortcut for `auditStatus === "pass"`. |
-| `auditBlockingReasons[]` | Machine-readable blockers such as `output-scan-truncated` or `output-structure-issues`; structure blockers include `issueCodes` from `structureSummary.issues[]`. |
+| `auditBlockingReasons[]` | Machine-readable blockers such as `not-split-output`, `output-scan-truncated`, or `output-structure-issues`; structure blockers include `issueCodes` from `structureSummary.issues[]`. |
 | `filesIncluded` / `familiesIncluded` | Whether `files[]` and `families[]` are present. |
-| `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, missing manifests, and output structure issues. |
-| `structureSummary` | Machine-readable output-structure audit. After real batch writes, treat the output directory as complete only when `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false`. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
+| `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, missing manifests, output structure issues, and organizer-staging misuse such as `organized-staging-not-split-output`. |
+| `structureSummary` | Machine-readable output-structure audit. After real batch writes, treat the output directory as complete only when `outputRoleDecision.auditAppliesToThisDirectory !== false`, `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false`. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
 | `structureSummary.layoutKind` | Detected output layout such as `single-family`, `family-tree`, `mixed`, `empty`, or `unknown`; look it up in `outputStructureCatalog.layoutKinds` before deciding whether `outDir` points at the right level. |
 | `structureSummary.issues[].code` | Machine-readable structure issue code such as `missing-manifests`, `unexpected-output-files`, or `web-output-missing`; look it up in `outputStructureCatalog.issueCodes` before explaining the audit result. |
 | `fontEntryCount` | Number of detected per-font output entries. |

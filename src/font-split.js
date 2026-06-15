@@ -566,6 +566,11 @@ const WARNING_CODE_CATALOG = {
     severity: 'action-required',
     suggestedAction: 'Inspect structureSummary.conforms, issues[], and unexpectedFileExamples[] before treating generated output as valid.',
   },
+  'organized-staging-not-split-output': {
+    sources: ['inspectionWarnings'],
+    severity: 'action-required',
+    suggestedAction: 'Inspect this directory as source-like staging with inspect_font_inputs, then run split_font_batch safe-preview before auditing generated split output.',
+  },
   'organization-dry-run': {
     sources: ['organizationWarnings'],
     severity: 'info',
@@ -923,8 +928,9 @@ const FONT_IDENTITY_BASIS_CATALOG = Object.freeze({
 
 const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
   summaryType: 'output-structure-catalog',
-  purpose: 'Machine-readable companion for inspect_split_output outputStructureDecision and structureSummary fields.',
+  purpose: 'Machine-readable companion for inspect_split_output outputRoleDecision, outputStructureDecision, and structureSummary fields.',
   passCriteria: [
+    'outputRoleDecision.auditAppliesToThisDirectory is not false',
     'outputStructureDecision.status is pass',
     'auditStatus is pass',
     'auditPassed is true',
@@ -934,6 +940,7 @@ const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
   ],
   nonIntuitiveBehavior: [
     'ok:true means inspect_split_output ran; it is not proof that the output tree structure passed.',
+    'outputRoleDecision can stop the audit when outDir is organizer staging rather than generated split output.',
     'includeFiles:false and includeFamilies:false can hide large arrays while still running structureSummary checks.',
     'copy-original entries intentionally do not produce result.css or WOFF2 files.',
     'missing split-meta.json manifests make entries lower confidence even when files can be inferred from structure.',
@@ -942,12 +949,12 @@ const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
     pass: {
       status: 'pass',
       meaning: 'The scan was not truncated and no structure blockers were found.',
-      agentAction: 'You may report the output structure audit as passed only when outputStructureDecision.status, auditStatus, auditPassed, structureSummary.conforms, and maxFilesHit all satisfy the pass criteria.',
+      agentAction: 'You may report the output structure audit as passed only when outputRoleDecision, outputStructureDecision.status, auditStatus, auditPassed, structureSummary.conforms, and maxFilesHit all satisfy the pass criteria.',
     },
     'action-required': {
       status: 'action-required',
       meaning: 'The scan completed but structureSummary found issues that need review.',
-      agentAction: 'Inspect outputStructureDecision.issueCodes, auditBlockingReasons, structureSummary.issues, unexpectedFileExamples, and entryIssueExamples before reporting completion.',
+      agentAction: 'Inspect outputRoleDecision, outputStructureDecision.issueCodes, auditBlockingReasons, structureSummary.issues, unexpectedFileExamples, and entryIssueExamples before reporting completion.',
     },
     incomplete: {
       status: 'incomplete',
@@ -1079,6 +1086,12 @@ const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
       severity: 'action-required',
       meaning: 'A copy-original entry unexpectedly contains generated CSS or WOFF2 files.',
       agentAction: 'Inspect the manifest and entry files; the output directory may contain stale files from an older run.',
+    },
+    'organized-staging-not-split-output': {
+      code: 'organized-staging-not-split-output',
+      severity: 'action-required',
+      meaning: 'The inspected directory contains font-organization-manifest.json, so it looks like organize_font_directory staging rather than generated split output.',
+      agentAction: 'Inspect the directory with inspect_font_inputs, then run split_font_batch safe-preview; reserve inspect_split_output for the generated split output root.',
     },
   },
 });
@@ -1717,12 +1730,12 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   structureSummary: {
     sourceTools: ['inspect_split_output'],
     meaning: 'Machine-readable check for whether output files fit the documented split-output directory structure, including unexpected files, manifest coverage, and per-entry output-mode requirements.',
-    agentAction: 'Check outputStructureDecision.status first, then require structureSummary.conforms true before claiming the output directory is structurally valid; inspect issues[] and unexpectedFileExamples[] when false.',
+    agentAction: 'Check outputRoleDecision and outputStructureDecision.status first, then require structureSummary.conforms true before claiming the output directory is structurally valid; inspect issues[] and unexpectedFileExamples[] when false.',
   },
   outputStructureCatalog: {
     sourceTools: ['get_agent_guidance'],
-    meaning: 'Catalog of inspect_split_output audit statuses, structureSummary layout kinds, output modes, issue codes, pass criteria, and non-intuitive audit behavior.',
-    agentAction: 'Use it before explaining outputStructureDecision or structureSummary issues; do not claim an output tree passed from ok:true alone.',
+    meaning: 'Catalog of inspect_split_output outputRoleDecision, audit statuses, structureSummary layout kinds, output modes, issue codes, pass criteria, and non-intuitive audit behavior.',
+    agentAction: 'Use it before explaining outputRoleDecision, outputStructureDecision, or structureSummary issues; do not claim an output tree passed from ok:true alone.',
   },
   'structureSummary.layoutKind': {
     sourceTools: ['inspect_split_output'],
@@ -1734,15 +1747,20 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Machine-readable output structure issue code, such as missing-manifests, unexpected-output-files, or web-output-missing.',
     agentAction: 'Look up each code in outputStructureCatalog.issueCodes, then inspect unexpectedFileExamples or entryIssueExamples for evidence.',
   },
+  outputRoleDecision: {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Compact machine-readable decision about whether the inspected outDir is a valid target for split-output auditing or appears to be organizer staging.',
+    agentAction: 'Check this before outputStructureDecision. If isSplitOutput is false or auditAppliesToThisDirectory is false, inspect the directory as source-like staging with inspect_font_inputs and run split_font_batch safe-preview before auditing generated output.',
+  },
   outputStructureDecision: {
     sourceTools: ['inspect_split_output'],
-    meaning: 'Compact machine-readable decision derived from auditStatus, auditBlockingReasons, maxFilesHit, and structureSummary.',
-    agentAction: 'Use this first after inspect_split_output to decide whether the output tree passed, needs a higher maxFiles rerun, or needs structureSummary issue review.',
+    meaning: 'Compact machine-readable decision derived from outputRoleDecision, auditStatus, auditBlockingReasons, maxFilesHit, and structureSummary.',
+    agentAction: 'Use this after outputRoleDecision to decide whether the output tree passed, needs a higher maxFiles rerun, points at organizer staging, or needs structureSummary issue review.',
   },
   auditStatus: {
     sourceTools: ['inspect_split_output'],
     meaning: 'Compact output audit status: pass, incomplete, or action-required.',
-    agentAction: 'Require outputStructureDecision.status pass, auditStatus pass, auditPassed true, maxFilesHit false, and structureSummary.conforms true before reporting an output audit as complete.',
+    agentAction: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, maxFilesHit false, and structureSummary.conforms true before reporting an output audit as complete.',
   },
   auditPassed: {
     sourceTools: ['inspect_split_output'],
@@ -2006,25 +2024,25 @@ const TOOL_OPTION_CATALOG = {
     tool: 'inspect_split_output',
     sourceDestructive: false,
     writesFilesByDefault: false,
-    inspectAfterOverride: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'maxFilesHit'],
+    inspectAfterOverride: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'maxFilesHit'],
     options: {
       maxFiles: {
         defaultValue: 200000,
         useWhen: 'Raise when auditing very large output trees.',
         nonIntuitiveBehavior: 'maxFilesHit true makes the audit incomplete even when ok is true.',
-        inspectFields: ['outputStructureDecision', 'auditStatus', 'maxFilesHit', 'inspectionWarnings'],
+        inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'maxFilesHit', 'inspectionWarnings'],
       },
       includeFiles: {
         defaultValue: true,
         useWhen: 'Set false for compact output audits where only structure and counts are needed.',
-        nonIntuitiveBehavior: 'compact audits can omit files[] while still returning outputStructureDecision and structureSummary.',
-        inspectFields: ['filesIncluded', 'outputStructureDecision', 'structureSummary'],
+        nonIntuitiveBehavior: 'compact audits can omit files[] while still returning outputRoleDecision, outputStructureDecision, and structureSummary.',
+        inspectFields: ['filesIncluded', 'outputRoleDecision', 'outputStructureDecision', 'structureSummary'],
       },
       includeFamilies: {
         defaultValue: true,
         useWhen: 'Set false for compact output audits over large family trees.',
         nonIntuitiveBehavior: 'includeFamilies false hides families[] inventory but does not skip structureSummary checks.',
-        inspectFields: ['familiesIncluded', 'outputStructureDecision', 'structureSummary'],
+        inspectFields: ['familiesIncluded', 'outputRoleDecision', 'outputStructureDecision', 'structureSummary'],
       },
     },
   },
@@ -2225,9 +2243,9 @@ const SAFE_INVOCATION_TEMPLATES = [
       includeFamilies: false,
     },
     customizableFields: ['outDir', 'maxFiles', 'includeFiles', 'includeFamilies'],
-    inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
-    nextStep: 'Require outputStructureDecision.status pass, auditStatus pass, and structureSummary.conforms true; if maxFilesHit is true or manifest/structure issues are detected, disclose uncertainty or rerun with more detail.',
-    successCriteria: 'Require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as valid.',
+    inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
+    nextStep: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, and structureSummary.conforms true; if maxFilesHit is true or manifest/structure issues are detected, disclose uncertainty or rerun with more detail.',
+    successCriteria: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as valid.',
   },
 ];
 
@@ -2737,7 +2755,7 @@ function buildToolSafetyQuickReference() {
         sourceDestructive: false,
         sourceFilesMovedDeletedOrRewritten: false,
         writeScope: 'none',
-        mustInspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
+        mustInspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
         nonIntuitiveBehavior: 'It audits generated split output; it is not the right tool for source-like organize_font_directory staging output.',
       },
     ],
@@ -2793,7 +2811,7 @@ function buildDirectoryOrganizationQuickAnswer() {
     successCriteria: [
       'Before any copy, sourceDestructive false, sourceFilesPreserved true, planActionSummary or plan[] matches user intent, and organizationWarnings are acceptable.',
       'Before any split write, run split_font_batch with safe-preview args and inspect planned paths, warnings, maxFilesHit, dedupe, and errors.',
-      'After any split write, run inspect_split_output and require outputStructureDecision.status pass before reporting structural success.',
+      'After any split write, run inspect_split_output and require outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass before reporting structural success.',
     ],
     nonIntuitiveBehavior: [
       'organize_font_directory never moves, deletes, or rewrites source font files; dryRun:false copies selected fonts into outputDir.',
@@ -2811,8 +2829,8 @@ function buildRecommendedWorkflowPlan(workflow) {
     writesFiles: false,
     sourceDestructive: false,
     goal: 'Audit the generated output directory before reporting completion.',
-    inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'manifestCount', 'missingManifestCount'],
-    successCriteria: 'outputStructureDecision.status is pass, auditStatus is pass, auditPassed is true, structureSummary.conforms is true, maxFilesHit is false, and inspectionWarnings contain no action-required structure or truncation issues.',
+    inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'manifestCount', 'missingManifestCount'],
+    successCriteria: 'outputRoleDecision.auditAppliesToThisDirectory is not false, outputStructureDecision.status is pass, auditStatus is pass, auditPassed is true, structureSummary.conforms is true, maxFilesHit is false, and inspectionWarnings contain no action-required structure or truncation issues.',
   };
   const plans = {
     overview: {
@@ -3575,8 +3593,8 @@ export function getAgentGuidance(args = {}) {
     {
       id: 'output-audited',
       appliesTo: ['overview', 'batch', 'inspect'],
-      check: 'After batch processing, inspect the output directory and require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating the audit as complete.',
-      responseFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
+      check: 'After batch processing, inspect the output directory and require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating the audit as complete.',
+      responseFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
     },
     {
       id: 'local-compact-check-passed',
@@ -3741,7 +3759,7 @@ export function getAgentGuidance(args = {}) {
       'Call organize_font_directory with dryRun true if directory layout is flat/mixed/unfamiliar or if the user asks to stage fonts into a cleaner structure.',
       'Call split_font_batch with dryRun true to preview output layout.',
       'Call split_font_batch with includeResults false for full-library processing.',
-      'Call inspect_split_output after processing; require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false; use includeFiles false / includeFamilies false for compact summaries.',
+      'Call inspect_split_output after processing; require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false; use includeFiles false / includeFamilies false for compact summaries.',
     ],
     single: [
       'Call split_font with one fontPath.',
@@ -3754,7 +3772,7 @@ export function getAgentGuidance(args = {}) {
       'Call split_font_batch with workflowPreset safe-preview to review planned paths without writing.',
       'Use batchNamingMode numeric-suffix and batchDedupeMode font-identity unless the user asks for another policy.',
       'Use includeResults false for large real runs.',
-      'Call inspect_split_output on the outputRoot when done; require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false; use includeFiles false / includeFamilies false for large outputs.',
+      'Call inspect_split_output on the outputRoot when done; require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false; use includeFiles false / includeFamilies false for large outputs.',
     ],
     inspect: [
       'Call get_runtime_status to verify workspace, cn-font-split package, and WASM runtime availability when setup is uncertain.',
@@ -4072,8 +4090,8 @@ export function getAgentGuidance(args = {}) {
             includeFiles: false,
             includeFamilies: false,
           },
-          inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary', 'maxFilesHit', 'inspectionWarnings'],
-          successCriteria: 'Treat the final split output as valid only when inspect_split_output reports outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
+          inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary', 'maxFilesHit', 'inspectionWarnings'],
+          successCriteria: 'Treat the final split output as valid only when inspect_split_output reports outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
         },
       ],
       ifPlanLooksGood: [
@@ -4486,6 +4504,7 @@ export function getAgentGuidance(args = {}) {
       'planIncluded',
       'manifestCount',
       'missingManifestCount',
+      'outputRoleDecision',
       'outputStructureDecision',
       'auditStatus',
       'auditPassed',
@@ -5242,7 +5261,53 @@ function buildInputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, inv
   return warnings;
 }
 
-function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, includeFamilies, missingManifestCount, structureIssueCount }) {
+function buildOutputRoleDecision({ outDirRelative, relativeEntries, maxFiles }) {
+  const organizationManifest = relativeEntries.find((file) => file.relativePath === ORGANIZATION_MANIFEST_FILE_NAME);
+  if (organizationManifest) {
+    return {
+      summaryType: 'output-role-decision',
+      status: 'not-split-output',
+      detectedRole: 'organized-font-source-staging',
+      isSplitOutput: false,
+      auditAppliesToThisDirectory: false,
+      organizationManifestPath: organizationManifest.path,
+      shortAnswer: 'This directory looks like organize_font_directory outputDir staging, not generated split output.',
+      recommendedAction: 'inspect-staging-as-input-then-batch-preview',
+      suggestedInspectInputArgs: {
+        inputDir: outDirRelative,
+        includeFiles: false,
+        maxFiles,
+      },
+      suggestedBatchPreviewArgs: {
+        inputDir: outDirRelative,
+        workflowPreset: 'safe-preview',
+        maxFiles,
+      },
+      mustInspectFields: ['outputRoleDecision', 'inspectionWarnings', 'auditBlockingReasons', 'structureSummary'],
+      nonIntuitiveBehavior: [
+        'organize_font_directory writes font-organization-manifest.json in outputDir, but that outputDir is source-like staging.',
+        'inspect_split_output audits generated split output from split_font or split_font_batch, not organizer staging trees.',
+      ],
+    };
+  }
+
+  return {
+    summaryType: 'output-role-decision',
+    status: 'audit-target',
+    detectedRole: 'generated-split-output-or-unknown',
+    isSplitOutput: null,
+    auditAppliesToThisDirectory: true,
+    organizationManifestPath: null,
+    shortAnswer: 'No organizer manifest was detected; continue with the split-output structure audit.',
+    recommendedAction: 'continue-output-structure-audit',
+    mustInspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary'],
+    nonIntuitiveBehavior: [
+      'No organizer manifest means this is not recognized as organize_font_directory staging, but output validity still depends on outputStructureDecision and structureSummary.',
+    ],
+  };
+}
+
+function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, includeFamilies, missingManifestCount, structureIssueCount, outputRoleDecision }) {
   const warnings = [];
   const push = (code, message) => warnings.push({ code, message });
 
@@ -5261,12 +5326,24 @@ function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, in
   if (structureIssueCount > 0) {
     push('output-structure-issues', `${structureIssueCount} output structure issue(s) were detected; inspect structureSummary before treating the output as valid.`);
   }
+  if (outputRoleDecision?.isSplitOutput === false) {
+    push('organized-staging-not-split-output', 'The inspected directory contains font-organization-manifest.json, so it looks like organize_font_directory staging rather than generated split output.');
+  }
 
   return warnings;
 }
 
-function buildOutputAuditStatus({ maxFilesHit, maxFiles, structureSummary }) {
+function buildOutputAuditStatus({ maxFilesHit, maxFiles, structureSummary, outputRoleDecision }) {
   const auditBlockingReasons = [];
+  if (outputRoleDecision?.isSplitOutput === false) {
+    auditBlockingReasons.push({
+      code: 'not-split-output',
+      message: 'The inspected directory appears to be organize_font_directory staging, not generated split output.',
+      issueCodes: ['organized-staging-not-split-output'],
+      recommendedAction: outputRoleDecision.recommendedAction,
+      organizationManifestPath: outputRoleDecision.organizationManifestPath,
+    });
+  }
   if (maxFilesHit) {
     auditBlockingReasons.push({
       code: 'output-scan-truncated',
@@ -5296,6 +5373,7 @@ function buildOutputStructureDecision({
   maxFilesHit,
   maxFiles,
   structureSummary,
+  outputRoleDecision,
 }) {
   const auditStatus = auditStatusSummary.auditStatus;
   const auditPassed = auditStatusSummary.auditPassed === true;
@@ -5307,7 +5385,9 @@ function buildOutputStructureDecision({
       ...(structureSummary?.issues || []).map((issue) => issue.code),
     ].filter(Boolean)),
   ];
-  const recommendedAction = auditStatus === 'pass'
+  const recommendedAction = outputRoleDecision?.isSplitOutput === false
+    ? outputRoleDecision.recommendedAction
+    : auditStatus === 'pass'
     ? 'continue'
     : maxFilesHit
       ? 'rerun-inspect-split-output-with-higher-maxFiles'
@@ -5324,6 +5404,9 @@ function buildOutputStructureDecision({
     maxFilesHit: Boolean(maxFilesHit),
     blockingReasonCodes,
     issueCodes,
+    outputRole: outputRoleDecision?.detectedRole,
+    isSplitOutput: outputRoleDecision?.isSplitOutput ?? null,
+    auditAppliesToThisDirectory: outputRoleDecision?.auditAppliesToThisDirectory !== false,
     layoutKind: structureSummary?.layoutKind,
     issueCount: structureSummary?.issueCount || 0,
     unexpectedFileCount: structureSummary?.unexpectedFileCount || 0,
@@ -5333,8 +5416,8 @@ function buildOutputStructureDecision({
     fontEntryCount: structureSummary?.fontEntryCount || 0,
     missingManifestCount: structureSummary?.missingManifestCount || 0,
     outputModeCounts: structureSummary?.outputModeCounts || {},
-    evidenceFields: ['auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
-    passCriteria: 'Require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
+    evidenceFields: ['outputRoleDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
+    passCriteria: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
     nonIntuitiveBehavior: 'ok:true means the output directory inspection ran; it does not by itself mean the output structure passed. Check outputStructureDecision.status before reporting completion.',
   };
 }
@@ -5568,8 +5651,8 @@ function buildBatchNextActions({
       reason: 'A real batch write can create or update output files; inspect the output directory before reporting completion.',
       suggestedArgs: buildBatchAuditArgs({ outputRoot }),
       suggestedArgsField: 'batchDecision.auditArgs',
-      inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
-      successCriteria: 'Require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
+      inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
+      successCriteria: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
     });
   }
 
@@ -6342,7 +6425,7 @@ function buildSourceLayoutMismatchSummary({
       'Treat this summary as routing guidance, not proof of success.',
       'Before writing split output, run split_font_batch with safe-preview arguments and inspect planned paths, warnings, maxFilesHit, and errors.',
       'Before copy-only staging, review planActionSummary and plan[] when available; if plan[] was omitted, rerun the organization dry-run with includePlan:true.',
-      'After any reviewed batch write, run inspect_split_output and require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
+      'After any reviewed batch write, run inspect_split_output and require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
     ],
     nonIntuitiveBehavior: [
       'copyOnlyStaging is never source-destructive: dryRun:false copies selected fonts to outputDir and does not move, delete, or rewrite source fonts.',
@@ -6509,8 +6592,8 @@ function buildDirectoryWorkflowSummary({
         includeFamilies: false,
         maxFiles: 200000,
       },
-      inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
-      successCriteria: 'Require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before reporting completion.',
+      inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
+      successCriteria: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before reporting completion.',
     },
   );
 
@@ -6609,7 +6692,7 @@ function buildDirectoryWorkflowSummary({
     successCriteria: [
       'Do not treat organization as complete until sourceDestructive is false, organizationWarnings are reviewed, and planActionSummary or plan matches user intent.',
       'Run a split_font_batch safe-preview before any reviewed batch write.',
-      'After any reviewed batch write, require inspect_split_output to report outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false before reporting structural success.',
+      'After any reviewed batch write, require inspect_split_output to report outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false before reporting structural success.',
     ],
     nonIntuitiveBehavior,
   });
@@ -6829,7 +6912,7 @@ function buildStagingDirectoryDecision({
     successCriteria: [
       'If status is ready-for-source-preflight, run inspect_font_inputs on outputDir and require maxFilesHit false before using it as split input.',
       'Before any reviewed split write, run split_font_batch safe-preview on outputDir and review planned paths, warnings, dedupe, maxFilesHit, and errors.',
-      'After any reviewed split write, run inspect_split_output on the split outputRoot and require outputStructureDecision.status pass.',
+      'After any reviewed split write, run inspect_split_output on the split outputRoot and require outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass.',
     ],
     nonIntuitiveBehavior: [
       'The organizer outputDir is source-like staging, not split output; inspect_split_output applies only after split_font or split_font_batch writes generated output.',
@@ -9562,6 +9645,11 @@ export async function inspectSplitOutput(args) {
     manifestCount,
     missingManifestCount,
   });
+  const outputRoleDecision = buildOutputRoleDecision({
+    outDirRelative,
+    relativeEntries,
+    maxFiles,
+  });
 
   const inspectionWarnings = buildOutputInspectionWarnings({
     maxFilesHit: outputSummary.truncated,
@@ -9570,17 +9658,20 @@ export async function inspectSplitOutput(args) {
     includeFamilies,
     missingManifestCount,
     structureIssueCount: structureSummary.issueCount,
+    outputRoleDecision,
   });
   const auditStatusSummary = buildOutputAuditStatus({
     maxFilesHit: outputSummary.truncated,
     maxFiles,
     structureSummary,
+    outputRoleDecision,
   });
   const outputStructureDecision = buildOutputStructureDecision({
     auditStatusSummary,
     maxFilesHit: outputSummary.truncated,
     maxFiles,
     structureSummary,
+    outputRoleDecision,
   });
 
   return {
@@ -9589,6 +9680,7 @@ export async function inspectSplitOutput(args) {
     maxFiles,
     maxFilesHit: outputSummary.truncated,
     ...auditStatusSummary,
+    outputRoleDecision,
     outputStructureDecision,
     fileCount: files.length,
     totalBytes,
