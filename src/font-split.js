@@ -1396,8 +1396,13 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   recommendedNextActions: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
-    meaning: 'Machine-readable follow-up checklist for batch and directory organization workflows. Each action includes inspectFields and successCriteria; scanner follow-up suggestedArgs may include maxFiles to preserve the current scan cap.',
-    agentAction: 'Treat as guidance, inspect each action inspectFields, and satisfy successCriteria before proceeding or reporting completion. When suggestedArgs.maxFiles is present, preserve it unless intentionally changing the scan cap.',
+    meaning: 'Machine-readable follow-up checklist for batch and directory organization workflows. Each action includes inspectFields and successCriteria; actions with copyable args may also include suggestedArgs and, when those args mirror another response field, suggestedArgsField.',
+    agentAction: 'Treat as guidance, inspect each action inspectFields, and satisfy successCriteria before proceeding or reporting completion. Prefer suggestedArgsField when present to cite the canonical args source; when suggestedArgs.maxFiles is present, preserve it unless intentionally changing the scan cap.',
+  },
+  'recommendedNextActions[].suggestedArgsField': {
+    sourceTools: ['split_font_batch', 'organize_font_directory'],
+    meaning: 'Canonical response field that supplied a recommended next action suggestedArgs object, such as batchDecision.reviewedWriteArgs, batchDecision.auditArgs, recommendedBatchPreviewArgs, or sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs.',
+    agentAction: 'Use this pointer before copying recommendedNextActions[].suggestedArgs so you know whether the action mirrors a reviewed-write route, an output audit route, direct original-input preview args, or organized staging safe-preview args.',
   },
   'recommendedNextActions[].suggestedArgs.maxFiles': {
     sourceTools: ['organize_font_directory'],
@@ -4021,6 +4026,7 @@ export function getAgentGuidance(args = {}) {
       'organizationWarnings',
       'organizationWarningCount',
       'recommendedNextActions',
+      'recommendedNextActions[].suggestedArgsField',
       'recommendedNextActions[].suggestedArgs.maxFiles',
       'operationMode',
       'copiedCount',
@@ -5126,6 +5132,7 @@ function buildBatchNextActions({
           effectiveArgs,
           batchOptions,
         }),
+        suggestedArgsField: 'batchDecision.reviewedWriteArgs',
         inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
         successCriteria: 'The reviewed write should return dryRun false, sourceDestructive false, errorCount zero, and an audit-split-output next action whenever output was written.',
       });
@@ -5140,6 +5147,7 @@ function buildBatchNextActions({
       tool: 'inspect_split_output',
       reason: 'A real batch write can create or update output files; inspect the output directory before reporting completion.',
       suggestedArgs: buildBatchAuditArgs({ outputRoot }),
+      suggestedArgsField: 'batchDecision.auditArgs',
       inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
       successCriteria: 'Require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
     });
@@ -5354,6 +5362,7 @@ function buildOrganizationNextActions({
         recommendedBatchOptions: layout.recommendedBatchOptions,
         extraArgs: { maxFiles },
       }),
+      suggestedArgsField: 'recommendedBatchPreviewArgs',
       inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'The batch preview should remain dryRun true and sourceDestructive false, with planned grouping and warnings reviewed before any real write.',
     });
@@ -5408,6 +5417,7 @@ function buildOrganizationNextActions({
           recommendedBatchOptions: layout.recommendedBatchOptions,
           extraArgs: { maxFiles },
         }),
+        suggestedArgsField: 'recommendedBatchPreviewArgs',
         inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
         successCriteria: 'The original-layout batch preview should remain dryRun true and sourceDestructive false, with planned paths and grouping reviewed before a real write.',
       });
@@ -5452,6 +5462,7 @@ function buildOrganizationNextActions({
         recommendedBatchOptions: layout.recommendedBatchOptions,
         extraArgs: { maxFiles },
       }),
+      suggestedArgsField: 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs',
       inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'The organized-output batch preview should remain dryRun true and sourceDestructive false, with planned paths and warnings reviewed before a real write.',
     });

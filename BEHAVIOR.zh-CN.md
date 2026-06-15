@@ -542,7 +542,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 1. 先调用 `organize_font_directory`，保持默认 `dryRun: true`。
 2. 检查 `safetySummary`、`layout.layoutKind`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`recommendedNextActions[]`、`organizationWarnings[]`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree` 和 `mayOverwriteOutputTree`。
-3. 如果用户只是想调整批量参数，不一定需要真的整理目录；优先把 `recommendedBatchPreviewArgs` 用于 `split_font_batch` 无写入预览。`recommendedBatchPreviewArgs.maxFiles` 会保留本次扫描上限，避免复制下一步调用时退回默认值；目录整理返回的后续扫描动作也会通过 `recommendedNextActions[].suggestedArgs.maxFiles` 保留本次上限，除非动作本身明确要求调高上限；`recommendedBatchOptions` 只是策略片段，不能单独当作完整安全调用。
+3. 如果用户只是想调整批量参数，不一定需要真的整理目录；优先把 `recommendedBatchPreviewArgs` 用于 `split_font_batch` 无写入预览。`recommendedBatchPreviewArgs.maxFiles` 会保留本次扫描上限，避免复制下一步调用时退回默认值；当 `recommendedNextActions[].suggestedArgsField` 存在时，它会指出该动作的可复制参数镜像了哪个权威响应字段；目录整理返回的后续扫描动作也会通过 `recommendedNextActions[].suggestedArgs.maxFiles` 保留本次上限，除非动作本身明确要求调高上限；`recommendedBatchOptions` 只是策略片段，不能单独当作完整安全调用。
 4. 如果用户明确希望得到更规整的暂存目录，再用 `dryRun: false` 执行 copy-only 整理。
 5. 整理完成后，对 `outputDir` 调用 `inspect_font_inputs` 或把它作为后续 `split_font_batch.inputDir`。
 6. `recommendedNextActions[]` 是给 agent 的下一步清单；它不会自动执行，也不能替代对每项 `inspectFields` 的检查和 `successCriteria` 的确认。
@@ -714,7 +714,7 @@ split-meta.json
 
 `batchDecision` 会把复杂的批量响应压缩成主线路由，例如 `review-dry-run-plan`、`rerun-batch-with-higher-maxFiles`、`inspect-batch-errors`、`audit-written-output`、`review-existing-output-skips`、`no-supported-fonts` 或 `no-selected-fonts`。它只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `batchWarnings[]`、`errors[]`、`recommendedNextActions[]`，以及真实写入后的输出审计字段。
 
-`recommendedNextActions[]` 是检查清单，不会自动执行。每项的 `successCriteria` 是继续下一步或报告完成前的判断条件。真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
+`recommendedNextActions[]` 是检查清单，不会自动执行。每项的 `successCriteria` 是继续下一步或报告完成前的判断条件。若某项带有 `suggestedArgsField`，它只是说明 `suggestedArgs` 镜像了哪个权威字段，例如 `batchDecision.reviewedWriteArgs`、`batchDecision.auditArgs`、`recommendedBatchPreviewArgs` 或 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`，不是成功证明。真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
 
 常见 `batchWarnings[].code`：
 
@@ -754,7 +754,7 @@ split-meta.json
 | `layout.layoutKind` | `empty` / `flat` / `nested` / `mixed` |
 | `recommendedBatchOptions` | 根据目录结构建议的后续批量策略片段，不是完整安全调用 |
 | `recommendedBatchPreviewArgs` | 可直接复制的后续 `split_font_batch` 无写入预览参数；`recommendedBatchPreviewArgs.maxFiles` 会保留本次扫描上限 |
-| `recommendedNextActions[]` | 面向 agent 的后续动作建议，包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs`、`inspectFields` 和 `successCriteria`；`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对该 preset 的差异覆盖；目录整理后续扫描动作会通过 `recommendedNextActions[].suggestedArgs.maxFiles` 保留本次扫描上限 |
+| `recommendedNextActions[]` | 面向 agent 的后续动作建议，包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs`、可选 `recommendedNextActions[].suggestedArgsField`、`inspectFields` 和 `successCriteria`；`suggestedArgsField` 指向这组参数对应的权威响应字段；`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对该 preset 的差异覆盖；目录整理后续扫描动作会通过 `recommendedNextActions[].suggestedArgs.maxFiles` 保留本次扫描上限 |
 | `organizationDecision` | 当前整理响应的紧凑主线路由建议 |
 | `organizationWarnings[]` | 摘要级风险和状态提示 |
 | `planActionSummary` | 计划动作汇总；即使 `includePlan: false` 也会返回 |
@@ -773,7 +773,7 @@ split-meta.json
 - `output-inside-input`：批量或整理输出目录位于输入目录内，后续扫描需要排除它，或明确把该输出目录作为下一步输入。
 - `font-parsing-skipped`：`parseFonts: false`，本次只做结构优先计划，没有读取字体元数据。
 
-`layoutDecision` 是最短的顶层路线索引，用于快速回答“当前布局是什么、推荐走哪条路、原目录能否先安全预览、是否需要 copy-only 暂存”。其中的 `layoutDecision.directoryHandling` 是更短的目录处理答案：它会用 `recommendedMode` 和 `shortAnswer` 说明应该直接预览原目录、复核 mixed 布局、使用已经写出的 copy-only 整理目录、重跑整理，还是停止等待输入/策略变化。`organizationDecision` 会把复杂的整理响应压缩成主线路由，例如 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output`。`directoryWorkflowSummary` 则把当前安全状态、布局复核原因、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示放在一起；其中 no-write `split_font_batch` 预览步骤会通过 `directoryWorkflowSummary.workflowSteps[].suggestedArgsField` 指向可复制参数的权威字段。`sourceLayoutMismatchSummary` 专门回答“原目录可否直接预览、是否需要 copy-only 暂存、暂存是否破坏源文件”，其中 `sourceLayoutMismatchSummary.decisionChecklist` 进一步集中列出源安全、直接预览、暂存、plan 可见性、warning 和输出审计检查。copy-only 写出后，`sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` 可以直接复制到 `split_font_batch`，并保留当前 `maxFiles`；同一组参数也会重复出现在 `sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs`。它们都只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility` 和可用时的 `plan[]`。
+`layoutDecision` 是最短的顶层路线索引，用于快速回答“当前布局是什么、推荐走哪条路、原目录能否先安全预览、是否需要 copy-only 暂存”。其中的 `layoutDecision.directoryHandling` 是更短的目录处理答案：它会用 `recommendedMode` 和 `shortAnswer` 说明应该直接预览原目录、复核 mixed 布局、使用已经写出的 copy-only 整理目录、重跑整理，还是停止等待输入/策略变化。`organizationDecision` 会把复杂的整理响应压缩成主线路由，例如 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output`。`directoryWorkflowSummary` 则把当前安全状态、布局复核原因、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示放在一起；其中 no-write `split_font_batch` 预览步骤会通过 `directoryWorkflowSummary.workflowSteps[].suggestedArgsField` 指向可复制参数的权威字段。`recommendedNextActions[].suggestedArgsField` 会在后续动作清单里提供同类来源指针，例如 `recommendedBatchPreviewArgs` 或 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`。`sourceLayoutMismatchSummary` 专门回答“原目录可否直接预览、是否需要 copy-only 暂存、暂存是否破坏源文件”，其中 `sourceLayoutMismatchSummary.decisionChecklist` 进一步集中列出源安全、直接预览、暂存、plan 可见性、warning 和输出审计检查。copy-only 写出后，`sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` 可以直接复制到 `split_font_batch`，并保留当前 `maxFiles`；同一组参数也会重复出现在 `sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs`。它们都只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility` 和可用时的 `plan[]`。
 
 目录路由相关的 `inspectFields`、`mustInspectFields` 和 `responseFields` 只要列出 `sourceLayoutMismatchSummary`，也会同时列出 `sourceLayoutMismatchSummary.decisionChecklist`。这避免 agent 只检查父摘要而漏掉嵌套决策清单。
 
