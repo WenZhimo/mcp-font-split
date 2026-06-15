@@ -1264,6 +1264,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Per-step compact check metadata, including ok, exitCode, elapsedMs, output byte counts, and stdout/stderr tails only for failing steps.',
     agentAction: 'Use failed step tails for quick triage; rerun the failed npm script directly for full output.',
   },
+  'coverageSummary.archiveHandlingScope': {
+    sourceTools: ['npm run smoke:real-corpus-suite'],
+    meaning: 'Machine-readable scope statement for archive files in the real-corpus suite: archives are counted as ignored files, but archive contents are not extracted, scanned, or counted as tested fonts.',
+    agentAction: 'Use this field before reporting real-corpus coverage when the corpus contains zip/rar/7z/tar files; do not imply fonts inside archives were tested unless they were extracted outside this tool and scanned as normal files.',
+  },
   safeInvocationTemplates: {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Machine-readable safe starting calls for common AI-agent workflows. Each template includes inspectFields and successCriteria.',
@@ -3252,6 +3257,7 @@ export function getAgentGuidance(args = {}) {
       'testScope',
       'coverageSummary.functionalCoverage',
       'coverageSummary.unsupportedFileCategoryCoverage',
+      'coverageSummary.archiveHandlingScope',
       'coverageSummary.outputStructureAuditSummary',
       'runSummaries',
       'omittedDetailFields',
@@ -3265,6 +3271,7 @@ export function getAgentGuidance(args = {}) {
       'coverageSummary.functionalCoverage includes input-count-guide as covered',
       'coverageSummary.functionalCoverage entries are all covered',
       'coverageSummary.outputStructureAuditSummary single and batch outputStructureDecision.status are pass',
+      'coverageSummary.archiveHandlingScope.archiveInternalFontsCovered is false',
     ],
     statusMeanings: [
       {
@@ -3292,6 +3299,7 @@ export function getAgentGuidance(args = {}) {
       'Use coverageSummary.functionalCoverage input-count-guide to confirm inputCountGuide was checked across inspect, organize, and batch paths.',
       'Default suite output is compact and omits child run details; use verboseCommand for full per-child summaries and evidence.',
       'Archive files are counted as ignored files; the suite does not prove archive extraction because archive extraction is outside this tool layer.',
+      'If archive-internal fonts must be tested, extract archives outside this tool first and rerun the suite against the extracted directory tree.',
     ],
     evidenceFields: {
       countGuide: 'corpusCountGuide',
@@ -3300,6 +3308,7 @@ export function getAgentGuidance(args = {}) {
       selectedTargets: 'testScope.targetSampling.selectedTargets',
       representativeWriteAudit: 'testScope.representativeWriteAudit',
       ignoredFileCoverage: 'coverageSummary.unsupportedFileCategoryCoverage',
+      archiveHandlingScope: 'coverageSummary.archiveHandlingScope',
       inputCountGuideCoverage: 'coverageSummary.functionalCoverage[id=input-count-guide]',
       outputStructureAudit: 'coverageSummary.outputStructureAuditSummary',
     },
@@ -3328,6 +3337,11 @@ export function getAgentGuidance(args = {}) {
           reportAs: 'Ignored-file category and extension coverage, including extensions beyond .zip/.txt.',
         },
         {
+          id: 'archive-handling-scope',
+          evidenceField: 'coverageSummary.archiveHandlingScope',
+          reportAs: 'Archive files were counted as ignored files only; archive contents were not scanned as covered fonts.',
+        },
+        {
           id: 'functional-coverage',
           evidenceField: 'coverageSummary.functionalCoverage',
           reportAs: 'Representative feature paths covered by the suite.',
@@ -3349,6 +3363,7 @@ export function getAgentGuidance(args = {}) {
         'check:compact: ok=<compact-check-result.ok>, failedStepId=<compact-check-result.failedStepId>',
         'real-corpus suite: status=<reliabilityGateDecision.status>, fullCorpusFonts=<corpusCountGuide.fullCorpus.supportedFontCount>, ignoredFiles=<corpusCountGuide.fullCorpus.unsupportedFileCount>',
         'real-corpus sampling: fixedTargets=<corpusCountGuide.representativeTargets.fixedRegressionTargetCount>, selectedTargets=<corpusCountGuide.representativeTargets.selectedTargetCount>/<corpusCountGuide.representativeTargets.availableTargetCount>, perDirectoryAcceptanceAudit=false',
+        'real-corpus archives: archiveCount=<coverageSummary.archiveHandlingScope.archiveCount>, archiveInternalFontsCovered=<coverageSummary.archiveHandlingScope.archiveInternalFontsCovered>',
         'real-corpus coverage: functionalCoverage=<covered>/<total>, outputAudit single=<coverageSummary.outputStructureAuditSummary.singleOutputStructureDecisionStatus>, batch=<coverageSummary.outputStructureAuditSummary.batchOutputStructureDecisionStatus>',
       ],
     },

@@ -587,6 +587,23 @@ function buildUnsupportedFileCategoryCoverage({ total, byCategory, byExtension, 
   };
 }
 
+function buildArchiveHandlingScope({ archiveCount = 0 } = {}) {
+  return {
+    summaryType: 'archive-handling-scope',
+    scopeKind: 'counted-ignored-archives-only',
+    sourceField: 'coverageSummary.unsupportedFileCategoryCoverage.archiveCount',
+    archiveCount,
+    archivesPresent: archiveCount > 0,
+    archivesCountedAsIgnored: true,
+    archivesExtracted: false,
+    archiveContentsScanned: false,
+    archiveInternalFontsCovered: false,
+    supportedFontCountIncludesArchiveContents: false,
+    recommendedAction: 'extract-archives-outside-this-tool-if-needed',
+    meaning: 'Archive files found in the corpus are counted as ignored/non-font files only; this suite does not extract archives or test fonts that may exist inside them.',
+  };
+}
+
 function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
   const runByScenario = Object.fromEntries((runs || []).map((run) => [run.scenario, run || {}]));
   const byScenario = Object.fromEntries((runs || []).map((run) => [run.scenario, run.summary || {}]));
@@ -611,6 +628,9 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     byCategory: corpusUnsupportedByCategory,
     byExtension: corpusUnsupportedByExtension,
     handlingSummary: corpusUnsupportedHandlingSummary,
+  });
+  const archiveHandlingScope = buildArchiveHandlingScope({
+    archiveCount: unsupportedFileCategoryCoverage.archiveCount,
   });
   const outputStructureAuditSummary = {
     summaryType: 'real-corpus-output-structure-audit',
@@ -753,6 +773,7 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
       unsupportedCategories: unsupportedFileCategoryCoverage.categories,
       unsupportedExtensionCount: unsupportedFileCategoryCoverage.extensionCount,
       unsupportedExtensionsBeyondZipTxt: unsupportedFileCategoryCoverage.extensionsBeyondZipTxt,
+      archiveHandlingScope,
     },
     targetSampling: {
       scopeKind: 'fixed-regression-plus-adaptive-sampling',
@@ -877,6 +898,7 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
         decision: readonly.corpusUnsupportedFileDecision,
         coverage: unsupportedFileCategoryCoverage,
         archiveCount: readonly.corpusUnsupportedArchiveCount,
+        archiveHandlingScope,
         handlingSummary: readonly.corpusUnsupportedHandlingSummary,
       },
     },
@@ -1085,6 +1107,7 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     corpusUnsupportedHandlingSummary,
     corpusUnsupportedArchiveCount,
     unsupportedFileCategoryCoverage,
+    archiveHandlingScope,
     corpusMaxFilesHit,
     fixedRegressionTargets: DEFAULT_REAL_CORPUS_TARGETS,
     targetSelectionMode: targets.selectionMode,
@@ -1105,6 +1128,7 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
   const targetSampling = coverageSummary.testScope?.targetSampling || {};
   const writeAudit = coverageSummary.testScope?.representativeWriteAudit || {};
   const ignoredCoverage = coverageSummary.unsupportedFileCategoryCoverage || {};
+  const archiveScope = coverageSummary.archiveHandlingScope || {};
   const ignoredCategoryText = (ignoredCoverage.categories || []).join(', ') || 'none';
   const structureAudit = coverageSummary.outputStructureAuditSummary || {};
   const fixedCount = targetSampling.fixedRegressionTargetCount ?? coverageSummary.fixedRegressionTargets?.length;
@@ -1116,6 +1140,7 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
   const lines = [
     `Full corpus scan: ${corpusScan.supportedFontCount ?? 'unknown'} supported font files and ${corpusScan.unsupportedFileCount ?? 'unknown'} ignored/non-font files; maxFilesHit=${corpusScan.maxFilesHit}.`,
     `Ignored-file coverage: ${ignoredCoverage.categoryCount ?? 'unknown'} categories (${ignoredCategoryText}), ${ignoredCoverage.extensionCount ?? 'unknown'} extension types, ${ignoredCoverage.extensionsBeyondZipTxtCount ?? 'unknown'} extension types beyond .zip/.txt.`,
+    `Archive handling scope: ${archiveScope.archiveCount ?? 'unknown'} archives counted as ignored files; archivesExtracted=${archiveScope.archivesExtracted}, archiveInternalFontsCovered=${archiveScope.archiveInternalFontsCovered}.`,
     `Target sampling: ${fixedCount ?? 'unknown'} fixed regression targets and ${selectedCount ?? 'unknown'} selected representative targets out of ${availableCount ?? 'unknown'} available target directories; this is not per-directory acceptance.`,
     `Representative write audit: sample=${writeAudit.sampleInputDir || 'unknown'}, single=${writeAudit.singleAuditStatus || 'unknown'} structureConforms=${structureAudit.singleStructureConforms}, batch=${writeAudit.batchAuditStatus || 'unknown'} structureConforms=${structureAudit.batchStructureConforms}.`,
     `Interpretation: small numbers such as ${fixedCount ?? 'fixed'} or ${selectedCount ?? 'selected'} are target counts, not the full corpus font count; use testScope.corpusScan.supportedFontCount for the root-level font total.`,
@@ -1130,6 +1155,9 @@ function buildRealCorpusSuiteHumanSummary(coverageSummary) {
     ignoredFileCategoryCount: ignoredCoverage.categoryCount,
     ignoredFileExtensionCount: ignoredCoverage.extensionCount,
     ignoredFileExtensionsBeyondZipTxtCount: ignoredCoverage.extensionsBeyondZipTxtCount,
+    archiveCount: archiveScope.archiveCount,
+    archivesExtracted: archiveScope.archivesExtracted,
+    archiveInternalFontsCovered: archiveScope.archiveInternalFontsCovered,
     fixedRegressionTargetCount: fixedCount,
     selectedTargetCount: selectedCount,
     availableTargetCount: availableCount,
@@ -1164,6 +1192,8 @@ function buildRealCorpusCountGuide(coverageSummary, humanSummary) {
       unsupportedFileCount,
       maxFilesHitField: 'testScope.corpusScan.maxFilesHit',
       maxFilesHit: corpusScan.maxFilesHit,
+      archiveHandlingScopeField: 'coverageSummary.archiveHandlingScope',
+      archiveInternalFontsCovered: coverageSummary.archiveHandlingScope?.archiveInternalFontsCovered,
       meaning: 'Use these fields when answering how many supported font files or ignored/non-font files the bounded root scan saw.',
     },
     representativeTargets: {
@@ -1232,6 +1262,7 @@ function buildCompactRealCorpusCoverageSummary(coverageSummary = {}) {
     fixedRegressionTargets: coverageSummary.fixedRegressionTargets,
     representativeWriteSample: coverageSummary.testScope?.representativeWriteAudit?.sampleInputDir,
     unsupportedFileCategoryCoverage: coverageSummary.unsupportedFileCategoryCoverage,
+    archiveHandlingScope: coverageSummary.archiveHandlingScope,
     outputStructureAuditSummary: buildCompactOutputStructureAuditSummary(coverageSummary.outputStructureAuditSummary),
     functionalCoverage: (coverageSummary.functionalCoverage || []).map((item) => ({
       id: item.id,
@@ -1255,6 +1286,7 @@ function buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary) {
     .map((item) => item.id)
     .filter(Boolean);
   const outputAudit = coverageSummary.outputStructureAuditSummary || {};
+  const archiveHandlingScope = coverageSummary.archiveHandlingScope || {};
   const targetSampling = coverageSummary.testScope?.targetSampling || {};
   const corpusScan = coverageSummary.testScope?.corpusScan || {};
   const writeAudit = coverageSummary.testScope?.representativeWriteAudit || {};
@@ -1274,6 +1306,15 @@ function buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary) {
   }
   if (!(coverageSummary.unsupportedFileCategoryCoverage?.extensionsBeyondZipTxtCount > 0)) {
     blockingReasonCodes.push('ignored-file-extension-coverage-too-narrow');
+  }
+  if (
+    archiveHandlingScope.summaryType !== 'archive-handling-scope'
+    || archiveHandlingScope.archivesCountedAsIgnored !== true
+    || archiveHandlingScope.archivesExtracted !== false
+    || archiveHandlingScope.archiveContentsScanned !== false
+    || archiveHandlingScope.archiveInternalFontsCovered !== false
+  ) {
+    blockingReasonCodes.push('archive-handling-scope-ambiguous');
   }
   if (!(coverageSummary.selectedTargetCount > 0)) {
     blockingReasonCodes.push('target-sampling-empty');
@@ -1321,6 +1362,10 @@ function buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary) {
       'testScope.targetSampling.fixedRegressionTargetCount',
       'testScope.targetSampling.selectedTargetCount',
     ],
+    archiveHandlingScopeField: 'coverageSummary.archiveHandlingScope',
+    archiveCount: archiveHandlingScope.archiveCount,
+    archivesExtracted: archiveHandlingScope.archivesExtracted,
+    archiveInternalFontsCovered: archiveHandlingScope.archiveInternalFontsCovered,
     corpusSupportedFontCount: corpusScan.supportedFontCount,
     corpusUnsupportedFileCount: corpusScan.unsupportedFileCount,
     fixedRegressionTargetCount: targetSampling.fixedRegressionTargetCount,
@@ -1336,10 +1381,11 @@ function buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary) {
       'testScope',
       'coverageSummary.functionalCoverage',
       'coverageSummary.unsupportedFileCategoryCoverage',
+      'coverageSummary.archiveHandlingScope',
       'coverageSummary.outputStructureAuditSummary',
     ],
-    passCriteria: 'Require a complete full-root corpus scan, selected target sampling, all functionalCoverage entries covered, representative single and batch outputStructureDecision.status pass, structureSummary.conforms true, and perDirectoryAcceptanceAudit false.',
-    nonIntuitiveBehavior: 'status pass means the representative real-corpus feature chain passed; it is not a per-directory acceptance audit and target counts such as 4 or 10 are not the full corpus font count.',
+    passCriteria: 'Require a complete full-root corpus scan, selected target sampling, all functionalCoverage entries covered, archiveHandlingScope.archiveInternalFontsCovered false, representative single and batch outputStructureDecision.status pass, structureSummary.conforms true, and perDirectoryAcceptanceAudit false.',
+    nonIntuitiveBehavior: 'status pass means the representative real-corpus feature chain passed; it is not a per-directory acceptance audit, target counts such as 4 or 10 are not the full corpus font count, and archives are counted as ignored files rather than extracted.',
   };
 }
 
@@ -2889,6 +2935,7 @@ if (scenario === 'single') {
     || result.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('corpusCountGuide')
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('coverageSummary.outputStructureAuditSummary')
+    || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('coverageSummary.archiveHandlingScope')
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('runSummaries')
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('omittedDetailFields')
     || !result.localVerificationOutputGuide?.passCriteria?.some((item) => item.includes('reliabilityGateDecision.status is pass'))
@@ -2896,8 +2943,10 @@ if (scenario === 'single') {
     || !result.localVerificationOutputGuide?.nonIntuitiveBehavior?.some((item) => item.includes('Default suite output is compact'))
     || result.localVerificationOutputGuide?.evidenceFields?.countGuide !== 'corpusCountGuide'
     || result.localVerificationOutputGuide?.evidenceFields?.fullCorpusFontCount !== 'testScope.corpusScan.supportedFontCount'
+    || result.localVerificationOutputGuide?.evidenceFields?.archiveHandlingScope !== 'coverageSummary.archiveHandlingScope'
     || result.localVerificationOutputGuide?.completionReportGuide?.summaryType !== 'local-verification-completion-report-guide'
     || !result.localVerificationOutputGuide?.completionReportGuide?.requiredClaims?.some((item) => item.id === 'full-corpus-count' && item.evidenceField === 'corpusCountGuide.fullCorpus.supportedFontCount')
+    || !result.localVerificationOutputGuide?.completionReportGuide?.requiredClaims?.some((item) => item.id === 'archive-handling-scope' && item.evidenceField === 'coverageSummary.archiveHandlingScope')
     || !result.localVerificationOutputGuide?.completionReportGuide?.requiredClaims?.some((item) => item.id === 'representative-output-audit' && item.evidenceField === 'coverageSummary.outputStructureAuditSummary')
     || !result.localVerificationOutputGuide?.completionReportGuide?.forbiddenClaims?.some((item) => item.includes('every font'))
     || !result.localVerificationOutputGuide?.completionReportGuide?.forbiddenClaims?.some((item) => item.includes('every directory'))
@@ -5951,6 +6000,7 @@ if (scenario === 'single') {
     assertDocsContain('real corpus reliability gate decision', '`reliabilityGateDecision`');
     assertDocsContain('real corpus suite test scope', '`testScope`');
     assertDocsContain('real corpus ignored category coverage', '`coverageSummary.unsupportedFileCategoryCoverage`');
+    assertDocsContain('real corpus archive handling scope', '`coverageSummary.archiveHandlingScope`');
     assertDocsContain('real corpus output structure audit summary', '`coverageSummary.outputStructureAuditSummary`');
     assertDocsContain('real corpus input directory decision coverage id', '`input-directory-decision`');
     assertDocsContain('real corpus staging directory coverage id', '`staging-directory-decision`');
@@ -6100,6 +6150,7 @@ if (scenario === 'single') {
     '`input-directory-decision`',
     '`staging-directory-decision`',
     '`coverageSummary.unsupportedFileCategoryCoverage`',
+    '`coverageSummary.archiveHandlingScope`',
     '`coverageSummary.outputStructureAuditSummary`',
     '`runSummaries`',
     '`omittedDetailFields`',
@@ -6586,6 +6637,13 @@ if (scenario === 'single') {
     || !Array.isArray(coverageSummary.corpusUnsupportedByCategory)
     || coverageSummary.unsupportedFileCategoryCoverage?.summaryType !== 'unsupported-file-category-coverage'
     || coverageSummary.unsupportedFileCategoryCoverage?.extensionsBeyondZipTxtCount < 1
+    || coverageSummary.archiveHandlingScope?.summaryType !== 'archive-handling-scope'
+    || coverageSummary.archiveHandlingScope?.archiveCount !== coverageSummary.unsupportedFileCategoryCoverage?.archiveCount
+    || coverageSummary.archiveHandlingScope?.archivesCountedAsIgnored !== true
+    || coverageSummary.archiveHandlingScope?.archivesExtracted !== false
+    || coverageSummary.archiveHandlingScope?.archiveContentsScanned !== false
+    || coverageSummary.archiveHandlingScope?.archiveInternalFontsCovered !== false
+    || coverageSummary.archiveHandlingScope?.recommendedAction !== 'extract-archives-outside-this-tool-if-needed'
     || coverageSummary.selectedTargetCount < 1
     || coverageSummary.batchAuditStatus !== 'pass'
     || coverageSummary.outputStructureAuditSummary?.summaryType !== 'real-corpus-output-structure-audit'
@@ -6617,7 +6675,9 @@ if (scenario === 'single') {
     || reliabilityGateDecision.corpusSupportedFontCount !== coverageSummary.corpusSupportedFontCount
     || reliabilityGateDecision.selectedTargetCount !== coverageSummary.selectedTargetCount
     || reliabilityGateDecision.coveredFunctionalCoverageCount !== coverageSummary.functionalCoverage.length
+    || reliabilityGateDecision.archiveInternalFontsCovered !== false
     || reliabilityGateDecision.blockingReasonCodes?.length !== 0
+    || !reliabilityGateDecision.evidenceFields?.includes('coverageSummary.archiveHandlingScope')
     || !reliabilityGateDecision.evidenceFields?.includes('coverageSummary.outputStructureAuditSummary')
     || !reliabilityGateDecision.passCriteria?.includes('outputStructureDecision.status pass')
     || !reliabilityGateDecision.nonIntuitiveBehavior?.includes('not the full corpus font count')
@@ -6658,6 +6718,7 @@ if (scenario === 'single') {
       || finalOutput.runSummaries.length !== runs.length
       || finalOutput.runSummaries.some((run) => Object.hasOwn(run, 'summary'))
       || finalOutput.coverageSummary?.summaryType !== 'real-corpus-suite-compact-coverage'
+      || finalOutput.coverageSummary?.archiveHandlingScope?.archiveInternalFontsCovered !== false
       || finalOutput.coverageSummary?.functionalCoverage?.some((item) => Object.hasOwn(item, 'evidence') || item.evidenceOmitted !== true)
       || !finalOutput.omittedDetailFields?.includes('runs')
       || !finalOutput.verboseCommandHint?.includes('--verbose')
