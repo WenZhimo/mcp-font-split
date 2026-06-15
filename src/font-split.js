@@ -1396,8 +1396,13 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   recommendedNextActions: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
-    meaning: 'Machine-readable follow-up checklist for batch and directory organization workflows. Each action includes inspectFields and successCriteria.',
-    agentAction: 'Treat as guidance, inspect each action inspectFields, and satisfy successCriteria before proceeding or reporting completion.',
+    meaning: 'Machine-readable follow-up checklist for batch and directory organization workflows. Each action includes inspectFields and successCriteria; scanner follow-up suggestedArgs may include maxFiles to preserve the current scan cap.',
+    agentAction: 'Treat as guidance, inspect each action inspectFields, and satisfy successCriteria before proceeding or reporting completion. When suggestedArgs.maxFiles is present, preserve it unless intentionally changing the scan cap.',
+  },
+  'recommendedNextActions[].suggestedArgs.maxFiles': {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Current scan cap copied into organization follow-up actions that rescan source or staging directories. The explicit higher-cap rerun action may use a placeholder instead.',
+    agentAction: 'Keep this value when copying suggestedArgs into the next inspect_font_inputs, organize_font_directory, or split_font_batch call so the follow-up covers the same bounded scan scope.',
   },
   operationMode: {
     sourceTools: ['organize_font_directory'],
@@ -3991,6 +3996,7 @@ export function getAgentGuidance(args = {}) {
       'organizationWarnings',
       'organizationWarningCount',
       'recommendedNextActions',
+      'recommendedNextActions[].suggestedArgs.maxFiles',
       'operationMode',
       'copiedCount',
       'organizationManifestPath',
@@ -5282,6 +5288,7 @@ function buildOrganizationNextActions({
         workflowPreset: 'safe-preview',
         options,
         optionOverrides: { dryRun: true, parseFonts: true },
+        extraArgs: { maxFiles },
       }),
       inspectFields: withDirectoryRouteInspectFields(['parsedFontMetadata', 'validFontCount', 'invalidFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing']),
       successCriteria: 'The rerun should parse font metadata before relying on invalid-font counts, identity dedupe, glyph counts, or metadata family grouping.',
@@ -5300,6 +5307,7 @@ function buildOrganizationNextActions({
         workflowPreset: 'safe-preview',
         options,
         optionOverrides: { dryRun: true, includePlan: true, copyInvalidFonts: true },
+        extraArgs: { maxFiles },
       }),
       inspectFields: withDirectoryRouteInspectFields(['invalidFontCount', 'plan']),
       note: 'Use copyInvalidFonts:true only when preserving broken font-like files is intentional.',
@@ -5316,6 +5324,7 @@ function buildOrganizationNextActions({
       suggestedArgs: buildSuggestedBatchPreviewArgs({
         inputDir: inputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
+        extraArgs: { maxFiles },
       }),
       inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'The batch preview should remain dryRun true and sourceDestructive false, with planned grouping and warnings reviewed before any real write.',
@@ -5331,6 +5340,7 @@ function buildOrganizationNextActions({
       suggestedArgs: buildSuggestedBatchPreviewArgs({
         inputDir: outputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
+        extraArgs: { maxFiles },
       }),
       inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'inputDir', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
       note: 'Use the organized outputDir intentionally as the next inputDir, or keep future scans scoped so they do not reprocess organized copies.',
@@ -5368,6 +5378,7 @@ function buildOrganizationNextActions({
         suggestedArgs: buildSuggestedBatchPreviewArgs({
           inputDir: inputDirRelative,
           recommendedBatchOptions: layout.recommendedBatchOptions,
+          extraArgs: { maxFiles },
         }),
         inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
         successCriteria: 'The original-layout batch preview should remain dryRun true and sourceDestructive false, with planned paths and grouping reviewed before a real write.',
@@ -5383,6 +5394,7 @@ function buildOrganizationNextActions({
           workflowPreset: 'reviewed-write',
           options,
           optionOverrides: { dryRun: false, overwriteExisting: false },
+          extraArgs: { maxFiles },
         }),
         inspectFields: withDirectoryRouteInspectFields(['sourceSafetyDecision', 'safetySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree']),
         successCriteria: 'The reviewed organization copy should be sourceDestructive false and copy-only, with copiedCount or planActionSummary matching the reviewed plan.',
@@ -5397,6 +5409,7 @@ function buildOrganizationNextActions({
       suggestedArgs: {
         inputDir: outputDirRelative,
         includeFiles: false,
+        maxFiles,
       },
       inspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'layout', 'recommendedBatchPreviewArgs', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount', 'inspectionWarnings'],
       successCriteria: 'The staging inspection should complete without scan truncation and show the expected supported fonts before using the staging directory for splitting.',
@@ -5409,6 +5422,7 @@ function buildOrganizationNextActions({
       suggestedArgs: buildSuggestedBatchPreviewArgs({
         inputDir: outputDirRelative,
         recommendedBatchOptions: layout.recommendedBatchOptions,
+        extraArgs: { maxFiles },
       }),
       inspectFields: ['sourceSafetyDecision', 'safetySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errors'],
       successCriteria: 'The organized-output batch preview should remain dryRun true and sourceDestructive false, with planned paths and warnings reviewed before a real write.',

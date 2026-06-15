@@ -2363,6 +2363,12 @@ function assertSafeRecommendedBatchPreviewArgs(previewArgs, expected, context) {
   ], `${context} recommendedBatchPreviewArgs`);
 }
 
+function assertSuggestedArgsPreserveMaxFiles(action, expectedMaxFiles, context) {
+  if (!action?.suggestedArgs || action.suggestedArgs.maxFiles !== expectedMaxFiles) {
+    throw new Error(`${context}: expected suggestedArgs.maxFiles to preserve the current scan cap ${expectedMaxFiles}.`);
+  }
+}
+
 async function collectProbeFiles(dir, { maxFiles = 120 } = {}) {
   const files = [];
   const excludedDirs = new Set(['.git', 'node_modules', 'font-split-mcp', '__MACOSX']);
@@ -2850,6 +2856,12 @@ if (scenario === 'single') {
   if (!result.responseFieldsToCheck?.includes('recommendedNextActions')) {
     throw new Error('Expected agent guidance to recommend checking organization next actions.');
   }
+  if (
+    !result.responseFieldsToCheck?.includes('recommendedNextActions[].suggestedArgs.maxFiles')
+    || !result.toolResponseFieldCatalog?.['recommendedNextActions[].suggestedArgs.maxFiles']?.meaning?.includes('scan cap')
+  ) {
+    throw new Error('Expected agent guidance to explain recommendedNextActions suggestedArgs maxFiles preservation.');
+  }
   if (!result.responseFieldsToCheck?.includes('planActionSummary')) {
     throw new Error('Expected agent guidance to recommend checking organization plan action summaries.');
   }
@@ -3325,6 +3337,7 @@ if (scenario === 'single') {
     sourceLayoutMismatchSummary: 'organize_font_directory',
     'sourceLayoutMismatchSummary.decisionChecklist': 'organize_font_directory',
     recommendedNextActions: 'split_font_batch',
+    'recommendedNextActions[].suggestedArgs.maxFiles': 'organize_font_directory',
     safetySummary: 'split_font_batch',
     inputCountGuide: 'inspect_font_inputs',
     unsupportedFileSummary: 'organize_font_directory',
@@ -4003,6 +4016,11 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected organization dry-run to summarize the invalid-font decision route.');
   }
+  assertSuggestedArgsPreserveMaxFiles(
+    (result.recommendedNextActions || []).find((action) => action.id === 'decide-on-invalid-fonts'),
+    10,
+    'organize-dry-run decide-on-invalid-fonts action',
+  );
   assertDirectoryWorkflowSummary(result.directoryWorkflowSummary, {
     context: 'organize-dry-run',
     expectedLayoutKind: 'nested',
@@ -4238,12 +4256,15 @@ if (scenario === 'single') {
     }
   }
   const copiedBatchAction = (copied.recommendedNextActions || []).find((action) => action.id === 'preview-batch-split-organized-output');
+  const inspectCopiedAction = (copied.recommendedNextActions || []).find((action) => action.id === 'inspect-organized-output');
   if (
     copiedBatchAction?.suggestedArgs?.workflowPreset !== 'safe-preview'
     || copiedBatchAction?.suggestedArgs?.batchGroupBy !== 'source-dir'
   ) {
     throw new Error('Expected organized-output batch preview action to use safe-preview with source-dir grouping only as the scene-specific override.');
   }
+  assertSuggestedArgsPreserveMaxFiles(inspectCopiedAction, 10, 'inspect-organized-output suggestedArgs');
+  assertSuggestedArgsPreserveMaxFiles(copiedBatchAction, 10, 'preview-batch-split-organized-output suggestedArgs');
   assertActionSuggestedArgsOmit(copiedBatchAction, ['dryRun', 'includeResults', 'skipMode', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode'], 'preview-batch-split-organized-output suggestedArgs');
   if (await fs.readFile(sourcePath, 'utf8') !== 'not a real font') {
     throw new Error('Expected source file content to be preserved after organization copy.');
@@ -4560,6 +4581,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected rerun-with-font-parsing to use safe-preview, preserve only the metadata-family grouping override, and inspect organizationDecision.');
   }
+  assertSuggestedArgsPreserveMaxFiles(rerunWithParsingAction, 10, 'rerun-with-font-parsing suggestedArgs');
   assertActionSuggestedArgsOmit(rerunWithParsingAction, ['dryRun', 'parseFonts', 'includePlan', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'], 'rerun-with-font-parsing suggestedArgs');
   const structurePreviewAction = (result.recommendedNextActions || []).find((action) => action.id === 'preview-batch-split-original-layout');
   if (
@@ -4569,6 +4591,7 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected structure-only batch preview action to use safe-preview with source-dir grouping and inspect batchDecision.');
   }
+  assertSuggestedArgsPreserveMaxFiles(structurePreviewAction, 10, 'preview-batch-split-original-layout suggestedArgs');
   assertActionSuggestedArgsOmit(structurePreviewAction, ['dryRun', 'includeResults', 'skipMode', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode'], 'preview-batch-split-original-layout suggestedArgs');
   for (const expectedAction of ['rerun-with-font-parsing', 'review-plan-before-writing']) {
     assertInspectFieldsExist((result.recommendedNextActions || []).find((action) => action.id === expectedAction), {
@@ -5994,7 +6017,7 @@ if (scenario === 'single') {
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'without writing output', 'organize_font_directory safe-preview', 'maxFiles', 'preserves']);
-    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'layoutDecision.directoryHandling', 'stagingDirectoryDecision', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'maxFiles', 'preserves', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
+    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'layoutDecision.directoryHandling', 'stagingDirectoryDecision', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'recommendedBatchPreviewArgs', 'recommendedNextActions', 'suggestedArgs.maxFiles', 'maxFiles', 'preserves', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
     expectDescriptionIncludes('inspect_split_output', ['outputStructureDecision', 'auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
@@ -6081,6 +6104,7 @@ if (scenario === 'single') {
       'recommendedBatchPreviewArgs',
       'recommendedBatchPreviewArgs.maxFiles',
       'recommendedNextActions',
+      'recommendedNextActions[].suggestedArgs.maxFiles',
       'successCriteria',
       'sourceSafetyDecision',
       'safetySummary',
@@ -6319,6 +6343,7 @@ if (scenario === 'single') {
     '`recommendedBatchPreviewArgs`',
     '`recommendedBatchPreviewArgs.maxFiles`',
     '`recommendedNextActions[]`',
+    '`recommendedNextActions[].suggestedArgs.maxFiles`',
     '`successCriteria`',
     '`planActionSummary`',
     '`batchDecision`',
