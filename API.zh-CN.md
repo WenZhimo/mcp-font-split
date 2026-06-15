@@ -14,7 +14,7 @@
 | `detailLevel` | `compact`, `full` | `compact` | 响应体量。`compact` 保留工作流关键 section，并默认省略较大的 catalog / 示例；`full` 返回全部指南 section。 |
 | `sections` | section 名称数组 | 不设置 | 聚焦返回指定 section。设置后会覆盖 `detailLevel` 的默认 section 集。 |
 
-响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchCustomizationQuickReference[]`、`batchPolicyGuide`、`toolOptionCatalog`、`fontIdentityBasisCatalog`、`outputStructureCatalog`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
+响应始终包含 `guidanceView`，用于说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称。默认响应是紧凑版：包含工作区路径规则、支持扩展名、默认策略、`configurationRecipes[]`、`batchCustomizationQuickReference[]`、`directoryOrganizationQuickAnswer`、`batchPolicyGuide`、`toolOptionCatalog`、`fontIdentityBasisCatalog`、`outputStructureCatalog`、`unsupportedFileCategoryCatalog`、`directoryHandlingModeCatalog`、推荐批量和目录整理参数、需要检查的响应字段、完成验证清单、`errorResponseCatalog`、`localVerificationOutputGuide`、`directoryWorkflowDecisionMatrix[]`、`safeInvocationTemplates[]`、`nextToolDecisionSummary`、`recommendedWorkflowPlan`，以及推荐工具调用顺序。AI agent 在不确定该走单文件、批量、预检、整理还是审计流程时，应该先调用这个工具，而不是猜测本机路径或依赖过期记忆。
 
 当 agent 需要一次拿到全部 catalog 和示例时，使用 `detailLevel: "full"`。当只需要某些数据时，使用 `sections`，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog", "identity-catalog", "output-catalog"]`。可选 section 名称见 `guidanceView.availableSections`。
 
@@ -23,6 +23,8 @@
 `configurationRecipes[]` 会把常见用户意图映射成 preset-first 调用和取舍说明。当前覆盖默认安全批量、保留每个源字体、按源目录分组、按字体 metadata 分组、快速结构优先扫描、copy-only 暂存整理，以及大库审查后写入。每个配方都会包含 `inspectFields` 和 `successCriteria`。配方只是指南，不是成功证明；agent 仍必须实际运行预览/写入工具，检查这些字段，并满足对应条件。
 
 `batchCustomizationQuickReference[]` 是常见批量自定义的紧凑入口。它会把用户意图映射成最小 `overrideArgs`、带 `workflowPreset: "safe-preview"` 的可复制 `previewArgs`、带 `workflowPreset: "reviewed-write"` 的 `writeArgsAfterReview`、必须检查的 `inspectFields`、`successCriteria` 和非直觉行为。常见覆盖先看它；如果用户要求更细的取舍，再查 `batchPolicyGuide` 的逐值说明。
+
+`directoryOrganizationQuickAnswer` 是源目录结构不匹配问题的紧凑答案。它直接说明辅助工具是 `organize_font_directory`，第一步应使用 `workflowPreset: "safe-preview"`，审查后的写入也是 copy-only 到 `outputDir`，源字体不会被移动、删除或重写，并且整理出的 `outputDir` 是源目录式暂存，不是最终拆分输出。当用户只是问“有没有目录整理工具”或“会不会破坏源目录”时，先看它；需要更细路线时再看 `directoryWorkflowDecisionMatrix[]`。
 
 `batchPolicyGuide` 是批量策略选项的机器可读自定义指南。它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`；每个策略值都会包含 `useWhen`、`avoidWhen`、`inspectFields` 和 `successCriteria`。当用户要求偏离默认 preset 的行为时，先参考它选择最小显式覆盖，然后先预览再写入。
 
@@ -76,7 +78,7 @@
 | `tools` | 工具清单，以及每个工具适合在什么时候调用。 |
 | `defaults` | 重要默认策略和支持的字体扩展名。 |
 | `recommendations` | 推荐的批量、检查和目录整理参数，以及 `workflowPresets[]`、`batchCustomizationQuickReference[]`、`batchPolicyGuide`、`configurationRecipes[]`、`fontIdentityBasisCatalog`、`outputStructureCatalog` 和 `unsupportedFileCategoryCatalog`。 |
-| `directory-workflows` | 面向扁平、嵌套、混合、嘈杂和暂存目录场景的目录工作流决策表。 |
+| `directory-workflows` | `directoryOrganizationQuickAnswer`，以及面向扁平、嵌套、混合、嘈杂和暂存目录场景的目录工作流决策数据。 |
 | `examples` | 具体源目录示例；在 `full` 详情或显式请求时返回。 |
 | `verification` | agent 在宣称成功前应该验证的检查清单。 |
 | `error-catalog` | `FontSplitConfigurationError`、`BatchSplitError` 等结构化 MCP 错误的错误响应目录。 |

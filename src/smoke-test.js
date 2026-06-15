@@ -2723,6 +2723,7 @@ if (scenario === 'single') {
     || !defaultGuidance.safeInvocationTemplates?.length
     || defaultGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !defaultGuidance.directoryHandlingModeCatalog?.['preview-original-input']
+    || defaultGuidance.directoryOrganizationQuickAnswer?.summaryType !== 'directory-organization-quick-answer'
     || !defaultGuidance.directoryWorkflowDecisionMatrix?.length
     || !defaultGuidance.configurationRecipes?.length
     || !defaultGuidance.batchPolicyGuide?.length
@@ -2768,6 +2769,7 @@ if (scenario === 'single') {
     || !compactGuidance.safeInvocationTemplates?.length
     || compactGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !compactGuidance.directoryHandlingModeCatalog?.['preview-organized-output']
+    || compactGuidance.directoryOrganizationQuickAnswer?.summaryType !== 'directory-organization-quick-answer'
     || !compactGuidance.directoryWorkflowDecisionMatrix?.length
     || !compactGuidance.configurationRecipes?.length
     || !compactGuidance.batchPolicyGuide?.length
@@ -2878,6 +2880,13 @@ if (scenario === 'single') {
     || !result.toolResponseFieldCatalog?.batchCustomizationQuickReference?.agentAction?.includes('smallest explicit override')
   ) {
     throw new Error('Expected agent guidance to expose batchCustomizationQuickReference as the compact customization entrypoint.');
+  }
+  if (
+    !result.responseFieldsToCheck?.includes('directoryOrganizationQuickAnswer')
+    || result.toolResponseFieldCatalog?.directoryOrganizationQuickAnswer?.sourceTools?.[0] !== 'get_agent_guidance'
+    || !result.toolResponseFieldCatalog?.directoryOrganizationQuickAnswer?.agentAction?.includes('safe-preview')
+  ) {
+    throw new Error('Expected agent guidance to expose directoryOrganizationQuickAnswer as the compact directory safety answer.');
   }
   if (
     !result.responseFieldsToCheck?.includes('configurationTrace')
@@ -3446,6 +3455,7 @@ if (scenario === 'single') {
     'layoutDecision.directoryHandling.recommendedMode': 'organize_font_directory',
     stagingDirectoryDecision: 'organize_font_directory',
     directoryHandlingModeCatalog: 'get_agent_guidance',
+    directoryOrganizationQuickAnswer: 'get_agent_guidance',
     sourceLayoutMismatchSummary: 'organize_font_directory',
     'sourceLayoutMismatchSummary.decisionChecklist': 'organize_font_directory',
     'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs': 'organize_font_directory',
@@ -3485,6 +3495,24 @@ if (scenario === 'single') {
     if (!result.toolResponseFieldCatalog?.[fieldName]?.sourceTools?.includes(toolName)) {
       throw new Error(`Expected toolResponseFieldCatalog.${fieldName} to include ${toolName}.`);
     }
+  }
+  const directoryQuickAnswer = result.directoryOrganizationQuickAnswer || {};
+  if (
+    directoryQuickAnswer.summaryType !== 'directory-organization-quick-answer'
+    || directoryQuickAnswer.helperTool !== 'organize_font_directory'
+    || directoryQuickAnswer.sourceDestructive !== false
+    || directoryQuickAnswer.sourceFilesPreserved !== true
+    || directoryQuickAnswer.firstCallArgs?.workflowPreset !== 'safe-preview'
+    || directoryQuickAnswer.writeArgsAfterReview?.workflowPreset !== 'reviewed-write'
+    || directoryQuickAnswer.writeMode !== 'copy-only-outputDir'
+    || directoryQuickAnswer.outputDirRole !== 'organized-font-source-staging'
+    || directoryQuickAnswer.isSplitOutput !== false
+    || !directoryQuickAnswer.inspectFields?.includes('sourceSafetyDecision')
+    || !directoryQuickAnswer.inspectFields?.includes('sourceLayoutMismatchSummary')
+    || !directoryQuickAnswer.successCriteria?.some((item) => item.includes('sourceDestructive false'))
+    || !directoryQuickAnswer.nonIntuitiveBehavior?.some((item) => item.includes('never moves, deletes, or rewrites source font files'))
+  ) {
+    throw new Error('Expected directoryOrganizationQuickAnswer to directly answer helper-tool and source-safety questions.');
   }
   assertBatchPolicyGuide(result.batchPolicyGuide || []);
   const quickReferenceIds = new Set((result.batchCustomizationQuickReference || []).map((item) => item.id));
@@ -6213,7 +6241,7 @@ if (scenario === 'single') {
       assertEnumMatches(`organize_font_directory ${optionName}`, getSchemaEnumValues(organizeProps[optionName]), expectedValues);
     }
     assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
-    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchCustomizationQuickReference', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchCustomizationQuickReference', 'directoryOrganizationQuickAnswer', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'recommendedNextActions[].suggestedArgsField', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'without writing output', 'organize_font_directory safe-preview', 'maxFiles', 'preserves']);
@@ -6276,6 +6304,7 @@ if (scenario === 'single') {
       'quickStartCallExamples[]',
       'configurationRecipes',
       'batchCustomizationQuickReference',
+      'directoryOrganizationQuickAnswer',
       'batchPolicyGuide',
       'batchPolicySummary',
       'configurationTrace',
@@ -6487,6 +6516,7 @@ if (scenario === 'single') {
     '`quickStartCallExamples[]`',
     '`configurationRecipes[]`',
     '`batchCustomizationQuickReference[]`',
+    '`directoryOrganizationQuickAnswer`',
     '`toolOptionCatalog`',
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
@@ -6626,7 +6656,7 @@ if (scenario === 'single') {
     ok: true,
     toolCount: guidance.tools?.length || 0,
     documentedWorkflowPresetCount: guidance.workflowPresets?.length || 0,
-    checkedHighRiskTokenCount: 46,
+    checkedHighRiskTokenCount: 47,
     checkedWarningCodeCount: 10,
     checkedDebugEventCount: 5,
   }, null, 2));

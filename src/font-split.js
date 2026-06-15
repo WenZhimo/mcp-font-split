@@ -242,7 +242,7 @@ const GUIDANCE_SECTION_FIELDS = {
   tools: ['tools', 'supportedExtensions'],
   defaults: ['defaultPolicies'],
   recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets', 'batchCustomizationQuickReference', 'batchPolicyGuide', 'configurationRecipes', 'unsupportedFileCategoryCatalog', 'fontIdentityBasisCatalog', 'outputStructureCatalog'],
-  'directory-workflows': ['directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix'],
+  'directory-workflows': ['directoryOrganizationQuickAnswer', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix'],
   examples: ['directoryWorkflowExamples'],
   verification: ['verificationChecklist', 'localVerificationOutputGuide'],
   'error-catalog': ['errorResponseCatalog'],
@@ -1564,6 +1564,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Compact intent-to-override table for common batch customization requests, including preset-first preview/write args, minimal explicit overrides, inspect fields, and success criteria.',
     agentAction: 'Start here when the user asks to customize grouping, naming, dedupe, or error handling; copy the smallest explicit override into a safe-preview call, then inspect listed fields before reviewed-write.',
   },
+  directoryOrganizationQuickAnswer: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Short answer for whether this package has a directory organization helper and whether that helper can modify source font files.',
+    agentAction: 'Use this first when the user asks what to do with mismatched source directory layouts; start with its safe-preview args, then inspect source safety, layout, warnings, and plan evidence before any reviewed copy.',
+  },
   batchPolicySummary: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Compact echo of the batch-related policies selected for this call, linked to the relevant batchPolicyGuide success criteria.',
@@ -2593,6 +2598,59 @@ function buildBatchCustomizationQuickReference() {
       nonIntuitiveBehavior: 'collect can return ok:true with errors[], so ok:true alone is not proof that the batch fully succeeded.',
     },
   ];
+}
+
+function buildDirectoryOrganizationQuickAnswer() {
+  return {
+    summaryType: 'directory-organization-quick-answer',
+    directAnswer: 'Yes. Use organize_font_directory when the source directory layout does not match the desired batch grouping; it is source-non-destructive.',
+    helperTool: 'organize_font_directory',
+    helperToolPurpose: 'Plan a safer layout or copy selected font files into a cleaner source-like staging directory before split_font_batch.',
+    firstCall: 'Run organize_font_directory with workflowPreset safe-preview before writing anything.',
+    firstCallArgs: {
+      inputDir: '<font-source-dir>',
+      workflowPreset: 'safe-preview',
+    },
+    writeCallAfterReview: 'After reviewing the safe-preview plan, rerun organize_font_directory with workflowPreset reviewed-write to copy selected fonts into outputDir.',
+    writeArgsAfterReview: {
+      inputDir: '<font-source-dir>',
+      outputDir: '<organized-output-dir>',
+      workflowPreset: 'reviewed-write',
+    },
+    sourceDestructive: false,
+    sourceFilesPreserved: true,
+    sourceFilesMovedDeletedOrRewritten: false,
+    dryRunDefault: true,
+    writeMode: 'copy-only-outputDir',
+    outputDirRole: 'organized-font-source-staging',
+    isSplitOutput: false,
+    nextToolAfterStaging: 'split_font_batch',
+    auditToolAfterSplitWrite: 'inspect_split_output',
+    inspectFields: [
+      'sourceSafetyDecision',
+      'safetySummary',
+      'layoutDecision',
+      'layoutDecision.directoryHandling',
+      'stagingDirectoryDecision',
+      'directoryWorkflowSummary',
+      'sourceLayoutMismatchSummary',
+      'sourceLayoutMismatchSummary.decisionChecklist',
+      'recommendedBatchPreviewArgs',
+      'recommendedNextActions',
+      'organizationWarnings',
+      'planActionSummary',
+    ],
+    successCriteria: [
+      'Before any copy, sourceDestructive false, sourceFilesPreserved true, planActionSummary or plan[] matches user intent, and organizationWarnings are acceptable.',
+      'Before any split write, run split_font_batch with safe-preview args and inspect planned paths, warnings, maxFilesHit, dedupe, and errors.',
+      'After any split write, run inspect_split_output and require outputStructureDecision.status pass before reporting structural success.',
+    ],
+    nonIntuitiveBehavior: [
+      'organize_font_directory never moves, deletes, or rewrites source font files; dryRun:false copies selected fonts into outputDir.',
+      'outputDir is source-like staging, not generated split output; inspect_split_output is for the later split outputRoot, not the organized staging directory.',
+      'writesSourceTree true means outputDir is inside the input tree; it does not mean source font files were modified.',
+    ],
+  };
 }
 
 function buildRecommendedWorkflowPlan(workflow) {
@@ -4135,6 +4193,7 @@ export function getAgentGuidance(args = {}) {
     },
     workflowPresets: buildWorkflowPresetCatalog(),
     batchCustomizationQuickReference: buildBatchCustomizationQuickReference(),
+    directoryOrganizationQuickAnswer: buildDirectoryOrganizationQuickAnswer(),
     batchPolicyGuide: BATCH_POLICY_GUIDE,
     configurationRecipes,
     fontIdentityBasisCatalog: FONT_IDENTITY_BASIS_CATALOG,
@@ -4164,6 +4223,7 @@ export function getAgentGuidance(args = {}) {
       'workflowPresets',
       'workflowPreset',
       'batchCustomizationQuickReference',
+      'directoryOrganizationQuickAnswer',
       'batchPolicyGuide',
       'batchPolicySummary',
       'configurationTrace',
