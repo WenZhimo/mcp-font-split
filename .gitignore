@@ -1,4 +1,5 @@
 node_modules/
+HANDOFF.local.md
 
 # Local smoke/debug/batch outputs generated while testing this MCP server.
 .font-split-*/
