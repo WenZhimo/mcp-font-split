@@ -2601,6 +2601,8 @@ if (scenario === 'single') {
     || !compactGuidance.configurationRecipes?.length
     || !compactGuidance.batchPolicyGuide?.length
     || compactGuidance.toolOptionCatalog?.summaryType !== 'tool-option-catalog'
+    || !compactGuidance.fontIdentityBasisCatalog?.['typographic-family-subfamily']
+    || !compactGuidance.fontIdentityBasisCatalog?.['opentype-family-subfamily']
     || !compactGuidance.unsupportedFileCategoryCatalog?.archive
     || compactGuidance.guidanceView.availableSections.length !== new Set(compactGuidance.guidanceView.availableSections).size
     || compactGuidance.guidanceView.sectionsIncluded.length !== new Set(compactGuidance.guidanceView.sectionsIncluded).size
@@ -2783,6 +2785,33 @@ if (scenario === 'single') {
   }
   if (!result.responseFieldsToCheck?.includes('toolOptionCatalog')) {
     throw new Error('Expected agent guidance to recommend checking the tool option catalog.');
+  }
+  if (!result.responseFieldsToCheck?.includes('fontIdentityBasisCatalog')) {
+    throw new Error('Expected agent guidance to recommend checking the font identity basis catalog.');
+  }
+  const identityCatalogGuidance = getAgentGuidance({ sections: ['identity-catalog'] });
+  if (
+    identityCatalogGuidance.guidanceView?.sectionsIncluded?.length !== 1
+    || identityCatalogGuidance.guidanceView.sectionsIncluded[0] !== 'identity-catalog'
+    || !identityCatalogGuidance.fontIdentityBasisCatalog?.['typographic-family-subfamily']?.nameIds?.includes(16)
+    || !identityCatalogGuidance.fontIdentityBasisCatalog?.['opentype-family-subfamily']?.nameIds?.includes(1)
+    || identityCatalogGuidance.fontIdentityBasisCatalog?.['path-fallback']?.semanticIdentity === true
+    || Object.hasOwn(identityCatalogGuidance, 'toolOptionCatalog')
+    || Object.hasOwn(identityCatalogGuidance, 'toolResponseFieldCatalog')
+    || Object.hasOwn(identityCatalogGuidance, 'safeInvocationTemplates')
+  ) {
+    throw new Error('Expected focused identity-catalog guidance to explain identity basis values without unrelated sections.');
+  }
+  if (
+    !result.fontIdentityBasisCatalog?.['full-name']
+    || !result.fontIdentityBasisCatalog?.['postscript-name']
+    || result.fontIdentityBasisCatalog?.['typographic-family-subfamily']?.priority !== 1
+    || result.fontIdentityBasisCatalog?.['opentype-family-subfamily']?.priority !== 2
+    || !result.toolResponseFieldCatalog?.fontIdentityBasisCatalog
+    || !result.toolResponseFieldCatalog?.identityBasis
+    || !result.toolResponseFieldCatalog?.['dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts']
+  ) {
+    throw new Error('Expected full guidance to expose fontIdentityBasisCatalog and response-field catalog entries.');
   }
   if (
     !result.responseFieldsToCheck?.includes('errorResponseCatalog')
@@ -5742,7 +5771,7 @@ if (scenario === 'single') {
       assertEnumMatches(`organize_font_directory ${optionName}`, getSchemaEnumValues(organizeProps[optionName]), expectedValues);
     }
     assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
-    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'without writing output', 'organize_font_directory safe-preview', 'maxFiles', 'preserves']);
@@ -5808,6 +5837,9 @@ if (scenario === 'single') {
       'batchPolicySummary',
       'dedupeDecisionSummary',
       'identityEvidenceSummary',
+      'fontIdentityBasisCatalog',
+      'identityBasis',
+      'dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts',
       'layoutDecision',
       'layoutDecision.directoryHandling',
       'stagingDirectoryDecision',
@@ -5891,6 +5923,8 @@ if (scenario === 'single') {
     assertDocsContain('staging directory decision', '`stagingDirectoryDecision`');
     assertDocsContain('error response catalog', '`errorResponseCatalog`');
     assertDocsContain('error catalog section', '`error-catalog`');
+    assertDocsContain('identity catalog section', '`identity-catalog`');
+    assertDocsContain('identity catalog focused request', '`sections: ["identity-catalog"]`');
     assertDocsContain('error type field', '`errorType`');
     assertDocsContain('batch split error type', '`errorType: "batch-split-error"`');
     assertDocsContain('configuration error summary type', '`details.summaryType: "configuration-error"`');
@@ -5999,6 +6033,10 @@ if (scenario === 'single') {
     '`batchPolicySummary`',
     '`dedupeDecisionSummary`',
     '`identityEvidenceSummary`',
+    '`fontIdentityBasisCatalog`',
+    '`identityBasis`',
+    '`dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts`',
+    '`identity-catalog`',
     '`layoutDecision`',
     '`layoutDecision.directoryHandling`',
     '`stagingDirectoryDecision`',

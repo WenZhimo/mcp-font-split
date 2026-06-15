@@ -26,7 +26,7 @@
 - 批量扫描并处理字体目录。
 - 在大批量处理前预检输入目录，先发现坏字体或身份解析问题。
 - 当源字体目录结构与预期批量分组不一致时，生成整理计划，或把字体非破坏性复制到更规整的暂存目录。
-- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南、安全调用模板、工具选项目录、错误响应形态、warning code 含义和响应字段含义选择安全工作流；默认返回紧凑指南，也可按 section 请求完整 catalog。
+- 提供 `get_agent_guidance`，让 AI 编程助理用机器可读指南、安全调用模板、工具选项目录、字体 identity basis 目录、错误响应形态、warning code 含义和响应字段含义选择安全工作流；默认返回紧凑指南，也可按 section 请求完整 catalog。
 - 提供 `get_runtime_status`，让 agent 在处理前确认工作区、Node engine 兼容性、包版本和 WASM 是否可用。
 - 在输出目录中保留原字体副本。
 - 为每个处理过的字体写入 `split-meta.json`。
@@ -37,7 +37,7 @@
 
 | 工具 | 说明 |
 |------|------|
-| `get_agent_guidance` | 返回面向 AI agent 的工作流指南、路径规则、默认策略、工具选项目录、需要检查的响应字段和完成验证清单；默认紧凑，可用 `detailLevel` / `sections` 请求完整 catalog 或指定 section。 |
+| `get_agent_guidance` | 返回面向 AI agent 的工作流指南、路径规则、默认策略、工具选项目录、`fontIdentityBasisCatalog`、需要检查的响应字段和完成验证清单；默认紧凑，可用 `detailLevel` / `sections` 请求完整 catalog 或指定 section，例如 `sections: ["identity-catalog"]`。 |
 | `get_runtime_status` | 返回工作区、Node engine 兼容性、包版本、平台、cn-font-split 运行时和 WASM 可用性的只读诊断信息。 |
 | `split_font` | 处理单个字体。根据参数，结果可能是真正分片、单 WOFF2 fallback，或 copy-original 元数据登记。 |
 | `inspect_font_inputs` | 不写输出地扫描输入字体，报告解析状态、identity key、glyph count、坏字体清单、目录布局和第一步路线建议。 |
@@ -58,6 +58,7 @@
 - `get_agent_guidance` 会返回 `configurationRecipes[]`，把常见意图映射成 preset-first 参数，例如保留全部源字体、按源目录分组、按字体 metadata 分组、快速结构扫描、copy-only 暂存整理或大库审查后写入。配方只是安全起点，仍必须运行预览/写入工具，检查列出的 `inspectFields`，并满足 `successCriteria`。
 - `get_agent_guidance` 会返回 `batchPolicyGuide`，这是批量策略自定义指南，覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个选项值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前的 `successCriteria`。
 - `get_agent_guidance` 默认还会返回 `toolOptionCatalog`，这是高影响输入参数的机器可读目录。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的默认值、允许值、安全写入语义、非直觉行为，以及改写参数后应检查哪些响应字段；只想看它时可请求 `sections: ["option-catalog"]`。
+- `get_agent_guidance` 默认还会返回 `fontIdentityBasisCatalog`，解释 `identityBasis` 和 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 里的取值、OpenType name ID 来源、可信度，以及是否能支撑语义字体等价判断；只想看这部分时可请求 `sections: ["identity-catalog"]`。
 - `get_agent_guidance` 还会返回 `unsupportedFileCategoryCatalog`，解释 `unsupportedFileSummary.byCategory[]` 中 `archive`、`document`、`unsupported-font` 等分类的代表扩展名和处理行为；每个工具响应里的 `unsupportedFileDecision` 会给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则提供证据，压缩包只会被报告，不会被解压、复制或拆分。
 - 输入扫描类工具会返回 `inputCountGuide`，用一个紧凑对象解释扫描文件数、支持字体数、忽略文件数、`maxFilesHit` 是否导致计数不完整、文件明细是否被故意省略，以及非字体文件的处理方式。把真实语料计数当作完整结论前应先看它。
 - `inspect_font_inputs` 还会返回 `inputDirectoryDecision`、`layout` 和 `recommendedBatchPreviewArgs`。这是无写入的第一步 triage：它会提示应调高 `maxFiles`、先处理坏字体、直接做 `split_font_batch` safe-preview，还是先做非破坏性的 `organize_font_directory` safe-preview；它不是整理计划或拆分成功证明。返回的安全预览参数会通过 `recommendedBatchPreviewArgs.maxFiles` 保留本次扫描上限，复制下一步调用时不会意外退回默认值。
@@ -276,6 +277,7 @@ fonts/
 - 如果身份解析失败，去重会回退到基于路径的 key，并把真实错误留给处理阶段和 `batchErrorMode`。
 
 查看 `dedupeDecisionSummary` 可以快速理解本次去重：它会报告请求/实际模式、key 策略、跳过重复数、缺失 identity key 数量、是否路径回退、是否因跳过解析而受限、代表格式优先级，以及 `identityEvidenceSummary` 中的 identity basis 计数和少量重复样例。如果 `pathFallbackUsed` 或 `dedupeLimitedByParsing` 为 true，应说明语义 identity 去重受到限制。
+解释 `identityBasis` 或 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 时，优先查 `get_agent_guidance.fontIdentityBasisCatalog`；低置信度或路径回退 basis 不应被描述成完整语义去重证据。
 
 `batchErrorMode` 说明：
 

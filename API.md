@@ -14,9 +14,9 @@ Return machine-readable usage guidance for AI coding assistants.
 | `detailLevel` | `compact`, `full` | `compact` | Response size. `compact` keeps the workflow-critical sections and omits bulky catalogs/examples; `full` returns every guidance section. |
 | `sections` | array of section names | unset | Focused section filter. When set, it overrides the default section set from `detailLevel`. |
 
-The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available. By default the response is compact: it includes workspace path rules, supported extensions, default policies, `configurationRecipes[]`, `batchPolicyGuide`, `toolOptionCatalog`, `unsupportedFileCategoryCatalog`, `directoryHandlingModeCatalog`, recommended batch and organization options, response fields to inspect, a verification checklist, `errorResponseCatalog`, `localVerificationOutputGuide`, `directoryWorkflowDecisionMatrix[]`, `safeInvocationTemplates[]`, `nextToolDecisionSummary`, `recommendedWorkflowPlan`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available. By default the response is compact: it includes workspace path rules, supported extensions, default policies, `configurationRecipes[]`, `batchPolicyGuide`, `toolOptionCatalog`, `fontIdentityBasisCatalog`, `unsupportedFileCategoryCatalog`, `directoryHandlingModeCatalog`, recommended batch and organization options, response fields to inspect, a verification checklist, `errorResponseCatalog`, `localVerificationOutputGuide`, `directoryWorkflowDecisionMatrix[]`, `safeInvocationTemplates[]`, `nextToolDecisionSummary`, `recommendedWorkflowPlan`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
 
-Use `detailLevel: "full"` when the agent needs every catalog and example in one response. Use `sections` when it only needs specific data, for example `["error-catalog", "warning-catalog", "field-catalog", "option-catalog"]`. Available sections are reported in `guidanceView.availableSections`.
+Use `detailLevel: "full"` when the agent needs every catalog and example in one response. Use `sections` when it only needs specific data, for example `["error-catalog", "warning-catalog", "field-catalog", "option-catalog", "identity-catalog"]`. Available sections are reported in `guidanceView.availableSections`.
 
 For a minimal routing response, request `workflow: "organize"` with `sections: ["workflow"]` and inspect `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`. The nested `workflowQuickStart.recommendedCallExample` object is the copyable first call. For an uncertain source directory, that recommended call is the no-write `organize_font_directory` safe preview (`workflowPreset: "safe-preview"`), with `writesFiles: false` and `sourceDestructive: false`. Use its `alternateCallExamples[]` only after the user asks for staging or the inspected response requires a different branch.
 
@@ -25,6 +25,8 @@ For a minimal routing response, request `workflow: "organize"` with `sections: [
 `batchPolicyGuide` is a machine-readable customization guide for batch policy options. It covers `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, and `batchErrorMode`; each policy value includes `useWhen`, `avoidWhen`, `inspectFields`, and `successCriteria`. Use it when the user asks for behavior different from the recommended presets, then preview before writing.
 
 `toolOptionCatalog` is returned by default and with `sections: ["option-catalog"]`. It is a machine-readable catalog for high-impact tool inputs, including raw defaults, preset-first customization routes, allowed values, write/source safety behavior, response-size controls, non-intuitive behavior, and the response fields to inspect after an override. Use it before changing options such as `dryRun`, `includeResults`, `maxFiles`, `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, `parseFonts`, `smallGlyphAction`, `splitFailureAction`, or `includeFiles`.
+
+`fontIdentityBasisCatalog` is returned by default and with `sections: ["identity-catalog"]`. It explains the values emitted as `identityBasis` by `inspect_font_inputs` and summarized as `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` by dedupe responses. Each entry identifies the OpenType name IDs used, confidence, whether the basis is semantic identity evidence, and how strongly agents may describe duplicate decisions.
 
 `unsupportedFileCategoryCatalog` explains the categories used by `unsupportedFileSummary.byCategory[]`, including representative extensions, category meaning, and handling behavior. Tool responses also include `unsupportedFileDecision` for quick triage, plus `unsupportedFileSummary.categoryDetails[]` and `unsupportedFileSummary.handlingSummary` for evidence, so agents can interpret the current scan without a second guidance lookup. In particular, `archive` files are reported for awareness but are not extracted, copied, or split.
 
@@ -56,6 +58,8 @@ The real-corpus suite also exposes `staging-directory-decision` in `coverageSumm
 
 `toolOptionCatalog` is the companion input-side catalog. It explains which options change safety, output shape, response size, dedupe/naming semantics, or audit compactness, and it highlights non-intuitive defaults such as raw `split_font_batch.dryRun: false`, `organize_font_directory.dryRun: true`, `parseFonts: false` limiting identity dedupe, and `includeResults: false` / `includeFiles: false` producing compact responses.
 
+`fontIdentityBasisCatalog` is the companion identity-side catalog. Use it before interpreting `identityBasis` or `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts`; path-only, missing, or low-confidence family-only bases should not be reported as complete semantic dedupe proof.
+
 Guidance section names:
 
 | Section | Contents |
@@ -63,7 +67,7 @@ Guidance section names:
 | `workspace` | Workspace root and path-base information. |
 | `tools` | Tool inventory and when each tool should be called. |
 | `defaults` | Important default policies and supported extensions. |
-| `recommendations` | Recommended batch, inspect, and organization options, plus `workflowPresets[]`, `batchPolicyGuide`, `configurationRecipes[]`, and `unsupportedFileCategoryCatalog`. |
+| `recommendations` | Recommended batch, inspect, and organization options, plus `workflowPresets[]`, `batchPolicyGuide`, `configurationRecipes[]`, `fontIdentityBasisCatalog`, and `unsupportedFileCategoryCatalog`. |
 | `directory-workflows` | Directory workflow decision matrix for flat, nested, mixed, noisy, and staging scenarios. |
 | `examples` | Concrete source-tree examples; returned in `full` detail or when explicitly requested. |
 | `verification` | Checklist items an agent should verify before reporting success. |
@@ -71,6 +75,7 @@ Guidance section names:
 | `warning-catalog` | Warning-code catalog for `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]`. |
 | `field-catalog` | Response-field catalog mapping fields to meanings and agent actions. |
 | `option-catalog` | Tool input option catalog mapping high-impact options to defaults, allowed values, safety behavior, non-intuitive behavior, and fields to inspect. |
+| `identity-catalog` | Font identity basis catalog mapping `identityBasis` values to OpenType name ID sources, confidence, semantic identity status, and agent actions. |
 | `safe-templates` | Copyable safe invocation templates for common workflows. |
 | `response-fields` | Short list of response fields agents should inspect. |
 | `path-rules` | Path containment and relative-path rules. |

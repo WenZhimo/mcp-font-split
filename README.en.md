@@ -26,7 +26,7 @@ Invalid explicit configuration values are rejected instead of silently falling b
 - Batch-process font directories under the configured workspace.
 - Preflight input directories to find invalid font-like files before large batch runs.
 - Plan or copy-organize source font directories into a cleaner staging layout when the source structure does not match the desired batch grouping.
-- Provide `get_agent_guidance` so AI coding assistants can choose a safe workflow from machine-readable guidance, safe invocation templates, a tool option catalog, error-response shapes, warning-code meanings, and response-field meanings. It returns compact guidance by default, with section-based access to full catalogs.
+- Provide `get_agent_guidance` so AI coding assistants can choose a safe workflow from machine-readable guidance, safe invocation templates, a tool option catalog, a font identity basis catalog, error-response shapes, warning-code meanings, and response-field meanings. It returns compact guidance by default, with section-based access to full catalogs.
 - Provide `get_runtime_status` so agents can verify workspace, Node engine compatibility, package versions, and WASM availability before processing.
 - Preserve original font files in the output family directory.
 - Write `split-meta.json` manifests for processed fonts.
@@ -37,7 +37,7 @@ Invalid explicit configuration values are rejected instead of silently falling b
 
 | Tool | Description |
 |------|-------------|
-| `get_agent_guidance` | Return AI-agent-oriented workflow guidance, path rules, defaults, a tool option catalog, response fields to check, and a verification checklist. It is compact by default; use `detailLevel` / `sections` to request full catalogs or focused sections. |
+| `get_agent_guidance` | Return AI-agent-oriented workflow guidance, path rules, defaults, a tool option catalog, `fontIdentityBasisCatalog`, response fields to check, and a verification checklist. It is compact by default; use `detailLevel` / `sections` to request full catalogs or focused sections such as `sections: ["identity-catalog"]`. |
 | `get_runtime_status` | Return read-only diagnostics for workspace, Node engine compatibility, package versions, platform, cn-font-split runtime, and WASM availability. |
 | `split_font` | Process one font file. Depending on options, it may create subset WOFF2 chunks, a single WOFF2 fallback, or a copy-original metadata entry. |
 | `inspect_font_inputs` | Scan input fonts without writing output; reports parse status, identity keys, glyph counts, invalid font-like files, source layout, and the first route recommendation. |
@@ -58,6 +58,7 @@ Key defaults and policy choices:
 - `get_agent_guidance` returns `configurationRecipes[]`, which map common intent to preset-first arguments, such as preserving every source font, grouping by source folders, grouping by font metadata, fast structure scans, copy-only staging, or large reviewed writes. Recipes are safe starting points; agents still need to run the preview/write tools, inspect the listed `inspectFields`, and satisfy `successCriteria`.
 - `get_agent_guidance` returns `batchPolicyGuide`, a batch customization guide for `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, and `batchErrorMode`. Each option value explains when to use it, when to avoid it, which fields to inspect, and which `successCriteria` must be satisfied before continuing.
 - `get_agent_guidance` also returns `toolOptionCatalog` by default. This machine-readable catalog covers high-impact inputs for `split_font_batch`, `organize_font_directory`, `split_font`, `inspect_font_inputs`, and `inspect_split_output`, including defaults, allowed values, safety/write behavior, non-intuitive behavior, and response fields to inspect after an override. Request `sections: ["option-catalog"]` when that is the only needed section.
+- `get_agent_guidance` also returns `fontIdentityBasisCatalog` by default. It explains the values used by `identityBasis` and `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts`, including OpenType name ID sources, confidence, and whether the basis supports semantic font-equivalence claims. Request `sections: ["identity-catalog"]` when that is the only needed section.
 - `get_agent_guidance` also returns `unsupportedFileCategoryCatalog`, which explains the representative extensions and handling behavior behind `unsupportedFileSummary.byCategory[]` categories such as `archive`, `document`, and `unsupported-font`; each tool response also includes quick triage in `unsupportedFileDecision` plus evidence in `unsupportedFileSummary.categoryDetails[]` and `unsupportedFileSummary.handlingSummary`, so archives are reported but not extracted, copied, or split.
 - Source-scan tools return `inputCountGuide`, a compact explanation of scanned file counts, supported versus ignored files, `maxFilesHit` completeness, omitted file details, and unsupported-file handling. Use it before treating real-corpus counts as complete.
 - `inspect_font_inputs` also returns `inputDirectoryDecision`, `layout`, and `recommendedBatchPreviewArgs`. This is no-write first-step triage: it tells agents whether to raise `maxFiles`, review invalid fonts, run `split_font_batch` safe-preview directly, or run non-destructive `organize_font_directory` safe-preview first. It is not an organization plan or proof that splitting succeeded. Returned safe-preview args preserve the current scan cap as `recommendedBatchPreviewArgs.maxFiles`, so a copied follow-up call does not silently fall back to the default.
@@ -276,6 +277,7 @@ In batch mode, the output directory key is the bare `fontBaseName` unless anothe
 - If identity extraction fails, dedupe falls back to a path-based key and leaves the actual failure for the processing phase and `batchErrorMode`.
 
 Use `dedupeDecisionSummary` for a compact read on the dedupe pass. It reports requested/effective mode, key strategy, skipped duplicate count, identity-key gaps, path fallback, parsing limitations, representative format priority, and capped `identityEvidenceSummary` basis counts and duplicate examples. If `pathFallbackUsed` or `dedupeLimitedByParsing` is true, disclose that semantic identity dedupe was limited.
+When explaining `identityBasis` or `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts`, look up `get_agent_guidance.fontIdentityBasisCatalog` first; low-confidence or path-fallback bases should not be described as complete semantic dedupe evidence.
 
 `batchErrorMode` details:
 

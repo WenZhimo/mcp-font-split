@@ -65,6 +65,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 调用方应该检查的关键响应字段
 - `configurationRecipes[]`：把常见用户意图映射到 preset-first 参数和取舍说明
 - `batchPolicyGuide`：解释批量策略自定义项该如何选择
+- `fontIdentityBasisCatalog`：解释 `identityBasis` 与 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 的取值、OpenType name ID 来源、置信度和语义 identity 证据强度
 - `unsupportedFileCategoryCatalog`：解释 `unsupportedFileSummary.byCategory[]` 中各分类的代表扩展名、含义和处理行为
 - `unsupportedFileDecision`：每次输入扫描响应里的快速判断，说明是否存在被忽略文件、是否包含压缩包、是否存在 `.zip` / `.txt` 之外的噪声，以及这些文件是否会被解压、复制或拆分
 - `inputCountGuide`：每次输入扫描类响应里的计数解释，说明扫描了多少文件、支持和忽略数量、计数是否被 `maxFiles` 截断、明细是否被故意省略，以及非字体文件的处理方式
@@ -76,7 +77,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `errorResponseCatalog`：解释结构化 MCP 错误和普通错误的响应形态
 - `guidanceView`：说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称
 
-当 agent 需要完整错误响应目录、warning code 目录、响应字段目录、工具选项目录或示例时，应设置 `detailLevel: "full"`，或用 `sections` 精确请求，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog"]`。
+当 agent 需要完整错误响应目录、warning code 目录、响应字段目录、工具选项目录、identity basis 目录或示例时，应设置 `detailLevel: "full"`，或用 `sections` 精确请求，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog", "identity-catalog"]`。
 
 当 AI agent 不确定应使用单文件、批量、输入预检还是输出审计流程时，应先调用 `get_agent_guidance`，再选择后续工具。响应里的 `verificationChecklist[]` 是给 agent 用的防误判清单；在向用户宣称完成前，应检查其中适用于当前工作流的项目。
 其中 `local-compact-check-passed` 是面向本包维护者的普通本地门禁：运行 `npm run check:compact` 可用低噪声方式执行标准 syntax/smoke 检查；需要纯 JSON 时运行 `npm run --silent check:compact -- --json`。成功时它只打印步骤摘要和 `compact-check-result`，失败时返回失败步骤的 stdout/stderr 尾部，便于 agent 快速定位。`local-real-corpus-suite-passed` 是真实语料验证项：当改动会影响功能行为时，应在本机真实字体语料库上运行 `smoke:real-corpus-suite`，也就是 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`。它是代表性可靠性门禁，不是逐个字体目录人工验收，也不是运行时 MCP 工具调用。
@@ -90,6 +91,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 `configurationRecipes[]` 是给 agent 用的配置配方表；它把“保留每个源字体”“按源目录分组”“按字体 metadata 分组”“快速结构优先扫描”“copy-only 暂存整理”“大库审查后写入”等用户意图映射到最小 preset-first 参数，并列出写入行为、源目录安全性、取舍、必须检查的 `inspectFields` 和继续前必须满足的 `successCriteria`。配方不是成功证明，不能替代实际工具响应检查。
 `batchPolicyGuide` 是给 agent 用的批量策略自定义指南；它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个可选值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前必须满足的 `successCriteria`。当用户想偏离默认 preset 行为时，应优先参考它选择最小显式覆盖，并先运行 safe-preview。
 `toolOptionCatalog` 是给 agent 用的工具输入选项目录，默认 compact 指南就会返回，也可用 `sections: ["option-catalog"]` 单独请求。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的高影响参数，说明默认值、允许值、写入/源安全语义、响应体量影响、非直觉行为，以及改写参数后必须检查哪些响应字段。它尤其用于避免误读 `split_font_batch.dryRun` 原始默认会写输出、`organize_font_directory.dryRun` 默认只预览、`parseFonts: false` 会限制 identity 去重，以及 `includeResults: false` / `includeFiles: false` 会故意省略大块明细。
+`fontIdentityBasisCatalog` 是给 agent 用的字体 identity basis 目录，默认 compact 指南就会返回，也可用 section `identity-catalog`（例如 `sections: ["identity-catalog"]`）单独请求。它会解释 `typographic-family-subfamily`、`opentype-family-subfamily`、`full-name`、`postscript-name`、family-only、`path-stem`、`path-fallback`、`missing` 等 basis 的 OpenType name ID 来源、置信度、是否属于语义 identity 证据，以及解释 `identityBasis` 或 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 时应采取的动作。
 `unsupportedFileCategoryCatalog` 是给 agent 解释非字体噪声分类的机器可读目录；它会说明 `archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other` 的代表扩展名与处理行为。每次工具响应中的 `unsupportedFileDecision` 会先给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则重复当前扫描实际出现分类的处理语义。尤其要注意，`archive` 只表示“被报告的压缩包”，不会触发解压、复制或拆分。
 `directoryHandlingModeCatalog` 是给 agent 解释 `layoutDecision.directoryHandling.recommendedMode` 的机器可读目录；它会说明每个 mode 何时出现、下一步建议、是否会在复核前写文件、源目录安全性、必须检查的字段和非直觉行为。`directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段、继续前必须满足的 `successCriteria` 和非直觉行为。推荐参数会优先使用 `workflowPreset`，只保留路径、规模或目录形态造成的差异覆盖。它们不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
 `directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描，以及一个面向 flat/nested/mixed/output-inside-input 的 `sourceLayoutMismatchSummary` 对照示例。示例调用也采用 preset-first 风格，并带有 `mustInspectFields` 和 `successCriteria`。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`sourceLayoutMismatchSummary` 和 warning 字段为准。
@@ -325,6 +327,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `font-identity`：按归一化后的字体身份跨任意格式去重，保留优先级最高的代表。身份键优先使用 OpenType name IDs 16/17（typographic family/subfamily），缺失完整 typographic 成对字段时回退到 name IDs 1/2（family/subfamily），再回退到 name ID 4（full name）、name ID 6（PostScript name）或 family-only；`identityBasis` 会标明实际采用的来源，`glyphCount` 只作为诊断信息，不参与等价判定。
 
 `dedupeDecisionSummary` 是批量和目录整理响应里的紧凑去重结论。它会给出请求/实际去重模式、`keyStrategy`、`deduplicatedCount`、`skippedDuplicateCount`、`identityKeyMissingCount`、`pathFallbackUsed`、`dedupeLimitedByParsing`、`representativePriority`，以及嵌套的 `identityEvidenceSummary`。`identityEvidenceSummary` 只给出 identity basis 计数和少量重复样例，用来低噪声解释“为什么这些输入被视为重复”；它不是完整 per-file 明细。当 `pathFallbackUsed` 或 `dedupeLimitedByParsing` 为 true 时，agent 不能把结果说成完整的语义 identity 去重；应说明已经回退到路径/stem，或建议用 `parseFonts: true` 重新预检。
+解释 `identityBasis` 或 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 时，应优先查 `get_agent_guidance.fontIdentityBasisCatalog`。如果 basis 是 `path-stem`、`path-fallback`、`missing` 或低置信度 family-only，则不能把它描述成完整语义 identity 去重证据。
 
 ### 4.10 `batchErrorMode`（批量专用）
 
