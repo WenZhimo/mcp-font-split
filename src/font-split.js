@@ -1274,6 +1274,26 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Machine-readable guide for interpreting local maintenance smoke output, including check:compact and smoke:real-corpus-suite.',
     agentAction: 'Use this after running local maintenance gates to decide whether compact standard checks passed and which real-corpus output fields prove the representative reliability gate passed.',
   },
+  'localVerificationOutputGuide.completionReportGuide': {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Nested guide for reporting local verification results without overstating representative real-corpus coverage.',
+    agentAction: 'Use requiredClaims, forbiddenClaims, and conciseReportTemplate before writing a phase summary after local gates pass.',
+  },
+  'localVerificationOutputGuide.completionReportGuide.requiredClaims': {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Evidence-backed claims an agent should include when summarizing completed local compact and real-corpus gates.',
+    agentAction: 'Map each claim to its evidenceField instead of reporting ok:true alone.',
+  },
+  'localVerificationOutputGuide.completionReportGuide.forbiddenClaims': {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Claims an agent must avoid after representative real-corpus testing, such as implying every font or directory was manually accepted.',
+    agentAction: 'Check this before final summaries so representative coverage is not overstated.',
+  },
+  'localVerificationOutputGuide.completionReportGuide.conciseReportTemplate': {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Low-noise report template for local verification summaries, including compact check status, real-corpus counts, archive scope, tool coverage, and output audit status.',
+    agentAction: 'Use this shape when the user asks for a stage summary or verification result.',
+  },
   'compact-check-result.ok': {
     sourceTools: ['npm run check:compact'],
     meaning: 'Boolean pass/fail result from the compact local syntax/smoke gate wrapper.',
@@ -4302,6 +4322,10 @@ export function getAgentGuidance(args = {}) {
       'toolResponseFieldCatalog',
       'toolOptionCatalog',
       'localVerificationOutputGuide',
+      'localVerificationOutputGuide.completionReportGuide',
+      'localVerificationOutputGuide.completionReportGuide.requiredClaims',
+      'localVerificationOutputGuide.completionReportGuide.forbiddenClaims',
+      'localVerificationOutputGuide.completionReportGuide.conciseReportTemplate',
       'safeInvocationTemplates',
       'nextToolDecisionSummary',
       'recommendedWorkflowPlan',

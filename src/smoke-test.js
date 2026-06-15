@@ -3112,8 +3112,16 @@ if (scenario === 'single') {
   ) {
     throw new Error('Expected toolOptionCatalog to explain defaults, allowed values, safety, and non-intuitive configuration behavior.');
   }
-  if (!result.responseFieldsToCheck?.includes('localVerificationOutputGuide')) {
-    throw new Error('Expected agent guidance to recommend checking the local verification output guide.');
+  for (const localVerificationField of [
+    'localVerificationOutputGuide',
+    'localVerificationOutputGuide.completionReportGuide',
+    'localVerificationOutputGuide.completionReportGuide.requiredClaims',
+    'localVerificationOutputGuide.completionReportGuide.forbiddenClaims',
+    'localVerificationOutputGuide.completionReportGuide.conciseReportTemplate',
+  ]) {
+    if (!result.responseFieldsToCheck?.includes(localVerificationField)) {
+      throw new Error(`Expected agent guidance to recommend checking ${localVerificationField}.`);
+    }
   }
   if (
     result.localVerificationOutputGuide?.summaryType !== 'local-verification-output-guide'
@@ -3511,6 +3519,10 @@ if (scenario === 'single') {
     'nextToolDecisionSummary.quickStartCallExamples': 'get_agent_guidance',
     'nextToolDecisionSummary.workflowQuickStart': 'get_agent_guidance',
     localVerificationOutputGuide: 'get_agent_guidance',
+    'localVerificationOutputGuide.completionReportGuide': 'get_agent_guidance',
+    'localVerificationOutputGuide.completionReportGuide.requiredClaims': 'get_agent_guidance',
+    'localVerificationOutputGuide.completionReportGuide.forbiddenClaims': 'get_agent_guidance',
+    'localVerificationOutputGuide.completionReportGuide.conciseReportTemplate': 'get_agent_guidance',
   };
   for (const [fieldName, toolName] of Object.entries(expectedFieldCatalogEntries)) {
     if (!result.toolResponseFieldCatalog?.[fieldName]?.sourceTools?.includes(toolName)) {
