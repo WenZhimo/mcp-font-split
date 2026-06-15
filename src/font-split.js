@@ -1459,6 +1459,11 @@ const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Response-local navigation summary for source-layout mismatch handling, safe staging, batch preview, reviewed write, and output audit.',
     agentAction: 'Use it to explain the current layout workflow in one pass, then verify the referenced safety, warning, plan, batch preview, and audit fields.',
   },
+  'directoryWorkflowSummary.workflowSteps[].suggestedArgsField': {
+    sourceTools: ['organize_font_directory'],
+    meaning: 'Canonical response field that supplied a workflow step suggestedArgs object, such as recommendedBatchPreviewArgs or sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs.',
+    agentAction: 'Use this before copying workflowSteps[].suggestedArgs so you can cite the stable source field and avoid mixing policy fragments with runnable safe-preview calls.',
+  },
   sourceLayoutMismatchSummary: {
     sourceTools: ['organize_font_directory'],
     meaning: 'Compact response-local answer for whether the current source layout matches recommended batch grouping, whether direct original-input preview is safe, whether copy-only staging is optional or needed, and a decisionChecklist for agent routing.',
@@ -4028,6 +4033,7 @@ export function getAgentGuidance(args = {}) {
       'directoryHandlingModeCatalog',
       'organizationDecision',
       'directoryWorkflowSummary',
+      'directoryWorkflowSummary.workflowSteps[].suggestedArgsField',
       'sourceLayoutMismatchSummary',
       'sourceLayoutMismatchSummary.decisionChecklist',
       'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs',
@@ -6008,6 +6014,7 @@ function buildDirectoryWorkflowSummary({
       writesFiles: false,
       sourceDestructive: false,
       suggestedArgs: originalPreviewAction.suggestedArgs,
+      suggestedArgsField: 'recommendedBatchPreviewArgs',
       inspectFields: originalPreviewAction.inspectFields,
       successCriteria: originalPreviewAction.successCriteria,
     });
@@ -6036,6 +6043,9 @@ function buildDirectoryWorkflowSummary({
       writesFiles: false,
       sourceDestructive: false,
       suggestedArgs: organizedPreviewAction.suggestedArgs,
+      suggestedArgsField: sourceLayoutMismatchSummary.copyOnlyStaging?.safePreviewArgs
+        ? 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs'
+        : 'organizationDecision.safeBatchPreviewArgs',
       inspectFields: organizedPreviewAction.inspectFields,
       successCriteria: organizedPreviewAction.successCriteria,
     });

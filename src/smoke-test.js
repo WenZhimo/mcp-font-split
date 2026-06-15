@@ -2241,6 +2241,9 @@ function assertDirectoryWorkflowSummary(summary, {
     if (!step.tool || typeof step.writesFiles !== 'boolean' || step.sourceDestructive !== false || !step.successCriteria) {
       throw new Error(`${context}: expected directoryWorkflowSummary step ${step.id} to include tool, writesFiles, sourceDestructive, and successCriteria.`);
     }
+    if (step.tool === 'split_font_batch' && step.writesFiles === false && step.suggestedArgs && !step.suggestedArgsField) {
+      throw new Error(`${context}: expected no-write split_font_batch step ${step.id} to expose suggestedArgsField.`);
+    }
   }
   if (expectedReviewReason && !(summary.sourceLayout?.reviewReasons || []).includes(expectedReviewReason)) {
     throw new Error(`${context}: expected directoryWorkflowSummary review reason ${expectedReviewReason}.`);
@@ -4323,6 +4326,8 @@ if (scenario === 'single') {
     expectedCurrentStep: 'copy-only-staging',
     expectedStepIds: ['preview-batch-split-organized-output'],
   });
+  const organizedPreviewStep = copied.directoryWorkflowSummary?.workflowSteps
+    ?.find((step) => step.id === 'preview-batch-split-organized-output');
   const copyOnlyStagingChecklistItem = copied.sourceLayoutMismatchSummary?.decisionChecklist?.items
     ?.find((item) => item.id === 'copy-only-staging');
   if (
@@ -4334,6 +4339,13 @@ if (scenario === 'single') {
     || copyOnlyStagingChecklistItem?.suggestedArgsField !== 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs'
   ) {
     throw new Error('Expected organize-copy sourceLayoutMismatchSummary copy-only staging guidance to expose copyable safePreviewArgs with maxFiles.');
+  }
+  if (
+    organizedPreviewStep?.suggestedArgsField !== 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs'
+    || organizedPreviewStep?.suggestedArgs?.inputDir !== outputDir
+    || organizedPreviewStep?.suggestedArgs?.maxFiles !== 10
+  ) {
+    throw new Error('Expected organize-copy workflowSteps preview step to point at the canonical copy-only staging safePreviewArgs.');
   }
   assertLayoutDecision(copied.layoutDecision, {
     context: 'organize-copy',
@@ -6124,7 +6136,7 @@ if (scenario === 'single') {
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'without writing output', 'organize_font_directory safe-preview', 'maxFiles', 'preserves']);
-    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'layoutDecision.directoryHandling', 'stagingDirectoryDecision', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs', 'sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs', 'recommendedBatchPreviewArgs', 'recommendedNextActions', 'suggestedArgs.maxFiles', 'maxFiles', 'preserves', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
+    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'layoutDecision.directoryHandling', 'stagingDirectoryDecision', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'directoryWorkflowSummary.workflowSteps[].suggestedArgsField', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs', 'sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs', 'recommendedBatchPreviewArgs', 'recommendedNextActions', 'suggestedArgs.maxFiles', 'maxFiles', 'preserves', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
     expectDescriptionIncludes('inspect_split_output', ['outputStructureDecision', 'auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
     console.log(JSON.stringify({
       ok: true,
@@ -6195,6 +6207,7 @@ if (scenario === 'single') {
       'layoutDecision.directoryHandling',
       'stagingDirectoryDecision',
       'directoryWorkflowSummary',
+      'directoryWorkflowSummary.workflowSteps[].suggestedArgsField',
       'sourceLayoutMismatchSummary',
       'sourceLayoutMismatchSummary.decisionChecklist',
       'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs',
@@ -6407,6 +6420,7 @@ if (scenario === 'single') {
     '`layoutDecision.directoryHandling`',
     '`stagingDirectoryDecision`',
     '`directoryWorkflowSummary`',
+    '`directoryWorkflowSummary.workflowSteps[].suggestedArgsField`',
     '`sourceLayoutMismatchSummary`',
     '`sourceLayoutMismatchSummary.decisionChecklist`',
     '`sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`',
