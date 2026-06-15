@@ -4219,6 +4219,7 @@ if (scenario === 'single') {
     || copied.organizationDecision?.preferredNextActionId !== 'preview-batch-split-organized-output'
     || copied.organizationDecision?.nextInputDir !== outputDir
     || copied.organizationDecision?.safeBatchPreviewArgs?.inputDir !== outputDir
+    || copied.organizationDecision?.safeBatchPreviewArgs?.maxFiles !== 10
     || copied.organizationDecision?.sourceDestructive !== false
     || copied.organizationDecision?.writesBeforeReview !== false
   ) {
@@ -4240,6 +4241,9 @@ if (scenario === 'single') {
     expectedStagingNeed: 'already-written-copy-only',
     expectedRecommendedMode: 'preview-organized-output',
   });
+  if (copied.layoutDecision?.directoryHandling?.safePreviewArgs?.maxFiles !== 10) {
+    throw new Error('Expected organize-copy layoutDecision.directoryHandling.safePreviewArgs to preserve maxFiles.');
+  }
   assertStagingDirectoryDecision(copied.stagingDirectoryDecision, {
     context: 'organize-copy',
     expectedStatus: 'ready-for-source-preflight',

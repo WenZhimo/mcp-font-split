@@ -5436,6 +5436,7 @@ function buildOrganizationDecision({
   options,
   inputDirRelative,
   outputDirRelative,
+  maxFiles,
   maxFilesHit,
   layout,
   invalidFontCount,
@@ -5507,6 +5508,7 @@ function buildOrganizationDecision({
         safeBatchPreviewArgs: buildSuggestedBatchPreviewArgs({
           inputDir: outputDirRelative,
           recommendedBatchOptions: layout.recommendedBatchOptions,
+          extraArgs: { maxFiles },
         }),
         reason: 'A copy-only staging directory was written; inspect or preview that organized output before splitting.',
       });
@@ -8794,6 +8796,7 @@ export async function organizeFontDirectory(args = {}) {
     options,
     inputDirRelative,
     outputDirRelative,
+    maxFiles,
     maxFilesHit: scan.truncated,
     layout,
     invalidFontCount: invalidEntries.length,
