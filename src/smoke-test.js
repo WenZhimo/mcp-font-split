@@ -553,6 +553,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       sampleInputDir: result.sample?.inputDir,
       sampleFontPath: result.sampleFontPath,
       outputRoot: result.outputRoot,
+      singleOutputRoleDecision: result.singleAudit?.outputRoleDecision,
       singleOutputStructureDecision: result.singleAudit?.outputStructureDecision,
       singleAuditStatus: result.singleAudit?.auditStatus,
       singleAuditPassed: result.singleAudit?.auditPassed,
@@ -560,6 +561,7 @@ function summarizeRealCorpusSubprocess(scenario, result) {
       singleStructureLayoutKind: result.singleAudit?.structureSummary?.layoutKind,
       singleManifestCoverageOk: result.singleAudit?.structureSummary?.manifestCoverageOk,
       singleStructureIssueCount: result.singleAudit?.structureSummary?.issueCount,
+      batchOutputRoleDecision: result.batchAudit?.outputRoleDecision,
       batchOutputStructureDecision: result.batchAudit?.outputStructureDecision,
       batchAuditStatus: result.batchAudit?.auditStatus,
       batchAuditPassed: result.batchAudit?.auditPassed,
@@ -697,6 +699,9 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     summaryType: 'real-corpus-output-structure-audit',
     sampleInputDir: integration.sampleInputDir,
     outputRoot: integration.outputRoot,
+    singleOutputRoleDecision: integration.singleOutputRoleDecision,
+    singleOutputRoleDecisionStatus: integration.singleOutputRoleDecision?.status,
+    singleOutputRoleAuditApplies: integration.singleOutputRoleDecision?.auditAppliesToThisDirectory,
     singleOutputStructureDecision: integration.singleOutputStructureDecision,
     singleAuditStatus: integration.singleAuditStatus,
     singleAuditPassed: integration.singleAuditPassed,
@@ -704,6 +709,9 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
     singleStructureLayoutKind: integration.singleStructureLayoutKind,
     singleManifestCoverageOk: integration.singleManifestCoverageOk,
     singleStructureIssueCount: integration.singleStructureIssueCount,
+    batchOutputRoleDecision: integration.batchOutputRoleDecision,
+    batchOutputRoleDecisionStatus: integration.batchOutputRoleDecision?.status,
+    batchOutputRoleAuditApplies: integration.batchOutputRoleDecision?.auditAppliesToThisDirectory,
     batchOutputStructureDecision: integration.batchOutputStructureDecision,
     batchAuditStatus: integration.batchAuditStatus,
     batchAuditPassed: integration.batchAuditPassed,
@@ -855,10 +863,14 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
       sampleInputDir: integration.sampleInputDir,
       sampleFontPath: integration.sampleFontPath,
       outputRoot: integration.outputRoot,
+      singleOutputRoleDecisionStatus: integration.singleOutputRoleDecision?.status,
+      singleOutputRoleAuditApplies: integration.singleOutputRoleDecision?.auditAppliesToThisDirectory,
       singleOutputStructureDecisionStatus: integration.singleOutputStructureDecision?.status,
       singleAuditStatus: integration.singleAuditStatus,
       singleAuditPassed: integration.singleAuditPassed,
       singleStructureConforms: integration.singleStructureConforms,
+      batchOutputRoleDecisionStatus: integration.batchOutputRoleDecision?.status,
+      batchOutputRoleAuditApplies: integration.batchOutputRoleDecision?.auditAppliesToThisDirectory,
       batchOutputStructureDecisionStatus: integration.batchOutputStructureDecision?.status,
       batchAuditStatus: integration.batchAuditStatus,
       batchAuditPassed: integration.batchAuditPassed,
@@ -1300,6 +1312,8 @@ function buildCompactOutputStructureAuditSummary(summary = {}) {
     summaryType: summary.summaryType,
     sampleInputDir: summary.sampleInputDir,
     outputRoot: summary.outputRoot,
+    singleOutputRoleDecisionStatus: summary.singleOutputRoleDecision?.status,
+    singleOutputRoleAuditApplies: summary.singleOutputRoleDecision?.auditAppliesToThisDirectory,
     singleOutputStructureDecisionStatus: summary.singleOutputStructureDecision?.status,
     singleAuditStatus: summary.singleAuditStatus,
     singleAuditPassed: summary.singleAuditPassed,
@@ -1307,6 +1321,8 @@ function buildCompactOutputStructureAuditSummary(summary = {}) {
     singleStructureLayoutKind: summary.singleStructureLayoutKind,
     singleManifestCoverageOk: summary.singleManifestCoverageOk,
     singleStructureIssueCount: summary.singleStructureIssueCount,
+    batchOutputRoleDecisionStatus: summary.batchOutputRoleDecision?.status,
+    batchOutputRoleAuditApplies: summary.batchOutputRoleDecision?.auditAppliesToThisDirectory,
     batchOutputStructureDecisionStatus: summary.batchOutputStructureDecision?.status,
     batchAuditStatus: summary.batchAuditStatus,
     batchAuditPassed: summary.batchAuditPassed,
@@ -1342,7 +1358,9 @@ function buildCompactRealCorpusCoverageSummary(coverageSummary = {}) {
     })),
     omittedDetailFields: [
       'coverageSummary.functionalCoverage[].evidence',
+      'coverageSummary.outputStructureAuditSummary.singleOutputRoleDecision',
       'coverageSummary.outputStructureAuditSummary.singleOutputStructureDecision',
+      'coverageSummary.outputStructureAuditSummary.batchOutputRoleDecision',
       'coverageSummary.outputStructureAuditSummary.batchOutputStructureDecision',
     ],
     detailHint: 'Rerun with --verbose to include full per-child summaries and coverage evidence.',
@@ -1403,7 +1421,9 @@ function buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary) {
     blockingReasonCodes.push('tool-coverage-gaps');
   }
   if (
-    outputAudit.singleOutputStructureDecision?.status !== 'pass'
+    outputAudit.singleOutputRoleDecision?.auditAppliesToThisDirectory !== true
+    || outputAudit.batchOutputRoleDecision?.auditAppliesToThisDirectory !== true
+    || outputAudit.singleOutputStructureDecision?.status !== 'pass'
     || outputAudit.batchOutputStructureDecision?.status !== 'pass'
     || outputAudit.singleStructureConforms !== true
     || outputAudit.batchStructureConforms !== true
@@ -1452,6 +1472,10 @@ function buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary) {
     allRequiredToolsCovered: toolCoverageSummary.allRequiredToolsCovered === true,
     uncoveredTools: toolCoverageSummary.uncoveredTools || [],
     representativeWriteSample: writeAudit.sampleInputDir,
+    singleOutputRoleDecisionStatus: outputAudit.singleOutputRoleDecision?.status,
+    singleOutputRoleAuditApplies: outputAudit.singleOutputRoleDecision?.auditAppliesToThisDirectory,
+    batchOutputRoleDecisionStatus: outputAudit.batchOutputRoleDecision?.status,
+    batchOutputRoleAuditApplies: outputAudit.batchOutputRoleDecision?.auditAppliesToThisDirectory,
     singleOutputStructureDecisionStatus: outputAudit.singleOutputStructureDecision?.status,
     batchOutputStructureDecisionStatus: outputAudit.batchOutputStructureDecision?.status,
     evidenceFields: [
@@ -1463,7 +1487,7 @@ function buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary) {
       'coverageSummary.archiveHandlingScope',
       'coverageSummary.outputStructureAuditSummary',
     ],
-    passCriteria: 'Require a complete full-root corpus scan, selected target sampling, all functionalCoverage entries covered, all required public MCP tools covered by toolCoverageSummary, archiveHandlingScope.archiveInternalFontsCovered false, representative single and batch outputStructureDecision.status pass, structureSummary.conforms true, and perDirectoryAcceptanceAudit false.',
+    passCriteria: 'Require a complete full-root corpus scan, selected target sampling, all functionalCoverage entries covered, all required public MCP tools covered by toolCoverageSummary, archiveHandlingScope.archiveInternalFontsCovered false, representative single and batch outputRoleDecision.auditAppliesToThisDirectory true, outputStructureDecision.status pass, structureSummary.conforms true, and perDirectoryAcceptanceAudit false.',
     nonIntuitiveBehavior: 'status pass means the representative real-corpus feature chain passed; it is not a per-directory acceptance audit, target counts such as 4 or 10 are not the full corpus font count, and archives are counted as ignored files rather than extracted.',
   };
 }
@@ -1523,7 +1547,9 @@ function buildRealCorpusSuiteFinalOutput({
     output.omittedDetailFields = [
       'runs',
       'coverageSummary.functionalCoverage[].evidence',
+      'coverageSummary.outputStructureAuditSummary.singleOutputRoleDecision',
       'coverageSummary.outputStructureAuditSummary.singleOutputStructureDecision',
+      'coverageSummary.outputStructureAuditSummary.batchOutputRoleDecision',
       'coverageSummary.outputStructureAuditSummary.batchOutputStructureDecision',
     ];
     output.verboseCommandHint = 'Rerun the same command with --verbose to include child run summaries and detailed coverage evidence.';
@@ -1866,7 +1892,9 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
     || batchWriteRoute?.nextRouteAfterSuccess !== 'output-audit'
     || !batchWriteRoute.inspectFields?.includes('dedupeDecisionSummary')
     || auditRoute?.firstTool !== 'inspect_split_output'
+    || !auditRoute.inspectFields?.includes('outputRoleDecision')
     || !auditRoute.inspectFields?.includes('outputStructureDecision')
+    || !auditRoute.continueWhen?.includes('outputRoleDecision.auditAppliesToThisDirectory')
   ) {
     throw new Error(`${context}: expected nextToolDecisionSummary to route layout, preview, reviewed write, and audit safely.`);
   }
@@ -3177,6 +3205,7 @@ if (scenario === 'single') {
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('runSummaries')
     || !result.localVerificationOutputGuide?.requiredOutputFields?.includes('omittedDetailFields')
     || !result.localVerificationOutputGuide?.passCriteria?.some((item) => item.includes('reliabilityGateDecision.status is pass'))
+    || !result.localVerificationOutputGuide?.passCriteria?.some((item) => item.includes('outputRoleDecision.auditAppliesToThisDirectory'))
     || !result.localVerificationOutputGuide?.nonIntuitiveBehavior?.some((item) => item.includes('not a per-directory acceptance audit'))
     || !result.localVerificationOutputGuide?.nonIntuitiveBehavior?.some((item) => item.includes('Default suite output is compact'))
     || result.localVerificationOutputGuide?.evidenceFields?.countGuide !== 'corpusCountGuide'
@@ -3900,7 +3929,8 @@ if (scenario === 'single') {
   }
   const outputChecklist = (result.verificationChecklist || []).find((item) => item.id === 'output-audited');
   if (
-    !outputChecklist?.responseFields?.includes('outputStructureDecision')
+    !outputChecklist?.responseFields?.includes('outputRoleDecision')
+    || !outputChecklist?.responseFields?.includes('outputStructureDecision')
     || !outputChecklist?.responseFields?.includes('auditStatus')
     || !outputChecklist?.responseFields?.includes('auditPassed')
     || !outputChecklist?.responseFields?.includes('auditBlockingReasons')
@@ -7158,8 +7188,12 @@ if (scenario === 'single') {
     || coverageSummary.testScope?.targetSampling?.perDirectoryAcceptanceAudit !== false
     || coverageSummary.testScope?.representativeWriteAudit?.scopeKind !== 'single-representative-write-and-audit'
     || coverageSummary.testScope?.representativeWriteAudit?.batchAuditStatus !== coverageSummary.batchAuditStatus
+    || coverageSummary.outputStructureAuditSummary?.singleOutputRoleDecision?.auditAppliesToThisDirectory !== true
+    || coverageSummary.outputStructureAuditSummary?.batchOutputRoleDecision?.auditAppliesToThisDirectory !== true
     || coverageSummary.outputStructureAuditSummary?.singleOutputStructureDecision?.status !== 'pass'
     || coverageSummary.outputStructureAuditSummary?.batchOutputStructureDecision?.status !== 'pass'
+    || coverageSummary.testScope?.representativeWriteAudit?.singleOutputRoleAuditApplies !== true
+    || coverageSummary.testScope?.representativeWriteAudit?.batchOutputRoleAuditApplies !== true
     || coverageSummary.testScope?.representativeWriteAudit?.singleStructureConforms !== true
     || coverageSummary.testScope?.representativeWriteAudit?.batchStructureConforms !== true
     || !Array.isArray(coverageSummary.functionalCoverage)
@@ -7221,9 +7255,12 @@ if (scenario === 'single') {
     || reliabilityGateDecision.coveredRequiredToolCount !== coverageSummary.toolCoverageSummary?.requiredToolCount
     || !reliabilityGateDecision.evidenceFields?.includes('coverageSummary.toolCoverageSummary')
     || reliabilityGateDecision.archiveInternalFontsCovered !== false
+    || reliabilityGateDecision.singleOutputRoleAuditApplies !== true
+    || reliabilityGateDecision.batchOutputRoleAuditApplies !== true
     || reliabilityGateDecision.blockingReasonCodes?.length !== 0
     || !reliabilityGateDecision.evidenceFields?.includes('coverageSummary.archiveHandlingScope')
     || !reliabilityGateDecision.evidenceFields?.includes('coverageSummary.outputStructureAuditSummary')
+    || !reliabilityGateDecision.passCriteria?.includes('outputRoleDecision.auditAppliesToThisDirectory')
     || !reliabilityGateDecision.passCriteria?.includes('outputStructureDecision.status pass')
     || !reliabilityGateDecision.nonIntuitiveBehavior?.includes('not the full corpus font count')
     || !ignoredCoverageLine
@@ -7260,6 +7297,10 @@ if (scenario === 'single') {
       || finalOutput.corpusCountGuide?.representativeTargets?.targetCountsAreFullCorpusCounts !== false
       || finalOutput.corpusCountGuide?.representativeTargets?.perDirectoryAcceptanceAudit !== false
       || !finalOutput.corpusCountGuide?.directAnswer?.includes('Full corpus scan counted')
+      || finalOutput.coverageSummary?.outputStructureAuditSummary?.singleOutputRoleAuditApplies !== true
+      || finalOutput.coverageSummary?.outputStructureAuditSummary?.batchOutputRoleAuditApplies !== true
+      || finalOutput.coverageSummary?.outputStructureAuditSummary?.singleOutputRoleDecisionStatus !== 'audit-target'
+      || finalOutput.coverageSummary?.outputStructureAuditSummary?.batchOutputRoleDecisionStatus !== 'audit-target'
       || !Array.isArray(finalOutput.runSummaries)
       || finalOutput.runSummaries.length !== runs.length
       || finalOutput.runSummaries.some((run) => Object.hasOwn(run, 'summary'))
@@ -7268,6 +7309,8 @@ if (scenario === 'single') {
       || finalOutput.coverageSummary?.archiveHandlingScope?.archiveInternalFontsCovered !== false
       || finalOutput.coverageSummary?.functionalCoverage?.some((item) => Object.hasOwn(item, 'evidence') || item.evidenceOmitted !== true)
       || !finalOutput.omittedDetailFields?.includes('runs')
+      || !finalOutput.omittedDetailFields?.includes('coverageSummary.outputStructureAuditSummary.singleOutputRoleDecision')
+      || !finalOutput.omittedDetailFields?.includes('coverageSummary.outputStructureAuditSummary.batchOutputRoleDecision')
       || !finalOutput.verboseCommandHint?.includes('--verbose')
       || Buffer.byteLength(finalOutputJson, 'utf8') > 50000
     )
@@ -8125,6 +8168,7 @@ if (scenario === 'single') {
       manifestCount: singleAudit.manifestCount,
       auditStatus: singleAudit.auditStatus,
       auditPassed: singleAudit.auditPassed,
+      outputRoleDecision: singleAudit.outputRoleDecision,
       outputStructureDecision: singleAudit.outputStructureDecision,
       auditBlockingReasons: singleAudit.auditBlockingReasons,
       structureSummary: singleAudit.structureSummary,
@@ -8160,6 +8204,7 @@ if (scenario === 'single') {
       copyOriginalOutputCount: batchAudit.copyOriginalOutputCount,
       auditStatus: batchAudit.auditStatus,
       auditPassed: batchAudit.auditPassed,
+      outputRoleDecision: batchAudit.outputRoleDecision,
       outputStructureDecision: batchAudit.outputStructureDecision,
       auditBlockingReasons: batchAudit.auditBlockingReasons,
       inspectionWarnings: batchAudit.inspectionWarnings,

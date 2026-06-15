@@ -2227,8 +2227,8 @@ const SAFE_INVOCATION_TEMPLATES = [
     },
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'],
     inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'dedupeDecisionSummary', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
-    nextStep: 'Run inspect_split_output on outputRoot before reporting completion and require outputStructureDecision.status pass.',
-    successCriteria: 'The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up inspect_split_output audit with outputStructureDecision.status pass before reporting completion.',
+    nextStep: 'Run inspect_split_output on outputRoot before reporting completion and require outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass.',
+    successCriteria: 'The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up inspect_split_output audit with outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass before reporting completion.',
   },
   {
     id: 'output-audit-compact',
@@ -2939,8 +2939,8 @@ function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Audit the single-font output directory when reporting generated files.',
-          inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'manifestCount', 'inspectionWarnings'],
-          successCriteria: 'outputStructureDecision.status is pass and structureSummary.conforms is true, or any structure limitation is disclosed.',
+          inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'manifestCount', 'inspectionWarnings'],
+          successCriteria: 'outputRoleDecision.auditAppliesToThisDirectory is not false, outputStructureDecision.status is pass, and structureSummary.conforms is true, or any structure limitation is disclosed.',
         },
       ],
       decisionPoints: [
@@ -3030,7 +3030,7 @@ function buildRecommendedWorkflowPlan(workflow) {
           id: 'need-details',
           when: 'A compact scan shows warnings, missing manifests, invalid fonts, or structure issues.',
           action: 'Rerun with includeFiles:true or includeFamilies:true only for the narrowed area that needs detail.',
-          inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'inspectionWarnings', 'structureSummary', 'filesIncluded', 'familiesIncluded'],
+          inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'inspectionWarnings', 'structureSummary', 'filesIncluded', 'familiesIncluded'],
           successCriteria: 'Detailed rerun is limited to the narrowed area and resolves or discloses the warnings, missing manifests, invalid fonts, or structure issues that prompted it.',
         },
       ],
@@ -3278,7 +3278,7 @@ function buildNextToolDecisionSummary(workflow) {
       inspectFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'manifestPath'],
       continueWhen: 'manifestPath exists and fallback/copy-original behavior has been disclosed when present.',
       requiredAfterWriteTool: 'inspect_split_output',
-      requiredAfterWriteFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary'],
+      requiredAfterWriteFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary'],
     },
     {
       id: 'unfamiliar-directory',
@@ -3360,8 +3360,8 @@ function buildNextToolDecisionSummary(workflow) {
       templateId: 'output-audit-compact',
       writesFiles: false,
       sourceDestructive: false,
-      inspectFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
-      continueWhen: 'outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
+      inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
+      continueWhen: 'outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
       nextRouteAfterSuccess: 'complete',
     },
     {
@@ -3371,7 +3371,7 @@ function buildNextToolDecisionSummary(workflow) {
       alternateTool: 'inspect_split_output',
       writesFiles: false,
       sourceDestructive: false,
-      inspectFields: ['maxFilesHit', 'inspectionWarnings', 'unsupportedFileDecision', 'unsupportedFileSummary', 'outputStructureDecision', 'auditStatus', 'structureSummary'],
+      inspectFields: ['maxFilesHit', 'inspectionWarnings', 'unsupportedFileDecision', 'unsupportedFileSummary', 'outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'structureSummary'],
       continueWhen: 'Use inspect_font_inputs for source directories and inspect_split_output for generated output; rerun with higher maxFiles or details when warnings require it.',
     },
   ];
@@ -3643,6 +3643,7 @@ export function getAgentGuidance(args = {}) {
       'coverageSummary.functionalCoverage includes input-count-guide as covered',
       'coverageSummary.functionalCoverage entries are all covered',
       'coverageSummary.toolCoverageSummary.allRequiredToolsCovered is true',
+      'coverageSummary.outputStructureAuditSummary single and batch outputRoleDecision.auditAppliesToThisDirectory are not false',
       'coverageSummary.outputStructureAuditSummary single and batch outputStructureDecision.status are pass',
       'coverageSummary.archiveHandlingScope.archiveInternalFontsCovered is false',
     ],
@@ -3745,7 +3746,7 @@ export function getAgentGuidance(args = {}) {
         'real-corpus sampling: fixedTargets=<corpusCountGuide.representativeTargets.fixedRegressionTargetCount>, selectedTargets=<corpusCountGuide.representativeTargets.selectedTargetCount>/<corpusCountGuide.representativeTargets.availableTargetCount>, perDirectoryAcceptanceAudit=false',
         'real-corpus archives: archiveCount=<coverageSummary.archiveHandlingScope.archiveCount>, archiveInternalFontsCovered=<coverageSummary.archiveHandlingScope.archiveInternalFontsCovered>',
         'real-corpus tools: covered=<coverageSummary.toolCoverageSummary.coveredRequiredToolCount>/<coverageSummary.toolCoverageSummary.requiredToolCount>, allRequiredToolsCovered=<coverageSummary.toolCoverageSummary.allRequiredToolsCovered>',
-        'real-corpus coverage: functionalCoverage=<covered>/<total>, outputAudit single=<coverageSummary.outputStructureAuditSummary.singleOutputStructureDecisionStatus>, batch=<coverageSummary.outputStructureAuditSummary.batchOutputStructureDecisionStatus>',
+        'real-corpus coverage: functionalCoverage=<covered>/<total>, outputAudit singleRole=<coverageSummary.outputStructureAuditSummary.singleOutputRoleAuditApplies>, single=<coverageSummary.outputStructureAuditSummary.singleOutputStructureDecisionStatus>, batchRole=<coverageSummary.outputStructureAuditSummary.batchOutputRoleAuditApplies>, batch=<coverageSummary.outputStructureAuditSummary.batchOutputStructureDecisionStatus>',
       ],
     },
   };
@@ -3777,7 +3778,7 @@ export function getAgentGuidance(args = {}) {
     inspect: [
       'Call get_runtime_status to verify workspace, cn-font-split package, and WASM runtime availability when setup is uncertain.',
       'Call inspect_font_inputs to audit source directories before processing.',
-      'Call inspect_split_output to audit generated output directories; require outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false; set includeFiles false / includeFamilies false when only summary counts are needed.',
+      'Call inspect_split_output to audit generated output directories; require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false; set includeFiles false / includeFamilies false when only summary counts are needed.',
       'If maxFilesHit is true, rerun with a higher maxFiles before treating the summary as complete.',
     ],
     organize: [
@@ -4106,7 +4107,7 @@ export function getAgentGuidance(args = {}) {
         stagingIsFinalSplitOutput: false,
         outputAuditRequiredAfterSplitWrite: true,
       },
-      mustInspectFields: withDirectoryRouteInspectFields(['sourceSafetyDecision', 'safetySummary', 'operationMode', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary']),
+      mustInspectFields: withDirectoryRouteInspectFields(['sourceSafetyDecision', 'safetySummary', 'operationMode', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs', 'outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary']),
       successCriteria: 'Complete route requires organization safe-preview review, copy-only organization with sourceDestructive false, staged split_font_batch safe-preview from sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs, reviewed batch write with errorCount zero, and final inspect_split_output audit pass.',
     },
     {
@@ -4158,11 +4159,11 @@ export function getAgentGuidance(args = {}) {
         'Preview before writing; inspect batchDecision, batchWarnings, maxFilesHit, skippedDuplicates, errors, and safetySummary.',
       ],
       inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'maxFilesHit', 'dedupeDecisionSummary', 'skippedDuplicates', 'errorCount', 'errors', 'recommendedNextActions'],
-      successCriteria: 'Preview must be no-write and acceptable; reviewed write must have sourceDestructive false and errorCount zero; final inspect_split_output audit must reach outputStructureDecision.status pass before reporting completion.',
+      successCriteria: 'Preview must be no-write and acceptable; reviewed write must have sourceDestructive false and errorCount zero; final inspect_split_output audit must reach outputRoleDecision.auditAppliesToThisDirectory not false and outputStructureDecision.status pass before reporting completion.',
       auditAfterWrite: {
         tool: 'inspect_split_output',
-        requiredFields: ['outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary', 'maxFilesHit', 'inspectionWarnings'],
-        passWhen: 'outputStructureDecision.status is pass, auditStatus is pass, auditPassed is true, structureSummary.conforms is true, and maxFilesHit is false.',
+        requiredFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary', 'maxFilesHit', 'inspectionWarnings'],
+        passWhen: 'outputRoleDecision.auditAppliesToThisDirectory is not false, outputStructureDecision.status is pass, auditStatus is pass, auditPassed is true, structureSummary.conforms is true, and maxFilesHit is false.',
       },
     },
     {
@@ -4188,7 +4189,7 @@ export function getAgentGuidance(args = {}) {
         'Keep batchNamingMode numeric-suffix unless the user explicitly wants another collision policy.',
       ],
       inspectFields: ['batchPolicySummary', 'dedupeDecisionSummary', 'batchDecision', 'planned', 'plannedCount', 'skippedDuplicates', 'batchWarnings', 'outputTreeInsideInputTree'],
-      successCriteria: 'Preview and reviewed write must intentionally use batchDedupeMode none, preserve every supported selected source font, and still reach outputStructureDecision.status pass after writing.',
+      successCriteria: 'Preview and reviewed write must intentionally use batchDedupeMode none, preserve every supported selected source font, and still reach outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass after writing.',
     },
     {
       id: 'source-folder-families',
@@ -4295,10 +4296,10 @@ export function getAgentGuidance(args = {}) {
       sourceDestructive: false,
       tradeoffs: [
         'includeResults is false through reviewed-write, keeping large responses compact.',
-        'Always follow the audit-split-output next action and require outputStructureDecision.status pass plus auditStatus pass before reporting completion.',
+        'Always follow the audit-split-output next action and require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, and auditStatus pass before reporting completion.',
       ],
       inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'errorCount', 'errors', 'recommendedNextActions', 'resultsIncluded'],
-      successCriteria: 'Run only after a reviewed preview; require maxFilesHit false, errorCount zero, audit-split-output next action, and an inspect_split_output audit with outputStructureDecision.status pass before reporting completion.',
+      successCriteria: 'Run only after a reviewed preview; require maxFilesHit false, errorCount zero, audit-split-output next action, and an inspect_split_output audit with outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass before reporting completion.',
     },
   ];
 
@@ -6245,6 +6246,7 @@ function buildSourceLayoutDecisionChecklist({
         requiredAfterSplitWrite: true,
         nextTool: 'inspect_split_output',
         evidenceFields: [
+          'outputRoleDecision',
           'outputStructureDecision',
           'auditStatus',
           'auditPassed',
@@ -6822,7 +6824,7 @@ function buildLayoutDecision({
       'Use layoutDecision only as a compact route summary; it is not proof that organization or splitting is complete.',
       'Before any copy-only write, confirm sourceDestructive false and review planActionSummary, organizationWarnings, and plan[] when available.',
       'Before any reviewed batch write, run split_font_batch with safe-preview arguments and inspect planned paths, warnings, maxFilesHit, and errors.',
-      'After any reviewed batch write, run inspect_split_output and require outputStructureDecision.status pass.',
+      'After any reviewed batch write, run inspect_split_output and require outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass.',
     ],
     nonIntuitiveBehavior: [
       'organize_font_directory never moves, deletes, or rewrites source font files; dryRun:false is copy-only into outputDir.',
