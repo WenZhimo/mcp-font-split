@@ -64,6 +64,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 推荐工具调用顺序
 - 调用方应该检查的关键响应字段
 - `configurationRecipes[]`：把常见用户意图映射到 preset-first 参数和取舍说明
+- `batchCustomizationQuickReference[]`：用更短的速查入口解释常见批量自定义该加哪些最小覆盖参数
 - `batchPolicyGuide`：解释批量策略自定义项该如何选择
 - `fontIdentityBasisCatalog`：解释 `identityBasis` 与 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 的取值、OpenType name ID 来源、置信度和语义 identity 证据强度
 - `unsupportedFileCategoryCatalog`：解释 `unsupportedFileSummary.byCategory[]` 中各分类的代表扩展名、含义和处理行为
@@ -90,6 +91,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 `localVerificationOutputGuide.completionReportGuide` 是本地门禁通过后的汇报指南。其中 `completionReportGuide` 会给出 `requiredClaims[]`、`forbiddenClaims[]` 和 `conciseReportTemplate[]`：agent 应报告 compact 检查、代表性真实语料门禁、全库根扫描计数、忽略文件覆盖、压缩包处理范围、功能覆盖和代表性输出审计，同时不得把代表性测试夸大成每个字体或每个目录都已人工验收，也不得暗示压缩包已经被解压验证或包内字体已经被覆盖。
 
 `configurationRecipes[]` 是给 agent 用的配置配方表；它把“保留每个源字体”“按源目录分组”“按字体 metadata 分组”“快速结构优先扫描”“copy-only 暂存整理”“大库审查后写入”等用户意图映射到最小 preset-first 参数，并列出写入行为、源目录安全性、取舍、必须检查的 `inspectFields` 和继续前必须满足的 `successCriteria`。配方不是成功证明，不能替代实际工具响应检查。
+`batchCustomizationQuickReference[]` 是比 `batchPolicyGuide` 更短的批量自定义速查表；它覆盖保留每个源字体、按源目录分组、按字体 metadata 分组、使用裸名、显式来源后缀、收集错误等常见意图。每个条目都会给出最小 `overrideArgs`、带 `workflowPreset: "safe-preview"` 的 `previewArgs`、带 `workflowPreset: "reviewed-write"` 的 `writeArgsAfterReview`、必须检查的 `inspectFields`、继续前的 `successCriteria` 和非直觉行为。它用于快速选择常见覆盖；如果用户要求更细的策略取舍，再查看 `batchPolicyGuide` 的逐值说明。
 `batchPolicyGuide` 是给 agent 用的批量策略自定义指南；它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个可选值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前必须满足的 `successCriteria`。当用户想偏离默认 preset 行为时，应优先参考它选择最小显式覆盖，并先运行 safe-preview。
 `toolOptionCatalog` 是给 agent 用的工具输入选项目录，默认 compact 指南就会返回，也可用 `sections: ["option-catalog"]` 单独请求。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的高影响参数，说明默认值、允许值、写入/源安全语义、响应体量影响、非直觉行为，以及改写参数后必须检查哪些响应字段。它尤其用于避免误读 `split_font_batch.dryRun` 原始默认会写输出、`organize_font_directory.dryRun` 默认只预览、`parseFonts: false` 会限制 identity 去重，以及 `includeResults: false` / `includeFiles: false` 会故意省略大块明细。
 `fontIdentityBasisCatalog` 是给 agent 用的字体 identity basis 目录，默认 compact 指南就会返回，也可用 section `identity-catalog`（例如 `sections: ["identity-catalog"]`）单独请求。它会解释 `typographic-family-subfamily`、`opentype-family-subfamily`、`full-name`、`postscript-name`、family-only、`path-stem`、`path-fallback`、`missing` 等 basis 的 OpenType name ID 来源、置信度、是否属于语义 identity 证据，以及解释 `identityBasis` 或 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 时应采取的动作。

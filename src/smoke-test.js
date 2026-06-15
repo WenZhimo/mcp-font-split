@@ -2726,6 +2726,7 @@ if (scenario === 'single') {
     || !defaultGuidance.directoryWorkflowDecisionMatrix?.length
     || !defaultGuidance.configurationRecipes?.length
     || !defaultGuidance.batchPolicyGuide?.length
+    || !defaultGuidance.batchCustomizationQuickReference?.length
     || defaultGuidance.toolOptionCatalog?.summaryType !== 'tool-option-catalog'
     || !defaultGuidance.unsupportedFileCategoryCatalog?.archive
     || defaultGuidance.nextToolDecisionSummary?.primaryRouteId !== 'unfamiliar-directory'
@@ -2770,6 +2771,7 @@ if (scenario === 'single') {
     || !compactGuidance.directoryWorkflowDecisionMatrix?.length
     || !compactGuidance.configurationRecipes?.length
     || !compactGuidance.batchPolicyGuide?.length
+    || !compactGuidance.batchCustomizationQuickReference?.length
     || compactGuidance.toolOptionCatalog?.summaryType !== 'tool-option-catalog'
     || !compactGuidance.fontIdentityBasisCatalog?.['typographic-family-subfamily']
     || !compactGuidance.fontIdentityBasisCatalog?.['opentype-family-subfamily']
@@ -2869,6 +2871,13 @@ if (scenario === 'single') {
   }
   if (!result.responseFieldsToCheck?.includes('configurationRecipes')) {
     throw new Error('Expected agent guidance to recommend checking configuration recipes.');
+  }
+  if (
+    !result.responseFieldsToCheck?.includes('batchCustomizationQuickReference')
+    || result.toolResponseFieldCatalog?.batchCustomizationQuickReference?.sourceTools?.[0] !== 'get_agent_guidance'
+    || !result.toolResponseFieldCatalog?.batchCustomizationQuickReference?.agentAction?.includes('smallest explicit override')
+  ) {
+    throw new Error('Expected agent guidance to expose batchCustomizationQuickReference as the compact customization entrypoint.');
   }
   if (
     !result.responseFieldsToCheck?.includes('configurationTrace')
@@ -3393,6 +3402,9 @@ if (scenario === 'single') {
     for (const fieldName of item.inspectFields || []) referencedFieldNames.add(fieldName);
     for (const fieldName of item.auditAfterWrite?.requiredFields || []) referencedFieldNames.add(fieldName);
   }
+  for (const item of result.batchCustomizationQuickReference || []) {
+    for (const fieldName of item.inspectFields || []) referencedFieldNames.add(fieldName);
+  }
   for (const item of result.safeInvocationTemplates || []) {
     for (const fieldName of item.inspectFields || []) referencedFieldNames.add(fieldName);
   }
@@ -3418,6 +3430,7 @@ if (scenario === 'single') {
     workflowPresets: 'get_agent_guidance',
     workflowPreset: 'split_font_batch',
     batchPolicyGuide: 'get_agent_guidance',
+    batchCustomizationQuickReference: 'get_agent_guidance',
     batchPolicySummary: 'split_font_batch',
     configurationTrace: 'split_font_batch',
     batchGroupBy: 'split_font_batch',
@@ -3474,6 +3487,38 @@ if (scenario === 'single') {
     }
   }
   assertBatchPolicyGuide(result.batchPolicyGuide || []);
+  const quickReferenceIds = new Set((result.batchCustomizationQuickReference || []).map((item) => item.id));
+  for (const requiredQuickReference of ['safe-defaults', 'preserve-every-source-font', 'source-folder-families', 'metadata-family-groups', 'plain-output-names', 'source-suffix-traceability', 'collect-errors-for-report']) {
+    if (!quickReferenceIds.has(requiredQuickReference)) {
+      throw new Error(`Expected batchCustomizationQuickReference to include ${requiredQuickReference}.`);
+    }
+  }
+  for (const item of result.batchCustomizationQuickReference || []) {
+    assertNonEmptyString(item.id, 'batchCustomizationQuickReference', 'id');
+    assertNonEmptyString(item.userIntent, `batchCustomizationQuickReference.${item.id}`, 'userIntent');
+    assertNonEmptyStringArray(item.optionNames, `batchCustomizationQuickReference.${item.id}`, 'optionNames');
+    assertNonEmptyStringArray(item.inspectFields, `batchCustomizationQuickReference.${item.id}`, 'inspectFields');
+    assertNonEmptyString(item.successCriteria, `batchCustomizationQuickReference.${item.id}`, 'successCriteria');
+    if (item.previewArgs?.workflowPreset !== 'safe-preview' || item.writeArgsAfterReview?.workflowPreset !== 'reviewed-write') {
+      throw new Error(`Expected batchCustomizationQuickReference.${item.id} to use preset-first preview/write args.`);
+    }
+  }
+  const preserveQuickReference = (result.batchCustomizationQuickReference || []).find((item) => item.id === 'preserve-every-source-font');
+  const metadataQuickReference = (result.batchCustomizationQuickReference || []).find((item) => item.id === 'metadata-family-groups');
+  const plainQuickReference = (result.batchCustomizationQuickReference || []).find((item) => item.id === 'plain-output-names');
+  const collectQuickReference = (result.batchCustomizationQuickReference || []).find((item) => item.id === 'collect-errors-for-report');
+  if (
+    preserveQuickReference?.overrideArgs?.batchDedupeMode !== 'none'
+    || !preserveQuickReference.inspectFields?.includes('dedupeDecisionSummary')
+    || metadataQuickReference?.overrideArgs?.batchGroupBy !== 'font-family'
+    || !metadataQuickReference.nonIntuitiveBehavior?.includes('metadata')
+    || plainQuickReference?.overrideArgs?.batchNamingMode !== 'plain'
+    || !plainQuickReference.nonIntuitiveBehavior?.includes('collision')
+    || collectQuickReference?.overrideArgs?.batchErrorMode !== 'collect'
+    || !collectQuickReference.successCriteria?.includes('errorCount zero')
+  ) {
+    throw new Error('Expected batchCustomizationQuickReference entries to expose compact override args and counterintuitive checks.');
+  }
   const recipeIds = new Set((result.configurationRecipes || []).map((item) => item.id));
   for (const requiredRecipe of ['safe-default-batch', 'preserve-every-source-font', 'source-folder-families', 'metadata-family-groups', 'fast-structure-first-scan', 'copy-clean-staging-directory', 'large-reviewed-write']) {
     if (!recipeIds.has(requiredRecipe)) {
@@ -6168,7 +6213,7 @@ if (scenario === 'single') {
       assertEnumMatches(`organize_font_directory ${optionName}`, getSchemaEnumValues(organizeProps[optionName]), expectedValues);
     }
     assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
-    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchCustomizationQuickReference', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
     expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'recommendedNextActions[].suggestedArgsField', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'without writing output', 'organize_font_directory safe-preview', 'maxFiles', 'preserves']);
@@ -6230,6 +6275,7 @@ if (scenario === 'single') {
       'workflowQuickStart',
       'quickStartCallExamples[]',
       'configurationRecipes',
+      'batchCustomizationQuickReference',
       'batchPolicyGuide',
       'batchPolicySummary',
       'configurationTrace',
@@ -6440,6 +6486,7 @@ if (scenario === 'single') {
     '`sections: ["workflow"]`',
     '`quickStartCallExamples[]`',
     '`configurationRecipes[]`',
+    '`batchCustomizationQuickReference[]`',
     '`toolOptionCatalog`',
     '`batchPolicyGuide`',
     '`batchPolicySummary`',
