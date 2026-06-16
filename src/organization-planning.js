@@ -926,6 +926,95 @@ export function buildLayoutDecision({
   };
 }
 
+export function buildStagingDirectoryDecision({
+  options,
+  outputDirRelative,
+  layout,
+  copiedCount,
+  skippedTargetExists,
+  selectedFontCount,
+  errorCount,
+  organizationManifestPath,
+  safePreviewArgs,
+}) {
+  let status = 'not-written-dry-run';
+  let recommendedAction = 'review-plan-before-copying';
+  let shortAnswer = 'No staging directory was written; review the plan before deciding whether copy-only organization is needed.';
+
+  if (!options.dryRun && errorCount > 0) {
+    status = 'organization-errors';
+    recommendedAction = 'inspect-organization-errors';
+    shortAnswer = 'The copy-only organization run reported errors; resolve them before using outputDir as a split source.';
+  } else if (!options.dryRun && copiedCount > 0) {
+    status = 'ready-for-source-preflight';
+    recommendedAction = 'inspect-staging-with-inspect_font_inputs';
+    shortAnswer = 'The organizer wrote a source-like staging directory; inspect it as input, then run split_font_batch safe-preview before any split write.';
+  } else if (!options.dryRun && skippedTargetExists > 0) {
+    status = 'review-existing-targets';
+    recommendedAction = 'inspect-existing-staging-targets';
+    shortAnswer = 'No new files were copied because targets already existed; inspect outputDir before deciding whether to reuse or overwrite it.';
+  } else if (!options.dryRun && selectedFontCount === 0) {
+    status = 'no-copyable-fonts';
+    recommendedAction = 'adjust-organization-policy-or-stop';
+    shortAnswer = 'No copyable fonts were selected, so outputDir is not a useful staging source yet.';
+  } else if (!options.dryRun) {
+    status = 'no-new-copies';
+    recommendedAction = 'inspect-outputDir-before-reuse';
+    shortAnswer = 'The organization call wrote no new font copies; inspect outputDir before using it as the next input.';
+  }
+
+  return {
+    summaryType: 'staging-directory-decision',
+    appliesToTool: 'organize_font_directory',
+    status,
+    shortAnswer,
+    recommendedAction,
+    outputDir: outputDirRelative,
+    outputDirRole: 'organized-font-source-staging',
+    isSplitOutput: false,
+    sourceDestructive: false,
+    sourceFilesPreserved: true,
+    sourceFilesMovedDeletedOrRewritten: false,
+    operationMode: options.dryRun ? 'plan-only' : 'copy-only',
+    copiedCount,
+    skippedTargetExists,
+    selectedFontCount,
+    layoutKind: layout.layoutKind,
+    recommendedBatchGroupBy: layout.recommendedBatchOptions?.batchGroupBy || null,
+    organizationManifestPath,
+    inspectTool: 'inspect_font_inputs',
+    inspectArgs: {
+      inputDir: outputDirRelative,
+      includeFiles: false,
+    },
+    previewTool: 'split_font_batch',
+    safePreviewArgs,
+    auditToolAfterSplitWrite: 'inspect_split_output',
+    mustInspectFields: [
+      'stagingDirectoryDecision',
+      'inputCountGuide',
+      'supportedFontCount',
+      'unsupportedFileDecision',
+      'unsupportedFileSummary',
+      'invalidFontCount',
+      'missingIdentityCount',
+      'inspectionWarnings',
+      'organizationManifestPath',
+      'planActionSummary',
+      'organizationWarnings',
+    ],
+    successCriteria: [
+      'If status is ready-for-source-preflight, run inspect_font_inputs on outputDir and require maxFilesHit false before using it as split input.',
+      'Before any reviewed split write, run split_font_batch safe-preview on outputDir and review planned paths, warnings, dedupe, maxFilesHit, and errors.',
+      'After any reviewed split write, run inspect_split_output on the split outputRoot and require outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass.',
+    ],
+    nonIntuitiveBehavior: [
+      'The organizer outputDir is source-like staging, not split output; inspect_split_output applies only after split_font or split_font_batch writes generated output.',
+      'organize_font_directory dryRun:false copies fonts into outputDir; it never moves, deletes, or rewrites source font files.',
+    ],
+  };
+}
+
 export async function resolveOrganizationGroupName({ entry, inputDir, groupingMode }) {
   if (entry.metadataParsed === false) {
     const relativeToInput = path.relative(inputDir, entry.file);
