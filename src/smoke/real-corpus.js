@@ -265,6 +265,7 @@ function summarizeInputDirectoryDecision(decision) {
     recommendedBatchGroupBy: decision.recommendedBatchGroupBy,
     safeBatchPreviewWorkflowPreset: decision.safeBatchPreviewArgs?.workflowPreset,
     safeOrganizationPreviewWorkflowPreset: decision.safeOrganizationPreviewArgs?.workflowPreset,
+    directoryOrganizationSafety: decision.directoryOrganizationSafety,
     suggestedArgsWorkflowPreset: decision.suggestedArgs?.workflowPreset,
     mustInspectFields: decision.mustInspectFields,
     nonIntuitiveBehaviorCount: decision.nonIntuitiveBehavior?.length,
@@ -285,8 +286,19 @@ function inputDirectoryDecisionCovered(summary) {
     && typeof summary.recommendedBatchGroupBy === 'string'
     && summary.safeBatchPreviewWorkflowPreset === 'safe-preview'
     && summary.safeOrganizationPreviewWorkflowPreset === 'safe-preview'
+    && summary.directoryOrganizationSafety?.summaryType === 'directory-organization-safety'
+    && summary.directoryOrganizationSafety?.helperTool === 'organize_font_directory'
+    && summary.directoryOrganizationSafety?.helperToolDefaultMode === 'safe-preview-plan-only'
+    && summary.directoryOrganizationSafety?.helperToolWriteMode === 'copy-only-outputDir'
+    && summary.directoryOrganizationSafety?.sourceDestructive === false
+    && summary.directoryOrganizationSafety?.sourceFilesMovedDeletedOrRewritten === false
+    && summary.directoryOrganizationSafety?.isSplitOutput === false
+    && summary.directoryOrganizationSafety?.safePreviewArgs?.workflowPreset === 'safe-preview'
+    && summary.directoryOrganizationSafety?.inspectAfterCopyTool === 'inspect_font_inputs'
+    && summary.directoryOrganizationSafety?.previewAfterCopyTool === 'split_font_batch'
     && Array.isArray(summary.mustInspectFields)
     && summary.mustInspectFields.includes('inputDirectoryDecision')
+    && summary.mustInspectFields.includes('inputDirectoryDecision.directoryOrganizationSafety')
     && summary.mustInspectFields.includes('layout')
     && summary.mustInspectFields.includes('recommendedBatchPreviewArgs')
     && summary.mustInspectFields.includes('unsupportedFileDecision')

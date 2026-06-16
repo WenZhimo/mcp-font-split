@@ -84,6 +84,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `unsupportedFileDecision`：每次输入扫描响应里的快速判断，说明是否存在被忽略文件、是否包含压缩包、是否存在 `.zip` / `.txt` 之外的噪声，以及这些文件是否会被解压、复制或拆分
 - `inputCountGuide`：每次输入扫描类响应里的计数解释，说明扫描了多少文件、支持和忽略数量、计数是否被 `maxFiles` 截断、明细是否被故意省略，以及非字体文件的处理方式
 - `inputDirectoryDecision`：`inspect_font_inputs` 返回的第一步目录路线提示，说明应重扫、复核坏字体、直接做 `split_font_batch` safe-preview，还是先做非破坏性的 `organize_font_directory` safe-preview
+- `inputDirectoryDecision.directoryOrganizationSafety`：当前输入目录检查响应里的目录整理安全短答案，说明整理工具是 `organize_font_directory`、默认无写入、reviewed-write 也只是 copy-only 写入 `outputDir`、不会移动/删除/重写源字体，并提醒整理输出不是最终 split 输出
 - `safeInvocationTemplates[]`：常见工作流的安全起步调用模板
 - `nextToolDecisionSummary`：更短的“下一步该调用哪个工具”路由索引
 - `recommendedWorkflowPlan`：把安全模板编排成有序阶段的推荐路线图
@@ -194,6 +195,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 
 - `directoryOrganizationQuickAnswer` 是目录整理短答案。它说明 `organize_font_directory` 可用、默认 `workflowPreset: "safe-preview"`、审查后 `workflowPreset: "reviewed-write"` 也只是 copy-only 写入 `outputDir`，不会移动、删除或重写源字体。
 - `directoryOrganizationQuickAnswer` 还会标出 `outputDir` 是源目录式暂存，并列出必须检查的 `sourceSafetyDecision`、`layoutDecision`、`stagingDirectoryDecision`、`sourceLayoutMismatchSummary`、`organizationWarnings` 和 `planActionSummary`。
+- `inputDirectoryDecision.directoryOrganizationSafety` 是同一安全答案在 `inspect_font_inputs` 当前响应里的版本；当 agent 已经完成输入预检时，优先读它来确认本目录是否适合先做 `organize_font_directory` safe-preview。
 - `directoryHandlingModeCatalog` 解释 `layoutDecision.directoryHandling.recommendedMode` 的 mode 含义、下一步建议、写入安全性、必查字段和非直觉行为。
 - `directoryWorkflowDecisionMatrix[]` 把常见目录场景映射到首选工具、推荐参数、后续工具、写入安全、源目录安全、`successCriteria` 和非直觉行为。
   它不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
@@ -298,7 +300,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 
 限制：
 
-- `inputDirectoryDecision` 只是第一步 triage，不是整理计划，也不是分割成功证明；继续前仍要检查它列出的 `mustInspectFields` 和后续 safe-preview 响应
+- `inputDirectoryDecision` 只是第一步 triage，不是整理计划，也不是分割成功证明；继续前仍要检查它列出的 `mustInspectFields`、`inputDirectoryDecision.directoryOrganizationSafety` 和后续 safe-preview 响应
 - 预检通过不保证后续分割一定成功，因为 cn-font-split 仍可能在真正分片阶段失败
 - 预检失败的字体会进入 `invalidFonts[]`，不会让整个检查工具直接中断
 

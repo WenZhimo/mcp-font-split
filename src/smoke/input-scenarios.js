@@ -134,8 +134,17 @@ async function runFontInputsSmoke() {
     || result.inputDirectoryDecision?.safeBatchPreviewArgs?.maxFiles !== 10
     || result.inputDirectoryDecision?.safeOrganizationPreviewArgs?.workflowPreset !== 'safe-preview'
     || result.inputDirectoryDecision?.safeOrganizationPreviewArgs?.maxFiles !== 10
+    || result.inputDirectoryDecision?.directoryOrganizationSafety?.summaryType !== 'directory-organization-safety'
+    || result.inputDirectoryDecision?.directoryOrganizationSafety?.helperTool !== 'organize_font_directory'
+    || result.inputDirectoryDecision?.directoryOrganizationSafety?.helperToolDefaultMode !== 'safe-preview-plan-only'
+    || result.inputDirectoryDecision?.directoryOrganizationSafety?.helperToolWriteMode !== 'copy-only-outputDir'
+    || result.inputDirectoryDecision?.directoryOrganizationSafety?.sourceDestructive !== false
+    || result.inputDirectoryDecision?.directoryOrganizationSafety?.sourceFilesMovedDeletedOrRewritten !== false
+    || result.inputDirectoryDecision?.directoryOrganizationSafety?.isSplitOutput !== false
+    || result.inputDirectoryDecision?.directoryOrganizationSafety?.safePreviewArgs?.maxFiles !== 10
     || result.inputDirectoryDecision?.evidence?.hasArchives !== true
     || !result.inputDirectoryDecision?.mustInspectFields?.includes('recommendedBatchPreviewArgs')
+    || !result.inputDirectoryDecision?.mustInspectFields?.includes('inputDirectoryDecision.directoryOrganizationSafety')
     || !result.inputDirectoryDecision?.nonIntuitiveBehavior?.some((item) => item.includes('never writes output'))
   ) {
     throw new Error('Expected input inspection to expose inputDirectoryDecision for invalid-font triage.');
@@ -168,6 +177,13 @@ async function runFontInputsSmoke() {
     || mixedLayout.inputDirectoryDecision?.safeOrganizationPreviewArgs?.inputDir !== layoutDir
     || mixedLayout.inputDirectoryDecision?.safeOrganizationPreviewArgs?.workflowPreset !== 'safe-preview'
     || mixedLayout.inputDirectoryDecision?.safeOrganizationPreviewArgs?.maxFiles !== 20
+    || mixedLayout.inputDirectoryDecision?.directoryOrganizationSafety?.safePreviewArgs?.inputDir !== layoutDir
+    || mixedLayout.inputDirectoryDecision?.directoryOrganizationSafety?.safePreviewArgs?.workflowPreset !== 'safe-preview'
+    || mixedLayout.inputDirectoryDecision?.directoryOrganizationSafety?.safePreviewArgs?.maxFiles !== 20
+    || mixedLayout.inputDirectoryDecision?.directoryOrganizationSafety?.inspectAfterCopyTool !== 'inspect_font_inputs'
+    || mixedLayout.inputDirectoryDecision?.directoryOrganizationSafety?.previewAfterCopyTool !== 'split_font_batch'
+    || mixedLayout.inputDirectoryDecision?.directoryOrganizationSafety?.auditAfterSplitWriteTool !== 'inspect_split_output'
+    || !mixedLayout.inputDirectoryDecision?.directoryOrganizationSafety?.nonIntuitiveBehavior?.some((item) => item.includes('not final split output'))
     || mixedLayout.inputDirectoryDecision?.suggestedArgs?.workflowPreset !== 'safe-preview'
     || mixedLayout.inputDirectoryDecision?.suggestedArgs?.maxFiles !== 20
     || mixedLayout.inputDirectoryDecision?.evidence?.rootFontCount !== 1

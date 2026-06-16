@@ -238,6 +238,7 @@ Important result fields:
 |-------|---------|
 | `inputCountGuide` | Compact guide for interpreting `scannedFileCount`, supported/unsupported counts, `maxFilesHit`, whether file details were included or intentionally omitted, and unsupported-file handling. |
 | `inputDirectoryDecision` | No-write first-pass route for this input directory: rerun the scan, review invalid fonts, run direct `split_font_batch` safe-preview, or run non-destructive `organize_font_directory` safe-preview first. It includes `safeBatchPreviewArgs`, `safeOrganizationPreviewArgs`, `mustInspectFields`, and `nonIntuitiveBehavior`. |
+| `inputDirectoryDecision.directoryOrganizationSafety` | Compact answer for "is there a directory organizer and is it destructive?" It names `organize_font_directory`, gives no-write `safePreviewArgs`, states `helperToolDefaultMode: "safe-preview-plan-only"`, `helperToolWriteMode: "copy-only-outputDir"`, `sourceDestructive: false`, `sourceFilesMovedDeletedOrRewritten: false`, and `isSplitOutput: false`. |
 | `layout` | Directory shape summary: `empty`, `flat`, `nested`, or `mixed`, with root/nested counts and recommended batch grouping. |
 | `recommendedBatchPreviewArgs` | Copyable no-write `split_font_batch` preview arguments derived from the detected layout, including `recommendedBatchPreviewArgs.maxFiles` to preserve the current scan cap. |
 | `supportedFontCount` | Files with supported font extensions. |
@@ -255,6 +256,7 @@ Use the compact input decision fields in this order:
 
 - `inputCountGuide` is the shortest count route for agents. Check `countCompleteness`, `maxFilesHit`, `fileDetailsVisibility`, `recommendedAction`, and `unsupportedFilesHandling` before treating source counts as complete.
 - `inputDirectoryDecision` is the shortest directory-route hint from input inspection. Treat it as triage, not proof of success; still inspect `layout`, `inspectionWarnings`, unsupported-file summaries, and the suggested safe-preview response before writing.
+- `inputDirectoryDecision.directoryOrganizationSafety` is the shortest safety answer for directory organization. It exists so agents do not have to infer from several fields whether `organize_font_directory` is available, whether it writes by default, and whether reviewed organization can change source files.
 - `unsupportedFileDecision` is the shortest ignored-file route. Check `status`, `totalUnsupportedFileCount`, `hasArchives`, `extensionsBeyondZipTxtCount`, `reviewRecommended`, `recommendedAction`, and `handlingSummary` first.
 - `unsupportedFileSummary` exposes `unsupportedFileSummary.total`, `unsupportedFileSummary.byExtension[]`, `unsupportedFileSummary.byCategory[]`, `unsupportedFileSummary.categoryDetails[]`, `unsupportedFileSummary.handlingSummary`, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`.
 - `byCategory[]` uses coarse categories for agent triage: `archive`, `document`, `image`, `web`, `metadata`, `signature`, `unsupported-font`, `extensionless`, and `other`.

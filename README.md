@@ -78,7 +78,7 @@
 }
 ```
 
-先看 `inputCountGuide`、`inputDirectoryDecision`、`unsupportedFileDecision`、`unsupportedFileSummary`、`layout` 和 `maxFilesHit`。压缩包和非字体文件会被报告为忽略项，不会被自动解压、复制或拆分。
+先看 `inputCountGuide`、`inputDirectoryDecision`、`inputDirectoryDecision.directoryOrganizationSafety`、`unsupportedFileDecision`、`unsupportedFileSummary`、`layout` 和 `maxFilesHit`。压缩包和非字体文件会被报告为忽略项，不会被自动解压、复制或拆分。
 
 ### 3. 批量 safe-preview
 
@@ -149,6 +149,7 @@
 - `ok: true` 只表示工具按所选策略完成，不代表一定发生了正常多子集分片；优先看 `resultType`、`outputMode`、`performedSplit`、`usedFallback`、`skipped` 和 `warnings`。
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；工具响应里用 `.` 表示工作区根目录。
 - 写入类工具完成后，不要只看 `ok`；还要看 `sourceSafetyDecision`、`safetySummary`、`recommendedNextActions[]` 和必要时的 `inspect_split_output` 审计结果。
+- `inputDirectoryDecision.directoryOrganizationSafety` 是判断 `organize_font_directory` 是否可用、是否可能改动源文件的最短答案。
 - `organize_font_directory` 不移动、不删除、不重写源字体；它写出的 `outputDir` 只是 copy-only 暂存源目录。
 - `split_font_batch` 默认 `batchNamingMode: "numeric-suffix"`：先用裸名，只有真实冲突时才加 `-1`、`-2` 等稳定数字后缀。
 - `batchDedupeMode: "same-path"` 只是路径/stem 级去重；`batchDedupeMode: "font-identity"` 会跨格式比较字体身份。
@@ -177,7 +178,7 @@
 | 工具 | 优先检查 |
 |------|----------|
 | `split_font` | `outputMode`、`resultType`、`performedSplit`、`usedFallback`、`skipReason`、`warnings` |
-| `inspect_font_inputs` | `inputCountGuide`、`inputDirectoryDecision`、`unsupportedFileSummary`、`layout` |
+| `inspect_font_inputs` | `inputCountGuide`、`inputDirectoryDecision`、`inputDirectoryDecision.directoryOrganizationSafety`、`unsupportedFileSummary`、`layout` |
 | `split_font_batch` | `batchDecision`、`batchWarnings`、`batchPolicySummary`、`dedupeDecisionSummary`、`recommendedNextActions`、`sourceSafetyDecision`、`safetySummary` |
 | `organize_font_directory` | `layoutDecision`、`sourceSafetyDecision`、`stagingDirectoryDecision`、`recommendedNextActions` |
 | `inspect_split_output` | `outputRoleDecision`、`outputStructureDecision`、`auditStatus`、`auditPassed`、`structureSummary` |

@@ -135,7 +135,7 @@ server.registerTool(
   'inspect_font_inputs',
   {
     title: 'Inspect input fonts before splitting',
-    description: 'Call this before large batch runs to scan supported font files, validate basic font metadata parsing, report identity keys, glyph counts, invalid font-like files, layout, recommendedBatchPreviewArgs, and inputDirectoryDecision without writing output. inputDirectoryDecision gives a first-pass route for direct safe batch preview versus non-destructive organize_font_directory safe-preview. recommendedBatchPreviewArgs preserves the current maxFiles scan cap for copyable follow-up previews.',
+    description: 'Call this before large batch runs to scan supported font files, validate basic font metadata parsing, report identity keys, glyph counts, invalid font-like files, layout, recommendedBatchPreviewArgs, inputDirectoryDecision, and inputDirectoryDecision.directoryOrganizationSafety without writing output. inputDirectoryDecision gives a first-pass route for direct safe batch preview versus non-destructive organize_font_directory safe-preview. inputDirectoryDecision.directoryOrganizationSafety gives the shortest answer for whether organize_font_directory is available, whether it writes by default, and whether reviewed organization can change source files. recommendedBatchPreviewArgs preserves the current maxFiles scan cap for copyable follow-up previews.',
     inputSchema: {
       inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
       maxFiles: z.number().int().positive().max(50000).optional().describe('Maximum source files to scan. Defaults to 50000.'),

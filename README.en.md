@@ -78,7 +78,7 @@ When layout, write risk, or the next tool is unclear, inspect `recommendedWorkfl
 }
 ```
 
-Start with `inputCountGuide`, `inputDirectoryDecision`, `unsupportedFileDecision`, `unsupportedFileSummary`, `layout`, and `maxFilesHit`. Archives and non-font files are reported as ignored inputs; they are not extracted, copied, or split automatically.
+Start with `inputCountGuide`, `inputDirectoryDecision`, `inputDirectoryDecision.directoryOrganizationSafety`, `unsupportedFileDecision`, `unsupportedFileSummary`, `layout`, and `maxFilesHit`. Archives and non-font files are reported as ignored inputs; they are not extracted, copied, or split automatically.
 
 ### 3. Batch Safe Preview
 
@@ -149,6 +149,7 @@ The organizer returns a plan by default. Even with `reviewed-write`, it performs
 - `ok: true` only means the selected policy completed. It does not always mean normal multi-subset output happened. Prefer `resultType`, `outputMode`, `performedSplit`, `usedFallback`, `skipped`, and `warnings`.
 - Paths are restricted to `FONT_SPLIT_ROOT`; tool responses use `.` for the workspace root.
 - After any write-capable tool, do not trust `ok` alone. Inspect `sourceSafetyDecision`, `safetySummary`, `recommendedNextActions[]`, and, when applicable, an `inspect_split_output` audit.
+- `inputDirectoryDecision.directoryOrganizationSafety` is the shortest answer for whether `organize_font_directory` is available and whether it can change source files.
 - `organize_font_directory` never moves, deletes, or rewrites source fonts; its `outputDir` is copy-only source staging.
 - `split_font_batch` defaults to `batchNamingMode: "numeric-suffix"`: bare names first, stable `-1`, `-2`, etc. only on real collisions.
 - `batchDedupeMode: "same-path"` is path/stem-level dedupe; `batchDedupeMode: "font-identity"` compares font identity across formats.
@@ -177,7 +178,7 @@ For complete arguments, response fields, and error shapes, see the [API Referenc
 | Tool | Check First |
 |------|-------------|
 | `split_font` | `outputMode`, `resultType`, `performedSplit`, `usedFallback`, `skipReason`, `warnings` |
-| `inspect_font_inputs` | `inputCountGuide`, `inputDirectoryDecision`, `unsupportedFileSummary`, `layout` |
+| `inspect_font_inputs` | `inputCountGuide`, `inputDirectoryDecision`, `inputDirectoryDecision.directoryOrganizationSafety`, `unsupportedFileSummary`, `layout` |
 | `split_font_batch` | `batchDecision`, `batchWarnings`, `batchPolicySummary`, `dedupeDecisionSummary`, `recommendedNextActions`, `sourceSafetyDecision`, `safetySummary` |
 | `organize_font_directory` | `layoutDecision`, `sourceSafetyDecision`, `stagingDirectoryDecision`, `recommendedNextActions` |
 | `inspect_split_output` | `outputRoleDecision`, `outputStructureDecision`, `auditStatus`, `auditPassed`, `structureSummary` |

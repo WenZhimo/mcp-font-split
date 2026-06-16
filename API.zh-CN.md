@@ -238,6 +238,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 |------|------|
 | `inputCountGuide` | 解释 `scannedFileCount`、支持/忽略数量、`maxFilesHit`、文件详情是否返回或被故意省略，以及非字体文件处理方式的紧凑指南。 |
 | `inputDirectoryDecision` | 本输入目录的无写入第一步路线：重扫、复核坏字体、直接运行 `split_font_batch` safe-preview，或先运行非破坏性的 `organize_font_directory` safe-preview。它会包含 `safeBatchPreviewArgs`、`safeOrganizationPreviewArgs`、`mustInspectFields` 和 `nonIntuitiveBehavior`。 |
+| `inputDirectoryDecision.directoryOrganizationSafety` | 对“有没有目录整理工具、它是不是破坏性的”的紧凑答案。它会命名 `organize_font_directory`，给出无写入的 `safePreviewArgs`，并明确 `helperToolDefaultMode: "safe-preview-plan-only"`、`helperToolWriteMode: "copy-only-outputDir"`、`sourceDestructive: false`、`sourceFilesMovedDeletedOrRewritten: false` 和 `isSplitOutput: false`。 |
 | `layout` | 目录形态摘要：`empty`、`flat`、`nested` 或 `mixed`，并包含根/嵌套字体数量和推荐批量分组。 |
 | `recommendedBatchPreviewArgs` | 按检测到的目录形态生成、可直接复制的 `split_font_batch` 无写入预览参数，并通过 `recommendedBatchPreviewArgs.maxFiles` 保留本次扫描上限。 |
 | `supportedFontCount` | 扩展名属于受支持字体格式的文件数。 |
@@ -255,6 +256,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 
 - `inputCountGuide` 是给 agent 的最短计数路线。先看 `countCompleteness`、`maxFilesHit`、`fileDetailsVisibility`、`recommendedAction` 和 `unsupportedFilesHandling`，再把源目录计数当作完整结论。
 - `inputDirectoryDecision` 是输入预检返回的最短目录路线提示。它只是 triage，不是成功证明；写入前仍要检查 `layout`、`inspectionWarnings`、忽略文件摘要，以及后续 safe-preview 响应。
+- `inputDirectoryDecision.directoryOrganizationSafety` 是目录整理的最短安全答案。它用于避免 agent 自己从多个字段推断 `organize_font_directory` 是否可用、默认是否写文件、reviewed organization 是否会改变源文件。
 - `unsupportedFileDecision` 是给忽略文件的最短判断路线。先看 `status`、`totalUnsupportedFileCount`、`hasArchives`、`extensionsBeyondZipTxtCount`、`reviewRecommended`、`recommendedAction` 和 `handlingSummary`。
 - `unsupportedFileSummary` 暴露 `unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.categoryDetails[]`、`unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。
 - `byCategory[]` 使用面向 agent 的粗分类：`archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other`。
