@@ -7,9 +7,21 @@ import {
 import { buildMinimalTtf } from './fixtures.js';
 
 async function runSingleSmoke() {
-  const fontPath = process.argv[3] || '0xA000/0xA000-Regular.ttf';
-  const outDir = process.argv[4] || 'font-split-mcp/.font-split-smoke-output';
+  const usesGeneratedInput = !process.argv[3];
+  const inputDir = '.font-split-single-input';
+  const fontPath = process.argv[3] || path.join(inputDir, 'SingleSmoke-Regular.ttf');
+  const outDir = process.argv[4] || '.font-split-smoke-output';
   console.log('Splitting:', fontPath, '->', outDir);
+  if (usesGeneratedInput) {
+    await fs.rm(inputDir, { recursive: true, force: true });
+    await fs.rm(outDir, { recursive: true, force: true });
+    await fs.mkdir(inputDir, { recursive: true });
+    await fs.writeFile(fontPath, buildMinimalTtf({
+      familyName: 'Single Smoke',
+      subfamilyName: 'Regular',
+      glyphCount: 5,
+    }));
+  }
   const result = await splitFont({
     fontPath,
     outDir,
@@ -17,6 +29,8 @@ async function runSingleSmoke() {
     reporter: true,
     chunkSize: 70 * 1024,
     fontFamily: 'SmokeTestFont',
+    smallGlyphAction: usesGeneratedInput ? 'copy-original' : undefined,
+    smallGlyphThreshold: usesGeneratedInput ? 1000000 : undefined,
     silent: true,
   });
   console.log(JSON.stringify(result, null, 2));
