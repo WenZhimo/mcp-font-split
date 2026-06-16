@@ -197,7 +197,13 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - 避免把已生成的输出再次当作输入
 - 避免把 macOS 压缩包里的资源叉伪文件误当成字体
 
-未被这些规则跳过、但扩展名不是受支持字体格式的文件，会计入 `inputCountGuide`、`unsupportedFileDecision` 和 `unsupportedFileSummary`。`inputCountGuide` 是计数解释入口，包含 `scannedFileCount`、`supportedFontCount`、`unsupportedFileCount`、`countCompleteness`、`fileDetailsVisibility` 和 `unsupportedFilesHandling`；当 `maxFilesHit: true` 时，不能把本次计数当作完整语料库数量。`unsupportedFileDecision` 是快速判断，包含 `status`、`totalUnsupportedFileCount`、`hasArchives`、`extensionsBeyondZipTxtCount`、`recommendedAction` 和处理标志；`unsupportedFileSummary` 是详细证据，包含 `unsupportedFileSummary.byExtension[]` 精确扩展名统计、`unsupportedFileSummary.byCategory[]` 概览分类、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 少量示例路径、无扩展文件的 `<none>` 计数，以及 `unsupportedFileSummary.examplesTruncated` 示例截断标记；它不是只统计 `.zip` 或 `.txt`。压缩包会归入 `archive` 分类，但仍然只是被忽略，不会被解压、复制或拆分，且 `unsupportedFileDecision.handlingSummary.archivesExtracted` 与 `unsupportedFileSummary.handlingSummary.archivesExtracted` 恒为 `false`。
+未被这些规则跳过、但扩展名不是受支持字体格式的文件，会计入 `inputCountGuide`、`unsupportedFileDecision` 和 `unsupportedFileSummary`。
+
+- `inputCountGuide` 是计数解释入口，包含 `scannedFileCount`、`supportedFontCount`、`unsupportedFileCount`、`countCompleteness`、`fileDetailsVisibility` 和 `unsupportedFilesHandling`。当 `maxFilesHit: true` 时，不能把本次计数当作完整语料库数量。
+- `unsupportedFileDecision` 是快速判断，包含 `status`、`totalUnsupportedFileCount`、`hasArchives`、`extensionsBeyondZipTxtCount`、`recommendedAction` 和处理标志。
+- `unsupportedFileSummary` 是详细证据，包含 `unsupportedFileSummary.byExtension[]` 精确扩展名统计、`unsupportedFileSummary.byCategory[]` 概览分类、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 少量示例路径、无扩展文件的 `<none>` 计数，以及 `unsupportedFileSummary.examplesTruncated` 示例截断标记。
+- 忽略文件统计不是只统计 `.zip` 或 `.txt`。
+- 压缩包会归入 `archive` 分类，但仍然只是被忽略，不会被解压、复制或拆分，且 `unsupportedFileDecision.handlingSummary.archivesExtracted` 与 `unsupportedFileSummary.handlingSummary.archivesExtracted` 恒为 `false`。
 
 ---
 
@@ -763,7 +769,11 @@ split-meta.json
 
 `batchDecision` 会把复杂的批量响应压缩成主线路由，例如 `review-dry-run-plan`、`rerun-batch-with-higher-maxFiles`、`inspect-batch-errors`、`audit-written-output`、`review-existing-output-skips`、`no-supported-fonts` 或 `no-selected-fonts`。它只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `batchWarnings[]`、`errors[]`、`recommendedNextActions[]`，以及真实写入后的输出审计字段。
 
-`recommendedNextActions[]` 是检查清单，不会自动执行。每项的 `successCriteria` 是继续下一步或报告完成前的判断条件。若某项带有 `suggestedArgsField`，它只是说明 `suggestedArgs` 镜像了哪个权威字段，例如 `batchDecision.reviewedWriteArgs`、`batchDecision.auditArgs`、`recommendedBatchPreviewArgs` 或 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`，不是成功证明。真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
+`recommendedNextActions[]` 是检查清单，不会自动执行。
+
+- 每项的 `successCriteria` 是继续下一步或报告完成前的判断条件。
+- 若某项带有 `suggestedArgsField`，它只是说明 `suggestedArgs` 镜像了哪个权威字段，例如 `batchDecision.reviewedWriteArgs`、`batchDecision.auditArgs`、`recommendedBatchPreviewArgs` 或 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`，不是成功证明。
+- 真实批量写入后，只有按 `audit-split-output.suggestedArgs` 调用 `inspect_split_output`，并确认 `outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true`、`maxFilesHit: false` 且没有需要行动的 `inspectionWarnings[]`，才应把输出目录视为结构验收通过。
 
 常见 `batchWarnings[].code`：
 
