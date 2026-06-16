@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { inflateSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { StaticWasm, fontSplit } from 'cn-font-split/dist/wasm/index.mjs';
@@ -49,6 +48,18 @@ import {
   normalizePositiveNumberOption,
   normalizeProcessingOptions,
 } from './config.js';
+import {
+  buildBatchDedupeIdentity,
+  buildFontIdentityKey,
+  compressWoff2,
+  decompressWoff1,
+  decompressWoff2,
+  detectFontContainer,
+  extractFontFamily,
+  extractFontIdentity,
+  getGlyphCount,
+  parseIdentityKey,
+} from './font-identity.js';
 import { stableStringify } from './stable-json.js';
 
 export {
@@ -74,8 +85,6 @@ export {
 };
 
 const require = createRequire(import.meta.url);
-const woff2Decompress = require('wawoff2/decompress');
-const woff2Compress = require('wawoff2/compress');
 const packageJson = require('../package.json');
 
 const CN_FONT_SPLIT_PACKAGE_JSON = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/package.json');
@@ -6768,263 +6777,6 @@ function buildFontSplitConfig(input, outDir, args) {
   return config;
 }
 
-function decodeFontNameValue(source, strStart, length, platformID, encodingID) {
-  if (platformID === 3 && (encodingID === 1 || encodingID === 10)) {
-    const view = new DataView(source.buffer, source.byteOffset, source.byteLength);
-    const chars = [];
-    for (let j = 0; j < length; j += 2) {
-      chars.push(view.getUint16(strStart + j));
-    }
-    return String.fromCharCode(...chars);
-  }
-
-  if (platformID === 0) {
-    const view = new DataView(source.buffer, source.byteOffset, source.byteLength);
-    const chars = [];
-    for (let j = 0; j < length; j += 2) {
-      chars.push(view.getUint16(strStart + j));
-    }
-    return String.fromCharCode(...chars);
-  }
-
-  if (platformID === 1) {
-    return new TextDecoder('latin1').decode(source.slice(strStart, strStart + length));
-  }
-
-  return null;
-}
-
-function nameRecordScore(platformID, encodingID) {
-  if (platformID === 3 && (encodingID === 1 || encodingID === 10)) return 3;
-  if (platformID === 0) return 2;
-  if (platformID === 1) return 1;
-  return 0;
-}
-
-function toNameRecordMap(scoredRecords) {
-  const records = new Map();
-  for (const [nameID, item] of scoredRecords.entries()) {
-    records.set(nameID, item.value);
-  }
-  return records;
-}
-
-function readFontNameRecords(buffer) {
-  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  const magic = view.getUint32(0);
-  let headerOffset = 0;
-
-  if (magic === 0x74746366) {
-    headerOffset = view.getUint32(12);
-  }
-
-  const numTables = view.getUint16(headerOffset + 4);
-  let nameTableOffset = 0;
-
-  for (let i = 0; i < numTables; i++) {
-    const entryOffset = headerOffset + 12 + i * 16;
-    const tag = String.fromCharCode(
-      view.getUint8(entryOffset), view.getUint8(entryOffset + 1),
-      view.getUint8(entryOffset + 2), view.getUint8(entryOffset + 3),
-    );
-    if (tag === 'name') {
-      nameTableOffset = view.getUint32(entryOffset + 8);
-      break;
-    }
-  }
-
-  if (!nameTableOffset) return new Map();
-
-  const nameCount = view.getUint16(nameTableOffset + 2);
-  const stringOffset = nameTableOffset + view.getUint16(nameTableOffset + 4);
-  const records = new Map();
-
-  for (let i = 0; i < nameCount; i++) {
-    const recordOffset = nameTableOffset + 6 + i * 12;
-    const platformID = view.getUint16(recordOffset);
-    const encodingID = view.getUint16(recordOffset + 2);
-    const nameID = view.getUint16(recordOffset + 6);
-    const length = view.getUint16(recordOffset + 8);
-    const offset = view.getUint16(recordOffset + 10);
-    const strStart = stringOffset + offset;
-
-    const decoded = decodeFontNameValue(buffer, strStart, length, platformID, encodingID);
-    const score = nameRecordScore(platformID, encodingID);
-    const existing = records.get(nameID);
-    if (!decoded || score === 0 || (existing && existing.score >= score)) continue;
-    records.set(nameID, { value: decoded, score });
-  }
-
-  return toNameRecordMap(records);
-}
-
-function readFontFamilyName(buffer) {
-  return readFontNameRecords(buffer).get(1) || null;
-}
-
-// WOFF has the sfnt tables wrapped; the name table offset is in the WOFF directory
-function parseWoffNameTable(nameTableBuf) {
-  return readFontNameTableRecords(nameTableBuf);
-}
-
-function readFontFamilyNameFromWoff(buffer) {
-  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  const magic = view.getUint32(0);
-
-  // wOFF (WOFF1)
-  if (magic === 0x774F4646) {
-    const numTables = view.getUint16(12);
-    for (let i = 0; i < numTables; i++) {
-      const entryOffset = 44 + i * 20;
-      const tag = String.fromCharCode(
-        view.getUint8(entryOffset), view.getUint8(entryOffset + 1),
-        view.getUint8(entryOffset + 2), view.getUint8(entryOffset + 3),
-      );
-      if (tag === 'name') {
-        const compOffset = view.getUint32(entryOffset + 4);
-        const compLength = view.getUint32(entryOffset + 8);
-        const origLength = view.getUint32(entryOffset + 12);
-        if (compLength === origLength) {
-          // uncompressed
-          const nameTable = buffer.slice(compOffset, compOffset + origLength);
-          return parseWoffNameTable(nameTable).get(1) || null;
-        }
-        return null; // compressed, skip
-      }
-    }
-  }
-
-  // WOFF2: too complex to decompress inline, return null.
-  if (magic === 0x774F4632) return null;
-
-  return null;
-}
-
-function readFontNameTableRecords(nameTableBuf) {
-  const view = new DataView(nameTableBuf.buffer, nameTableBuf.byteOffset, nameTableBuf.byteLength);
-  const nameCount = view.getUint16(2);
-  const stringOffset = view.getUint16(4);
-  const records = new Map();
-
-  for (let i = 0; i < nameCount; i++) {
-    const recordOffset = 6 + i * 12;
-    const platformID = view.getUint16(recordOffset);
-    const encodingID = view.getUint16(recordOffset + 2);
-    const nameID = view.getUint16(recordOffset + 6);
-    const length = view.getUint16(recordOffset + 8);
-    const offset = view.getUint16(recordOffset + 10);
-    const strStart = stringOffset + offset;
-
-    const decoded = decodeFontNameValue(nameTableBuf, strStart, length, platformID, encodingID);
-    const score = nameRecordScore(platformID, encodingID);
-    const existing = records.get(nameID);
-    if (!decoded || score === 0 || (existing && existing.score >= score)) continue;
-    records.set(nameID, { value: decoded, score });
-  }
-  return toNameRecordMap(records);
-}
-
-function normalizeIdentityName(value) {
-  if (typeof value !== 'string') return null;
-  const normalized = value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
-  return normalized || null;
-}
-
-function extractFontIdentity(buffer) {
-  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  const magic = view.getUint32(0);
-  if (magic === 0x774F4646 || magic === 0x774F4632) {
-    const family = normalizeIdentityName(readFontFamilyNameFromWoff(buffer));
-    return {
-      family,
-      subfamily: null,
-      typographicFamily: null,
-      typographicSubfamily: null,
-      opentypeFamily: family,
-      opentypeSubfamily: null,
-      fullName: null,
-      postscriptName: null,
-    };
-  }
-  const records = readFontNameRecords(buffer);
-  const typographicFamily = normalizeIdentityName(records.get(16));
-  const typographicSubfamily = normalizeIdentityName(records.get(17));
-  const opentypeFamily = normalizeIdentityName(records.get(1));
-  const opentypeSubfamily = normalizeIdentityName(records.get(2));
-  return {
-    family: typographicFamily || opentypeFamily,
-    subfamily: typographicSubfamily || opentypeSubfamily,
-    typographicFamily,
-    typographicSubfamily,
-    opentypeFamily,
-    opentypeSubfamily,
-    fullName: normalizeIdentityName(records.get(4)),
-    postscriptName: normalizeIdentityName(records.get(6)),
-  };
-}
-
-function buildFontIdentityKey(buffer) {
-  const identity = extractFontIdentity(buffer);
-  if (identity.typographicFamily && identity.typographicSubfamily) {
-    return stableStringify({
-      basis: 'typographic-family-subfamily',
-      family: identity.typographicFamily,
-      subfamily: identity.typographicSubfamily,
-      nameIds: [16, 17],
-    });
-  }
-  if (identity.opentypeFamily && identity.opentypeSubfamily) {
-    return stableStringify({
-      basis: 'opentype-family-subfamily',
-      family: identity.opentypeFamily,
-      subfamily: identity.opentypeSubfamily,
-      nameIds: [1, 2],
-    });
-  }
-  if (identity.fullName) {
-    return stableStringify({
-      basis: 'full-name',
-      fullName: identity.fullName,
-      nameIds: [4],
-    });
-  }
-  if (identity.postscriptName) {
-    return stableStringify({
-      basis: 'postscript-name',
-      postscriptName: identity.postscriptName,
-      nameIds: [6],
-    });
-  }
-  if (identity.typographicFamily) {
-    return stableStringify({
-      basis: 'typographic-family',
-      family: identity.typographicFamily,
-      nameIds: [16],
-    });
-  }
-  if (identity.opentypeFamily) {
-    return stableStringify({
-      basis: 'opentype-family',
-      family: identity.opentypeFamily,
-      nameIds: [1],
-    });
-  }
-  return null;
-}
-
-function extractFontFamily(buffer) {
-  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  const magic = view.getUint32(0);
-
-  // WOFF1 / WOFF2
-  if (magic === 0x774F4646 || magic === 0x774F4632) {
-    return readFontFamilyNameFromWoff(buffer);
-  }
-
-  // TTF/OTF/TTC
-  return readFontFamilyName(buffer);
-}
-
 function sanitizeDirName(name) {
   return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim();
 }
@@ -7108,44 +6860,6 @@ async function resolveStableBatchOutputNames({ resolvedOutDir, fontBaseName, fon
       splitDirName: candidate,
       copiedOriginalFileName: index === 0 ? fontFileName : `${candidate}${extension}`,
     };
-  }
-}
-
-async function buildBatchDedupeIdentity(file) {
-  const ext = path.extname(file).toLowerCase();
-  if (!FONT_EXTENSIONS.has(ext)) return null;
-  try {
-    let buffer = new Uint8Array(await fs.readFile(file));
-    if (buffer.byteLength < 4) return null;
-    const magic = new DataView(buffer.buffer, buffer.byteOffset, 4).getUint32(0);
-    if (magic === 0x774F4646) {
-      buffer = decompressWoff1(buffer);
-    } else if (magic === 0x774F4632) {
-      buffer = await decompressWoff2(buffer);
-    }
-    return buildFontIdentityKey(buffer);
-  } catch {
-    return null;
-  }
-}
-
-function detectFontContainer(buffer) {
-  if (buffer.byteLength < 4) return 'unknown';
-  const magic = new DataView(buffer.buffer, buffer.byteOffset, 4).getUint32(0);
-  if (magic === 0x00010000) return 'ttf';
-  if (magic === 0x4F54544F) return 'otf-cff';
-  if (magic === 0x74746366) return 'collection';
-  if (magic === 0x774F4646) return 'woff';
-  if (magic === 0x774F4632) return 'woff2';
-  return 'unknown';
-}
-
-function parseIdentityKey(identityKey) {
-  if (!identityKey) return null;
-  try {
-    return JSON.parse(identityKey);
-  } catch {
-    return null;
   }
 }
 
@@ -7524,79 +7238,8 @@ async function writeOrganizationManifest(outputDir, manifest) {
   await fs.writeFile(path.join(outputDir, ORGANIZATION_MANIFEST_FILE_NAME), JSON.stringify(manifest, null, 2));
 }
 
-function decompressWoff1(buffer) {
-  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  const signature = view.getUint32(0);
-  if (signature !== 0x774F4646) return buffer; // not WOFF1, return as-is
-
-  const sfntFlavor = view.getUint32(4);
-  const numTables = view.getUint16(12);
-  const totalSfntSize = view.getUint32(16);
-
-  // Build sfnt offset table
-  const sfntHeaderSize = 12 + numTables * 16;
-  const sfnt = new Uint8Array(totalSfntSize);
-  const sfntView = new DataView(sfnt.buffer);
-
-  // Write sfnt header
-  sfntView.setUint32(0, sfntFlavor);
-  sfntView.setUint16(4, numTables);
-  // searchRange, entrySelector, rangeShift
-  let searchRange = 1;
-  let entrySelector = 0;
-  while (searchRange * 2 <= numTables) { searchRange *= 2; entrySelector++; }
-  searchRange *= 16;
-  sfntView.setUint16(6, searchRange);
-  sfntView.setUint16(8, entrySelector);
-  sfntView.setUint16(10, numTables * 16 - searchRange);
-
-  let dataOffset = sfntHeaderSize;
-
-  for (let i = 0; i < numTables; i++) {
-    const woffEntry = 44 + i * 20;
-    const tag = view.getUint32(woffEntry);
-    const offset = view.getUint32(woffEntry + 4);
-    const compLength = view.getUint32(woffEntry + 8);
-    const origLength = view.getUint32(woffEntry + 12);
-    const origChecksum = view.getUint32(woffEntry + 16);
-
-    let tableData;
-    if (compLength === origLength) {
-      tableData = buffer.slice(offset, offset + origLength);
-    } else {
-      tableData = inflateSync(buffer.slice(offset, offset + compLength));
-    }
-
-    // Write sfnt table record
-    const recordOffset = 12 + i * 16;
-    sfntView.setUint32(recordOffset, tag);
-    sfntView.setUint32(recordOffset + 4, origChecksum);
-    sfntView.setUint32(recordOffset + 8, dataOffset);
-    sfntView.setUint32(recordOffset + 12, origLength);
-
-    // Write table data
-    sfnt.set(tableData instanceof Uint8Array ? tableData : new Uint8Array(tableData), dataOffset);
-
-    // Align to 4 bytes
-    dataOffset += origLength;
-    while (dataOffset % 4 !== 0) dataOffset++;
-  }
-
-  return new Uint8Array(sfnt.buffer, 0, dataOffset);
-}
-
 function fileExists(filePath) {
   return fs.stat(filePath).then(() => true).catch(() => false);
-}
-
-async function decompressWoff2(buffer) {
-  const result = await woff2Decompress(Buffer.from(buffer));
-  return new Uint8Array(result);
-}
-
-async function compressWoff2(buffer) {
-  const result = await woff2Compress(Buffer.from(buffer));
-  return new Uint8Array(result);
 }
 
 function inspectOversizedKern(buffer, thresholdRatio = 0.8) {
@@ -7715,24 +7358,6 @@ function stripOversizedKern(buffer) {
   }
 
   return { buffer: result, stripped: true };
-}
-
-function getGlyphCount(buffer) {
-  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  const magic = view.getUint32(0);
-  let headerOffset = 0;
-  if (magic === 0x74746366) headerOffset = view.getUint32(12);
-
-  const numTables = view.getUint16(headerOffset + 4);
-  for (let i = 0; i < numTables; i++) {
-    const off = headerOffset + 12 + i * 16;
-    const tag = String.fromCharCode(buffer[off], buffer[off + 1], buffer[off + 2], buffer[off + 3]);
-    if (tag === 'maxp') {
-      const tableOffset = view.getUint32(off + 8);
-      return view.getUint16(tableOffset + 4);
-    }
-  }
-  return -1;
 }
 
 async function writeGeneratedFiles(baseDir, generated) {
