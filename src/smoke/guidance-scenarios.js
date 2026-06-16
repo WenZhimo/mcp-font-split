@@ -880,6 +880,12 @@ async function runAgentGuidanceSmoke() {
   if (
     directoryQuickAnswer.summaryType !== 'directory-organization-quick-answer'
     || directoryQuickAnswer.helperTool !== 'organize_font_directory'
+    || directoryQuickAnswer.directoryOrganizationSafety?.summaryType !== 'directory-organization-safety'
+    || directoryQuickAnswer.directoryOrganizationSafety?.appliesToTool !== 'get_agent_guidance'
+    || directoryQuickAnswer.directoryOrganizationSafety?.safePreviewArgs?.workflowPreset !== 'safe-preview'
+    || directoryQuickAnswer.directoryOrganizationSafety?.helperToolWriteMode !== 'copy-only-outputDir'
+    || directoryQuickAnswer.directoryOrganizationSafety?.sourceFilesMovedDeletedOrRewritten !== false
+    || directoryQuickAnswer.directoryOrganizationSafety?.isSplitOutput !== false
     || directoryQuickAnswer.sourceDestructive !== false
     || directoryQuickAnswer.sourceFilesPreserved !== true
     || directoryQuickAnswer.firstCallArgs?.workflowPreset !== 'safe-preview'

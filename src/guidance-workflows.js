@@ -1,3 +1,5 @@
+import { buildDirectoryOrganizationSafety } from './directory-organization-safety.js';
+
 const SOURCE_LAYOUT_MISMATCH_FIELD = 'sourceLayoutMismatchSummary';
 const SOURCE_LAYOUT_DECISION_CHECKLIST_FIELD = 'sourceLayoutMismatchSummary.decisionChecklist';
 const SOURCE_LAYOUT_FIELD_LIST_KEYS = new Set(['inspectFields', 'mustInspectFields', 'responseFields']);
@@ -211,11 +213,17 @@ export function uniqueStrings(values) {
 }
 
 export function buildDirectoryOrganizationQuickAnswer() {
+  const directoryOrganizationSafety = buildDirectoryOrganizationSafety({
+    appliesToTool: 'get_agent_guidance',
+    inputDir: '<font-source-dir>',
+    outputDir: '<organized-output-dir>',
+  });
   return {
     summaryType: 'directory-organization-quick-answer',
     directAnswer: 'Yes. Use organize_font_directory when the source directory layout does not match the desired batch grouping; it is source-non-destructive.',
     helperTool: 'organize_font_directory',
     helperToolPurpose: 'Plan a safer layout or copy selected font files into a cleaner source-like staging directory before split_font_batch.',
+    directoryOrganizationSafety,
     firstCall: 'Run organize_font_directory with workflowPreset safe-preview before writing anything.',
     firstCallArgs: {
       inputDir: '<font-source-dir>',
@@ -227,15 +235,15 @@ export function buildDirectoryOrganizationQuickAnswer() {
       outputDir: '<organized-output-dir>',
       workflowPreset: 'reviewed-write',
     },
-    sourceDestructive: false,
-    sourceFilesPreserved: true,
-    sourceFilesMovedDeletedOrRewritten: false,
+    sourceDestructive: directoryOrganizationSafety.sourceDestructive,
+    sourceFilesPreserved: directoryOrganizationSafety.sourceFilesPreserved,
+    sourceFilesMovedDeletedOrRewritten: directoryOrganizationSafety.sourceFilesMovedDeletedOrRewritten,
     dryRunDefault: true,
-    writeMode: 'copy-only-outputDir',
-    outputDirRole: 'organized-font-source-staging',
-    isSplitOutput: false,
+    writeMode: directoryOrganizationSafety.helperToolWriteMode,
+    outputDirRole: directoryOrganizationSafety.outputDirRole,
+    isSplitOutput: directoryOrganizationSafety.isSplitOutput,
     nextToolAfterStaging: 'split_font_batch',
-    auditToolAfterSplitWrite: 'inspect_split_output',
+    auditToolAfterSplitWrite: directoryOrganizationSafety.auditAfterSplitWriteTool,
     inspectFields: [
       'sourceSafetyDecision',
       'safetySummary',
@@ -849,5 +857,3 @@ export function buildNextToolDecisionSummary(workflow) {
     ],
   });
 }
-
-
