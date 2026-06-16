@@ -26,7 +26,7 @@
 | `src/input-preflight.js`、`src/input-*.js` | `inspect_font_inputs` 运行时编排、输入扫描、输入目录判断、忽略文件摘要和目录结构预检。 |
 | `src/organization-runtime.js`、`src/organization-*.js` | `organize_font_directory` 运行时编排、copy-only 计划、manifest 和目录路线判断。 |
 | `src/output-audit.js` | `inspect_split_output` 输出目录角色判断和结构审计。 |
-| `src/guidance*.js`、`src/catalogs.js`、`src/font-format-catalog.js`、`src/guidance-section-catalog.js`、`src/tool-response-field-catalog.js`、`src/tool-option-catalog.js`、`src/workflow-preset-catalog.js`、`src/diagnostic-catalogs.js`、`src/font-identity-basis-catalog.js`、`src/output-structure-catalog.js`、`src/unsupported-file-catalog.js`、`src/directory-handling-catalog.js` | 面向 AI agent 的机器可读指南、支持字体格式事实、guidance section 目录、字段目录、警告目录、选项目录、工作流 preset 目录、忽略文件分类目录、目录处理目录和示例。`src/catalogs.js` 保留公共目录聚合与 re-export，体量较大的字体格式目录、guidance section 目录、响应字段目录、选项目录、工作流 preset 目录、诊断目录、identity basis 目录、输出结构目录、忽略文件分类目录和目录处理目录放在独立文件。 |
+| `src/guidance*.js`、`src/catalogs.js`、`src/font-format-catalog.js`、`src/guidance-section-catalog.js`、`src/tool-response-field-catalog.js`、`src/tool-option-catalog.js`、`src/tool-option-enum-catalog.js`、`src/workflow-preset-catalog.js`、`src/diagnostic-catalogs.js`、`src/font-identity-basis-catalog.js`、`src/output-structure-catalog.js`、`src/unsupported-file-catalog.js`、`src/directory-handling-catalog.js` | 面向 AI agent 的机器可读指南、支持字体格式事实、guidance section 目录、字段目录、警告目录、选项目录、选项枚举事实、工作流 preset 目录、忽略文件分类目录、目录处理目录和示例。`src/catalogs.js` 保留公共目录聚合与 re-export，体量较大的字体格式目录、guidance section 目录、响应字段目录、选项目录、选项枚举目录、工作流 preset 目录、诊断目录、identity basis 目录、输出结构目录、忽略文件分类目录和目录处理目录放在独立文件。 |
 | `src/smoke/` | 本地验证场景。涉及用户可见行为、字段契约或真实语料解释时，应优先补这里的 smoke guard。 |
 
 ## 事实来源规则
@@ -51,13 +51,14 @@
    - 为 README、API、BEHAVIOR、guidance/catalog 中重复出现的高风险说法增加 smoke guard。
    - 优先保护这些主题：目录整理是否破坏源文件、整理输出是否是最终拆分输出、`ok:true` 是否能代表成功、`copy-original` / fallback / skip 的区别。
 
-3. **拆薄 `src/font-split.js`**
-   - 每次只移动一个边界，例如单字体处理、批量编排、输入预检或目录整理。
-   - 保持公开导出和 MCP schema 不变。
-   - 先增加或确认 smoke 覆盖，再做移动。
+3. **保持运行时 facade 边界轻量**
+   - `src/font-split.js` 现在是公共 facade，不再往里放新的运行时逻辑。
+   - 如果大型运行时文件还需要拆薄，每次只移动一个行为边界，例如批量命名、去重、skip 检查、输出角色判断、输入预检或目录整理计划。
+   - 保持公开导出和 MCP schema 不变，并先增加或确认 smoke 覆盖，再做移动。
 
 4. **拆分大型 catalog / guidance 文件**
-   - `src/catalogs.js` 和 `src/agent-guidance.js` 是当前 AI 友好性的核心，但体积偏大。
+   - `src/catalogs.js` 应保持为轻量聚合与 re-export 层。
+   - `src/agent-guidance.js`、`src/tool-response-field-catalog.js` 和 `src/guidance-workflows.js` 是当前 AI 友好性的核心，但体积仍偏大。
    - 只在有明确边界时拆分，例如 field catalog、option catalog、warning catalog、output catalog。
    - 拆分后必须保证 `get_agent_guidance` 返回形态不漂移。
 

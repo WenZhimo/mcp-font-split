@@ -26,7 +26,7 @@ This document is for maintainers and AI agents taking over the repository. It do
 | `src/input-preflight.js`, `src/input-*.js` | `inspect_font_inputs` runtime orchestration, input scanning, source layout preflight, ignored-file summaries, and input decisions. |
 | `src/organization-runtime.js`, `src/organization-*.js` | `organize_font_directory` runtime orchestration, copy-only organization planning, organization manifests, and source-layout route decisions. |
 | `src/output-audit.js` | Output role detection and split-output structure audits. |
-| `src/guidance*.js`, `src/catalogs.js`, `src/font-format-catalog.js`, `src/guidance-section-catalog.js`, `src/tool-response-field-catalog.js`, `src/tool-option-catalog.js`, `src/workflow-preset-catalog.js`, `src/diagnostic-catalogs.js`, `src/font-identity-basis-catalog.js`, `src/output-structure-catalog.js`, `src/unsupported-file-catalog.js`, `src/directory-handling-catalog.js` | Machine-readable guidance, supported font format facts, guidance section catalogs, field catalogs, warning catalogs, option catalogs, workflow preset catalogs, unsupported-file category catalogs, directory handling catalogs, and agent examples. `src/catalogs.js` remains the public catalog aggregation and re-export layer; the large font-format, guidance-section, response-field, option, workflow-preset, diagnostic, identity-basis, output-structure, unsupported-file, and directory-handling catalogs live in dedicated files. |
+| `src/guidance*.js`, `src/catalogs.js`, `src/font-format-catalog.js`, `src/guidance-section-catalog.js`, `src/tool-response-field-catalog.js`, `src/tool-option-catalog.js`, `src/tool-option-enum-catalog.js`, `src/workflow-preset-catalog.js`, `src/diagnostic-catalogs.js`, `src/font-identity-basis-catalog.js`, `src/output-structure-catalog.js`, `src/unsupported-file-catalog.js`, `src/directory-handling-catalog.js` | Machine-readable guidance, supported font format facts, guidance section catalogs, field catalogs, warning catalogs, option catalogs, option enum facts, workflow preset catalogs, unsupported-file category catalogs, directory handling catalogs, and agent examples. `src/catalogs.js` remains the public catalog aggregation and re-export layer; the large font-format, guidance-section, response-field, option, option-enum, workflow-preset, diagnostic, identity-basis, output-structure, unsupported-file, and directory-handling catalogs live in dedicated files. |
 | `src/smoke/` | Local verification scenarios. Add smoke guards here when changing user-visible behavior, field contracts, or real-corpus interpretation. |
 
 ## Source Of Truth Rules
@@ -51,13 +51,14 @@ This document is for maintainers and AI agents taking over the repository. It do
    - Add smoke guards for high-risk statements repeated across README, API, BEHAVIOR, guidance, and catalogs.
    - Prioritize source-destructive safety, organization staging versus final output, `ok:true`, and copy-original / fallback / skip semantics.
 
-3. **Thin `src/font-split.js`**
-   - Move one boundary at a time: single-font processing, batch orchestration, input preflight, or organization flow.
-   - Keep public exports and MCP schema stable within the slice.
-   - Confirm smoke coverage before moving code.
+3. **Keep runtime facade boundaries thin**
+   - `src/font-split.js` is now a public facade. Keep new runtime logic out of it.
+   - When a large runtime file needs to shrink, move one behavior boundary at a time: batch naming, dedupe, skip checks, output role detection, input preflight, or organization planning.
+   - Keep public exports and MCP schema stable within the slice, and confirm smoke coverage before moving code.
 
 4. **Split large catalog and guidance files**
-   - `src/catalogs.js` and `src/agent-guidance.js` are central to AI friendliness but are large.
+   - `src/catalogs.js` should stay a lightweight aggregation and re-export layer.
+   - `src/agent-guidance.js`, `src/tool-response-field-catalog.js`, and `src/guidance-workflows.js` are central to AI friendliness but remain large.
    - Split only along clear boundaries such as field catalog, option catalog, warning catalog, or output catalog.
    - Preserve `get_agent_guidance` response shape.
 
