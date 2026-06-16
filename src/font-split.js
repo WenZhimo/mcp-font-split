@@ -65,6 +65,8 @@ import {
 } from './file-scan.js';
 import {
   appendCollisionSuffix,
+  buildBatchSafetySummary,
+  buildBatchWarnings,
   buildBatchOutputNames,
   buildSourceSuffix,
   buildBatchError,
@@ -4542,80 +4544,6 @@ function buildWarnings({ decompressedFrom, oversizedKernDetected, oversizedKernS
   if (oversizedKernStripped) warnings.push('oversized kern table stripped before splitting');
   if ((usedFallback || skipped) && skipReason) warnings.push(skipReason);
   return warnings;
-}
-
-function buildBatchWarnings({
-  dryRun,
-  includeResults,
-  inputScanTruncated,
-  maxFiles,
-  deduplicatedCount,
-  selectedCount,
-  skippedExisting,
-  errorCount,
-  batchErrorMode,
-  outputTreeInsideInputTree,
-}) {
-  const warnings = [];
-  const push = (code, message) => warnings.push({ code, message });
-
-  if (dryRun) {
-    push('dry-run-no-write', 'dryRun is true; no output files were written.');
-  }
-  if (outputTreeInsideInputTree) {
-    push('output-inside-input', 'outputRoot is inside or equal to inputDir. Future scans should exclude that output directory unless reprocessing generated output is intentional.');
-  }
-  if (inputScanTruncated) {
-    push('input-scan-truncated', `Input scan hit maxFiles (${maxFiles}); rerun with a higher maxFiles before treating counts as complete.`);
-  }
-  if (selectedCount < deduplicatedCount) {
-    push('batch-limit-truncated', `Batch limit selected ${selectedCount} of ${deduplicatedCount} deduplicated fonts.`);
-  }
-  if (!includeResults) {
-    push(
-      dryRun ? 'batch-plan-omitted' : 'batch-results-omitted',
-      dryRun
-        ? 'Dry-run plan details are omitted because includeResults is false.'
-        : 'Per-font result details are omitted because includeResults is false.',
-    );
-  }
-  if (skippedExisting > 0) {
-    push('existing-output-skipped', `${skippedExisting} selected fonts were skipped because existing output matched the selected skipMode.`);
-  }
-  if (errorCount > 0 && batchErrorMode === 'collect') {
-    push('errors-collected', 'Per-font errors were collected in errors[]; inspect them before claiming the batch fully succeeded.');
-  }
-
-  return warnings;
-}
-
-function buildBatchSafetySummary({ dryRun, selectedCount, outputTreeInsideInputTree }) {
-  const writesOutputTree = dryRun !== true;
-  const writesSourceTree = writesOutputTree && outputTreeInsideInputTree;
-  const mayOverwriteOutputTree = writesOutputTree && selectedCount > 0;
-  const writeScope = !writesOutputTree
-    ? 'none'
-    : outputTreeInsideInputTree ? 'output-tree-inside-input-tree' : 'output-tree-only';
-  const overwriteScope = !mayOverwriteOutputTree
-    ? 'none'
-    : outputTreeInsideInputTree ? 'output-tree-inside-input-tree' : 'output-tree-only';
-  const summary = dryRun
-    ? 'Batch dry run; no output files were written and source files were only scanned.'
-    : outputTreeInsideInputTree
-      ? 'Batch output write; outputRoot is inside or equal to inputDir, so the input tree receives generated output files, but source font files are never moved, deleted, or rewritten.'
-      : 'Batch output write; selected fonts are written only into outputRoot and source files are never moved, deleted, or rewritten.';
-  return {
-    operationMode: dryRun ? 'preview-only' : 'batch-output',
-    sourceDestructive: false,
-    sourceFilesPreserved: true,
-    writesSourceTree,
-    writesOutputTree,
-    outputTreeInsideInputTree,
-    mayOverwriteOutputTree,
-    writeScope,
-    overwriteScope,
-    summary,
-  };
 }
 
 function buildSourceSafetyDecision({
