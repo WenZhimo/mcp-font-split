@@ -3,6 +3,8 @@ import { buildDirectoryOrganizationSafety } from './directory-organization-safet
 const SOURCE_LAYOUT_MISMATCH_FIELD = 'sourceLayoutMismatchSummary';
 const SOURCE_LAYOUT_DECISION_CHECKLIST_FIELD = 'sourceLayoutMismatchSummary.decisionChecklist';
 const SOURCE_LAYOUT_FIELD_LIST_KEYS = new Set(['inspectFields', 'mustInspectFields', 'responseFields']);
+const INPUT_DIRECTORY_DECISION_FIELD = 'inputDirectoryDecision';
+const INPUT_DIRECTORY_ORGANIZATION_SAFETY_FIELD = 'inputDirectoryDecision.directoryOrganizationSafety';
 const DIRECTORY_ROUTE_REQUIRED_INSPECT_FIELDS = [
   'inputCountGuide',
   'layoutDecision',
@@ -18,6 +20,31 @@ const DIRECTORY_ROUTE_REQUIRED_INSPECT_FIELDS = [
   'organizationWarnings',
   'planActionSummary',
 ];
+const SOURCE_PREFLIGHT_CORE_INSPECT_FIELDS = [
+  'inputCountGuide',
+  INPUT_DIRECTORY_DECISION_FIELD,
+  INPUT_DIRECTORY_ORGANIZATION_SAFETY_FIELD,
+  'layout',
+  'recommendedBatchPreviewArgs',
+  'maxFilesHit',
+  'inspectionWarnings',
+  'supportedFontCount',
+  'unsupportedFileDecision',
+  'unsupportedFileSummary',
+];
+const SOURCE_PREFLIGHT_METADATA_INSPECT_FIELDS = [
+  ...SOURCE_PREFLIGHT_CORE_INSPECT_FIELDS,
+  'validFontCount',
+  'invalidFontCount',
+  'missingIdentityCount',
+];
+
+function sourcePreflightInspectFields(additionalFields = []) {
+  return uniqueStrings([
+    ...SOURCE_PREFLIGHT_CORE_INSPECT_FIELDS,
+    ...(Array.isArray(additionalFields) ? additionalFields : []),
+  ]);
+}
 
 export function withDirectoryRouteInspectFields(fields) {
   return uniqueStrings([
@@ -81,9 +108,9 @@ export const SAFE_INVOCATION_TEMPLATES = [
       includeFiles: false,
     },
     customizableFields: ['inputDir', 'maxFiles', 'includeFiles'],
-    inspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'layout', 'recommendedBatchPreviewArgs', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
-    nextStep: 'Use inputDirectoryDecision to choose between rerun, invalid-font review, direct batch safe-preview, or non-destructive organization safe-preview.',
-    successCriteria: 'Require maxFilesHit false before trusting counts, resolve or disclose invalid fonts and missing identities, then follow inputDirectoryDecision before any write.',
+    inspectFields: SOURCE_PREFLIGHT_METADATA_INSPECT_FIELDS,
+    nextStep: 'Use inputDirectoryDecision plus inputDirectoryDecision.directoryOrganizationSafety to choose between rerun, invalid-font review, direct batch safe-preview, or non-destructive organization safe-preview.',
+    successCriteria: 'Require maxFilesHit false before trusting counts, resolve or disclose invalid fonts and missing identities, then follow inputDirectoryDecision and directoryOrganizationSafety before any write.',
   },
   {
     id: 'single-font-process',
@@ -304,7 +331,7 @@ export function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Count supported fonts and ignored non-font files without writing output.',
-          inspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'layout', 'recommendedBatchPreviewArgs', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
+          inspectFields: sourcePreflightInspectFields(['invalidFontCount']),
           successCriteria: 'maxFilesHit is false, or the caller intentionally accepts a bounded summary.',
         },
         {
@@ -414,7 +441,7 @@ export function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Understand source size, ignored files, invalid fonts, and scan truncation before batch processing.',
-          inspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'layout', 'recommendedBatchPreviewArgs', 'maxFilesHit', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount', 'missingIdentityCount'],
+          inspectFields: sourcePreflightInspectFields(['invalidFontCount', 'missingIdentityCount']),
           successCriteria: 'The source scan is complete enough for the requested batch scope.',
         },
         {
@@ -470,7 +497,7 @@ export function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Inspect source font inputs without writing output.',
-          inspectFields: ['inputCountGuide', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary'],
+          inspectFields: sourcePreflightInspectFields(),
           successCriteria: 'maxFilesHit is false, or truncation is disclosed.',
         },
         auditStep,
@@ -516,7 +543,7 @@ export function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Inspect the staging output as the next source directory.',
-          inspectFields: ['inputCountGuide', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'maxFilesHit', 'inspectionWarnings'],
+          inspectFields: sourcePreflightInspectFields(),
           successCriteria: 'The staging directory contains the expected supported fonts.',
         },
         {
@@ -737,7 +764,7 @@ export function buildNextToolDecisionSummary(workflow) {
       templateId: 'source-preflight-compact',
       writesFiles: false,
       sourceDestructive: false,
-      inspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'layout', 'recommendedBatchPreviewArgs', 'maxFilesHit', 'inspectionWarnings', 'supportedFontCount', 'unsupportedFileDecision', 'unsupportedFileSummary', 'invalidFontCount'],
+      inspectFields: sourcePreflightInspectFields(['invalidFontCount']),
       continueWhen: 'maxFilesHit is false or truncation is intentionally accepted; ignored files and invalid fonts are reviewed.',
       nextRouteAfterSuccess: 'layout-uncertain-or-staging-wanted',
     },

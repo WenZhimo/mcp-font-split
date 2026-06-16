@@ -161,6 +161,7 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
     }
   }
   const layoutRoute = routesById.get('layout-uncertain-or-staging-wanted');
+  const unfamiliarDirectoryRoute = routesById.get('unfamiliar-directory');
   const stagingRoute = routesById.get('copy-only-staging');
   const structureRoute = routesById.get('large-noisy-structure-first');
   const batchPreviewRoute = routesById.get('batch-safe-preview');
@@ -170,7 +171,10 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
   assertDirectoryRouteInspectFields(structureRoute?.inspectFields, `${context}.routes.large-noisy-structure-first`);
   assertDirectoryRouteInspectFields(stagingRoute?.inspectFields, `${context}.routes.copy-only-staging`);
   if (
-    layoutRoute?.firstTool !== 'organize_font_directory'
+    unfamiliarDirectoryRoute?.firstTool !== 'inspect_font_inputs'
+    || !unfamiliarDirectoryRoute.inspectFields?.includes('inputDirectoryDecision')
+    || !unfamiliarDirectoryRoute.inspectFields?.includes('inputDirectoryDecision.directoryOrganizationSafety')
+    || layoutRoute?.firstTool !== 'organize_font_directory'
     || layoutRoute?.firstArgsHint?.workflowPreset !== 'safe-preview'
     || !layoutRoute.inspectFields?.includes('sourceLayoutMismatchSummary.decisionChecklist')
     || stagingRoute?.writeBehavior !== 'copy-only-outputDir'
@@ -205,6 +209,7 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
     }
   }
   const stagingExample = quickExamplesById.get('copy-reviewed-staging');
+  const inspectUnfamiliarExample = quickExamplesById.get('inspect-unfamiliar-source');
   const layoutExample = quickExamplesById.get('plan-source-layout');
   const structureExample = quickExamplesById.get('quick-structure-first-plan');
   const singleExample = quickExamplesById.get('process-single-font');
@@ -218,6 +223,8 @@ function assertNextToolDecisionSummary(summary, { context, workflow, primaryRout
     singleExample?.tool !== 'split_font'
     || singleExample?.args?.fontPath !== '<font-file>'
     || singleExample?.nextRouteAfterSuccess !== 'output-audit'
+    || inspectUnfamiliarExample?.tool !== 'inspect_font_inputs'
+    || !inspectUnfamiliarExample.inspectFields?.includes('inputDirectoryDecision.directoryOrganizationSafety')
     || stagingExample?.args?.workflowPreset !== 'reviewed-write'
     || stagingExample?.args?.outputDir !== '<organized-output-dir>'
     || stagingExample?.writesFiles !== true

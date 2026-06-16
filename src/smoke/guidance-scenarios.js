@@ -635,11 +635,12 @@ async function runAgentGuidanceSmoke() {
     || sourcePreflightTemplate?.sourceDestructive !== false
     || !sourcePreflightTemplate.inspectFields?.includes('inputCountGuide')
     || !sourcePreflightTemplate.inspectFields?.includes('inputDirectoryDecision')
+    || !sourcePreflightTemplate.inspectFields?.includes('inputDirectoryDecision.directoryOrganizationSafety')
     || !sourcePreflightTemplate.inspectFields?.includes('layout')
     || !sourcePreflightTemplate.inspectFields?.includes('recommendedBatchPreviewArgs')
     || !sourcePreflightTemplate.successCriteria?.includes('inputDirectoryDecision')
   ) {
-    throw new Error('Expected source preflight template to expose inputDirectoryDecision, layout, and safe preview args.');
+    throw new Error('Expected source preflight template to expose inputDirectoryDecision, directory organization safety, layout, and safe preview args.');
   }
   const mismatchTemplate = (result.safeInvocationTemplates || []).find((item) => item.id === 'directory-mismatch-plan');
   if (
@@ -745,13 +746,13 @@ async function runAgentGuidanceSmoke() {
   const workflowPlan = result.recommendedWorkflowPlan;
   if (
     workflowPlan?.id !== 'batch-workflow'
-    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'source-preflight-compact' && step.writesFiles === false && step.inspectFields?.includes('inputDirectoryDecision'))
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'source-preflight-compact' && step.writesFiles === false && step.inspectFields?.includes('inputDirectoryDecision') && step.inspectFields?.includes('inputDirectoryDecision.directoryOrganizationSafety'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-dry-run-preview' && step.writesFiles === false && step.inspectFields?.includes('batchDecision'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true && step.inspectFields?.includes('batchDecision') && step.inspectFields?.includes('dedupeDecisionSummary'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'directory-mismatch-plan' && step.inspectFields?.includes('organizationDecision'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('outputRoleDecision') && step.inspectFields?.includes('outputStructureDecision') && step.inspectFields?.includes('auditStatus') && step.inspectFields?.includes('structureSummary'))
   ) {
-    throw new Error('Expected batch recommendedWorkflowPlan to order preview, reviewed write, output audit, and route-decision checks.');
+    throw new Error('Expected batch recommendedWorkflowPlan to order source safety preflight, preview, reviewed write, output audit, and route-decision checks.');
   }
   const referencedTemplateIds = new Set();
   for (const step of workflowPlan.orderedSteps || []) {
