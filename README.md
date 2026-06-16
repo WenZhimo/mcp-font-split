@@ -183,6 +183,17 @@
 | `limit` / `maxFiles` | 控制批量规模和扫描上限；大目录通常需要显式调高。 |
 | `includeResults` | 大批量只需要摘要、warning 和错误时可设为 `false`。 |
 
+## 批量自定义速查
+
+| 目标 | 最小参数起点 | 必须注意 |
+|------|--------------|----------|
+| 保留每个源字体 | `workflowPreset: "preserve-all"` 或 `batchDedupeMode: "none"` | 不做 identity 去重；同名输出仍可能需要 `numeric-suffix` 避免互相覆盖。 |
+| 按源目录分家族 | `workflowPreset: "source-layout"` 或 `batchGroupBy: "source-dir"` | 适合来源目录本身有意义的字体包；目录结构混乱时先做 `organize_font_directory` safe-preview。 |
+| 按字体 metadata 分家族 | `workflowPreset: "metadata-family"` 或 `batchGroupBy: "font-family"` | 依赖字体内部 name 表；metadata 错乱时结果也会错。 |
+| 快速扫大而杂的目录 | `workflowPreset: "structure-first"`、`includeResults: false` | 适合先看规模和结构；字体解析被推迟时，identity 去重和坏字体判断会受限。 |
+| 强制裸输出名 | `batchNamingMode: "plain"` | 不自动加后缀，只在确认没有同名冲突或外部已处理冲突时使用。 |
+| 保留错误报告继续跑 | `batchErrorMode: "collect"` | 批量可能仍返回 `ok: true`；必须检查 `errorCount` 和 `errors[]`。 |
+
 完整参数、返回字段和错误形态请看 [API 参考](./API.zh-CN.md)。
 
 ## 如何解释返回结果

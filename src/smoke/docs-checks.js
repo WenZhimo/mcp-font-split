@@ -307,6 +307,16 @@ export async function runBehaviorDocsSmoke() {
   ) {
     throw new Error('Expected README files to provide a prominent non-destructive source layout mismatch quick check.');
   }
+  if (
+    !readmeZh.includes('## 批量自定义速查')
+    || !readmeZh.includes('`workflowPreset: "preserve-all"`')
+    || !readmeZh.includes('`batchErrorMode: "collect"`')
+    || !readmeEn.includes('## Batch Customization Quick Check')
+    || !readmeEn.includes('`workflowPreset: "preserve-all"`')
+    || !readmeEn.includes('`batchErrorMode: "collect"`')
+  ) {
+    throw new Error('Expected README files to provide a batch customization quick check.');
+  }
 
   for (const [label, text] of [
     ['README.md', readmeZh],

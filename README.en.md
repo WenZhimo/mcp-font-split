@@ -183,6 +183,17 @@ The organizer returns a plan by default. Even with `reviewed-write`, it performs
 | `limit` / `maxFiles` | Control batch size and scan bounds. Large directories usually need explicit higher values. |
 | `includeResults` | Set to `false` for large batches when summaries, warnings, and errors are enough. |
 
+## Batch Customization Quick Check
+
+| Goal | Minimal starting args | Must notice |
+|------|-----------------------|-------------|
+| Preserve every source font | `workflowPreset: "preserve-all"` or `batchDedupeMode: "none"` | Disables identity dedupe; same-name outputs may still need `numeric-suffix` to avoid overwriting each other. |
+| Group by source folders | `workflowPreset: "source-layout"` or `batchGroupBy: "source-dir"` | Best when source folders already represent meaningful font packages; for messy layouts, run `organize_font_directory` safe-preview first. |
+| Group by font metadata | `workflowPreset: "metadata-family"` or `batchGroupBy: "font-family"` | Depends on internal font name tables; bad metadata produces bad grouping. |
+| Scan a large noisy directory quickly | `workflowPreset: "structure-first"`, `includeResults: false` | Good for the first size/layout pass; when font parsing is deferred, identity dedupe and invalid-font checks are limited. |
+| Force bare output names | `batchNamingMode: "plain"` | Never adds suffixes automatically; use only when name collisions are impossible or handled elsewhere. |
+| Keep processing and report errors | `batchErrorMode: "collect"` | Batch may still return `ok: true`; always inspect `errorCount` and `errors[]`. |
+
 For complete arguments, response fields, and error shapes, see the [API Reference](./API.md).
 
 ## Reading Results
