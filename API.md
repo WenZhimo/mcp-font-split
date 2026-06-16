@@ -468,8 +468,19 @@ Important result fields:
 | `auditBlockingReasons[]` | Machine-readable blockers such as `not-split-output`, `output-scan-truncated`, or `output-structure-issues`; structure blockers include `issueCodes` from `structureSummary.issues[]`. |
 | `filesIncluded` / `familiesIncluded` | Whether `files[]` and `families[]` are present. |
 | `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, missing manifests, output structure issues, and organizer-staging misuse such as `organized-staging-not-split-output`. |
-| `structureSummary` | Machine-readable output-structure audit. After real batch writes, treat the output directory as complete only when `outputRoleDecision.auditAppliesToThisDirectory !== false`, `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false`. `conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`. |
+| `structureSummary` | Machine-readable output-structure audit. Use it for exact layout and manifest evidence after checking the compact audit fields. |
 | `structureSummary.layoutKind` | Detected output layout such as `single-family`, `family-tree`, `mixed`, `empty`, or `unknown`; look it up in `outputStructureCatalog.layoutKinds` before deciding whether `outDir` points at the right level. |
+
+After real batch writes, treat the output directory as complete only when all of these are true:
+
+- `outputRoleDecision.auditAppliesToThisDirectory !== false`
+- `outputStructureDecision.status: "pass"`
+- `auditStatus: "pass"`
+- `auditPassed: true`
+- `structureSummary.conforms: true`
+- `maxFilesHit: false`
+
+`structureSummary.conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`.
 | `structureSummary.issues[].code` | Machine-readable structure issue code such as `missing-manifests`, `unexpected-output-files`, or `web-output-missing`; look it up in `outputStructureCatalog.issueCodes` before explaining the audit result. |
 | `fontEntryCount` | Number of detected per-font output entries. |
 | `manifestCount` | Number of entries with `split-meta.json`. |

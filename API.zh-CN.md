@@ -468,8 +468,19 @@
 | `auditBlockingReasons[]` | 阻止审计通过的机器可读原因，例如 `not-split-output`、`output-scan-truncated` 或 `output-structure-issues`；结构问题会带上来自 `structureSummary.issues[]` 的 `issueCodes`。 |
 | `filesIncluded` / `familiesIncluded` | 响应中是否包含 `files[]` 和 `families[]`。 |
 | `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略、manifest 缺失、输出结构问题，以及 `organized-staging-not-split-output` 这类整理暂存目录误用。 |
-| `structureSummary` | 机器可读输出结构审计。真实批量写入后，只有 `outputRoleDecision.auditAppliesToThisDirectory !== false`、`outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为审计完成。`conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`。 |
+| `structureSummary` | 机器可读输出结构审计。检查紧凑审计字段后，用它查看精确布局和 manifest 证据。 |
 | `structureSummary.layoutKind` | 检测到的输出布局，例如 `single-family`、`family-tree`、`mixed`、`empty` 或 `unknown`；判断 `outDir` 是否指向正确层级前，应先查 `outputStructureCatalog.layoutKinds`。 |
+
+真实批量写入后，只有下面条件全都成立时，才应把输出目录视为审计完成：
+
+- `outputRoleDecision.auditAppliesToThisDirectory !== false`
+- `outputStructureDecision.status: "pass"`
+- `auditStatus: "pass"`
+- `auditPassed: true`
+- `structureSummary.conforms: true`
+- `maxFilesHit: false`
+
+`structureSummary.conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`。
 | `structureSummary.issues[].code` | 机器可读结构问题代码，例如 `missing-manifests`、`unexpected-output-files` 或 `web-output-missing`；解释审计结果前，应先查 `outputStructureCatalog.issueCodes`。 |
 | `fontEntryCount` | 检测到的字体输出条目数量。 |
 | `manifestCount` | 带 `split-meta.json` 的条目数量。 |
