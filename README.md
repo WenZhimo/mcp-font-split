@@ -26,7 +26,7 @@
 | 查 MCP 工具参数、返回字段和字段语义 | [API 参考](./API.zh-CN.md)；英文版见 [API Reference](./API.md) |
 | 判断批量去重、目录整理、fallback、输出审计等高风险行为 | [工具完整行为说明](./BEHAVIOR.zh-CN.md) |
 | 让 AI agent 选择下一步工具和安全参数 | 先调用 `get_agent_guidance`，再检查 `inspectFields` 和 `successCriteria` |
-| 维护项目并验证改动 | `npm run check:compact`；涉及行为时再跑 `npm run smoke:real-corpus-suite -- <字体语料目录>` |
+| 维护项目、理解结构并验证改动 | [维护者结构指南](./docs/MAINTAINING.zh-CN.md)；`npm run check:compact`；涉及行为时再跑 `npm run smoke:real-corpus-suite -- <字体语料目录>` |
 
 ## 目录结构不匹配速查
 

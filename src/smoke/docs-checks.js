@@ -7,6 +7,8 @@ import { getAgentGuidance } from '../font-split.js';
 const PUBLIC_DOC_FILES = [
   'README.md',
   'README.en.md',
+  'docs/MAINTAINING.zh-CN.md',
+  'docs/MAINTAINING.md',
   'API.md',
   'API.zh-CN.md',
   'BEHAVIOR.zh-CN.md',

@@ -26,7 +26,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 | Check MCP tool arguments, response fields, and field semantics | [API Reference](./API.md); Chinese version: [API 参考](./API.zh-CN.md) |
 | Review high-risk behavior around batch dedupe, directory organization, fallbacks, and output audits | [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md) |
 | Let an AI agent choose the next tool and safe arguments | Call `get_agent_guidance`, then inspect `inspectFields` and `successCriteria` |
-| Maintain the project and verify changes | `npm run check:compact`; for behavior changes also run `npm run smoke:real-corpus-suite -- <font-corpus-dir>` |
+| Maintain the project, understand structure, and verify changes | [Maintainer Structure Guide](./docs/MAINTAINING.md); `npm run check:compact`; for behavior changes also run `npm run smoke:real-corpus-suite -- <font-corpus-dir>` |
 
 ## Source Layout Mismatch Quick Check
 
