@@ -7,8 +7,12 @@ const execFileAsync = promisify(execFile);
 async function runCheckCompactSmoke() {
   console.log('Compact check smoke');
   const packageJson = JSON.parse(await fs.readFile('package.json', 'utf8'));
-  if (!packageJson.scripts?.['check:syntax']?.includes('scripts/run-check-compact.js')) {
-    throw new Error('compact check smoke: expected check:syntax to syntax-check scripts/run-check-compact.js.');
+  if (packageJson.scripts?.['check:syntax'] !== 'node scripts/check-syntax.js') {
+    throw new Error('compact check smoke: expected check:syntax to use scripts/check-syntax.js.');
+  }
+  const syntaxCheckScript = await fs.readFile('scripts/check-syntax.js', 'utf8');
+  if (!syntaxCheckScript.includes("'scripts/run-check-compact.js'")) {
+    throw new Error('compact check smoke: expected scripts/check-syntax.js to syntax-check scripts/run-check-compact.js.');
   }
 
   const parseCompactJson = (stdout, context) => {
