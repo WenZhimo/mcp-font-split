@@ -2,6 +2,7 @@ import path from 'node:path';
 import { FONT_EXTENSIONS } from './catalogs.js';
 import { normalizeBooleanOption, normalizePositiveNumberOption } from './config.js';
 import { summarizeFilesDetailed } from './file-scan.js';
+import { OUTPUT_AUDIT_PASS_CRITERIA } from './output-audit-criteria.js';
 import { resolveWorkspacePath, toRelativeWorkspacePath } from './path-utils.js';
 import { readSplitManifest } from './split-manifest.js';
 
@@ -163,7 +164,7 @@ export function buildOutputStructureDecision({
     missingManifestCount: structureSummary?.missingManifestCount || 0,
     outputModeCounts: structureSummary?.outputModeCounts || {},
     evidenceFields: ['outputRoleDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
-    passCriteria: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
+    passCriteria: OUTPUT_AUDIT_PASS_CRITERIA,
     nonIntuitiveBehavior: 'ok:true means the output directory inspection ran; it does not by itself mean the output structure passed. Check outputStructureDecision.status before reporting completion.',
   };
 }

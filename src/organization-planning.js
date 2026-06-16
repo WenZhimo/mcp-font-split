@@ -17,6 +17,11 @@ import {
   uniqueStrings,
 } from './guidance-workflows.js';
 import {
+  OUTPUT_AUDIT_COMPLETION_CRITERIA,
+  OUTPUT_AUDIT_MINIMUM_PASS_TEXT,
+  OUTPUT_AUDIT_PASS_CONDITIONS_TEXT,
+} from './output-audit-criteria.js';
+import {
   buildSuggestedBatchPreviewArgs,
   buildSuggestedOrganizationArgs,
 } from './suggested-args.js';
@@ -519,7 +524,7 @@ export function buildSourceLayoutMismatchSummary({
       'Treat this summary as routing guidance, not proof of success.',
       'Before writing split output, run split_font_batch with safe-preview arguments and inspect planned paths, warnings, maxFilesHit, and errors.',
       'Before copy-only staging, review planActionSummary and plan[] when available; if plan[] was omitted, rerun the organization dry-run with includePlan:true.',
-      'After any reviewed batch write, run inspect_split_output and require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
+      `After any reviewed batch write, run inspect_split_output and require ${OUTPUT_AUDIT_PASS_CONDITIONS_TEXT}.`,
     ],
     nonIntuitiveBehavior: [
       'copyOnlyStaging is never source-destructive: dryRun:false copies selected fonts to outputDir and does not move, delete, or rewrite source fonts.',
@@ -687,7 +692,7 @@ export function buildDirectoryWorkflowSummary({
         maxFiles: 200000,
       },
       inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
-      successCriteria: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before reporting completion.',
+      successCriteria: OUTPUT_AUDIT_COMPLETION_CRITERIA,
     },
   );
 
@@ -786,7 +791,7 @@ export function buildDirectoryWorkflowSummary({
     successCriteria: [
       'Do not treat organization as complete until sourceDestructive is false, organizationWarnings are reviewed, and planActionSummary or plan matches user intent.',
       'Run a split_font_batch safe-preview before any reviewed batch write.',
-      'After any reviewed batch write, require inspect_split_output to report outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false before reporting structural success.',
+      `After any reviewed batch write, require inspect_split_output to report ${OUTPUT_AUDIT_PASS_CONDITIONS_TEXT} before reporting structural success.`,
     ],
     nonIntuitiveBehavior,
   });
@@ -916,7 +921,7 @@ export function buildLayoutDecision({
       'Use layoutDecision only as a compact route summary; it is not proof that organization or splitting is complete.',
       'Before any copy-only write, confirm sourceDestructive false and review planActionSummary, organizationWarnings, and plan[] when available.',
       'Before any reviewed batch write, run split_font_batch with safe-preview arguments and inspect planned paths, warnings, maxFilesHit, and errors.',
-      'After any reviewed batch write, run inspect_split_output and require outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass.',
+      `After any reviewed batch write, run inspect_split_output and require ${OUTPUT_AUDIT_MINIMUM_PASS_TEXT}.`,
     ],
     nonIntuitiveBehavior: [
       'organize_font_directory never moves, deletes, or rewrites source font files; dryRun:false is copy-only into outputDir.',
@@ -1006,7 +1011,7 @@ export function buildStagingDirectoryDecision({
     successCriteria: [
       'If status is ready-for-source-preflight, run inspect_font_inputs on outputDir and require maxFilesHit false before using it as split input.',
       'Before any reviewed split write, run split_font_batch safe-preview on outputDir and review planned paths, warnings, dedupe, maxFilesHit, and errors.',
-      'After any reviewed split write, run inspect_split_output on the split outputRoot and require outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass.',
+      `After any reviewed split write, run inspect_split_output on the split outputRoot and require ${OUTPUT_AUDIT_MINIMUM_PASS_TEXT}.`,
     ],
     nonIntuitiveBehavior: [
       'The organizer outputDir is source-like staging, not split output; inspect_split_output applies only after split_font or split_font_batch writes generated output.',

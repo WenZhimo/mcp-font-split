@@ -1,4 +1,9 @@
 import { buildDirectoryOrganizationSafety } from './directory-organization-safety.js';
+import {
+  OUTPUT_AUDIT_MINIMUM_PASS_TEXT,
+  OUTPUT_AUDIT_PASS_CONDITIONS_TEXT,
+  OUTPUT_AUDIT_VALID_OUTPUT_CRITERIA,
+} from './output-audit-criteria.js';
 
 const SOURCE_LAYOUT_MISMATCH_FIELD = 'sourceLayoutMismatchSummary';
 const SOURCE_LAYOUT_DECISION_CHECKLIST_FIELD = 'sourceLayoutMismatchSummary.decisionChecklist';
@@ -206,8 +211,8 @@ export const SAFE_INVOCATION_TEMPLATES = [
     },
     customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'],
     inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'dedupeDecisionSummary', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
-    nextStep: 'Run inspect_split_output on outputRoot before reporting completion and require outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass.',
-    successCriteria: 'The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up inspect_split_output audit with outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass before reporting completion.',
+    nextStep: `Run inspect_split_output on outputRoot before reporting completion and require ${OUTPUT_AUDIT_MINIMUM_PASS_TEXT}.`,
+    successCriteria: `The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up inspect_split_output audit with ${OUTPUT_AUDIT_MINIMUM_PASS_TEXT} before reporting completion.`,
   },
   {
     id: 'output-audit-compact',
@@ -223,8 +228,8 @@ export const SAFE_INVOCATION_TEMPLATES = [
     },
     customizableFields: ['outDir', 'maxFiles', 'includeFiles', 'includeFamilies'],
     inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
-    nextStep: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, and structureSummary.conforms true; if maxFilesHit is true or manifest/structure issues are detected, disclose uncertainty or rerun with more detail.',
-    successCriteria: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as valid.',
+    nextStep: `Require ${OUTPUT_AUDIT_PASS_CONDITIONS_TEXT}; if maxFilesHit is true or manifest/structure issues are detected, disclose uncertainty or rerun with more detail.`,
+    successCriteria: OUTPUT_AUDIT_VALID_OUTPUT_CRITERIA,
   },
 ];
 
@@ -838,7 +843,7 @@ export function buildNextToolDecisionSummary(workflow) {
       writesFiles: false,
       sourceDestructive: false,
       inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
-      continueWhen: 'outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
+      continueWhen: OUTPUT_AUDIT_PASS_CONDITIONS_TEXT,
       nextRouteAfterSuccess: 'complete',
     },
     {

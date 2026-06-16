@@ -1,3 +1,9 @@
+import {
+  OUTPUT_AUDIT_COMPLETION_CRITERIA,
+  OUTPUT_AUDIT_PASS_CRITERIA_LIST,
+  OUTPUT_AUDIT_REPORT_PASS_ACTION,
+} from './output-audit-criteria.js';
+
 export const FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.ttc', '.otc', '.woff', '.woff2']);
 
 export const UNSUPPORTED_FILE_EXTENSION_CATEGORIES = {
@@ -489,15 +495,7 @@ export const FONT_IDENTITY_BASIS_CATALOG = Object.freeze({
 export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
   summaryType: 'output-structure-catalog',
   purpose: 'Machine-readable companion for inspect_split_output outputRoleDecision, outputStructureDecision, and structureSummary fields.',
-  passCriteria: [
-    'outputRoleDecision.auditAppliesToThisDirectory is not false',
-    'outputStructureDecision.status is pass',
-    'auditStatus is pass',
-    'auditPassed is true',
-    'structureSummary.conforms is true',
-    'maxFilesHit is false',
-    'inspectionWarnings contains no action-required output structure or truncation warnings',
-  ],
+  passCriteria: OUTPUT_AUDIT_PASS_CRITERIA_LIST,
   nonIntuitiveBehavior: [
     'ok:true means inspect_split_output ran; it is not proof that the output tree structure passed.',
     'outputRoleDecision can stop the audit when outDir is organizer staging rather than generated split output.',
@@ -509,7 +507,7 @@ export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
     pass: {
       status: 'pass',
       meaning: 'The scan was not truncated and no structure blockers were found.',
-      agentAction: 'You may report the output structure audit as passed only when outputRoleDecision, outputStructureDecision.status, auditStatus, auditPassed, structureSummary.conforms, and maxFilesHit all satisfy the pass criteria.',
+      agentAction: OUTPUT_AUDIT_REPORT_PASS_ACTION,
     },
     'action-required': {
       status: 'action-required',
@@ -1390,7 +1388,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
   auditStatus: {
     sourceTools: ['inspect_split_output'],
     meaning: 'Compact output audit status: pass, incomplete, or action-required.',
-    agentAction: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, maxFilesHit false, and structureSummary.conforms true before reporting an output audit as complete.',
+    agentAction: OUTPUT_AUDIT_COMPLETION_CRITERIA,
   },
   auditPassed: {
     sourceTools: ['inspect_split_output'],

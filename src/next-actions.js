@@ -9,6 +9,7 @@ import {
   buildSuggestedBatchWriteArgs,
   buildSuggestedOrganizationArgs,
 } from './suggested-args.js';
+import { OUTPUT_AUDIT_PASS_CRITERIA } from './output-audit-criteria.js';
 
 export function buildBatchNextActions({
   dryRun,
@@ -85,7 +86,7 @@ export function buildBatchNextActions({
       suggestedArgs: buildBatchAuditArgs({ outputRoot }),
       suggestedArgsField: 'batchDecision.auditArgs',
       inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount'],
-      successCriteria: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
+      successCriteria: OUTPUT_AUDIT_PASS_CRITERIA,
     });
   }
 
