@@ -22,7 +22,7 @@ This document is for maintainers and AI agents taking over the repository. It do
 | `src/config.js` | Defaults, workflow presets, explicit option validation, and configuration traces. |
 | `src/batch.js` | Batch naming, dedupe, skip checks, batch decisions, and debug decision logs. |
 | `src/font-identity.js` | Font identity, OpenType name data, WOFF/WOFF2 decompression, glyph and kern helpers. |
-| `src/input-*.js` | Input scanning, source layout preflight, ignored-file summaries, and input decisions. |
+| `src/input-preflight.js`, `src/input-*.js` | `inspect_font_inputs` runtime orchestration, input scanning, source layout preflight, ignored-file summaries, and input decisions. |
 | `src/organization-*.js` | Copy-only organization planning, organization manifests, and source-layout route decisions. |
 | `src/output-audit.js` | Output role detection and split-output structure audits. |
 | `src/guidance*.js`, `src/catalogs.js` | Machine-readable guidance, field catalogs, warning catalogs, option catalogs, and agent examples. |
