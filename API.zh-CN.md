@@ -14,6 +14,19 @@
 
 显式传入的无效配置会被拒绝，而不是静默回退。MCP 调用会先经过工具 schema；绕过 MCP schema 直接调用模块函数时，会抛出 `FontSplitConfigurationError`，并在 `details.summaryType: "configuration-error"`、`details.option`、`details.received`、`details.allowedValues` 或 `details.expectedType`、`details.defaultWhenOmitted`、`details.omitForDefaultBehavior: true` 中给出机器可读细节。需要默认行为时应省略该选项，而不是传入无效的枚举、布尔或数字值。
 
+## 目录整理安全字段速查
+
+当源字体目录结构和工具预期不一致时，优先用这些字段判断下一步，而不是只看 `ok`：
+
+| 场景 | 先查字段 | 通过含义 |
+|------|----------|----------|
+| 想知道是否需要整理目录 | `inputDirectoryDecision`、`sourceLayoutMismatchSummary` | 说明当前布局是否适合直接批量处理，以及推荐先预检、整理还是批量 safe-preview。 |
+| 想确认整理工具是否破坏源文件 | `inputDirectoryDecision.directoryOrganizationSafety`、`directoryOrganizationQuickAnswer.directoryOrganizationSafety` | `sourceDestructive: false` 且 `sourceFilesMovedDeletedOrRewritten: false` 表示整理工具不会移动、删除或重写源字体。 |
+| 想确认真实写入范围 | `sourceSafetyDecision`、`safetySummary`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree` | 写入应只落在 `outputDir` / `outputRoot`；如果输出目录位于输入目录内，必须把它当成输入树内写入风险解释。 |
+| 想确认整理输出能否当作最终结果 | `stagingDirectoryDecision`、`outputDirRole`、`isSplitOutput`、`inspect_split_output.outputRoleDecision` | `organize_font_directory` 产物是 copy-only 源目录暂存，不是最终 web-font 拆分输出；最终输出仍需 `split_font_batch` 写入并审计。 |
+
+推荐最小路径：`inspect_font_inputs` 只读预检 → `organize_font_directory` + `workflowPreset: "safe-preview"` → 审查计划 → 必要时 `reviewed-write` copy-only 暂存 → 重新预检暂存目录 → `split_font_batch` safe-preview / reviewed-write → `inspect_split_output` 审计。
+
 ## `get_agent_guidance`
 
 返回面向 AI 编程助理的机器可读使用指南。

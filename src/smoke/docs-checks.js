@@ -228,6 +228,14 @@ export async function runApiDocsSmoke() {
     assertDocsContain('recommendedBatchOptions not complete call warning', '`recommendedBatchOptions`');
     assertDocsContain('copy-only reviewed-write route', '`workflowPreset: "reviewed-write"`');
     assertDocsContain('copy-only staging full route example', '`copy-only-staging-to-audited-split`');
+    assertDocsContainAny('directory organization safety quick-reference heading', [
+      '## Directory Organization Safety Fields',
+      '## 目录整理安全字段速查',
+    ]);
+    assertDocsContain('directory organization safety source destructive field', '`sourceDestructive: false`');
+    assertDocsContain('directory organization safety source rewrite field', '`sourceFilesMovedDeletedOrRewritten: false`');
+    assertDocsContain('directory organization safety output role field', '`outputDirRole`');
+    assertDocsContain('directory organization safety split output flag', '`isSplitOutput`');
 
     console.log(JSON.stringify({
       ok: true,

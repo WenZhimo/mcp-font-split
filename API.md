@@ -14,6 +14,19 @@ This server exposes seven MCP tools. All paths are resolved inside `FONT_SPLIT_R
 
 Invalid explicit configuration values are rejected instead of silently falling back. MCP calls are guarded by the tool schema; direct module calls that bypass the MCP schema throw `FontSplitConfigurationError` with `details.summaryType: "configuration-error"`, `details.option`, `details.received`, `details.allowedValues` or `details.expectedType`, `details.defaultWhenOmitted`, and `details.omitForDefaultBehavior: true`. To use defaults, omit the option rather than passing an invalid enum, boolean, or numeric value.
 
+## Directory Organization Safety Fields
+
+When the source font directory layout does not match the tool's expectations, use these fields to choose the next step instead of trusting `ok` alone:
+
+| Scenario | Check first | Meaning when safe |
+|----------|-------------|-------------------|
+| Decide whether organization is needed | `inputDirectoryDecision`, `sourceLayoutMismatchSummary` | Explains whether the current layout is suitable for direct batch processing, or whether to preflight, organize, or batch safe-preview first. |
+| Confirm organization cannot damage source files | `inputDirectoryDecision.directoryOrganizationSafety`, `directoryOrganizationQuickAnswer.directoryOrganizationSafety` | `sourceDestructive: false` and `sourceFilesMovedDeletedOrRewritten: false` mean the organizer will not move, delete, or rewrite source fonts. |
+| Confirm real write scope | `sourceSafetyDecision`, `safetySummary`, `writesSourceTree`, `writesOutputTree`, `outputTreeInsideInputTree` | Writes should be limited to `outputDir` / `outputRoot`; if the output directory is inside the input directory, report it as an input-tree write risk. |
+| Confirm organized output is not the final result | `stagingDirectoryDecision`, `outputDirRole`, `isSplitOutput`, `inspect_split_output.outputRoleDecision` | `organize_font_directory` produces copy-only source staging, not final web-font split output; final output still requires `split_font_batch` and `inspect_split_output`. |
+
+Recommended minimal route: read-only `inspect_font_inputs` → `organize_font_directory` with `workflowPreset: "safe-preview"` → review the plan → optional `reviewed-write` copy-only staging → preflight the staging directory → `split_font_batch` safe-preview / reviewed-write → `inspect_split_output` audit.
+
 ## `get_agent_guidance`
 
 Return machine-readable usage guidance for AI coding assistants.
