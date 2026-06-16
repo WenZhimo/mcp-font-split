@@ -49,6 +49,7 @@ import {
   normalizePositiveNumberOption,
   normalizeProcessingOptions,
 } from './config.js';
+import { stableStringify } from './stable-json.js';
 
 export {
   BATCH_DEDUPE_MODES,
@@ -4562,16 +4563,6 @@ function buildUnsupportedFileCategoryCatalog() {
       },
     ]),
   );
-}
-
-function stableStringify(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
-  }
-  return JSON.stringify(value);
 }
 
 function classifyResultType({ outputMode, splitFailureFallbackApplied, skipReason }) {
