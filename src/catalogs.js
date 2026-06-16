@@ -1216,6 +1216,256 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
 };
 
 
+export const TOOL_OPTION_CATALOG = {
+  summaryType: 'tool-option-catalog',
+  purpose: 'Machine-readable guide to the tool input options that most often change behavior, safety, response size, or output structure.',
+  useHow: [
+    'Start with workflowPreset when available, then add only the smallest explicit override required by user intent.',
+    'Treat defaults as tool-specific: organize_font_directory defaults to dryRun true, while split_font_batch defaults to dryRun false.',
+    'After changing an option, inspect the listed response fields before claiming the option behaved as intended.',
+  ],
+  readOrder: ['split_font_batch', 'organize_font_directory', 'split_font', 'inspect_font_inputs', 'inspect_split_output'],
+  split_font_batch: {
+    tool: 'split_font_batch',
+    sourceDestructive: false,
+    writesFilesByDefault: true,
+    preferredSafeStart: { workflowPreset: 'safe-preview' },
+    preferredReviewedWrite: { workflowPreset: 'reviewed-write' },
+    inspectAfterOverride: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'maxFilesHit', 'errorCount', 'errors'],
+    options: {
+      workflowPreset: {
+        defaultValue: 'omitted-raw-tool-defaults',
+        allowedValues: WORKFLOW_PRESET_NAMES,
+        useWhen: 'Use preset-first configuration for common workflows before adding explicit overrides.',
+        nonIntuitiveBehavior: 'Explicit options override preset values; safe-preview is no-write, while reviewed-write writes output.',
+        inspectFields: ['workflowPreset', 'batchPolicySummary', 'sourceSafetyDecision', 'safetySummary'],
+      },
+      dryRun: {
+        defaultValue: false,
+        useWhen: 'Set true before unfamiliar batch writes to preview scan, dedupe, naming, and skip decisions.',
+        nonIntuitiveBehavior: 'The raw split_font_batch default can write output; safe-preview sets dryRun true for agent-safe planning.',
+        inspectFields: ['dryRun', 'sourceSafetyDecision', 'writesOutputTree', 'planned', 'batchDecision'],
+      },
+      includeResults: {
+        defaultValue: true,
+        useWhen: 'Keep true for small previews that need per-font result details.',
+        nonIntuitiveBehavior: 'Set false for large reviewed writes or summary-only runs; then rely on counts, errors, and inspect_split_output.',
+        inspectFields: ['resultsIncluded', 'processedFontCount', 'errorCount', 'errors'],
+      },
+      limit: {
+        defaultValue: 20,
+        useWhen: 'Cap how many deduped fonts are selected for processing.',
+        nonIntuitiveBehavior: 'limit is applied after dedupe; maxFiles controls source scanning.',
+        inspectFields: ['discoveredFontCount', 'deduplicatedCount', 'selectedFontCount', 'batchWarnings'],
+      },
+      maxFiles: {
+        defaultValue: 5000,
+        useWhen: 'Increase for large corpora before trusting counts or planned output.',
+        nonIntuitiveBehavior: 'When maxFilesHit is true, counts and plans are incomplete until rerun with a higher maxFiles.',
+        inspectFields: ['inputCountGuide', 'scannedFileCount', 'maxFilesHit', 'batchWarnings'],
+      },
+      skipMode: {
+        defaultValue: 'manifest',
+        allowedValues: SKIP_MODES,
+        useWhen: 'Control incremental reruns against existing generated output.',
+        nonIntuitiveBehavior: 'manifest compares source and effective options; force intentionally reprocesses even when output exists.',
+        inspectFields: ['skipMode', 'skippedExisting', 'skippedByManifest', 'reprocessedBecauseSourceChanged', 'reprocessedBecauseOptionsChanged'],
+      },
+      batchGroupBy: {
+        defaultValue: 'auto',
+        allowedValues: BATCH_GROUP_BY_MODES,
+        useWhen: 'Choose source folder grouping, metadata family grouping, or automatic layout-sensitive grouping.',
+        nonIntuitiveBehavior: 'auto can choose different grouping for flat versus nested sources; preview planned paths before writing.',
+        inspectFields: ['batchGroupBy', 'planned', 'batchWarnings', 'layoutDecision'],
+      },
+      batchNamingMode: {
+        defaultValue: 'numeric-suffix',
+        allowedValues: BATCH_NAMING_MODES,
+        useWhen: 'Choose how same-group output name collisions are handled.',
+        nonIntuitiveBehavior: 'numeric-suffix keeps the bare name until a real conflict exists; source-suffix is never implicit.',
+        inspectFields: ['batchNamingMode', 'planned', 'batchWarnings'],
+      },
+      batchDedupeMode: {
+        defaultValue: 'font-identity',
+        allowedValues: BATCH_DEDUPE_MODES,
+        useWhen: 'Choose whether equivalent source fonts are collapsed before splitting.',
+        nonIntuitiveBehavior: 'font-identity is semantic when identity keys are available; same-path is only path/stem-level.',
+        inspectFields: ['batchDedupeMode', 'dedupeDecisionSummary', 'skippedDuplicates'],
+      },
+      batchErrorMode: {
+        defaultValue: 'fail-after',
+        allowedValues: BATCH_ERROR_MODES,
+        useWhen: 'Choose whether per-font failures stop immediately, are collected, or fail after processing selected fonts.',
+        nonIntuitiveBehavior: 'collect can return ok:true with errors[]; require errorCount zero before reporting full success.',
+        inspectFields: ['batchErrorMode', 'errorCount', 'errors', 'batchDecision'],
+      },
+      debugBatchDecisions: {
+        defaultValue: false,
+        useWhen: 'Turn on while diagnosing dedupe, naming, skip, or per-font error decisions.',
+        nonIntuitiveBehavior: 'This emits structured logs for debugging; keep it off for normal large runs.',
+        inspectFields: ['batchWarnings', 'dedupeDecisionSummary', 'planned', 'errors'],
+      },
+    },
+  },
+  organize_font_directory: {
+    tool: 'organize_font_directory',
+    sourceDestructive: false,
+    writesFilesByDefault: false,
+    writeBehavior: 'dryRun false copies selected fonts into outputDir only',
+    preferredSafeStart: { workflowPreset: 'safe-preview' },
+    preferredReviewedWrite: { workflowPreset: 'reviewed-write' },
+    inspectAfterOverride: ['sourceSafetyDecision', 'safetySummary', 'layoutDecision', 'stagingDirectoryDecision', 'organizationDecision', 'directoryWorkflowSummary', 'sourceLayoutMismatchSummary', 'planActionSummary', 'organizationWarnings'],
+    options: {
+      workflowPreset: {
+        defaultValue: 'omitted-raw-organization-defaults',
+        allowedValues: WORKFLOW_PRESET_NAMES,
+        useWhen: 'Use safe-preview for a parsed no-write plan, reviewed-write for a reviewed copy-only staging run, or structure-first for fast layout-only scans.',
+        nonIntuitiveBehavior: 'Explicit options override preset values; reviewed-write copies to outputDir but still does not move, delete, or rewrite source files.',
+        inspectFields: ['workflowPreset', 'batchPolicySummary', 'sourceSafetyDecision', 'safetySummary'],
+      },
+      dryRun: {
+        defaultValue: true,
+        useWhen: 'Leave true until the organization plan, warnings, and source safety fields have been reviewed.',
+        nonIntuitiveBehavior: 'dryRun false is copy-only into outputDir; it never edits source files.',
+        inspectFields: ['dryRun', 'operationMode', 'sourceSafetyDecision', 'planActionSummary'],
+      },
+      includePlan: {
+        defaultValue: true,
+        useWhen: 'Keep true when exact per-file copy/skip targets must be reviewed.',
+        nonIntuitiveBehavior: 'includePlan false omits plan[] but keeps planActionSummary and planVisibility rerun guidance.',
+        inspectFields: ['planIncluded', 'directoryWorkflowSummary.planVisibility', 'planActionSummary', 'plan'],
+      },
+      parseFonts: {
+        defaultValue: true,
+        useWhen: 'Keep true for identity dedupe, metadata family grouping, glyph counts, and invalid-font detection.',
+        nonIntuitiveBehavior: 'parseFonts false makes identity dedupe and metadata-family grouping provisional; validFontCount and invalidFontCount are null, not zero.',
+        inspectFields: ['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'dedupeDecisionSummary'],
+      },
+      batchGroupBy: {
+        defaultValue: 'auto',
+        allowedValues: BATCH_GROUP_BY_MODES,
+        useWhen: 'Choose how organized copy folders are grouped.',
+        nonIntuitiveBehavior: 'font-family grouping depends on parseFonts true; source-dir grouping can preserve archive-per-family layouts.',
+        inspectFields: ['batchGroupBy', 'layout', 'recommendedBatchPreviewArgs', 'planActionSummary'],
+      },
+      batchNamingMode: {
+        defaultValue: 'numeric-suffix',
+        allowedValues: BATCH_NAMING_MODES,
+        useWhen: 'Choose how copied filenames avoid same-group collisions.',
+        nonIntuitiveBehavior: 'numeric-suffix only appends suffixes for real conflicts; plain requires manual collision review.',
+        inspectFields: ['batchNamingMode', 'plan', 'planActionSummary', 'organizationWarnings'],
+      },
+      batchDedupeMode: {
+        defaultValue: 'font-identity',
+        allowedValues: BATCH_DEDUPE_MODES,
+        useWhen: 'Choose whether equivalent fonts are copied once or preserved individually.',
+        nonIntuitiveBehavior: 'When parseFonts is false, requested font-identity effectively falls back to path/stem-level dedupe.',
+        inspectFields: ['requestedBatchDedupeMode', 'effectiveBatchDedupeMode', 'dedupeDecisionSummary', 'skippedDuplicates'],
+      },
+      copyInvalidFonts: {
+        defaultValue: false,
+        useWhen: 'Set true only when supported-extension files that failed parsing must still be copied to staging.',
+        nonIntuitiveBehavior: 'Invalid copied files may still fail later during splitting; disclose this before treating staging as ready.',
+        inspectFields: ['invalidFontCount', 'organizationWarnings', 'planActionSummary', 'errors'],
+      },
+      overwriteExisting: {
+        defaultValue: false,
+        useWhen: 'Set true only when replacing files already present in outputDir is intentional.',
+        nonIntuitiveBehavior: 'overwriteExisting affects outputDir only; source files remain untouched.',
+        inspectFields: ['overwriteExisting', 'mayOverwriteOutputTree', 'skippedTargetExists', 'organizationWarnings'],
+      },
+    },
+  },
+  split_font: {
+    tool: 'split_font',
+    sourceDestructive: false,
+    writesFilesByDefault: true,
+    inspectAfterOverride: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'manifestPath'],
+    options: {
+      outDir: {
+        defaultValue: 'split-output/<font-family>',
+        useWhen: 'Set when the output location should be stable or shared with a later inspect_split_output audit.',
+        nonIntuitiveBehavior: 'outDir is an output tree; source font files are not modified.',
+        inspectFields: ['manifestPath', 'resultType', 'outputMode'],
+      },
+      smallGlyphAction: {
+        defaultValue: 'subset',
+        allowedValues: SMALL_GLYPH_ACTIONS,
+        useWhen: 'Choose how very small fonts should be handled.',
+        nonIntuitiveBehavior: 'single-woff2 and copy-original are fallbacks; copy-original does not generate normal WOFF2/CSS subset output.',
+        inspectFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings'],
+      },
+      splitFailureAction: {
+        defaultValue: 'error',
+        allowedValues: SPLIT_FAILURE_ACTIONS,
+        useWhen: 'Choose whether split failures can fall back to one WOFF2 file.',
+        nonIntuitiveBehavior: 'single-woff2 fallback is not a normal multi-subset split and must be disclosed.',
+        inspectFields: ['resultType', 'outputMode', 'usedFallback', 'warnings', 'errors'],
+      },
+      oversizedKernAction: {
+        defaultValue: 'preserve',
+        allowedValues: OVERSIZED_KERN_ACTIONS,
+        useWhen: 'Choose whether an oversized kern table may be stripped before splitting.',
+        nonIntuitiveBehavior: 'strip is a destructive transform on the generated processing buffer, not on the source file; it may affect kerning.',
+        inspectFields: ['warnings', 'processingSummary'],
+      },
+      fontFamily: {
+        defaultValue: 'derived-from-source-or-cn-font-split',
+        useWhen: 'Override CSS font-family when the generated CSS should use a specific family name.',
+        nonIntuitiveBehavior: 'This controls CSS metadata, not source grouping for batch runs.',
+        inspectFields: ['manifestPath', 'warnings'],
+      },
+    },
+  },
+  inspect_font_inputs: {
+    tool: 'inspect_font_inputs',
+    sourceDestructive: false,
+    writesFilesByDefault: false,
+    inspectAfterOverride: ['inputCountGuide', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'validFontCount', 'invalidFontCount', 'missingIdentityCount'],
+    options: {
+      maxFiles: {
+        defaultValue: 50000,
+        useWhen: 'Raise for larger root scans before trusting corpus counts.',
+        nonIntuitiveBehavior: 'maxFilesHit true means counts are truncated and should not be reported as complete.',
+        inspectFields: ['inputCountGuide', 'maxFilesHit', 'inspectionWarnings'],
+      },
+      includeFiles: {
+        defaultValue: true,
+        useWhen: 'Set false for compact scans over large or noisy source trees.',
+        nonIntuitiveBehavior: 'includeFiles false hides per-font files[] details but keeps aggregate counts and unsupported-file summaries.',
+        inspectFields: ['filesIncluded', 'inputCountGuide', 'unsupportedFileSummary'],
+      },
+    },
+  },
+  inspect_split_output: {
+    tool: 'inspect_split_output',
+    sourceDestructive: false,
+    writesFilesByDefault: false,
+    inspectAfterOverride: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'maxFilesHit'],
+    options: {
+      maxFiles: {
+        defaultValue: 200000,
+        useWhen: 'Raise when auditing very large output trees.',
+        nonIntuitiveBehavior: 'maxFilesHit true makes the audit incomplete even when ok is true.',
+        inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'maxFilesHit', 'inspectionWarnings'],
+      },
+      includeFiles: {
+        defaultValue: true,
+        useWhen: 'Set false for compact output audits where only structure and counts are needed.',
+        nonIntuitiveBehavior: 'compact audits can omit files[] while still returning outputRoleDecision, outputStructureDecision, and structureSummary.',
+        inspectFields: ['filesIncluded', 'outputRoleDecision', 'outputStructureDecision', 'structureSummary'],
+      },
+      includeFamilies: {
+        defaultValue: true,
+        useWhen: 'Set false for compact output audits over large family trees.',
+        nonIntuitiveBehavior: 'includeFamilies false hides families[] inventory but does not skip structureSummary checks.',
+        inspectFields: ['familiesIncluded', 'outputRoleDecision', 'outputStructureDecision', 'structureSummary'],
+      },
+    },
+  },
+};
+
+
 export const WARNING_CODE_CATALOG = {
   'dry-run-no-write': {
     sources: ['batchWarnings'],
