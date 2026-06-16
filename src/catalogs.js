@@ -1,14 +1,6 @@
 import { buildToolOptionCatalog } from './tool-option-catalog.js';
 import { WORKFLOW_PRESET_NAMES } from './workflow-preset-catalog.js';
 
-export const FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.ttc', '.otc', '.woff', '.woff2']);
-
-export const FORMAT_PRIORITY = { '.otf': 0, '.ttf': 1, '.woff2': 2, '.ttc': 3, '.otc': 4, '.woff': 5 };
-
-export const FORMAT_PRIORITY_ORDER = Object.entries(FORMAT_PRIORITY)
-  .sort((a, b) => a[1] - b[1])
-  .map(([extension]) => extension);
-
 export const SKIP_MODES = ['manifest', 'force'];
 export const BATCH_GROUP_BY_MODES = ['auto', 'source-dir', 'font-family'];
 export const BATCH_NAMING_MODES = ['plain', 'numeric-suffix', 'source-suffix'];
@@ -39,6 +31,12 @@ export {
   GUIDANCE_SECTION_NAMES,
   GUIDANCE_WORKFLOWS,
 } from './guidance-section-catalog.js';
+
+export {
+  FONT_EXTENSIONS,
+  FORMAT_PRIORITY,
+  FORMAT_PRIORITY_ORDER,
+} from './font-format-catalog.js';
 
 export const TOOL_OPTION_CATALOG = buildToolOptionCatalog({
   WORKFLOW_PRESET_NAMES,
