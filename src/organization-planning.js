@@ -7,8 +7,14 @@ import {
   resolveBatchFamilyDirName,
   sanitizeDirName,
 } from './batch.js';
-import { uniqueStrings } from './guidance-workflows.js';
-import { buildSuggestedBatchPreviewArgs } from './suggested-args.js';
+import {
+  attachSourceLayoutDecisionChecklistFields,
+  uniqueStrings,
+} from './guidance-workflows.js';
+import {
+  buildSuggestedBatchPreviewArgs,
+  buildSuggestedOrganizationArgs,
+} from './suggested-args.js';
 
 export function getOrganizationDedupeKey(entry, dedupeMode) {
   if (dedupeMode === 'none') return `unique:${entry.file}`;
@@ -516,6 +522,269 @@ export function buildSourceLayoutMismatchSummary({
       'requestedGroupingMatchesRecommendation only compares policy shape; it does not prove that every font family name or output path is correct.',
     ],
   };
+}
+
+export function buildDirectoryWorkflowSummary({
+  options,
+  inputDirRelative,
+  layout,
+  safetySummary,
+  organizationDecision,
+  recommendedBatchPreviewArgs,
+  recommendedNextActions,
+  warnings,
+  outputDirRelative,
+  effectiveDedupeMode,
+}) {
+  const sourceLayoutMismatchSummary = buildSourceLayoutMismatchSummary({
+    options,
+    layout,
+    safetySummary,
+    organizationDecision,
+    recommendedBatchPreviewArgs,
+    outputDirRelative,
+    effectiveDedupeMode,
+    warnings,
+  });
+  const warningCodes = new Set(warnings.map((warning) => warning.code));
+  const actionById = new Map((recommendedNextActions || []).map((action) => [action.id, action]));
+  const reviewReasons = [];
+  if (layout.layoutKind === 'mixed') {
+    reviewReasons.push('mixed-root-and-nested-fonts');
+  }
+  if (!options.parseFonts) {
+    reviewReasons.push('metadata-not-parsed');
+  }
+  if (warningCodes.has('invalid-fonts-skipped')) {
+    reviewReasons.push('invalid-fonts-skipped');
+  }
+  if (warningCodes.has('duplicate-fonts-skipped')) {
+    reviewReasons.push('duplicates-skipped');
+  }
+  if (warningCodes.has('output-inside-input')) {
+    reviewReasons.push('output-tree-inside-input-tree');
+  }
+
+  const workflowSteps = [
+    {
+      id: 'review-source-layout',
+      status: 'current-response',
+      tool: 'organize_font_directory',
+      writesFiles: safetySummary.writesOutputTree,
+      sourceDestructive: false,
+      inspectFields: [
+        'inputCountGuide',
+        'sourceSafetyDecision',
+        'safetySummary',
+        'layout',
+        'layoutDecision',
+        'layoutDecision.directoryHandling',
+        'batchPolicySummary',
+        'stagingDirectoryDecision',
+        'organizationDecision',
+        'directoryWorkflowSummary',
+        'sourceLayoutMismatchSummary',
+        'sourceLayoutMismatchSummary.decisionChecklist',
+        'recommendedBatchPreviewArgs',
+        'organizationWarnings',
+        'planActionSummary',
+        'plan',
+      ],
+      successCriteria: 'Confirm sourceDestructive false, review layout and organizationWarnings, and decide whether original input or copy-only staging should be previewed next.',
+    },
+  ];
+
+  const rerunParsingAction = actionById.get('rerun-with-font-parsing');
+  if (rerunParsingAction) {
+    workflowSteps.push({
+      id: 'rerun-with-font-parsing',
+      status: organizationDecision.preferredNextActionId === 'rerun-with-font-parsing' ? 'preferred-next' : 'available-next',
+      tool: 'organize_font_directory',
+      writesFiles: false,
+      sourceDestructive: false,
+      suggestedArgs: rerunParsingAction.suggestedArgs,
+      inspectFields: rerunParsingAction.inspectFields,
+      successCriteria: rerunParsingAction.successCriteria,
+    });
+  }
+
+  const originalPreviewAction = actionById.get('preview-batch-split-original-layout') || actionById.get('review-mixed-layout-grouping');
+  if (originalPreviewAction) {
+    workflowSteps.push({
+      id: 'preview-batch-split-original-layout',
+      status: organizationDecision.preferredNextActionId === originalPreviewAction?.id ? 'preferred-next' : 'available-next',
+      tool: 'split_font_batch',
+      writesFiles: false,
+      sourceDestructive: false,
+      suggestedArgs: originalPreviewAction.suggestedArgs,
+      suggestedArgsField: 'recommendedBatchPreviewArgs',
+      inspectFields: originalPreviewAction.inspectFields,
+      successCriteria: originalPreviewAction.successCriteria,
+    });
+  }
+
+  const copyStagingAction = actionById.get('copy-organized-staging-directory');
+  if (copyStagingAction) {
+    workflowSteps.push({
+      id: 'copy-organized-staging-directory',
+      status: organizationDecision.optionalStagingActionId === 'copy-organized-staging-directory' ? 'optional-next' : 'available-next',
+      tool: 'organize_font_directory',
+      writesFiles: true,
+      sourceDestructive: false,
+      suggestedArgs: copyStagingAction.suggestedArgs,
+      inspectFields: copyStagingAction.inspectFields,
+      successCriteria: copyStagingAction.successCriteria,
+    });
+  }
+
+  const organizedPreviewAction = actionById.get('preview-batch-split-organized-output');
+  if (organizedPreviewAction) {
+    workflowSteps.push({
+      id: 'preview-batch-split-organized-output',
+      status: organizationDecision.preferredNextActionId === 'preview-batch-split-organized-output' ? 'preferred-next' : 'available-next',
+      tool: 'split_font_batch',
+      writesFiles: false,
+      sourceDestructive: false,
+      suggestedArgs: organizedPreviewAction.suggestedArgs,
+      suggestedArgsField: sourceLayoutMismatchSummary.copyOnlyStaging?.safePreviewArgs
+        ? 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs'
+        : 'organizationDecision.safeBatchPreviewArgs',
+      inspectFields: organizedPreviewAction.inspectFields,
+      successCriteria: organizedPreviewAction.successCriteria,
+    });
+  }
+
+  workflowSteps.push(
+    {
+      id: 'reviewed-batch-write',
+      status: 'after-reviewed-preview',
+      tool: 'split_font_batch',
+      writesFiles: true,
+      sourceDestructive: false,
+      suggestedArgsHint: {
+        inputDir: '<reviewed original inputDir or organized outputDir>',
+        outputRoot: '<reviewed split output root>',
+        workflowPreset: 'reviewed-write',
+      },
+      inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'errorCount', 'errors', 'recommendedNextActions'],
+      successCriteria: 'Only run after the safe-preview plan is acceptable; require sourceDestructive false, maxFilesHit false, and errorCount zero.',
+    },
+    {
+      id: 'audit-split-output',
+      status: 'after-reviewed-write',
+      tool: 'inspect_split_output',
+      writesFiles: false,
+      sourceDestructive: false,
+      suggestedArgsHint: {
+        outDir: '<reviewed split output root>',
+        includeFiles: false,
+        includeFamilies: false,
+        maxFiles: 200000,
+      },
+      inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
+      successCriteria: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before reporting completion.',
+    },
+  );
+
+  const nonIntuitiveBehavior = [
+    'organize_font_directory never moves, deletes, or rewrites source font files; dryRun:false is copy-only into outputDir.',
+    'recommendedBatchOptions is only a policy fragment; use recommendedBatchPreviewArgs or a workflowSteps suggestedArgs object for a copyable safe-preview call that preserves the current scan maxFiles.',
+  ];
+  if (!options.parseFonts) {
+    nonIntuitiveBehavior.push('parseFonts:false makes identity dedupe and metadata-family grouping provisional until rerun with parsing.');
+  }
+  if (layout.layoutKind === 'mixed') {
+    nonIntuitiveBehavior.push('mixed layout means fonts were found both at input root and nested directories, so direct grouping can surprise users.');
+  }
+  if (safetySummary.outputTreeInsideInputTree) {
+    nonIntuitiveBehavior.push('outputDir is inside inputDir; future broad scans can reprocess organized copies unless the next input is scoped intentionally.');
+  }
+  if (safetySummary.writesSourceTree) {
+    nonIntuitiveBehavior.push('writesSourceTree true means the output tree is inside the input tree, not that source font files are modified.');
+  }
+
+  const planVisibility = {
+    planIncluded: options.includePlan,
+    detailsOmitted: options.includePlan ? [] : ['plan'],
+    availableSummaryFields: [
+      'planActionSummary',
+      'layoutDecision',
+      'layoutDecision.directoryHandling',
+      'stagingDirectoryDecision',
+      'organizationDecision',
+      'directoryWorkflowSummary',
+      'sourceLayoutMismatchSummary',
+      'sourceLayoutMismatchSummary.decisionChecklist',
+      'recommendedNextActions',
+      'organizationWarnings',
+      'layout',
+      'safetySummary',
+      'batchPolicySummary',
+    ],
+    summaryUse: options.includePlan
+      ? 'plan[] is available for exact per-file copy, skip, dedupe, and target review.'
+      : 'plan[] is omitted; planActionSummary and routing fields are suitable for triage but not exact per-file target review.',
+    rerunWithPlanBeforeWrite: options.dryRun && !options.includePlan,
+    rerunWithPlanArgs: options.dryRun && !options.includePlan
+      ? buildSuggestedOrganizationArgs({
+        inputDir: inputDirRelative,
+        outputDir: outputDirRelative,
+        workflowPreset: 'safe-preview',
+        options,
+        optionOverrides: { dryRun: true, includePlan: true },
+        extraArgs: { includePlan: true },
+      })
+      : null,
+    successCriteria: options.includePlan
+      ? 'Detailed plan[] is visible; review it with organizationWarnings before any copy-only write.'
+      : 'For large/noisy triage, inspect availableSummaryFields; before copy-only writes that depend on exact targets, rerun the dry-run with includePlan:true.',
+  };
+
+  return attachSourceLayoutDecisionChecklistFields({
+    summaryType: 'directory-layout-workflow',
+    appliesToTool: 'organize_font_directory',
+    currentStep: options.dryRun ? 'layout-plan' : 'copy-only-staging',
+    planVisibility,
+    sourceLayoutMismatchSummary,
+    sourceLayout: {
+      layoutKind: layout.layoutKind,
+      recommendedBatchGroupBy: layout.recommendedBatchOptions?.batchGroupBy,
+      reviewRecommended: reviewReasons.length > 0,
+      reviewReasons,
+    },
+    currentCallSafety: {
+      operationMode: safetySummary.operationMode,
+      sourceDestructive: false,
+      sourceFilesPreserved: true,
+      writesSourceTree: safetySummary.writesSourceTree,
+      writesOutputTree: safetySummary.writesOutputTree,
+      outputTreeInsideInputTree: safetySummary.outputTreeInsideInputTree,
+      mayOverwriteOutputTree: safetySummary.mayOverwriteOutputTree,
+    },
+    policySnapshot: {
+      batchGroupBy: options.batchGroupBy,
+      batchNamingMode: options.batchNamingMode,
+      requestedBatchDedupeMode: options.batchDedupeMode,
+      effectiveBatchDedupeMode: effectiveDedupeMode,
+    },
+    route: {
+      route: organizationDecision.route,
+      preferredNextActionId: organizationDecision.preferredNextActionId,
+      nextTool: organizationDecision.nextTool,
+      nextInputDir: organizationDecision.nextInputDir,
+      copyOnlyStagingRequired: organizationDecision.copyOnlyStagingRequired,
+      optionalStagingActionId: organizationDecision.optionalStagingActionId,
+    },
+    directBatchPreviewArgs: recommendedBatchPreviewArgs,
+    stagingOutputDir: outputDirRelative,
+    workflowSteps,
+    successCriteria: [
+      'Do not treat organization as complete until sourceDestructive is false, organizationWarnings are reviewed, and planActionSummary or plan matches user intent.',
+      'Run a split_font_batch safe-preview before any reviewed batch write.',
+      'After any reviewed batch write, require inspect_split_output to report outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false before reporting structural success.',
+    ],
+    nonIntuitiveBehavior,
+  });
 }
 
 export async function resolveOrganizationGroupName({ entry, inputDir, groupingMode }) {
