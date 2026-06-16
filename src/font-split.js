@@ -26,6 +26,7 @@ import {
 import {
   DEFAULT_WORKSPACE_ROOT,
   PROJECT_ROOT,
+  fileExists,
   isInside,
   pathStatus,
   resolveWorkspacePath,
@@ -67,6 +68,7 @@ import {
   buildBatchOutputNames,
   buildSourceSuffix,
   compareBatchDedupeRepresentative,
+  resolveStableBatchOutputNames,
   sanitizeDirName,
 } from './batch.js';
 import {
@@ -6329,67 +6331,6 @@ function buildFontSplitConfig(input, outDir, args) {
   return config;
 }
 
-async function listExistingSplitDirNames(resolvedOutDir, fontBaseName) {
-  let entries;
-  try {
-    entries = await fs.readdir(resolvedOutDir, { withFileTypes: true });
-  } catch (error) {
-    if (error.code === 'ENOENT') return [];
-    throw error;
-  }
-
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((name) => name === fontBaseName || name.startsWith(`${fontBaseName}-`))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-}
-
-async function resolveStableBatchOutputNames({ resolvedOutDir, fontBaseName, fontFileName, inputRelativePath, reservedNames = new Set() }) {
-  const extension = path.extname(fontFileName);
-  const existingNames = await listExistingSplitDirNames(resolvedOutDir, fontBaseName);
-  const seen = new Set([...existingNames, ...reservedNames]);
-
-  for (const name of existingNames) {
-    const manifest = await readSplitManifest(path.join(resolvedOutDir, name));
-    if (manifest?.source?.input === inputRelativePath && !reservedNames.has(name)) {
-      return {
-        splitDirName: name,
-        copiedOriginalFileName: `${name}${extension}`,
-      };
-    }
-  }
-
-  let index = 0;
-  while (true) {
-    const candidate = appendCollisionSuffix(fontBaseName, index);
-    const candidateDir = path.join(resolvedOutDir, candidate);
-    const manifest = await readSplitManifest(candidateDir);
-    if (manifest?.source?.input === inputRelativePath && !reservedNames.has(candidate)) {
-      return {
-        splitDirName: candidate,
-        copiedOriginalFileName: `${candidate}${extension}`,
-      };
-    }
-    if (manifest) {
-      index++;
-      continue;
-    }
-    if (seen.has(candidate)) {
-      index++;
-      continue;
-    }
-    if (await fileExists(candidateDir)) {
-      index++;
-      continue;
-    }
-    return {
-      splitDirName: candidate,
-      copiedOriginalFileName: index === 0 ? fontFileName : `${candidate}${extension}`,
-    };
-  }
-}
-
 async function inspectInputFontFile(file) {
   const ext = path.extname(file).toLowerCase();
   const stat = await fs.stat(file);
@@ -6751,10 +6692,6 @@ function buildOrganizationManifest({ inputDirRelative, outputDirRelative, option
 
 async function writeOrganizationManifest(outputDir, manifest) {
   await fs.writeFile(path.join(outputDir, ORGANIZATION_MANIFEST_FILE_NAME), JSON.stringify(manifest, null, 2));
-}
-
-function fileExists(filePath) {
-  return fs.stat(filePath).then(() => true).catch(() => false);
 }
 
 function inspectOversizedKern(buffer, thresholdRatio = 0.8) {

@@ -57,3 +57,12 @@ export async function pathStatus(targetPath) {
     };
   }
 }
+
+export async function fileExists(targetPath) {
+  try {
+    await fs.stat(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
