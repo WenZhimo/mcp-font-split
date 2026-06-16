@@ -24,11 +24,8 @@ import {
   SKIP_MODES,
   SMALL_GLYPH_ACTIONS,
   SPLIT_FAILURE_ACTIONS,
-  UNSUPPORTED_FILE_CATEGORY_DETAILS,
-  UNSUPPORTED_FILE_EXTENSION_CATEGORIES,
   WARNING_CODE_CATALOG,
   WORKFLOW_PRESET_NAMES,
-  WORKFLOW_PRESETS,
   buildDirectoryHandlingModeCatalog,
 } from './catalogs.js';
 import {
@@ -71,6 +68,8 @@ import {
 import {
   buildProjectStatusNotice,
   buildToolSafetyQuickReference,
+  buildUnsupportedFileCategoryCatalog,
+  buildWorkflowPresetCatalog,
 } from './guidance.js';
 import {
   SAFE_INVOCATION_TEMPLATES,
@@ -1194,35 +1193,6 @@ export function getAgentGuidance(args = {}) {
   return selectGuidanceSections(
     attachSourceLayoutDecisionChecklistFields(guidance),
     guidanceView.sectionsIncluded,
-  );
-}
-
-function buildWorkflowPresetCatalog() {
-  return WORKFLOW_PRESET_NAMES.map((id) => {
-    const preset = WORKFLOW_PRESETS[id];
-    return {
-      id,
-      description: preset.description,
-      writesBatchFiles: preset.writesBatchFiles,
-      writesOrganizationFiles: preset.writesOrganizationFiles,
-      batchDefaults: preset.batch,
-      organizationDefaults: preset.organize,
-      explicitOptionsOverridePreset: true,
-    };
-  });
-}
-
-function buildUnsupportedFileCategoryCatalog() {
-  return Object.fromEntries(
-    Object.entries(UNSUPPORTED_FILE_CATEGORY_DETAILS).map(([category, details]) => [
-      category,
-      {
-        category,
-        extensions: details.extensions || [...(UNSUPPORTED_FILE_EXTENSION_CATEGORIES[category] || [])].sort(),
-        meaning: details.meaning,
-        handling: details.handling,
-      },
-    ]),
   );
 }
 

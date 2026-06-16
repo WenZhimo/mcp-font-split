@@ -1,3 +1,10 @@
+import {
+  UNSUPPORTED_FILE_CATEGORY_DETAILS,
+  UNSUPPORTED_FILE_EXTENSION_CATEGORIES,
+  WORKFLOW_PRESETS,
+  WORKFLOW_PRESET_NAMES,
+} from './catalogs.js';
+
 export function buildProjectStatusNotice() {
   return {
     summaryType: 'project-status-notice',
@@ -25,6 +32,35 @@ export function buildProjectStatusNotice() {
       'After updating the package, rerun get_agent_guidance instead of relying on older conversation memory.',
     ],
   };
+}
+
+export function buildWorkflowPresetCatalog() {
+  return WORKFLOW_PRESET_NAMES.map((id) => {
+    const preset = WORKFLOW_PRESETS[id];
+    return {
+      id,
+      description: preset.description,
+      writesBatchFiles: preset.writesBatchFiles,
+      writesOrganizationFiles: preset.writesOrganizationFiles,
+      batchDefaults: preset.batch,
+      organizationDefaults: preset.organize,
+      explicitOptionsOverridePreset: true,
+    };
+  });
+}
+
+export function buildUnsupportedFileCategoryCatalog() {
+  return Object.fromEntries(
+    Object.entries(UNSUPPORTED_FILE_CATEGORY_DETAILS).map(([category, details]) => [
+      category,
+      {
+        category,
+        extensions: details.extensions || [...(UNSUPPORTED_FILE_EXTENSION_CATEGORIES[category] || [])].sort(),
+        meaning: details.meaning,
+        handling: details.handling,
+      },
+    ]),
+  );
 }
 
 export function buildToolSafetyQuickReference() {
