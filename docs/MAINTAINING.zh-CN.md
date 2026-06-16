@@ -18,12 +18,12 @@
 | 文件或目录 | 责任 |
 |------------|------|
 | `src/server.js` | MCP schema 和工具入口描述。参数枚举、类型约束和用户可见工具说明先从这里确认。 |
-| `src/font-split.js` | 公共运行时 facade，导出 `splitFont`、`splitFontBatch`、`inspectFontInputs`、`organizeFontDirectory`，同时重新导出 guidance/runtime/status。它仍偏重，后续重构应继续拆薄。 |
+| `src/font-split.js` | 公共运行时 facade，保留 `splitFont`、`splitFontBatch` 编排，并重新导出 `inspectFontInputs`、`organizeFontDirectory`、guidance/runtime/status。它仍偏重，后续重构应继续拆薄。 |
 | `src/config.js` | 默认值、preset、显式配置校验和 configuration trace。无效配置拒绝语义应从这里和 `src/server.js` 一起验证。 |
 | `src/batch.js` | 批量命名、去重、skip、batch decision 和调试日志。 |
 | `src/font-identity.js` | 字体身份、name table、WOFF/WOFF2 解包、glyph/kern 相关逻辑。 |
 | `src/input-preflight.js`、`src/input-*.js` | `inspect_font_inputs` 运行时编排、输入扫描、输入目录判断、忽略文件摘要和目录结构预检。 |
-| `src/organization-*.js` | `organize_font_directory` 的 copy-only 计划、manifest、目录路线判断。 |
+| `src/organization-runtime.js`、`src/organization-*.js` | `organize_font_directory` 运行时编排、copy-only 计划、manifest 和目录路线判断。 |
 | `src/output-audit.js` | `inspect_split_output` 输出目录角色判断和结构审计。 |
 | `src/guidance*.js`、`src/catalogs.js` | 面向 AI agent 的机器可读指南、字段目录、警告目录、选项目录和示例。 |
 | `src/smoke/` | 本地验证场景。涉及用户可见行为、字段契约或真实语料解释时，应优先补这里的 smoke guard。 |

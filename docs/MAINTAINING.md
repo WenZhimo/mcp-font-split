@@ -18,12 +18,12 @@ This document is for maintainers and AI agents taking over the repository. It do
 | File or directory | Responsibility |
 |-------------------|----------------|
 | `src/server.js` | MCP schema and public tool descriptions. Confirm input types and user-visible tool wording here. |
-| `src/font-split.js` | Runtime facade exporting `splitFont`, `splitFontBatch`, `inspectFontInputs`, and `organizeFontDirectory`. It is still heavy and should keep getting thinner in small slices. |
+| `src/font-split.js` | Runtime facade that keeps `splitFont` and `splitFontBatch` orchestration, and re-exports `inspectFontInputs`, `organizeFontDirectory`, guidance, runtime, and status helpers. It is still heavy and should keep getting thinner in small slices. |
 | `src/config.js` | Defaults, workflow presets, explicit option validation, and configuration traces. |
 | `src/batch.js` | Batch naming, dedupe, skip checks, batch decisions, and debug decision logs. |
 | `src/font-identity.js` | Font identity, OpenType name data, WOFF/WOFF2 decompression, glyph and kern helpers. |
 | `src/input-preflight.js`, `src/input-*.js` | `inspect_font_inputs` runtime orchestration, input scanning, source layout preflight, ignored-file summaries, and input decisions. |
-| `src/organization-*.js` | Copy-only organization planning, organization manifests, and source-layout route decisions. |
+| `src/organization-runtime.js`, `src/organization-*.js` | `organize_font_directory` runtime orchestration, copy-only organization planning, organization manifests, and source-layout route decisions. |
 | `src/output-audit.js` | Output role detection and split-output structure audits. |
 | `src/guidance*.js`, `src/catalogs.js` | Machine-readable guidance, field catalogs, warning catalogs, option catalogs, and agent examples. |
 | `src/smoke/` | Local verification scenarios. Add smoke guards here when changing user-visible behavior, field contracts, or real-corpus interpretation. |
