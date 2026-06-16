@@ -3,7 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { FORMAT_PRIORITY } from './catalogs.js';
 import { fileExists, toRelativeWorkspacePath } from './path-utils.js';
-import { readSplitManifest } from './split-manifest.js';
+import { MANIFEST_VERSION, readSplitManifest } from './split-manifest.js';
+import { stableStringify } from './stable-json.js';
 
 export function sanitizeDirName(name) {
   return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim();
@@ -101,4 +102,40 @@ export function compareBatchDedupeRepresentative(candidate, existing) {
     undefined,
     { numeric: true },
   );
+}
+
+export function logBatchDecision(enabled, event, details) {
+  if (!enabled) return;
+  console.log(JSON.stringify({ scope: 'batch-decision', event, ...details }));
+}
+
+export function buildBatchError({ mode, errors, summary }) {
+  const error = new Error(`split_font_batch failed with ${errors.length} error(s) in ${mode} mode.`);
+  error.name = 'BatchSplitError';
+  error.details = { mode, errors, summary };
+  return error;
+}
+
+export async function shouldSkipExistingOutput({
+  skipMode,
+  resolvedOutDir,
+  splitDirName,
+  inputRelativePath,
+  inputStat,
+  effectiveConfig,
+  toolVersion,
+}) {
+  const splitDir = path.join(resolvedOutDir, splitDirName);
+  if (skipMode === 'force') {
+    return { shouldSkip: false, reason: 'force' };
+  }
+
+  const manifest = await readSplitManifest(splitDir);
+  if (!manifest) return { shouldSkip: false, reason: 'missing-manifest' };
+  const sameSource = manifest.source?.input === inputRelativePath
+    && manifest.source?.sizeBytes === inputStat.size
+    && manifest.source?.mtimeMs === inputStat.mtimeMs;
+  const sameConfig = stableStringify(manifest.effectiveConfig) === stableStringify(effectiveConfig);
+  const sameTool = manifest.toolVersion === toolVersion && manifest.manifestVersion === MANIFEST_VERSION;
+  return { shouldSkip: sameSource && sameConfig && sameTool, reason: sameSource && sameConfig && sameTool ? 'manifest' : 'stale-manifest', manifest };
 }

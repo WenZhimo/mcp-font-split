@@ -67,19 +67,19 @@ import {
   appendCollisionSuffix,
   buildBatchOutputNames,
   buildSourceSuffix,
+  buildBatchError,
   compareBatchDedupeRepresentative,
+  logBatchDecision,
   resolveStableBatchOutputNames,
   sanitizeDirName,
+  shouldSkipExistingOutput,
 } from './batch.js';
 import {
-  MANIFEST_VERSION,
   buildSplitManifest,
   manifestPathForSplitDir,
-  readSplitManifest,
   writeSplitManifest,
 } from './split-manifest.js';
 import { ORGANIZATION_MANIFEST_FILE_NAME } from './output-audit.js';
-import { stableStringify } from './stable-json.js';
 
 export {
   BATCH_DEDUPE_MODES,
@@ -6233,18 +6233,6 @@ function buildPlanActionSummary(plan) {
   };
 }
 
-function logBatchDecision(enabled, event, details) {
-  if (!enabled) return;
-  console.log(JSON.stringify({ scope: 'batch-decision', event, ...details }));
-}
-
-function buildBatchError({ mode, errors, summary }) {
-  const error = new Error(`split_font_batch failed with ${errors.length} error(s) in ${mode} mode.`);
-  error.name = 'BatchSplitError';
-  error.details = { mode, errors, summary };
-  return error;
-}
-
 async function resolveBatchFamilyDirName({ file, inputDir, groupingMode }) {
   const relativeToInput = path.relative(inputDir, file);
   const segments = relativeToInput.split(path.sep);
@@ -6260,22 +6248,6 @@ async function resolveBatchFamilyDirName({ file, inputDir, groupingMode }) {
 
   if (segments.length > 1) return segments[0];
   return metadataFamily;
-}
-
-async function shouldSkipExistingOutput({ skipMode, resolvedOutDir, splitDirName, inputRelativePath, inputStat, effectiveConfig }) {
-  const splitDir = path.join(resolvedOutDir, splitDirName);
-  if (skipMode === 'force') {
-    return { shouldSkip: false, reason: 'force' };
-  }
-
-  const manifest = await readSplitManifest(splitDir);
-  if (!manifest) return { shouldSkip: false, reason: 'missing-manifest' };
-  const sameSource = manifest.source?.input === inputRelativePath
-    && manifest.source?.sizeBytes === inputStat.size
-    && manifest.source?.mtimeMs === inputStat.mtimeMs;
-  const sameConfig = stableStringify(manifest.effectiveConfig) === stableStringify(effectiveConfig);
-  const sameTool = manifest.toolVersion === PACKAGE_VERSION && manifest.manifestVersion === MANIFEST_VERSION;
-  return { shouldSkip: sameSource && sameConfig && sameTool, reason: sameSource && sameConfig && sameTool ? 'manifest' : 'stale-manifest', manifest };
 }
 
 function buildFontSplitConfig(input, outDir, args) {
@@ -7293,6 +7265,7 @@ export async function splitFontBatch(args = {}) {
         inputRelativePath: relative,
         inputStat,
         effectiveConfig,
+        toolVersion: PACKAGE_VERSION,
       });
       logBatchDecision(batchOptions.debugBatchDecisions, 'skip-check', {
         mode: batchOptions.skipMode,
