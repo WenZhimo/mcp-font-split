@@ -289,6 +289,16 @@ export async function runBehaviorDocsSmoke() {
   if (!readmeZh.includes('路径/stem 级') || !readmeEn.includes('path/stem-level') || !serverSource.includes('same source path stem')) {
     throw new Error('Expected same-path documentation and schema descriptions to explain path/stem-level dedupe semantics.');
   }
+  if (
+    !readmeZh.includes('## 目录结构不匹配速查')
+    || !readmeZh.includes('不会移动、删除或重写源字体')
+    || !readmeZh.includes('不是最终 web-font 拆分结果')
+    || !readmeEn.includes('## Source Layout Mismatch Quick Check')
+    || !readmeEn.includes('never moves, deletes, or rewrites source fonts')
+    || !readmeEn.includes('not final web-font split output')
+  ) {
+    throw new Error('Expected README files to provide a prominent non-destructive source layout mismatch quick check.');
+  }
 
   for (const [label, text] of [
     ['README.md', readmeZh],

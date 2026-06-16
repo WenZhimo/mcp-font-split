@@ -28,6 +28,18 @@
 | 让 AI agent 选择下一步工具和安全参数 | 先调用 `get_agent_guidance`，再检查 `inspectFields` 和 `successCriteria` |
 | 维护项目并验证改动 | `npm run check:compact`；涉及行为时再跑 `npm run smoke:real-corpus-suite -- <字体语料目录>` |
 
+## 目录结构不匹配速查
+
+如果字体来自多个网站、压缩包解包目录、vendor dump 或混合根目录，先不要直接写入批量输出。推荐顺序是：
+
+1. 用 `inspect_font_inputs` 只读预检目录。
+2. 查看 `inputDirectoryDecision.directoryOrganizationSafety` 和 `sourceLayoutMismatchSummary`。
+3. 如果需要整理，先调用 `organize_font_directory` + `workflowPreset: "safe-preview"`。
+4. 只有审查计划后才使用 `reviewed-write`；它仍然只是 copy-only 写入 `outputDir`，不会移动、删除或重写源字体。
+5. 对整理后的暂存目录重新执行 `inspect_font_inputs`，再进入 `split_font_batch` safe-preview 和最终输出审计。
+
+非直觉点：`organize_font_directory` 的输出是“整理后的源目录暂存”，不是最终 web-font 拆分结果；最终结果仍必须由 `split_font_batch` 写出，并用 `inspect_split_output` 审计目录结构。
+
 ## 功能
 
 - 将 TTF/OTF/TTC/OTC/WOFF/WOFF2 字体处理为 web-font 输出。

@@ -28,6 +28,18 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 | Let an AI agent choose the next tool and safe arguments | Call `get_agent_guidance`, then inspect `inspectFields` and `successCriteria` |
 | Maintain the project and verify changes | `npm run check:compact`; for behavior changes also run `npm run smoke:real-corpus-suite -- <font-corpus-dir>` |
 
+## Source Layout Mismatch Quick Check
+
+If fonts came from multiple websites, extracted archives, vendor dumps, or a mixed root directory, do not start with a batch write. Recommended order:
+
+1. Run `inspect_font_inputs` as a read-only preflight.
+2. Check `inputDirectoryDecision.directoryOrganizationSafety` and `sourceLayoutMismatchSummary`.
+3. If organization is needed, call `organize_font_directory` with `workflowPreset: "safe-preview"` first.
+4. Use `reviewed-write` only after reviewing the plan; it is still copy-only into `outputDir` and never moves, deletes, or rewrites source fonts.
+5. Run `inspect_font_inputs` on the organized staging directory, then continue with `split_font_batch` safe-preview and final output audit.
+
+Non-intuitive behavior: `organize_font_directory` produces organized source-like staging, not final web-font split output. Final output must still be written by `split_font_batch` and audited with `inspect_split_output`.
+
 ## Features
 
 - Split TTF/OTF/TTC/OTC/WOFF/WOFF2 fonts into web-font output.
