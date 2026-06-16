@@ -5,7 +5,17 @@
 >
 > 这里写的是工具现在会怎么做，不是理想行为，也不是字体分割的一般原则。它包含正常功能、默认策略、可选 fallback、manifest 语义、批量跳过策略，以及可能违反用户直觉的地方。
 
-显式传入的无效配置不会触发“帮你猜一个默认值”的静默回退。MCP 调用会先被 schema 拦截；绕过 MCP schema 直接调用模块函数时，会抛出 `FontSplitConfigurationError`，并在 `details.summaryType: "configuration-error"`、`details.option`、`details.received`、`details.allowedValues` 或 `details.expectedType` 中说明问题。需要默认行为时应省略该字段。
+## 阅读导航
+
+| 你要判断的行为 | 建议先看 |
+|----------------|----------|
+| 工具能做什么、路径为什么会被拒绝 | 1-3 节 |
+| 参数默认值、无效配置、`workflowPreset` 和批量策略 | 4 节；显式传入的无效配置会被拒绝，绕过 MCP schema 时会抛出 `FontSplitConfigurationError`，并带有 `details.summaryType: "configuration-error"` |
+| 单文件、批量、目录整理和输出审计流程 | 5-9 节 |
+| 最容易误解或需要人工复核的行为 | 10-11 节 |
+| 推荐批量参数组合 | 12 节 |
+
+字段级 API 说明请看 [API 参考](./API.zh-CN.md)；README 只保留入口、常见工作流和关键风险索引。
 
 ---
 

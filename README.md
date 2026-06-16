@@ -18,6 +18,18 @@
 > [!WARNING]
 > 使用前请先阅读：[工具完整行为说明（含高风险 / 非直觉行为）](./BEHAVIOR.zh-CN.md)。这个封装层包含批量分组、增量跳过、WOFF 解压、fallback 输出和 manifest 元数据等策略行为。
 
+## 文档导航
+
+| 你要解决的问题 | 建议先看 |
+|----------------|----------|
+| 快速了解这个项目、安装和常见调用方式 | 当前 README 的“功能”“重要行为摘要”“示例”“安装” |
+| 查某个 MCP 工具的参数、返回字段和字段语义 | [API 参考](./API.zh-CN.md)；英文版见 [API Reference](./API.md) |
+| 判断批量去重、目录整理、输出审计、fallback 等高风险行为 | [工具完整行为说明](./BEHAVIOR.zh-CN.md) |
+| 让 AI agent 选择下一步工具和安全参数 | 先调用 `get_agent_guidance`，再检查返回的 `successCriteria` 和 `inspectFields` |
+| 维护本项目并验证改动 | 运行 `npm run check:compact`；涉及功能行为时再跑 `npm run smoke:real-corpus-suite -- <font-corpus-dir>` |
+
+README 只作为入口和常见工作流索引；字段级细节以 API 文档为准，高风险/非直觉行为以行为说明为准。
+
 ## 功能
 
 - 将 TTF/OTF/TTC/OTC/WOFF/WOFF2 字体处理为 web-font 输出。

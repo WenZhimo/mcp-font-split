@@ -18,6 +18,18 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 > [!WARNING]
 > Before using this tool, read the full behavior and risk notes in [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md). This wrapper contains policy choices around batch grouping, incremental skipping, WOFF normalization, fallback output, and metadata manifests.
 
+## Documentation Map
+
+| Need | Start here |
+|------|------------|
+| Understand the project, installation, and common calls | This README: Features, Important behavior summary, Examples, Installation |
+| Check MCP tool arguments, response fields, and field semantics | [API Reference](./API.md); Chinese version: [API 参考](./API.zh-CN.md) |
+| Review high-risk behavior around batch dedupe, directory organization, output audits, and fallbacks | [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md) |
+| Let an AI agent choose the next tool and safe arguments | Call `get_agent_guidance`, then inspect the returned `successCriteria` and `inspectFields` |
+| Maintain this project and verify changes | Run `npm run check:compact`; for behavior changes also run `npm run smoke:real-corpus-suite -- <font-corpus-dir>` |
+
+This README is an entry point and workflow index. Field-level details belong in the API docs; high-risk and non-intuitive behavior belongs in the behavior notes.
+
 ## Features
 
 - Split TTF/OTF/TTC/OTC/WOFF/WOFF2 fonts into web-font output files.

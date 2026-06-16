@@ -2,6 +2,16 @@
 
 This server exposes seven MCP tools. All paths are resolved inside `FONT_SPLIT_ROOT`; if that environment variable is not set, paths are resolved from the process working directory. Response paths use `.` for the workspace root instead of an empty string, including suggested follow-up arguments.
 
+## How to read this reference
+
+| Need | Start here |
+|------|------------|
+| Find the right tool and high-level workflow | `get_agent_guidance` |
+| Check exact option names, defaults, and allowed values | The tool-specific sections below |
+| Understand output fields and audits | `inspect_split_output` and the output-field paragraphs in each tool section |
+| Review high-risk behavior and non-intuitive defaults | [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md) |
+| See the Chinese version | [API 参考](./API.zh-CN.md) |
+
 Invalid explicit configuration values are rejected instead of silently falling back. MCP calls are guarded by the tool schema; direct module calls that bypass the MCP schema throw `FontSplitConfigurationError` with `details.summaryType: "configuration-error"`, `details.option`, `details.received`, `details.allowedValues` or `details.expectedType`, `details.defaultWhenOmitted`, and `details.omitForDefaultBehavior: true`. To use defaults, omit the option rather than passing an invalid enum, boolean, or numeric value.
 
 ## `get_agent_guidance`

@@ -2,6 +2,16 @@
 
 本 MCP Server 暴露 7 个工具。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。响应路径会用 `.` 表示工作区根目录，而不是空字符串；推荐后续调用参数也遵循这个规则。
 
+## 如何阅读这份 API
+
+| 你要解决的问题 | 建议先看 |
+|----------------|----------|
+| 选择正确工具和整体工作流 | `get_agent_guidance` |
+| 查精确参数名、默认值和允许值 | 下方各工具章节 |
+| 理解输出字段和审计结果 | `inspect_split_output` 以及各工具章节里的输出字段说明 |
+| 查看高风险行为和非直觉默认值 | [工具完整行为说明](./BEHAVIOR.zh-CN.md) |
+| 阅读英文版 | [API Reference](./API.md) |
+
 显式传入的无效配置会被拒绝，而不是静默回退。MCP 调用会先经过工具 schema；绕过 MCP schema 直接调用模块函数时，会抛出 `FontSplitConfigurationError`，并在 `details.summaryType: "configuration-error"`、`details.option`、`details.received`、`details.allowedValues` 或 `details.expectedType`、`details.defaultWhenOmitted`、`details.omitForDefaultBehavior: true` 中给出机器可读细节。需要默认行为时应省略该选项，而不是传入无效的枚举、布尔或数字值。
 
 ## `get_agent_guidance`
