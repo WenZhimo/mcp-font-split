@@ -63,8 +63,10 @@ import {
   summarizeFiles,
 } from './file-scan.js';
 import {
+  BATCH_POLICY_GUIDE,
   appendCollisionSuffix,
   buildBatchCustomizationQuickReference,
+  buildBatchPolicySummary,
   buildBatchSafetySummary,
   buildBatchWarnings,
   buildBatchOutputNames,
@@ -2038,129 +2040,6 @@ const SAFE_INVOCATION_TEMPLATES = [
   },
 ];
 
-const BATCH_POLICY_GUIDE = [
-  {
-    id: 'grouping-policy',
-    optionName: 'batchGroupBy',
-    appliesTo: ['split_font_batch', 'organize_font_directory'],
-    defaultValue: 'auto',
-    purpose: 'Choose the first-level family/group directory for batch output or organized copies.',
-    values: [
-      {
-        value: 'auto',
-        useWhen: 'The caller wants the tool to infer grouping from source shape: nested sources usually preserve source directories, flat sources lean on font metadata.',
-        avoidWhen: 'The user explicitly says source folders are authoritative, or explicitly wants internal font metadata to decide groups.',
-        inspectFields: ['layout', 'recommendedBatchPreviewArgs', 'batchGroupBy', 'planned', 'batchWarnings'],
-        successCriteria: 'Preview shows the intended family/group directories, with layout warnings reviewed before any write.',
-      },
-      {
-        value: 'source-dir',
-        useWhen: 'Each source folder already represents a family, vendor package, or archive-derived grouping that should be preserved.',
-        avoidWhen: 'The source is a flat dump or folder names are download artifacts rather than family names.',
-        inspectFields: ['layout', 'recommendedBatchPreviewArgs', 'batchGroupBy', 'planned', 'batchWarnings'],
-        successCriteria: 'Preview paths preserve the intended source folder grouping and do not mix unrelated root-level files unexpectedly.',
-      },
-      {
-        value: 'font-family',
-        useWhen: 'The source layout is flat or unreliable and internal font family metadata should decide grouping.',
-        avoidWhen: 'parseFonts is false, font metadata is missing/unreliable, or user wants original source folders preserved.',
-        inspectFields: ['parsedFontMetadata', 'missingIdentityCount', 'invalidFontCount', 'batchGroupBy', 'planned', 'batchWarnings'],
-        successCriteria: 'Metadata has been parsed, missing/invalid font counts are acceptable or disclosed, and preview paths use the intended font-family groups.',
-      },
-    ],
-  },
-  {
-    id: 'naming-policy',
-    optionName: 'batchNamingMode',
-    appliesTo: ['split_font_batch', 'organize_font_directory'],
-    defaultValue: 'numeric-suffix',
-    purpose: 'Choose how per-font output directories or organized copy filenames avoid collisions inside a group.',
-    values: [
-      {
-        value: 'numeric-suffix',
-        useWhen: 'Default agent-safe behavior: keep bare names unless a real same-group output name conflict exists.',
-        avoidWhen: 'The user demands exact bare names even if outputs collide, or wants source-derived suffixes for traceability.',
-        inspectFields: ['batchNamingMode', 'planned', 'batchWarnings', 'outputTreeInsideInputTree'],
-        successCriteria: 'Preview shows bare names when there is no real conflict and numeric suffixes only where collisions require them.',
-      },
-      {
-        value: 'plain',
-        useWhen: 'The user explicitly wants bare names and accepts that same-group collisions may overwrite/merge poorly or require manual handling.',
-        avoidWhen: 'The source contains multiple styles/files with the same stem inside one group or the run should be collision-safe by default.',
-        inspectFields: ['batchNamingMode', 'planned', 'batchWarnings', 'errorCount', 'errors'],
-        successCriteria: 'Plain naming is explicitly intentional, planned paths have been reviewed for collisions, and any collision/error risk is disclosed.',
-      },
-      {
-        value: 'source-suffix',
-        useWhen: 'The user explicitly wants source-derived suffixes to preserve traceability across folders or similarly named files.',
-        avoidWhen: 'Default behavior is desired, because source suffixes make names longer and should not appear implicitly.',
-        inspectFields: ['batchNamingMode', 'planned', 'batchWarnings'],
-        successCriteria: 'Source suffixes are intentionally requested and preview paths demonstrate the desired traceability without surprising extra suffixes.',
-      },
-    ],
-  },
-  {
-    id: 'dedupe-policy',
-    optionName: 'batchDedupeMode',
-    appliesTo: ['split_font_batch', 'organize_font_directory'],
-    defaultValue: 'font-identity',
-    purpose: 'Choose whether equivalent source fonts are collapsed before processing or copying.',
-    values: [
-      {
-        value: 'font-identity',
-        useWhen: 'Default behavior: dedupe equivalent fonts across formats when they represent the same effective font.',
-        avoidWhen: 'Every supported source font file must be preserved, even when only format/container differs.',
-        inspectFields: ['batchDedupeMode', 'dedupeDecisionSummary', 'skippedDuplicates', 'planned', 'batchWarnings', 'dedupeLimitedByParsing'],
-        successCriteria: 'Duplicate skips match user intent; if parsing was skipped, rerun with parseFonts true before trusting identity dedupe.',
-      },
-      {
-        value: 'same-path',
-        useWhen: 'A fast structure/path-level dedupe is enough, or parseFonts is intentionally disabled for a structure-first pass.',
-        avoidWhen: 'Equivalent fonts may appear across arbitrary folders/formats and should be deduped semantically.',
-        inspectFields: ['batchDedupeMode', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'dedupeDecisionSummary', 'skippedDuplicates', 'planned'],
-        successCriteria: 'The caller accepts path/stem-level dedupe limits and does not rely on it as semantic font identity.',
-      },
-      {
-        value: 'none',
-        useWhen: 'The user wants to preserve every supported source font file, including apparent duplicates or alternate containers.',
-        avoidWhen: 'The goal is one representative output per effective font.',
-        inspectFields: ['batchDedupeMode', 'dedupeDecisionSummary', 'skippedDuplicates', 'planned', 'batchWarnings', 'outputTreeInsideInputTree'],
-        successCriteria: 'Preview intentionally keeps every selected supported font, skippedDuplicates is zero, and naming collisions are handled or disclosed.',
-      },
-    ],
-  },
-  {
-    id: 'error-policy',
-    optionName: 'batchErrorMode',
-    appliesTo: ['split_font_batch'],
-    defaultValue: 'fail-after',
-    purpose: 'Choose how per-font processing errors affect the batch tool result.',
-    values: [
-      {
-        value: 'fail-after',
-        useWhen: 'Default behavior: process selected fonts, then fail the batch if any per-font errors occurred.',
-        avoidWhen: 'The caller wants a best-effort ok:true response with collected errors, or wants to stop immediately on the first error.',
-        inspectFields: ['batchErrorMode', 'errorCount', 'errors', 'batchDecision', 'recommendedNextActions'],
-        successCriteria: 'errorCount is zero before claiming success, or the thrown/returned batch failure is reported with errors[] details.',
-      },
-      {
-        value: 'fail-fast',
-        useWhen: 'The first per-font failure should stop the batch immediately to save time or avoid partial output.',
-        avoidWhen: 'The caller wants a complete list of all failing files in one run.',
-        inspectFields: ['batchErrorMode', 'errorCount', 'errors', 'batchDecision'],
-        successCriteria: 'The first failure is treated as blocking and partial output, if any, is audited or disclosed.',
-      },
-      {
-        value: 'collect',
-        useWhen: 'The caller intentionally wants ok:true best-effort output plus errors[] for later inspection.',
-        avoidWhen: 'An agent might forget to check errors[] and incorrectly report full success.',
-        inspectFields: ['batchErrorMode', 'errorCount', 'errors', 'batchDecision', 'recommendedNextActions'],
-        successCriteria: 'Every errors[] entry is inspected, resolved, or disclosed; errorCount must be zero before reporting full success.',
-      },
-    ],
-  },
-];
-
 function uniqueStrings(values) {
   const seen = new Set();
   const result = [];
@@ -2170,59 +2049,6 @@ function uniqueStrings(values) {
     result.push(value);
   }
   return result;
-}
-
-function getBatchPolicyGuideValue(optionName, value) {
-  const policy = BATCH_POLICY_GUIDE.find((item) => item.optionName === optionName);
-  const selectedValue = policy?.values?.find((item) => item.value === value);
-  return { policy, selectedValue };
-}
-
-function buildBatchPolicySummary({ appliesToTool, workflowPreset, values, effectiveValues = {}, availableInspectFields = null, notes = [] }) {
-  const selectedPolicies = Object.entries(values)
-    .filter(([, value]) => value !== undefined)
-    .map(([optionName, value]) => {
-      const { policy, selectedValue } = getBatchPolicyGuideValue(optionName, value);
-      const effectiveValue = effectiveValues[optionName];
-      return {
-        optionName,
-        value,
-        ...(effectiveValue !== undefined ? { effectiveValue } : {}),
-        ...(policy?.defaultValue !== undefined ? { defaultValue: policy.defaultValue, isDefault: value === policy.defaultValue } : {}),
-        inspectFields: selectedValue?.inspectFields || [],
-        successCriteria: selectedValue?.successCriteria || 'Inspect the resolved policy fields and verify they match user intent before continuing.',
-      };
-    });
-  const policyGuideInspectFields = uniqueStrings(selectedPolicies.flatMap((policy) => policy.inspectFields));
-  const availableInspectFieldSet = Array.isArray(availableInspectFields) ? new Set(availableInspectFields) : null;
-  const inspectFields = availableInspectFieldSet
-    ? policyGuideInspectFields.filter((fieldName) => availableInspectFieldSet.has(fieldName))
-    : policyGuideInspectFields;
-
-  const effectiveEntries = Object.fromEntries(
-    Object.entries(effectiveValues).filter(([, value]) => value !== undefined),
-  );
-  const derivedNotes = selectedPolicies
-    .filter((policy) => policy.effectiveValue !== undefined && policy.effectiveValue !== policy.value)
-    .map((policy) => `${policy.optionName} requested ${policy.value} but effectively uses ${policy.effectiveValue}.`);
-
-  return {
-    policySource: 'get_agent_guidance.batchPolicyGuide',
-    appliesToTool,
-    workflowPreset,
-    values,
-    ...(Object.keys(effectiveEntries).length > 0 ? { effectiveValues: effectiveEntries } : {}),
-    selectedPolicies,
-    inspectFields,
-    policyGuideInspectFields,
-    policySuccessCriteria: selectedPolicies.map((policy) => ({
-      optionName: policy.optionName,
-      value: policy.value,
-      ...(policy.effectiveValue !== undefined ? { effectiveValue: policy.effectiveValue } : {}),
-      successCriteria: policy.successCriteria,
-    })),
-    notes: uniqueStrings([...derivedNotes, ...notes]),
-  };
 }
 
 function buildProjectStatusNotice() {
