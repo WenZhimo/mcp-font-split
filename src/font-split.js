@@ -63,7 +63,6 @@ import {
 import {
   scanFilesRecursive,
   summarizeFiles,
-  summarizeFilesDetailed,
 } from './file-scan.js';
 import {
   MANIFEST_VERSION,
@@ -72,16 +71,7 @@ import {
   readSplitManifest,
   writeSplitManifest,
 } from './split-manifest.js';
-import {
-  ORGANIZATION_MANIFEST_FILE_NAME,
-  buildFontEntryInspection,
-  buildOutputAuditStatus,
-  buildOutputInspectionWarnings,
-  buildOutputRoleDecision,
-  buildOutputStructureDecision,
-  buildOutputStructureSummary,
-  relativePathInside,
-} from './output-audit.js';
+import { ORGANIZATION_MANIFEST_FILE_NAME } from './output-audit.js';
 import { stableStringify } from './stable-json.js';
 
 export {
@@ -105,6 +95,8 @@ export {
   resolveWorkspacePath,
   toRelativeWorkspacePath,
 };
+
+export { inspectSplitOutput } from './output-audit.js';
 
 const require = createRequire(import.meta.url);
 const packageJson = require('../package.json');
@@ -8209,167 +8201,4 @@ export async function organizeFontDirectory(args = {}) {
   }
 
   return result;
-}
-
-export async function inspectSplitOutput(args) {
-  const outDir = await resolveWorkspacePath(args.outDir || 'split-output', { mustExist: true });
-  const outDirRelative = toRelativeWorkspacePath(outDir);
-  const maxFiles = normalizePositiveNumberOption(args, 'maxFiles', 200000, { integer: true, max: 200000 });
-  const includeFiles = normalizeBooleanOption(args, 'includeFiles', true);
-  const includeFamilies = normalizeBooleanOption(args, 'includeFamilies', true);
-  const outputSummary = await summarizeFilesDetailed(outDir, { maxFiles });
-  const files = outputSummary.files;
-  const byExtension = {};
-  let totalBytes = 0;
-  for (const file of files) {
-    totalBytes += file.sizeBytes;
-    byExtension[file.extension || '(none)'] = (byExtension[file.extension || '(none)'] || 0) + 1;
-  }
-
-  const relativeEntries = files.map((file) => ({
-    ...file,
-    relativePath: relativePathInside(outDirRelative, file.path),
-  }));
-  const maxDepth = relativeEntries.reduce((depth, file) => Math.max(depth, file.relativePath.split('/').filter(Boolean).length), 0);
-  const singleFamilyLayout = maxDepth <= 2;
-
-  const familyMap = new Map();
-  const ensureFamily = (familyName) => {
-    if (!familyMap.has(familyName)) {
-      familyMap.set(familyName, { originals: [], splitDirs: new Map() });
-    }
-    return familyMap.get(familyName);
-  };
-
-  for (const file of relativeEntries) {
-    const relativeParts = file.relativePath.split('/').filter(Boolean);
-    if (relativeParts.length === 0) continue;
-
-    if (singleFamilyLayout) {
-      if (relativeParts.length === 1 && FONT_EXTENSIONS.has(file.extension)) {
-        const family = ensureFamily(path.basename(outDirRelative));
-        family.originals.push(file);
-        continue;
-      }
-      if (relativeParts.length >= 2) {
-        const family = ensureFamily(path.basename(outDirRelative));
-        const splitDirName = relativeParts[0];
-        if (!family.splitDirs.has(splitDirName)) family.splitDirs.set(splitDirName, []);
-        family.splitDirs.get(splitDirName).push(file);
-      }
-      continue;
-    }
-
-    const familyName = relativeParts[0];
-    if (relativeParts.length === 2 && FONT_EXTENSIONS.has(file.extension)) {
-      const family = ensureFamily(familyName);
-      family.originals.push(file);
-      continue;
-    }
-    if (relativeParts.length >= 3) {
-      const family = ensureFamily(familyName);
-      const splitDirName = relativeParts[1];
-      if (!family.splitDirs.has(splitDirName)) family.splitDirs.set(splitDirName, []);
-      family.splitDirs.get(splitDirName).push(file);
-    }
-  }
-
-  const families = [];
-  let fontEntryCount = 0;
-  let manifestCount = 0;
-  let subsetOutputCount = 0;
-  let singleWoff2OutputCount = 0;
-  let copyOriginalOutputCount = 0;
-  let missingManifestCount = 0;
-
-  for (const [familyName, family] of [...familyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const fontEntries = [];
-    for (const [splitDirName, outputFiles] of [...family.splitDirs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-      const splitDirPath = singleFamilyLayout
-        ? path.join(outDir, splitDirName)
-        : path.join(outDir, familyName, splitDirName);
-      const manifest = await readSplitManifest(splitDirPath);
-      const manifestCopiedOriginalPath = manifest?.result?.copiedOriginalPath || null;
-      const originalFiles = manifestCopiedOriginalPath
-        ? family.originals.filter((file) => file.path === manifestCopiedOriginalPath)
-        : family.originals.filter((file) => path.basename(file.path, file.extension) === splitDirName);
-      const entry = buildFontEntryInspection(familyName, splitDirName, originalFiles, outputFiles, manifest);
-      fontEntries.push(entry);
-      fontEntryCount++;
-      if (entry.hasManifest) manifestCount++; else missingManifestCount++;
-      if (entry.outputMode === 'subset') subsetOutputCount++;
-      if (entry.outputMode === 'single-woff2') singleWoff2OutputCount++;
-      if (entry.outputMode === 'copy-original') copyOriginalOutputCount++;
-    }
-    families.push({
-      familyName,
-      originalFiles: family.originals,
-      fontEntryCount: fontEntries.length,
-      fontEntries,
-    });
-  }
-
-  const structureSummary = buildOutputStructureSummary({
-    outDirRelative,
-    files,
-    families,
-    fontEntryCount,
-    manifestCount,
-    missingManifestCount,
-  });
-  const outputRoleDecision = buildOutputRoleDecision({
-    outDirRelative,
-    relativeEntries,
-    maxFiles,
-  });
-
-  const inspectionWarnings = buildOutputInspectionWarnings({
-    maxFilesHit: outputSummary.truncated,
-    maxFiles,
-    includeFiles,
-    includeFamilies,
-    missingManifestCount,
-    structureIssueCount: structureSummary.issueCount,
-    outputRoleDecision,
-  });
-  const auditStatusSummary = buildOutputAuditStatus({
-    maxFilesHit: outputSummary.truncated,
-    maxFiles,
-    structureSummary,
-    outputRoleDecision,
-  });
-  const outputStructureDecision = buildOutputStructureDecision({
-    auditStatusSummary,
-    maxFilesHit: outputSummary.truncated,
-    maxFiles,
-    structureSummary,
-    outputRoleDecision,
-  });
-
-  return {
-    ok: true,
-    outDir: outDirRelative,
-    maxFiles,
-    maxFilesHit: outputSummary.truncated,
-    ...auditStatusSummary,
-    outputRoleDecision,
-    outputStructureDecision,
-    fileCount: files.length,
-    totalBytes,
-    byExtension,
-    filesIncluded: includeFiles,
-    inspectionWarningCount: inspectionWarnings.length,
-    inspectionWarnings,
-    familyCount: families.length,
-    fontEntryCount,
-    manifestCount,
-    subsetOutputCount,
-    singleWoff2OutputCount,
-    copyOriginalOutputCount,
-    missingManifestCount,
-    structureSummary,
-    familiesIncluded: includeFamilies,
-    ...(includeFiles ? { files } : {}),
-    ...(includeFamilies ? { families } : {}),
-  };
 }
