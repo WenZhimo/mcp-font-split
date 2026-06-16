@@ -844,6 +844,88 @@ export function buildDirectoryHandlingDecision({
   };
 }
 
+export function buildLayoutDecision({
+  layout,
+  safetySummary,
+  organizationDecision,
+  directoryWorkflowSummary,
+}) {
+  const sourceLayoutMismatchSummary = directoryWorkflowSummary.sourceLayoutMismatchSummary;
+  const directOriginalInput = sourceLayoutMismatchSummary.directOriginalInput || {};
+  const copyOnlyStaging = sourceLayoutMismatchSummary.copyOnlyStaging || {};
+  const directoryHandling = buildDirectoryHandlingDecision({
+    layout,
+    safetySummary,
+    organizationDecision,
+    directOriginalInput,
+    copyOnlyStaging,
+  });
+  return {
+    summaryType: 'layout-decision',
+    appliesToTool: 'organize_font_directory',
+    shortAnswer: directoryHandling.shortAnswer,
+    layoutKind: layout.layoutKind,
+    recommendedBatchGroupBy: layout.recommendedBatchOptions?.batchGroupBy || null,
+    route: organizationDecision.route,
+    directoryHandling,
+    recommendedNextActionId: organizationDecision.preferredNextActionId || organizationDecision.optionalStagingActionId || null,
+    nextTool: organizationDecision.nextTool || null,
+    nextInputDir: organizationDecision.nextInputDir || null,
+    reason: organizationDecision.reason,
+    operationMode: safetySummary.operationMode,
+    sourceDestructive: false,
+    sourceFilesPreserved: true,
+    writesSourceTree: safetySummary.writesSourceTree,
+    writesOutputTree: safetySummary.writesOutputTree,
+    outputTreeInsideInputTree: safetySummary.outputTreeInsideInputTree,
+    mayOverwriteOutputTree: safetySummary.mayOverwriteOutputTree,
+    directOriginalInput: {
+      status: directOriginalInput.status || null,
+      previewTool: directOriginalInput.previewTool || 'split_font_batch',
+      previewRequiredBeforeWrite: directOriginalInput.previewRequiredBeforeWrite === true,
+      safePreviewArgs: directOriginalInput.safePreviewArgs || null,
+      reason: directOriginalInput.reason || null,
+    },
+    copyOnlyStaging: {
+      need: copyOnlyStaging.need || null,
+      outputDir: copyOnlyStaging.outputDir || null,
+      sourceDestructive: false,
+      sourceFilesPreserved: true,
+      sourceFilesMovedDeletedOrRewritten: false,
+      writeBehavior: copyOnlyStaging.writeBehavior || null,
+      nextActionId: copyOnlyStaging.nextActionId || null,
+      suggestedArgsField: copyOnlyStaging.suggestedArgsField || null,
+      safePreviewArgs: copyOnlyStaging.safePreviewArgs || null,
+      reason: copyOnlyStaging.reason || null,
+    },
+    mustInspectFields: [
+      'safetySummary',
+      'layout',
+      'layoutDecision',
+      'layoutDecision.directoryHandling',
+      'stagingDirectoryDecision',
+      'organizationDecision',
+      'sourceLayoutMismatchSummary',
+      'sourceLayoutMismatchSummary.decisionChecklist',
+      'directoryWorkflowSummary.planVisibility',
+      'recommendedNextActions',
+      'organizationWarnings',
+      'planActionSummary',
+    ],
+    successCriteria: [
+      'Use layoutDecision only as a compact route summary; it is not proof that organization or splitting is complete.',
+      'Before any copy-only write, confirm sourceDestructive false and review planActionSummary, organizationWarnings, and plan[] when available.',
+      'Before any reviewed batch write, run split_font_batch with safe-preview arguments and inspect planned paths, warnings, maxFilesHit, and errors.',
+      'After any reviewed batch write, run inspect_split_output and require outputRoleDecision.auditAppliesToThisDirectory not false plus outputStructureDecision.status pass.',
+    ],
+    nonIntuitiveBehavior: [
+      'organize_font_directory never moves, deletes, or rewrites source font files; dryRun:false is copy-only into outputDir.',
+      'writesSourceTree true means the output tree is inside the input tree, not that source font files are modified.',
+      'copyOnlyStaging is optional unless the route or user intent requires a cleaner staging directory.',
+    ],
+  };
+}
+
 export async function resolveOrganizationGroupName({ entry, inputDir, groupingMode }) {
   if (entry.metadataParsed === false) {
     const relativeToInput = path.relative(inputDir, entry.file);
