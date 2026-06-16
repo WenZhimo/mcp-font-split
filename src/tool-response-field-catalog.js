@@ -14,6 +14,10 @@ import {
   GUIDANCE_WARNING_FIELD_CATALOG,
   GUIDANCE_WORKFLOW_PRESET_FIELD_CATALOG,
 } from './guidance-response-field-catalog.js';
+import {
+  RUNTIME_STATUS_NODE_FIELD_CATALOG,
+  RUNTIME_STATUS_RUNTIME_FIELD_CATALOG,
+} from './runtime-status-response-field-catalog.js';
 
 export const ALL_TOOL_NAMES = [
   'get_agent_guidance',
@@ -31,47 +35,14 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Tool-level success flag. It means the selected policy completed, not necessarily that a normal multi-subset split happened.',
     agentAction: 'Inspect tool-specific outcome, warning, truncation, and error fields before claiming success.',
   },
-  node: {
-    sourceTools: ['get_runtime_status'],
-    meaning: 'Node.js runtime details, including whether the current version satisfies package.json engines.',
-    agentAction: 'If node.ok is false, handle recommendedActions before processing fonts.',
-  },
+  ...RUNTIME_STATUS_NODE_FIELD_CATALOG,
   workspace: {
     sourceTools: ['get_agent_guidance', 'get_runtime_status'],
     meaning: 'Resolved FONT_SPLIT_ROOT workspace and configuration status.',
     agentAction: 'Confirm paths are inside the intended workspace before reading or writing local fonts.',
   },
   ...GUIDANCE_HEADER_FIELD_CATALOG,
-  wasm: {
-    sourceTools: ['get_runtime_status'],
-    meaning: 'Resolved cn-font-split WASM runtime path and filesystem status.',
-    agentAction: 'If missing or not a file, follow recommendedActions before splitting.',
-  },
-  'wasm.fontSplitWasmPathConfigured': {
-    sourceTools: ['get_runtime_status'],
-    meaning: 'Whether FONT_SPLIT_WASM_PATH overrides the packaged cn-font-split WASM runtime.',
-    agentAction: 'Disclose custom-runtime use when debugging compatibility or reproducibility.',
-  },
-  cnFontSplit: {
-    sourceTools: ['get_runtime_status'],
-    meaning: 'cn-font-split package and WASM runtime version metadata.',
-    agentAction: 'Use this to diagnose version drift between the wrapper, package, and WASM runtime.',
-  },
-  'cnFontSplit.packageVersion': {
-    sourceTools: ['get_runtime_status'],
-    meaning: 'Installed cn-font-split package version.',
-    agentAction: 'Compare with expected dependency versions when reproducing behavior.',
-  },
-  'cnFontSplit.runtimeVersion': {
-    sourceTools: ['get_runtime_status'],
-    meaning: 'Recorded cn-font-split WASM runtime release, when available.',
-    agentAction: 'Record or repair the runtime when runtimeVersion is missing unexpectedly.',
-  },
-  recommendedActions: {
-    sourceTools: ['get_runtime_status'],
-    meaning: 'Machine-readable setup remediation actions.',
-    agentAction: 'Handle action-required items before calling writing tools.',
-  },
+  ...RUNTIME_STATUS_RUNTIME_FIELD_CATALOG,
   supportedFontCount: {
     sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory'],
     meaning: 'Number of scanned files with supported font extensions.',
