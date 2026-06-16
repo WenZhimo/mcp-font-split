@@ -6,12 +6,42 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { StaticWasm, fontSplit } from 'cn-font-split/dist/wasm/index.mjs';
 import {
+  BATCH_DEDUPE_MODES,
+  BATCH_ERROR_MODES,
+  BATCH_GROUP_BY_MODES,
+  BATCH_NAMING_MODES,
   FONT_EXTENSIONS,
   FORMAT_PRIORITY,
   FORMAT_PRIORITY_ORDER,
+  GUIDANCE_COMPACT_SECTION_NAMES,
+  GUIDANCE_DETAIL_LEVELS,
+  GUIDANCE_SECTION_FIELDS,
+  GUIDANCE_SECTION_NAMES,
+  GUIDANCE_WORKFLOWS,
+  OVERSIZED_KERN_ACTIONS,
+  SKIP_MODES,
+  SMALL_GLYPH_ACTIONS,
+  SPLIT_FAILURE_ACTIONS,
   UNSUPPORTED_FILE_CATEGORY_DETAILS,
   UNSUPPORTED_FILE_EXTENSION_CATEGORIES,
+  WORKFLOW_PRESET_NAMES,
+  WORKFLOW_PRESETS,
 } from './catalogs.js';
+
+export {
+  BATCH_DEDUPE_MODES,
+  BATCH_ERROR_MODES,
+  BATCH_GROUP_BY_MODES,
+  BATCH_NAMING_MODES,
+  GUIDANCE_DETAIL_LEVELS,
+  GUIDANCE_SECTION_NAMES,
+  GUIDANCE_WORKFLOWS,
+  OVERSIZED_KERN_ACTIONS,
+  SKIP_MODES,
+  SMALL_GLYPH_ACTIONS,
+  SPLIT_FAILURE_ACTIONS,
+  WORKFLOW_PRESET_NAMES,
+};
 
 const require = createRequire(import.meta.url);
 const woff2Decompress = require('wawoff2/decompress');
@@ -28,187 +58,6 @@ const MANIFEST_VERSION = 1;
 const ORGANIZATION_MANIFEST_FILE_NAME = 'font-organization-manifest.json';
 const ORGANIZATION_MANIFEST_VERSION = 1;
 const PACKAGE_VERSION = packageJson.version;
-const WORKFLOW_PRESETS = {
-  'safe-preview': {
-    description: 'No-write preview for unfamiliar sources. Good first call for agents before any batch write or organization copy.',
-    writesBatchFiles: false,
-    writesOrganizationFiles: false,
-    batch: {
-      dryRun: true,
-      includeResults: true,
-      skipMode: 'manifest',
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'font-identity',
-      batchErrorMode: 'fail-after',
-      splitFailureAction: 'single-woff2',
-    },
-    organize: {
-      dryRun: true,
-      includePlan: true,
-      parseFonts: true,
-      batchGroupBy: 'auto',
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'font-identity',
-      copyInvalidFonts: false,
-      overwriteExisting: false,
-    },
-  },
-  'reviewed-write': {
-    description: 'Write-oriented settings after a preview has been reviewed. Batch writes output; organization copies into outputDir only.',
-    writesBatchFiles: true,
-    writesOrganizationFiles: true,
-    batch: {
-      dryRun: false,
-      includeResults: false,
-      skipMode: 'manifest',
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'font-identity',
-      batchErrorMode: 'fail-after',
-      splitFailureAction: 'single-woff2',
-    },
-    organize: {
-      dryRun: false,
-      includePlan: true,
-      parseFonts: true,
-      batchGroupBy: 'auto',
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'font-identity',
-      copyInvalidFonts: false,
-      overwriteExisting: false,
-    },
-  },
-  'structure-first': {
-    description: 'Fast no-write structural scan for very large or noisy directories. Metadata-sensitive decisions remain limited.',
-    writesBatchFiles: false,
-    writesOrganizationFiles: false,
-    batch: {
-      dryRun: true,
-      includeResults: false,
-      skipMode: 'manifest',
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'same-path',
-      batchErrorMode: 'fail-after',
-    },
-    organize: {
-      dryRun: true,
-      includePlan: false,
-      parseFonts: false,
-      batchGroupBy: 'auto',
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'font-identity',
-      copyInvalidFonts: false,
-      overwriteExisting: false,
-    },
-  },
-  'source-layout': {
-    description: 'Prefer source directory names as family/group names. Useful for archive-per-family folder layouts.',
-    writesBatchFiles: 'depends-on-dryRun',
-    writesOrganizationFiles: 'depends-on-dryRun',
-    batch: {
-      batchGroupBy: 'source-dir',
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'font-identity',
-    },
-    organize: {
-      batchGroupBy: 'source-dir',
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'font-identity',
-    },
-  },
-  'metadata-family': {
-    description: 'Prefer internal font metadata as family/group names. Useful for flat vendor dumps.',
-    writesBatchFiles: 'depends-on-dryRun',
-    writesOrganizationFiles: 'depends-on-dryRun',
-    batch: {
-      batchGroupBy: 'font-family',
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'font-identity',
-    },
-    organize: {
-      batchGroupBy: 'font-family',
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'font-identity',
-    },
-  },
-  'preserve-all': {
-    description: 'Disable pre-processing dedupe while keeping collision-safe numeric names. Useful when every source font file must be kept.',
-    writesBatchFiles: 'depends-on-dryRun',
-    writesOrganizationFiles: 'depends-on-dryRun',
-    batch: {
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'none',
-    },
-    organize: {
-      batchNamingMode: 'numeric-suffix',
-      batchDedupeMode: 'none',
-    },
-  },
-};
-export const WORKFLOW_PRESET_NAMES = Object.keys(WORKFLOW_PRESETS);
-export const SKIP_MODES = ['manifest', 'force'];
-export const BATCH_GROUP_BY_MODES = ['auto', 'source-dir', 'font-family'];
-export const BATCH_NAMING_MODES = ['plain', 'numeric-suffix', 'source-suffix'];
-export const BATCH_DEDUPE_MODES = ['none', 'same-path', 'font-identity'];
-export const BATCH_ERROR_MODES = ['collect', 'fail-fast', 'fail-after'];
-export const OVERSIZED_KERN_ACTIONS = ['preserve', 'strip'];
-export const SMALL_GLYPH_ACTIONS = ['subset', 'single-woff2', 'copy-original'];
-export const SPLIT_FAILURE_ACTIONS = ['error', 'single-woff2'];
-export const GUIDANCE_WORKFLOWS = ['overview', 'single', 'batch', 'inspect', 'organize'];
-export const GUIDANCE_DETAIL_LEVELS = ['compact', 'full'];
-export const GUIDANCE_SECTION_NAMES = [
-  'workspace',
-  'tools',
-  'defaults',
-  'recommendations',
-  'option-catalog',
-  'identity-catalog',
-  'output-catalog',
-  'directory-workflows',
-  'examples',
-  'verification',
-  'error-catalog',
-  'warning-catalog',
-  'field-catalog',
-  'safe-templates',
-  'response-fields',
-  'path-rules',
-  'workflow',
-];
-const GUIDANCE_COMPACT_SECTION_NAMES = [
-  'workspace',
-  'tools',
-  'defaults',
-  'recommendations',
-  'option-catalog',
-  'identity-catalog',
-  'output-catalog',
-  'directory-workflows',
-  'safe-templates',
-  'verification',
-  'error-catalog',
-  'response-fields',
-  'path-rules',
-  'workflow',
-];
-const GUIDANCE_SECTION_FIELDS = {
-  workspace: ['workspace'],
-  tools: ['tools', 'toolSafetyQuickReference', 'supportedExtensions'],
-  defaults: ['projectStatusNotice', 'defaultPolicies'],
-  recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets', 'batchCustomizationQuickReference', 'batchPolicyGuide', 'configurationRecipes', 'unsupportedFileCategoryCatalog', 'fontIdentityBasisCatalog', 'outputStructureCatalog'],
-  'directory-workflows': ['directoryOrganizationQuickAnswer', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix'],
-  examples: ['directoryWorkflowExamples'],
-  verification: ['verificationChecklist', 'localVerificationOutputGuide'],
-  'error-catalog': ['errorResponseCatalog'],
-  'warning-catalog': ['warningCodeCatalog'],
-  'field-catalog': ['toolResponseFieldCatalog'],
-  'option-catalog': ['toolOptionCatalog'],
-  'identity-catalog': ['fontIdentityBasisCatalog'],
-  'output-catalog': ['outputStructureCatalog'],
-  'safe-templates': ['safeInvocationTemplates'],
-  'response-fields': ['responseFieldsToCheck'],
-  'path-rules': ['pathRules'],
-  workflow: ['recommendedWorkflow', 'nextToolDecisionSummary', 'recommendedWorkflowPlan'],
-};
 const RAW_BATCH_OPTION_DEFAULTS = {
   dryRun: false,
   includeResults: true,
