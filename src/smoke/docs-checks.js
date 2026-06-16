@@ -1,9 +1,54 @@
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { getAgentGuidance } from '../font-split.js';
 
+const PUBLIC_DOC_FILES = [
+  'README.md',
+  'README.en.md',
+  'API.md',
+  'API.zh-CN.md',
+  'BEHAVIOR.zh-CN.md',
+];
+
+const MOJIBAKE_MARKERS = [
+  '鍙傝',
+  '榛樿',
+  '鐩',
+  '銆',
+  '乣',
+];
+
+async function assertPublicDocsReadableAndLinked() {
+  const markdownLinkPattern = /!?\[[^\]]+\]\(([^)]+)\)/g;
+
+  for (const fileName of PUBLIC_DOC_FILES) {
+    const content = await fs.readFile(fileName, 'utf8');
+    const marker = MOJIBAKE_MARKERS.find((item) => content.includes(item));
+    if (marker) {
+      throw new Error(`${fileName} contains likely mojibake marker: ${marker}`);
+    }
+
+    for (const match of content.matchAll(markdownLinkPattern)) {
+      let target = match[1].trim();
+      if (!target || /^(https?:|mailto:)/i.test(target) || target.startsWith('#')) continue;
+      if (target.startsWith('<') && target.endsWith('>')) target = target.slice(1, -1);
+      const [targetPath] = target.split('#');
+      if (!targetPath) continue;
+      const resolved = path.resolve(path.dirname(fileName), decodeURIComponent(targetPath));
+      try {
+        await fs.access(resolved);
+      } catch {
+        throw new Error(`${fileName} has a broken local Markdown link: ${target}`);
+      }
+    }
+  }
+}
+
 export async function runApiDocsSmoke() {
+  await assertPublicDocsReadableAndLinked();
+
   const apiDocs = {
     'API.md': await fs.readFile('API.md', 'utf8'),
     'API.zh-CN.md': await fs.readFile('API.zh-CN.md', 'utf8'),
@@ -186,6 +231,8 @@ export async function runApiDocsSmoke() {
 }
 
 export async function runBehaviorDocsSmoke() {
+  await assertPublicDocsReadableAndLinked();
+
   const behaviorDoc = await fs.readFile('BEHAVIOR.zh-CN.md', 'utf8');
   const readmeZh = await fs.readFile('README.md', 'utf8');
   const readmeEn = await fs.readFile('README.en.md', 'utf8');
