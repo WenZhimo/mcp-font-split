@@ -92,6 +92,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `errorResponseCatalog`：解释结构化 MCP 错误和普通错误的响应形态
 - `guidanceView`：说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称
 - `outputStructureCatalog`：解释 `inspect_split_output` 的 `outputRoleDecision`、审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式和结构通过条件
+- `outputResultShapeQuickReference`：解释 `split_font` / `split_font_batch` 的结果形态，避免把 `ok:true`、fallback、copy-original、skip 或收集错误误报成正常多子集输出
 
 当 agent 需要完整错误响应目录、warning code 目录、响应字段目录、工具选项目录、identity basis 目录、输出结构目录或示例时，应设置 `detailLevel: "full"`，或用 `sections` 精确请求，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog", "identity-catalog", "output-catalog"]`。
 
@@ -184,6 +185,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 - `fontIdentityBasisCatalog` 是字体 identity basis 目录，可用 section `identity-catalog`（例如 `sections: ["identity-catalog"]`）单独请求。
   它解释 `typographic-family-subfamily`、`opentype-family-subfamily`、`full-name`、`postscript-name`、family-only、`path-stem`、`path-fallback`、`missing` 等 basis 的 OpenType name ID 来源、置信度和语义 identity 证据强度。
 - `outputStructureCatalog` 是输出结构审计目录，可用 section `output-catalog`（例如 `sections: ["output-catalog"]`）单独请求。它解释 `outputRoleDecision`、`outputStructureDecision.status`、`auditStatus`、`structureSummary.layoutKind`、`structureSummary.issues[].code`、`subset` / `single-woff2` / `copy-original` 输出模式和通过条件。
+- `outputResultShapeQuickReference` 是输出结果形态速查目录，可用 section `output-catalog` 单独请求。它的 `summaryType: "output-result-shape-quick-reference"`，覆盖正常 `subset` 输出、单 WOFF2 fallback、`copy-original` 记录、跳过已有输出，以及 `batchErrorMode: "collect"` 下 `ok:true` 但 `errorCount > 0` 的批量响应。
 - `ok:true` 只表示 `inspect_split_output` 调用完成，不代表输出结构通过。
 - 包含 `font-organization-manifest.json` 的目录是整理暂存，而不是生成后的拆分输出。
 - `includeFiles:false` 和 `includeFamilies:false` 只省略大数组，不会跳过结构审计。

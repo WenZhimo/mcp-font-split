@@ -204,3 +204,69 @@ export function buildToolSafetyQuickReference() {
     ],
   };
 }
+
+export function buildOutputResultShapeQuickReference() {
+  return {
+    summaryType: 'output-result-shape-quick-reference',
+    purpose: 'Fast answer for what a successful split response actually produced, so agents do not treat ok:true as proof of normal web-font subset output.',
+    inspectFields: ['ok', 'resultType', 'outputMode', 'performedSplit', 'usedFallback', 'skipped', 'skipReason', 'warnings', 'batchDecision', 'errorCount', 'errors', 'manifestPath'],
+    resultShapes: [
+      {
+        id: 'subset-output',
+        when: {
+          outputMode: 'subset',
+          performedSplit: true,
+        },
+        meaning: 'Normal multi-subset web-font output was produced.',
+        agentAction: 'After a real write, audit the output directory with inspect_split_output before reporting completion.',
+        successEvidence: ['manifestPath', 'inspect_split_output.outputStructureDecision.status', 'inspect_split_output.structureSummary.conforms'],
+      },
+      {
+        id: 'single-woff2-fallback',
+        when: {
+          outputMode: 'single-woff2',
+          usedFallback: true,
+        },
+        meaning: 'Normal multi-subset output did not happen; the result fell back to one WOFF2 output.',
+        agentAction: 'Disclose the fallback, inspect warnings and resultType, and do not describe this as normal multi-subset splitting.',
+        successEvidence: ['resultType', 'warnings', 'manifestPath'],
+      },
+      {
+        id: 'copy-original-record',
+        when: {
+          outputMode: 'copy-original',
+          usedFallback: true,
+        },
+        meaning: 'No web-font split output was generated; the original font was copied or recorded with metadata.',
+        agentAction: 'Do not report this as web-font output. Explain copy-original behavior and inspect manifestPath and resultType.',
+        successEvidence: ['resultType', 'manifestPath'],
+      },
+      {
+        id: 'skipped-existing-output',
+        when: {
+          skipped: true,
+          skipReason: '<present>',
+        },
+        meaning: 'The run did not reprocess this font because skip logic accepted existing output.',
+        agentAction: 'Inspect skipMode, skipReason, and output audit evidence before relying on the existing output.',
+        successEvidence: ['skipReason', 'inspect_split_output.outputStructureDecision.status'],
+      },
+      {
+        id: 'batch-partial-errors',
+        when: {
+          ok: true,
+          errorCount: '>0',
+        },
+        meaning: 'The batch completed according to its error policy, but one or more fonts failed.',
+        agentAction: 'Inspect batchErrorMode, errorCount, and errors[]; do not report full batch success until failures are resolved or explicitly accepted.',
+        successEvidence: ['batchDecision', 'errorCount', 'errors'],
+      },
+    ],
+    nonIntuitiveBehavior: [
+      'ok:true is not proof of normal subset output.',
+      'single-woff2 and copy-original are successful fallback/record paths, but they are not normal multi-subset web-font splitting.',
+      'A skipped result can be acceptable only when the existing output still passes the relevant manifest or output audit checks.',
+      'A batch can return ok:true with collected errors when batchErrorMode is collect; agents must inspect errorCount and errors[].',
+    ],
+  };
+}

@@ -25,6 +25,7 @@ async function runAgentGuidanceSmoke() {
     || Object.hasOwn(defaultGuidance, 'directoryWorkflowExamples')
     || defaultGuidance.projectStatusNotice?.summaryType !== 'project-status-notice'
     || defaultGuidance.toolSafetyQuickReference?.summaryType !== 'tool-safety-quick-reference'
+    || defaultGuidance.outputResultShapeQuickReference?.summaryType !== 'output-result-shape-quick-reference'
     || !defaultGuidance.safeInvocationTemplates?.length
     || defaultGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !defaultGuidance.directoryHandlingModeCatalog?.['preview-original-input']
@@ -73,6 +74,7 @@ async function runAgentGuidanceSmoke() {
     || Object.hasOwn(compactGuidance, 'directoryWorkflowExamples')
     || compactGuidance.projectStatusNotice?.summaryType !== 'project-status-notice'
     || compactGuidance.toolSafetyQuickReference?.summaryType !== 'tool-safety-quick-reference'
+    || compactGuidance.outputResultShapeQuickReference?.summaryType !== 'output-result-shape-quick-reference'
     || !compactGuidance.safeInvocationTemplates?.length
     || compactGuidance.localVerificationOutputGuide?.primaryDecisionField !== 'reliabilityGateDecision'
     || !compactGuidance.directoryHandlingModeCatalog?.['preview-organized-output']
@@ -205,6 +207,13 @@ async function runAgentGuidanceSmoke() {
     || !result.toolResponseFieldCatalog?.batchCustomizationQuickReference?.agentAction?.includes('smallest explicit override')
   ) {
     throw new Error('Expected agent guidance to expose batchCustomizationQuickReference as the compact customization entrypoint.');
+  }
+  if (
+    !result.responseFieldsToCheck?.includes('outputResultShapeQuickReference')
+    || result.toolResponseFieldCatalog?.outputResultShapeQuickReference?.sourceTools?.[0] !== 'get_agent_guidance'
+    || !result.toolResponseFieldCatalog?.outputResultShapeQuickReference?.agentAction?.includes('ok:true')
+  ) {
+    throw new Error('Expected agent guidance to expose outputResultShapeQuickReference as the compact output result-shape entrypoint.');
   }
   if (
     !result.responseFieldsToCheck?.includes('directoryOrganizationQuickAnswer')
@@ -408,6 +417,7 @@ async function runAgentGuidanceSmoke() {
     || !outputCatalogGuidance.outputStructureCatalog?.issueCodes?.['unexpected-output-files']
     || !outputCatalogGuidance.outputStructureCatalog?.issueCodes?.['web-output-missing']
     || !outputCatalogGuidance.outputStructureCatalog?.auditStatuses?.pass
+    || outputCatalogGuidance.outputResultShapeQuickReference?.summaryType !== 'output-result-shape-quick-reference'
     || Object.hasOwn(outputCatalogGuidance, 'toolOptionCatalog')
     || Object.hasOwn(outputCatalogGuidance, 'toolResponseFieldCatalog')
     || Object.hasOwn(outputCatalogGuidance, 'safeInvocationTemplates')
@@ -423,6 +433,33 @@ async function runAgentGuidanceSmoke() {
     || !result.toolResponseFieldCatalog?.['structureSummary.issues[].code']
   ) {
     throw new Error('Expected full guidance to expose outputStructureCatalog and response-field catalog entries.');
+  }
+  const outputResultShapeQuickReference = result.outputResultShapeQuickReference || {};
+  const outputResultShapeIds = new Set((outputResultShapeQuickReference.resultShapes || []).map((item) => item.id));
+  for (const requiredShape of ['subset-output', 'single-woff2-fallback', 'copy-original-record', 'skipped-existing-output', 'batch-partial-errors']) {
+    if (!outputResultShapeIds.has(requiredShape)) {
+      throw new Error(`Expected outputResultShapeQuickReference to include ${requiredShape}.`);
+    }
+  }
+  for (const requiredField of ['outputMode', 'resultType', 'performedSplit', 'usedFallback', 'errorCount', 'errors']) {
+    if (!outputResultShapeQuickReference.inspectFields?.includes(requiredField)) {
+      throw new Error(`Expected outputResultShapeQuickReference.inspectFields to include ${requiredField}.`);
+    }
+  }
+  if (
+    outputResultShapeQuickReference.summaryType !== 'output-result-shape-quick-reference'
+    || !outputResultShapeQuickReference.nonIntuitiveBehavior?.some((item) => item.includes('ok:true'))
+  ) {
+    throw new Error('Expected outputResultShapeQuickReference to summarize non-intuitive successful output shapes.');
+  }
+  for (const item of outputResultShapeQuickReference.resultShapes || []) {
+    assertNonEmptyString(item.id, 'outputResultShapeQuickReference', 'id');
+    assertNonEmptyString(item.meaning, `outputResultShapeQuickReference.${item.id}`, 'meaning');
+    assertNonEmptyString(item.agentAction, `outputResultShapeQuickReference.${item.id}`, 'agentAction');
+    assertNonEmptyStringArray(item.successEvidence, `outputResultShapeQuickReference.${item.id}`, 'successEvidence');
+    if (!item.when || Object.keys(item.when).length === 0) {
+      throw new Error(`Expected outputResultShapeQuickReference.${item.id} to declare when conditions.`);
+    }
   }
   if (
     !result.responseFieldsToCheck?.includes('errorResponseCatalog')
@@ -829,6 +866,7 @@ async function runAgentGuidanceSmoke() {
     toolSafetyQuickReference: 'get_agent_guidance',
     unsupportedFileCategoryCatalog: 'get_agent_guidance',
     outputStructureCatalog: 'get_agent_guidance',
+    outputResultShapeQuickReference: 'get_agent_guidance',
     recommendedBatchOptions: 'organize_font_directory',
     recommendedBatchPreviewArgs: 'organize_font_directory',
     layoutDecision: 'organize_font_directory',

@@ -12,6 +12,7 @@ import {
 import { workspaceRoot } from './path-utils.js';
 import {
   buildProjectStatusNotice,
+  buildOutputResultShapeQuickReference,
   buildToolSafetyQuickReference,
   buildUnsupportedFileCategoryCatalog,
   buildGuidanceView,
@@ -816,6 +817,7 @@ export function getAgentGuidance(args = {}) {
       { name: 'inspect_split_output', useWhen: 'Audit generated output structure and manifests.' },
     ],
     toolSafetyQuickReference: buildToolSafetyQuickReference(),
+    outputResultShapeQuickReference: buildOutputResultShapeQuickReference(),
     supportedExtensions: [...FONT_EXTENSIONS],
     projectStatusNotice: buildProjectStatusNotice(),
     defaultPolicies: {
@@ -884,6 +886,7 @@ export function getAgentGuidance(args = {}) {
       'recommendedActions',
       'projectStatusNotice',
       'toolSafetyQuickReference',
+      'outputResultShapeQuickReference',
       'workflowPresets',
       'workflowPreset',
       'batchCustomizationQuickReference',

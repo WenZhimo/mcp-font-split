@@ -53,6 +53,7 @@
 - `toolOptionCatalog`
 - `fontIdentityBasisCatalog`
 - `outputStructureCatalog`
+- `outputResultShapeQuickReference`
 - `unsupportedFileCategoryCatalog`
 - `directoryHandlingModeCatalog`
 - 推荐批量和目录整理参数
@@ -84,6 +85,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
   agent 应把当前仓库代码、实时 MCP schema、`get_agent_guidance`、`API.md` / `API.zh-CN.md` 和 `BEHAVIOR.zh-CN.md` 当作权威来源。
 - `configurationRecipes[]` 把常见用户意图映射成 preset-first 调用和取舍说明。每个配方包含 `inspectFields` 和 `successCriteria`；它是指南，不是成功证明。
 - `batchCustomizationQuickReference[]` 是常见批量覆盖的紧凑入口。它提供 `overrideArgs`、带 `workflowPreset: "safe-preview"` 的 `previewArgs`、带 `workflowPreset: "reviewed-write"` 的 `writeArgsAfterReview`、`inspectFields`、`successCriteria` 和非直觉行为。
+- `outputResultShapeQuickReference` 是输出结果形态速查矩阵。它的 summary type 是 `output-result-shape-quick-reference`。报告成功前应先看它，避免把 `ok:true` 误读成正常多子集输出；它覆盖 `subset`、`single-woff2`、`copy-original`、跳过已有输出，以及带收集错误完成的批量响应。
 - `batchPolicyGuide` 覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。需要逐值策略细节时先看它，然后预览再写入。
 - `toolOptionCatalog` 默认返回，也可通过 `sections: ["option-catalog"]` 聚焦请求。修改 `dryRun`、`includeResults`、`maxFiles`、`batchGroupBy`、`batchNamingMode`、`batchDedupeMode`、`parseFonts`、`smallGlyphAction`、`splitFailureAction` 或 `includeFiles` 前应先看它。
 - `configurationTrace` 会由 `split_font_batch` 和 `organize_font_directory` 返回。它记录选项来源（`raw-default`、`workflow-preset` 或 `explicit-argument`）、`rawDefault`、可选 `presetDefault`、可选 `explicitValue`、最终 `effectiveValue`、`explicitOverrideFields[]` 和 `presetDefaultFields[]`。
@@ -152,6 +154,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
   路径级、缺失或低置信度 family-only basis 不应被报告成完整语义去重证据。
 - `outputStructureCatalog` 默认返回，也可通过 `sections: ["output-catalog"]` 聚焦请求。解释 `outputRoleDecision`、`outputStructureDecision`、`structureSummary.layoutKind` 或 `structureSummary.issues[].code` 前应先看它。
   `ok:true` 只表示检查调用完成，不表示输出目录结构已经通过。它也解释整理暂存目录、`includeFiles:false` / `includeFamilies:false` 和 `copy-original` 输出。
+- `outputResultShapeQuickReference` 默认返回，也可通过 `sections: ["output-catalog"]` 聚焦请求。它解释如何区分正常 subset 输出、单 WOFF2 fallback、copy-original 记录、跳过已有输出，以及 `errorCount > 0` 的 `ok:true` 批量响应。
 - `unsupportedFileCategoryCatalog` 解释 `unsupportedFileSummary.byCategory[]`、代表性扩展名、分类含义和处理行为。工具响应也会提供 `unsupportedFileDecision`、`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary`。
   `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
 - `errorResponseCatalog` 默认返回，也可通过 `sections: ["error-catalog"]` 聚焦请求。结构化错误是 JSON 文本，包含 `ok: false`、`name`、`errorType`、`error` 和 `details`。
@@ -189,7 +192,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 | `workspace` | 工作区根目录和路径基准信息。 |
 | `tools` | 工具清单、`toolSafetyQuickReference`，以及每个工具适合在什么时候调用。 |
 | `defaults` | `projectStatusNotice`、重要默认策略和支持的字体扩展名。 |
-| `recommendations` | 推荐的批量、检查和目录整理参数，以及 `workflowPresets[]`、`batchCustomizationQuickReference[]`、`batchPolicyGuide`、`configurationRecipes[]`、`fontIdentityBasisCatalog`、`outputStructureCatalog` 和 `unsupportedFileCategoryCatalog`。 |
+| `recommendations` | 推荐的批量、检查和目录整理参数，以及 `workflowPresets[]`、`batchCustomizationQuickReference[]`、`outputResultShapeQuickReference`、`batchPolicyGuide`、`configurationRecipes[]`、`fontIdentityBasisCatalog`、`outputStructureCatalog` 和 `unsupportedFileCategoryCatalog`。 |
 | `directory-workflows` | `directoryOrganizationQuickAnswer`，以及面向扁平、嵌套、混合、嘈杂和暂存目录场景的目录工作流决策数据。 |
 | `examples` | 具体源目录示例；在 `full` 详情或显式请求时返回。 |
 | `verification` | agent 在宣称成功前应该验证的检查清单。 |
@@ -198,7 +201,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 | `field-catalog` | 把响应字段映射到含义和 agent 动作的字段目录。 |
 | `option-catalog` | 把高影响工具输入参数映射到默认值、允许值、安全行为、非直觉行为和必查响应字段的选项目录。 |
 | `identity-catalog` | 字体 identity basis 目录，把 `identityBasis` 取值映射到 OpenType name ID 来源、置信度、语义 identity 状态和 agent 动作。 |
-| `output-catalog` | 输出结构审计目录，把审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式、通过条件和非直觉审计行为映射成可解释条目。 |
+| `output-catalog` | 输出结构审计目录和 `outputResultShapeQuickReference`，把审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式、结果形态、通过条件和非直觉审计行为映射成可解释条目。 |
 | `safe-templates` | 常见工作流的可复制安全调用模板。 |
 | `response-fields` | agent 应检查的响应字段短清单。 |
 | `path-rules` | 路径限制和相对路径规则。 |

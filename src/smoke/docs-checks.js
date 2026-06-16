@@ -89,6 +89,7 @@ export async function runApiDocsSmoke() {
       'guidanceView',
       'projectStatusNotice',
       'toolSafetyQuickReference',
+      'outputResultShapeQuickReference',
       'recommendedWorkflowPlan',
       'nextToolDecisionSummary',
       'workflowQuickStart',
@@ -188,6 +189,8 @@ export async function runApiDocsSmoke() {
     assertDocsContain('local verification forbidden claims', '`forbiddenClaims`');
     assertDocsContain('local verification concise report template', '`conciseReportTemplate`');
     assertDocsContain('tool safety quick reference', '`toolSafetyQuickReference`');
+    assertDocsContain('output result shape quick reference', '`outputResultShapeQuickReference`');
+    assertDocsContain('output result shape summary type', '`output-result-shape-quick-reference`');
     assertDocsContain('tool safety moved/deleted/rewrite field', '`sourceFilesMovedDeletedOrRewritten`');
     assertDocsContain('tool safety default write field', '`defaultWritesFiles`');
     assertDocsContain('first input preflight example', '`first-input-preflight-example`');
@@ -379,6 +382,7 @@ export async function runBehaviorDocsSmoke() {
     '`dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts`',
     '`identity-catalog`',
     '`outputStructureCatalog`',
+    '`outputResultShapeQuickReference`',
     '`structureSummary.layoutKind`',
     '`structureSummary.issues[].code`',
     '`output-catalog`',
@@ -509,7 +513,7 @@ export async function runBehaviorDocsSmoke() {
     ok: true,
     toolCount: guidance.tools?.length || 0,
     documentedWorkflowPresetCount: guidance.workflowPresets?.length || 0,
-    checkedHighRiskTokenCount: 48,
+    checkedHighRiskTokenCount: 49,
     checkedWarningCodeCount: 11,
     checkedDebugEventCount: 5,
   }, null, 2));

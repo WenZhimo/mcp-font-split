@@ -53,6 +53,7 @@ By default the response is compact:
 - `toolOptionCatalog`
 - `fontIdentityBasisCatalog`
 - `outputStructureCatalog`
+- `outputResultShapeQuickReference`
 - `unsupportedFileCategoryCatalog`
 - `directoryHandlingModeCatalog`
 - recommended batch and organization options
@@ -84,6 +85,7 @@ Key routing objects:
   Treat the current repository code, live MCP schema, `get_agent_guidance`, `API.md` / `API.zh-CN.md`, and `BEHAVIOR.zh-CN.md` as authoritative.
 - `configurationRecipes[]` maps common user intent to preset-first calls and tradeoffs. Each recipe includes `inspectFields` and `successCriteria`; it is guidance, not proof of success.
 - `batchCustomizationQuickReference[]` is the compact entrypoint for common batch overrides. It provides `overrideArgs`, `previewArgs` with `workflowPreset: "safe-preview"`, `writeArgsAfterReview` with `workflowPreset: "reviewed-write"`, `inspectFields`, `successCriteria`, and non-intuitive behavior.
+- `outputResultShapeQuickReference` is the compact result-shape matrix. Its summary type is `output-result-shape-quick-reference`. Use it before reporting success so `ok:true` is not mistaken for normal multi-subset output; it covers `subset`, `single-woff2`, `copy-original`, skipped existing output, and batches that complete with collected errors.
 - `batchPolicyGuide` covers `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, and `batchErrorMode`. Use it for value-by-value policy details, then preview before writing.
 - `toolOptionCatalog` is returned by default and with `sections: ["option-catalog"]`. Use it before changing high-impact inputs such as `dryRun`, `includeResults`, `maxFiles`, `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, `parseFonts`, `smallGlyphAction`, `splitFailureAction`, or `includeFiles`.
 - `configurationTrace` is returned by `split_font_batch` and `organize_font_directory`. It records option provenance (`raw-default`, `workflow-preset`, or `explicit-argument`), `rawDefault`, optional `presetDefault`, optional `explicitValue`, final `effectiveValue`, `explicitOverrideFields[]`, and `presetDefaultFields[]`.
@@ -152,6 +154,7 @@ Catalogs for interpreting responses:
   Path-only, missing, or low-confidence family-only bases should not be reported as complete semantic dedupe proof.
 - `outputStructureCatalog` is returned by default and with `sections: ["output-catalog"]`. Use it before interpreting `outputRoleDecision`, `outputStructureDecision`, `structureSummary.layoutKind`, or `structureSummary.issues[].code`.
   `ok:true` only means the inspection call completed; it does not prove that the output tree passed. It also explains organizer staging, `includeFiles:false` / `includeFamilies:false`, and `copy-original` output.
+- `outputResultShapeQuickReference` is returned by default and with `sections: ["output-catalog"]`. It explains how to distinguish normal subset output, single-woff2 fallback, copy-original records, skipped existing output, and `ok:true` batch responses with `errorCount > 0`.
 - `unsupportedFileCategoryCatalog` explains `unsupportedFileSummary.byCategory[]`, representative extensions, category meaning, and handling behavior. Tool responses also include `unsupportedFileDecision`, `unsupportedFileSummary.categoryDetails[]`, and `unsupportedFileSummary.handlingSummary`.
   `archive` files are reported for awareness but are not extracted, copied, or split.
 - `errorResponseCatalog` is returned by default and with `sections: ["error-catalog"]`. Structured errors are JSON text with `ok: false`, `name`, `errorType`, `error`, and `details`.
@@ -189,7 +192,7 @@ Guidance section names:
 | `workspace` | Workspace root and path-base information. |
 | `tools` | Tool inventory, `toolSafetyQuickReference`, and when each tool should be called. |
 | `defaults` | `projectStatusNotice`, important default policies, and supported extensions. |
-| `recommendations` | Recommended batch, inspect, and organization options, plus `workflowPresets[]`, `batchCustomizationQuickReference[]`, `batchPolicyGuide`, `configurationRecipes[]`, `fontIdentityBasisCatalog`, `outputStructureCatalog`, and `unsupportedFileCategoryCatalog`. |
+| `recommendations` | Recommended batch, inspect, and organization options, plus `workflowPresets[]`, `batchCustomizationQuickReference[]`, `outputResultShapeQuickReference`, `batchPolicyGuide`, `configurationRecipes[]`, `fontIdentityBasisCatalog`, `outputStructureCatalog`, and `unsupportedFileCategoryCatalog`. |
 | `directory-workflows` | `directoryOrganizationQuickAnswer`, plus directory workflow decision data for flat, nested, mixed, noisy, and staging scenarios. |
 | `examples` | Concrete source-tree examples; returned in `full` detail or when explicitly requested. |
 | `verification` | Checklist items an agent should verify before reporting success. |
@@ -198,7 +201,7 @@ Guidance section names:
 | `field-catalog` | Response-field catalog mapping fields to meanings and agent actions. |
 | `option-catalog` | Tool input option catalog mapping high-impact options to defaults, allowed values, safety behavior, non-intuitive behavior, and fields to inspect. |
 | `identity-catalog` | Font identity basis catalog mapping `identityBasis` values to OpenType name ID sources, confidence, semantic identity status, and agent actions. |
-| `output-catalog` | Output structure audit catalog mapping audit statuses, `structureSummary.layoutKind`, `structureSummary.issues[].code`, output modes, pass criteria, and non-intuitive audit behavior. |
+| `output-catalog` | Output structure audit catalog and `outputResultShapeQuickReference`, mapping audit statuses, `structureSummary.layoutKind`, `structureSummary.issues[].code`, output modes, result shapes, pass criteria, and non-intuitive audit behavior. |
 | `safe-templates` | Copyable safe invocation templates for common workflows. |
 | `response-fields` | Short list of response fields agents should inspect. |
 | `path-rules` | Path containment and relative-path rules. |
