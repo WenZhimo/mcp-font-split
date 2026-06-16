@@ -822,7 +822,16 @@ split-meta.json
 - `output-inside-input`：批量或整理输出目录位于输入目录内，后续扫描需要排除它，或明确把该输出目录作为下一步输入。
 - `font-parsing-skipped`：`parseFonts: false`，本次只做结构优先计划，没有读取字体元数据。
 
-`layoutDecision` 是最短的顶层路线索引，用于快速回答“当前布局是什么、推荐走哪条路、原目录能否先安全预览、是否需要 copy-only 暂存”。其中的 `layoutDecision.directoryHandling` 是更短的目录处理答案：它会用 `recommendedMode` 和 `shortAnswer` 说明应该直接预览原目录、复核 mixed 布局、使用已经写出的 copy-only 整理目录、重跑整理，还是停止等待输入/策略变化。`organizationDecision` 会把复杂的整理响应压缩成主线路由，例如 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output`。`directoryWorkflowSummary` 则把当前安全状态、布局复核原因、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示放在一起；其中 no-write `split_font_batch` 预览步骤会通过 `directoryWorkflowSummary.workflowSteps[].suggestedArgsField` 指向可复制参数的权威字段。`recommendedNextActions[].suggestedArgsField` 会在后续动作清单里提供同类来源指针，例如 `recommendedBatchPreviewArgs` 或 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`。`sourceLayoutMismatchSummary` 专门回答“原目录可否直接预览、是否需要 copy-only 暂存、暂存是否破坏源文件”，其中 `sourceLayoutMismatchSummary.decisionChecklist` 进一步集中列出源安全、直接预览、暂存、plan 可见性、warning 和输出审计检查。copy-only 写出后，`sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` 可以直接复制到 `split_font_batch`，并保留当前 `maxFiles`；同一组参数也会重复出现在 `sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs`。它们都只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility` 和可用时的 `plan[]`。
+目录路线字段按下面层次阅读：
+
+- `layoutDecision` 是最短的顶层路线索引，用于快速回答“当前布局是什么、推荐走哪条路、原目录能否先安全预览、是否需要 copy-only 暂存”。
+- `layoutDecision.directoryHandling` 是更短的目录处理答案。它会用 `recommendedMode` 和 `shortAnswer` 说明应该直接预览原目录、复核 mixed 布局、使用已经写出的 copy-only 整理目录、重跑整理，还是停止等待输入/策略变化。
+- `organizationDecision` 会把复杂的整理响应压缩成主线路由，例如 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output`。
+- `directoryWorkflowSummary` 会把当前安全状态、布局复核原因、`planVisibility`、`workflowSteps[]`、成功标准和非直觉行为提示放在一起。其中 no-write `split_font_batch` 预览步骤会通过 `directoryWorkflowSummary.workflowSteps[].suggestedArgsField` 指向可复制参数的权威字段。
+- `recommendedNextActions[].suggestedArgsField` 会在后续动作清单里提供同类来源指针，例如 `recommendedBatchPreviewArgs` 或 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`。
+- `sourceLayoutMismatchSummary` 专门回答“原目录可否直接预览、是否需要 copy-only 暂存、暂存是否破坏源文件”。其中 `sourceLayoutMismatchSummary.decisionChecklist` 会集中列出源安全、直接预览、暂存、plan 可见性、warning 和输出审计检查。
+- copy-only 写出后，`sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` 可以直接复制到 `split_font_batch`，并保留当前 `maxFiles`；同一组参数也会重复出现在 `sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs`。
+- 这些字段只用于帮助 agent 选择下一步分支，不是成功证明；继续前仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility` 和可用时的 `plan[]`。
 
 目录路由相关的 `inspectFields`、`mustInspectFields` 和 `responseFields` 只要列出 `sourceLayoutMismatchSummary`，也会同时列出 `sourceLayoutMismatchSummary.decisionChecklist`。这避免 agent 只检查父摘要而漏掉嵌套决策清单。
 
@@ -844,7 +853,25 @@ split-meta.json
 
 `auditStatus` 是输出审计的紧凑门禁，取值为 `pass`、`action-required` 或 `incomplete`。`auditPassed` 是 `auditStatus === "pass"` 的布尔快捷字段。`auditBlockingReasons[]` 会列出阻止通过的机器可读原因，例如 `output-scan-truncated` 或 `output-structure-issues`；结构问题会带上来自 `structureSummary.issues[]` 的 `issueCodes`。
 
-`structureSummary` 是输出目录结构验收摘要。它会检查输出是否是文档化的 `single-family` 或 `family-tree` 结构，是否有无法归类到 family/font entry 的杂项文件，每个字体条目是否都有 `split-meta.json`，以及 manifest 声明为 `subset` / `single-woff2` / `copy-original` 时是否具备对应文件。`structureSummary.layoutKind` 给出检测到的布局类型；`structureSummary.issues[].code` 给出机器可读问题代码。真实批量写入后，只有 `outputRoleDecision.auditAppliesToThisDirectory !== false`、`outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才应把输出目录视为结构合格。若为 false，优先查看 `outputRoleDecision`、`auditBlockingReasons[]`、`structureSummary.issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 可能出现 `output-structure-issues` 或 `organized-staging-not-split-output`。
+`structureSummary` 是输出目录结构验收摘要。它会检查：
+
+- 输出是否是文档化的 `single-family` 或 `family-tree` 结构
+- 是否有无法归类到 family/font entry 的杂项文件
+- 每个字体条目是否都有 `split-meta.json`
+- manifest 声明为 `subset` / `single-woff2` / `copy-original` 时是否具备对应文件
+
+`structureSummary.layoutKind` 给出检测到的布局类型；`structureSummary.issues[].code` 给出机器可读问题代码。
+
+真实批量写入后，只有下面条件全都成立时，才应把输出目录视为结构合格：
+
+- `outputRoleDecision.auditAppliesToThisDirectory !== false`
+- `outputStructureDecision.status: "pass"`
+- `auditStatus: "pass"`
+- `auditPassed: true`
+- `structureSummary.conforms: true`
+- `maxFilesHit: false`
+
+若 `structureSummary.conforms` 为 false，优先查看 `outputRoleDecision`、`auditBlockingReasons[]`、`structureSummary.issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 可能出现 `output-structure-issues` 或 `organized-staging-not-split-output`。
 
 `copy-original` 条目是 manifest-only 的处理记录，故意不生成 web-font CSS 或 WOFF2 文件；只有 manifest 声明为 `subset` 或 `single-woff2` 却缺少对应 web 输出时，才应按 `web-output-missing` 之类的 issue 处理。
 
