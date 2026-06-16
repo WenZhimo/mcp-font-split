@@ -85,7 +85,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
   agent 应把当前仓库代码、实时 MCP schema、`get_agent_guidance`、`API.md` / `API.zh-CN.md` 和 `BEHAVIOR.zh-CN.md` 当作权威来源。
 - `configurationRecipes[]` 把常见用户意图映射成 preset-first 调用和取舍说明。每个配方包含 `inspectFields` 和 `successCriteria`；它是指南，不是成功证明。
 - `batchCustomizationQuickReference[]` 是常见批量覆盖的紧凑入口。它提供 `overrideArgs`、带 `workflowPreset: "safe-preview"` 的 `previewArgs`、带 `workflowPreset: "reviewed-write"` 的 `writeArgsAfterReview`、`inspectFields`、`successCriteria` 和非直觉行为。
-- `outputResultShapeQuickReference` 是输出结果形态速查矩阵。它的 summary type 是 `output-result-shape-quick-reference`。报告成功前应先看它，避免把 `ok:true` 误读成正常多子集输出；它覆盖 `subset`、`single-woff2`、`copy-original`、跳过已有输出，以及带收集错误完成的批量响应。
+- `outputResultShapeQuickReference` 是输出结果形态速查矩阵。它的 summary type 是 `output-result-shape-quick-reference`。报告成功前应先看它，避免把 `ok:true` 误读成正常多子集输出；它覆盖 `subset`、`single-woff2`、`copy-original`、单字体绕过处理、批量已有输出跳过、dry-run 跳过计划，以及带收集错误完成的批量响应。
 - `batchPolicyGuide` 覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。需要逐值策略细节时先看它，然后预览再写入。
 - `toolOptionCatalog` 默认返回，也可通过 `sections: ["option-catalog"]` 聚焦请求。修改 `dryRun`、`includeResults`、`maxFiles`、`batchGroupBy`、`batchNamingMode`、`batchDedupeMode`、`parseFonts`、`smallGlyphAction`、`splitFailureAction` 或 `includeFiles` 前应先看它。
 - `configurationTrace` 会由 `split_font_batch` 和 `organize_font_directory` 返回。它记录选项来源（`raw-default`、`workflow-preset` 或 `explicit-argument`）、`rawDefault`、可选 `presetDefault`、可选 `explicitValue`、最终 `effectiveValue`、`explicitOverrideFields[]` 和 `presetDefaultFields[]`。
@@ -154,7 +154,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
   路径级、缺失或低置信度 family-only basis 不应被报告成完整语义去重证据。
 - `outputStructureCatalog` 默认返回，也可通过 `sections: ["output-catalog"]` 聚焦请求。解释 `outputRoleDecision`、`outputStructureDecision`、`structureSummary.layoutKind` 或 `structureSummary.issues[].code` 前应先看它。
   `ok:true` 只表示检查调用完成，不表示输出目录结构已经通过。它也解释整理暂存目录、`includeFiles:false` / `includeFamilies:false` 和 `copy-original` 输出。
-- `outputResultShapeQuickReference` 默认返回，也可通过 `sections: ["output-catalog"]` 聚焦请求。它解释如何区分正常 subset 输出、单 WOFF2 fallback、copy-original 记录、跳过已有输出，以及 `errorCount > 0` 的 `ok:true` 批量响应。
+- `outputResultShapeQuickReference` 默认返回，也可通过 `sections: ["output-catalog"]` 聚焦请求。它解释如何区分正常 subset 输出、单 WOFF2 fallback、copy-original 记录、单字体绕过处理、批量已有输出跳过、dry-run 跳过计划，以及 `errorCount > 0` 的 `ok:true` 批量响应。
 - `unsupportedFileCategoryCatalog` 解释 `unsupportedFileSummary.byCategory[]`、代表性扩展名、分类含义和处理行为。工具响应也会提供 `unsupportedFileDecision`、`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary`。
   `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
 - `errorResponseCatalog` 默认返回，也可通过 `sections: ["error-catalog"]` 聚焦请求。结构化错误是 JSON 文本，包含 `ok: false`、`name`、`errorType`、`error` 和 `details`。
@@ -279,7 +279,9 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 | `resultType` | `subset`、`single-woff2-small-glyph`、`single-woff2-split-failure`、`single-woff2`、`copy-original-small-glyph` 之一。 |
 | `outputMode` | `subset`、`single-woff2`、`copy-original` 之一。 |
 | `performedSplit` | 只有真正执行多分片分割时才是 `true`。 |
-| `usedFallback` | 单 WOFF2 fallback 路径为 `true`。 |
+| `usedFallback` | 单 WOFF2 fallback 路径为 `true`；`copy-original` 使用 `skipped: true` 和 `usedFallback: false`。 |
+| `skipped` | 该字体主动绕过正常多分片处理时为 `true`，例如小字形 fallback 或 copy-original。 |
+| `skipReason` | 正常处理被绕过、或批量 dry-run 条目会被跳过的原因。应结合 `outputMode`、`usedFallback` 和 `skipMode` 解读。 |
 | `manifestPath` | `split-meta.json` 路径。 |
 
 ## `inspect_font_inputs`
@@ -428,7 +430,9 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 }
 ```
 
-`dryRun: true` 且 `includeResults: true` 时，响应使用 `planned[]` 而不是 `results[]`。每个计划条目包含 `input`、`groupName`、`splitDir`、`copiedOriginalPath`、`wouldProcess` 和 `skipReason`。
+`dryRun: true` 且 `includeResults: true` 时，响应使用 `planned[]` 而不是 `results[]`。每个计划条目包含 `input`、`groupName`、`splitDir`、`copiedOriginalPath`、`wouldProcess` 和 `skipReason`。如果 `planned[].wouldProcess` 为 `false`，应检查 `planned[].skipReason` 和 `skipMode`；只有明确要重处理已有输出时才使用 `skipMode: "force"`。
+
+批量响应还包含 `skippedExisting`、`skippedByManifest`、`reprocessedBecauseSourceChanged` 和 `reprocessedBecauseOptionsChanged`，用于解释增量重跑时输出是被复用还是被重新生成。已有输出跳过应搭配 `inspect_split_output` 审计，再报告复用输出可以接受。
 
 批量响应包含 `batchWarningCount` 和 `batchWarnings[]`，用于提示 dry-run 未写文件、扫描被 `maxFiles` 截断、`limit` 截断、每字体详情被省略、已有输出被跳过、错误被收集等摘要级状态。每个 warning 都包含机器可读的 `code` 和人类可读的 `message`。
 

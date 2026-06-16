@@ -822,6 +822,16 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'True when the result used a fallback path such as single-WOFF2 output.',
     agentAction: 'Tell the user fallback output was used and inspect warnings.',
   },
+  skipped: {
+    sourceTools: ['split_font', 'split_font_batch'],
+    meaning: 'Per-font signal that normal multi-subset splitting was intentionally bypassed, such as for small-glyph single-WOFF2 fallback or copy-original handling.',
+    agentAction: 'Interpret together with outputMode, resultType, usedFallback, and skipReason; do not confuse it with batch existing-output skip counters.',
+  },
+  skipReason: {
+    sourceTools: ['split_font', 'split_font_batch'],
+    meaning: 'Per-font or dry-run plan reason for bypassing normal processing or for a skip decision, such as small-glyph fallback, copy-original, manifest, missing-manifest, stale-manifest, or force.',
+    agentAction: 'Use this to explain why a font was not normally split; if the reason is manifest, audit existing output or use skipMode force only when reprocessing is intentional.',
+  },
   warnings: {
     sourceTools: ['split_font', 'split_font_batch'],
     meaning: 'Per-font warnings from processing one selected font.',
@@ -981,6 +991,16 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['split_font_batch'],
     meaning: 'Per-font dry-run plan entries for batch output paths and skip decisions.',
     agentAction: 'Review before rerunning a batch with dryRun:false.',
+  },
+  'planned[].wouldProcess': {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Per-plan-entry flag showing whether that selected font would be processed on a reviewed write.',
+    agentAction: 'When false, inspect planned[].skipReason and skipMode before deciding whether to rely on existing output or rerun with skipMode force.',
+  },
+  'planned[].skipReason': {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Per-plan-entry reason from the batch skip check, such as manifest, missing-manifest, stale-manifest, or force.',
+    agentAction: 'Use this to explain dry-run no-op entries and to decide whether existing output should be audited or force-reprocessed.',
   },
   plannedCount: {
     sourceTools: ['split_font_batch'],
@@ -1277,6 +1297,11 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Named configuration preset applied before explicit arguments. Explicit tool arguments override preset values.',
     agentAction: 'Use this to explain why effective defaults such as dryRun, parseFonts, skip mode, or dedupe mode were selected.',
   },
+  skipMode: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Resolved existing-output skip policy for batch runs: manifest accepts matching existing output, while force reprocesses selected fonts.',
+    agentAction: 'Use manifest for incremental reruns; use force only when the user intentionally wants to rewrite existing output, then audit the output root.',
+  },
   batchGroupBy: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Resolved first-level family/group directory policy: auto, source-dir, or font-family.',
@@ -1296,6 +1321,26 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['split_font_batch'],
     meaning: 'Resolved per-font batch error handling mode: collect, fail-fast, or fail-after.',
     agentAction: 'Use collect only when the caller will inspect errors[] and errorCount; require errorCount zero before treating a batch as successful.',
+  },
+  skippedExisting: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Number of selected batch fonts skipped because existing output matched the selected skipMode.',
+    agentAction: 'If nonzero, inspect skippedByManifest, batchDecision, batchWarnings, and audit existing output before reporting the batch as complete.',
+  },
+  skippedByManifest: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Number of selected batch fonts skipped specifically because a split-meta.json manifest matched the source file, effective config, tool version, and manifest version.',
+    agentAction: 'Use this as evidence for manifest-based incremental reuse, then audit the output directory if relying on reused output.',
+  },
+  reprocessedBecauseSourceChanged: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Number of stale-manifest entries reprocessed because the source file no longer matched the existing manifest.',
+    agentAction: 'Use this to explain why an incremental rerun wrote new output even when a manifest existed.',
+  },
+  reprocessedBecauseOptionsChanged: {
+    sourceTools: ['split_font_batch'],
+    meaning: 'Number of stale-manifest entries reprocessed because effective processing options changed while the source file still matched.',
+    agentAction: 'Use this to explain option-driven reprocessing in incremental batch runs.',
   },
   workflowPresets: {
     sourceTools: ['get_agent_guidance'],

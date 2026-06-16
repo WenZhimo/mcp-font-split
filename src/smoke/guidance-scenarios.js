@@ -436,12 +436,12 @@ async function runAgentGuidanceSmoke() {
   }
   const outputResultShapeQuickReference = result.outputResultShapeQuickReference || {};
   const outputResultShapeIds = new Set((outputResultShapeQuickReference.resultShapes || []).map((item) => item.id));
-  for (const requiredShape of ['subset-output', 'single-woff2-fallback', 'copy-original-record', 'skipped-existing-output', 'batch-partial-errors']) {
+  for (const requiredShape of ['subset-output', 'single-woff2-fallback', 'copy-original-record', 'single-font-split-skipped', 'batch-existing-output-skips', 'dry-run-existing-output-skip-plan', 'batch-partial-errors']) {
     if (!outputResultShapeIds.has(requiredShape)) {
       throw new Error(`Expected outputResultShapeQuickReference to include ${requiredShape}.`);
     }
   }
-  for (const requiredField of ['outputMode', 'resultType', 'performedSplit', 'usedFallback', 'errorCount', 'errors']) {
+  for (const requiredField of ['outputMode', 'resultType', 'performedSplit', 'usedFallback', 'skipped', 'skipReason', 'skipMode', 'skippedExisting', 'skippedByManifest', 'planned[].wouldProcess', 'planned[].skipReason', 'errorCount', 'errors']) {
     if (!outputResultShapeQuickReference.inspectFields?.includes(requiredField)) {
       throw new Error(`Expected outputResultShapeQuickReference.inspectFields to include ${requiredField}.`);
     }
@@ -459,6 +459,11 @@ async function runAgentGuidanceSmoke() {
     assertNonEmptyStringArray(item.successEvidence, `outputResultShapeQuickReference.${item.id}`, 'successEvidence');
     if (!item.when || Object.keys(item.when).length === 0) {
       throw new Error(`Expected outputResultShapeQuickReference.${item.id} to declare when conditions.`);
+    }
+  }
+  for (const fieldName of outputResultShapeQuickReference.inspectFields || []) {
+    if (!result.toolResponseFieldCatalog?.[fieldName]) {
+      throw new Error(`Expected toolResponseFieldCatalog to describe outputResultShapeQuickReference inspect field ${fieldName}.`);
     }
   }
   if (
@@ -858,6 +863,7 @@ async function runAgentGuidanceSmoke() {
     batchCustomizationQuickReference: 'get_agent_guidance',
     batchPolicySummary: 'split_font_batch',
     configurationTrace: 'split_font_batch',
+    skipMode: 'split_font_batch',
     batchGroupBy: 'split_font_batch',
     batchNamingMode: 'split_font_batch',
     batchDedupeMode: 'split_font_batch',
@@ -867,6 +873,8 @@ async function runAgentGuidanceSmoke() {
     unsupportedFileCategoryCatalog: 'get_agent_guidance',
     outputStructureCatalog: 'get_agent_guidance',
     outputResultShapeQuickReference: 'get_agent_guidance',
+    skipped: 'split_font',
+    skipReason: 'split_font',
     recommendedBatchOptions: 'organize_font_directory',
     recommendedBatchPreviewArgs: 'organize_font_directory',
     layoutDecision: 'organize_font_directory',
@@ -883,6 +891,12 @@ async function runAgentGuidanceSmoke() {
     recommendedNextActions: 'split_font_batch',
     'recommendedNextActions[].suggestedArgsField': 'split_font_batch',
     'recommendedNextActions[].suggestedArgs.maxFiles': 'organize_font_directory',
+    'planned[].wouldProcess': 'split_font_batch',
+    'planned[].skipReason': 'split_font_batch',
+    skippedExisting: 'split_font_batch',
+    skippedByManifest: 'split_font_batch',
+    reprocessedBecauseSourceChanged: 'split_font_batch',
+    reprocessedBecauseOptionsChanged: 'split_font_batch',
     safetySummary: 'split_font_batch',
     inputCountGuide: 'inspect_font_inputs',
     unsupportedFileSummary: 'organize_font_directory',

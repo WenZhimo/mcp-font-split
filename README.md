@@ -214,8 +214,9 @@
 |------------|------|--------|
 | `outputMode: "subset"`、`performedSplit: true` | 正常生成 web-font 分片。 | 真实写入后继续用 `inspect_split_output` 审计结构。 |
 | `outputMode: "single-woff2"`、`usedFallback: true` | 没有正常多分片，退化为单个 WOFF2。 | 向用户说明 fallback，并检查 `warnings[]`。 |
-| `outputMode: "copy-original"`、`usedFallback: true` | 没有生成 web-font 分片，只复制/登记原字体。 | 不要当成正常拆分结果；检查 manifest 和 `resultType`。 |
-| `skipped: true` 或 `skipReason` | 本次没有重新处理，通常是 manifest / existing-output 跳过。 | 检查 `skipMode`、`skipReason` 和已有输出审计。 |
+| `outputMode: "copy-original"`、`skipped: true`、`usedFallback: false` | 没有生成 web-font 分片，只复制/登记原字体。 | 不要当成正常拆分结果；检查 manifest、`resultType` 和 `skipReason`。 |
+| `skipped: true` 且有 `skipReason` | 单字体处理主动绕过正常多分片，例如小字形 fallback 或 copy-original。 | 结合 `outputMode` 和 `usedFallback` 解释；不要把它误当成批量已有输出跳过。 |
+| `skippedExisting > 0` 或 `planned[].wouldProcess: false` | 批量 skip 逻辑接受了已有输出，或 dry-run 计划跳过该条目。 | 检查 `skipMode`、`skippedByManifest`、`planned[].skipReason` 并审计已有输出。 |
 | `ok: true` 但 `errorCount > 0` | 批量按错误策略完成，但仍有单字体失败。 | 检查 `batchErrorMode`、`errorCount` 和 `errors[]`。 |
 
 ## 安装

@@ -85,7 +85,7 @@ Key routing objects:
   Treat the current repository code, live MCP schema, `get_agent_guidance`, `API.md` / `API.zh-CN.md`, and `BEHAVIOR.zh-CN.md` as authoritative.
 - `configurationRecipes[]` maps common user intent to preset-first calls and tradeoffs. Each recipe includes `inspectFields` and `successCriteria`; it is guidance, not proof of success.
 - `batchCustomizationQuickReference[]` is the compact entrypoint for common batch overrides. It provides `overrideArgs`, `previewArgs` with `workflowPreset: "safe-preview"`, `writeArgsAfterReview` with `workflowPreset: "reviewed-write"`, `inspectFields`, `successCriteria`, and non-intuitive behavior.
-- `outputResultShapeQuickReference` is the compact result-shape matrix. Its summary type is `output-result-shape-quick-reference`. Use it before reporting success so `ok:true` is not mistaken for normal multi-subset output; it covers `subset`, `single-woff2`, `copy-original`, skipped existing output, and batches that complete with collected errors.
+- `outputResultShapeQuickReference` is the compact result-shape matrix. Its summary type is `output-result-shape-quick-reference`. Use it before reporting success so `ok:true` is not mistaken for normal multi-subset output; it covers `subset`, `single-woff2`, `copy-original`, single-font skipped processing, batch existing-output skips, dry-run skip plans, and batches that complete with collected errors.
 - `batchPolicyGuide` covers `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, and `batchErrorMode`. Use it for value-by-value policy details, then preview before writing.
 - `toolOptionCatalog` is returned by default and with `sections: ["option-catalog"]`. Use it before changing high-impact inputs such as `dryRun`, `includeResults`, `maxFiles`, `batchGroupBy`, `batchNamingMode`, `batchDedupeMode`, `parseFonts`, `smallGlyphAction`, `splitFailureAction`, or `includeFiles`.
 - `configurationTrace` is returned by `split_font_batch` and `organize_font_directory`. It records option provenance (`raw-default`, `workflow-preset`, or `explicit-argument`), `rawDefault`, optional `presetDefault`, optional `explicitValue`, final `effectiveValue`, `explicitOverrideFields[]`, and `presetDefaultFields[]`.
@@ -154,7 +154,7 @@ Catalogs for interpreting responses:
   Path-only, missing, or low-confidence family-only bases should not be reported as complete semantic dedupe proof.
 - `outputStructureCatalog` is returned by default and with `sections: ["output-catalog"]`. Use it before interpreting `outputRoleDecision`, `outputStructureDecision`, `structureSummary.layoutKind`, or `structureSummary.issues[].code`.
   `ok:true` only means the inspection call completed; it does not prove that the output tree passed. It also explains organizer staging, `includeFiles:false` / `includeFamilies:false`, and `copy-original` output.
-- `outputResultShapeQuickReference` is returned by default and with `sections: ["output-catalog"]`. It explains how to distinguish normal subset output, single-woff2 fallback, copy-original records, skipped existing output, and `ok:true` batch responses with `errorCount > 0`.
+- `outputResultShapeQuickReference` is returned by default and with `sections: ["output-catalog"]`. It explains how to distinguish normal subset output, single-woff2 fallback, copy-original records, single-font skipped processing, batch existing-output skips, dry-run skip plans, and `ok:true` batch responses with `errorCount > 0`.
 - `unsupportedFileCategoryCatalog` explains `unsupportedFileSummary.byCategory[]`, representative extensions, category meaning, and handling behavior. Tool responses also include `unsupportedFileDecision`, `unsupportedFileSummary.categoryDetails[]`, and `unsupportedFileSummary.handlingSummary`.
   `archive` files are reported for awareness but are not extracted, copied, or split.
 - `errorResponseCatalog` is returned by default and with `sections: ["error-catalog"]`. Structured errors are JSON text with `ok: false`, `name`, `errorType`, `error`, and `details`.
@@ -279,7 +279,9 @@ Key result fields:
 | `resultType` | One of `subset`, `single-woff2-small-glyph`, `single-woff2-split-failure`, `single-woff2`, `copy-original-small-glyph`. |
 | `outputMode` | One of `subset`, `single-woff2`, `copy-original`. |
 | `performedSplit` | `true` only when multi-subset splitting actually ran. |
-| `usedFallback` | `true` for single-WOFF2 fallback paths. |
+| `usedFallback` | `true` for single-WOFF2 fallback paths; `copy-original` uses `skipped: true` and `usedFallback: false`. |
+| `skipped` | `true` when normal multi-subset splitting was intentionally bypassed for that font, such as small-glyph fallback or copy-original handling. |
+| `skipReason` | Reason normal processing was bypassed or a batch dry-run entry would be skipped. Interpret it with `outputMode`, `usedFallback`, and `skipMode`. |
 | `manifestPath` | Path to `split-meta.json`. |
 
 ## `inspect_font_inputs`
@@ -428,7 +430,9 @@ Compact full-library example:
 }
 ```
 
-Dry-run responses use `planned[]` instead of `results[]` when `includeResults` is true. Each planned item includes `input`, `groupName`, `splitDir`, `copiedOriginalPath`, `wouldProcess`, and `skipReason`.
+Dry-run responses use `planned[]` instead of `results[]` when `includeResults` is true. Each planned item includes `input`, `groupName`, `splitDir`, `copiedOriginalPath`, `wouldProcess`, and `skipReason`. If `planned[].wouldProcess` is `false`, inspect `planned[].skipReason` and `skipMode`; use `skipMode: "force"` only when reprocessing existing output is intentional.
+
+Batch responses also include `skippedExisting`, `skippedByManifest`, `reprocessedBecauseSourceChanged`, and `reprocessedBecauseOptionsChanged` so incremental reruns can explain whether output was reused or regenerated. Existing-output skips should be paired with an `inspect_split_output` audit before reporting reused output as acceptable.
 
 Batch responses include `batchWarningCount` and `batchWarnings[]` for summary-level notices such as dry-run no-write mode, scan truncation, limit truncation, omitted per-font details, existing-output skips, and collected per-font errors. Each warning has a machine-readable `code` and a human-readable `message`.
 

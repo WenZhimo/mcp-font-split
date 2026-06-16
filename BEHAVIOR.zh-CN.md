@@ -92,7 +92,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 - `errorResponseCatalog`：解释结构化 MCP 错误和普通错误的响应形态
 - `guidanceView`：说明本次返回了哪些 section、省略了哪些 section，以及可请求的 section 名称
 - `outputStructureCatalog`：解释 `inspect_split_output` 的 `outputRoleDecision`、审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式和结构通过条件
-- `outputResultShapeQuickReference`：解释 `split_font` / `split_font_batch` 的结果形态，避免把 `ok:true`、fallback、copy-original、skip 或收集错误误报成正常多子集输出
+- `outputResultShapeQuickReference`：解释 `split_font` / `split_font_batch` 的结果形态，避免把 `ok:true`、fallback、copy-original、单字体绕过处理、批量已有输出跳过或收集错误误报成正常多子集输出
 
 当 agent 需要完整错误响应目录、warning code 目录、响应字段目录、工具选项目录、identity basis 目录、输出结构目录或示例时，应设置 `detailLevel: "full"`，或用 `sections` 精确请求，例如 `["error-catalog", "warning-catalog", "field-catalog", "option-catalog", "identity-catalog", "output-catalog"]`。
 
@@ -185,7 +185,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 - `fontIdentityBasisCatalog` 是字体 identity basis 目录，可用 section `identity-catalog`（例如 `sections: ["identity-catalog"]`）单独请求。
   它解释 `typographic-family-subfamily`、`opentype-family-subfamily`、`full-name`、`postscript-name`、family-only、`path-stem`、`path-fallback`、`missing` 等 basis 的 OpenType name ID 来源、置信度和语义 identity 证据强度。
 - `outputStructureCatalog` 是输出结构审计目录，可用 section `output-catalog`（例如 `sections: ["output-catalog"]`）单独请求。它解释 `outputRoleDecision`、`outputStructureDecision.status`、`auditStatus`、`structureSummary.layoutKind`、`structureSummary.issues[].code`、`subset` / `single-woff2` / `copy-original` 输出模式和通过条件。
-- `outputResultShapeQuickReference` 是输出结果形态速查目录，可用 section `output-catalog` 单独请求。它的 `summaryType: "output-result-shape-quick-reference"`，覆盖正常 `subset` 输出、单 WOFF2 fallback、`copy-original` 记录、跳过已有输出，以及 `batchErrorMode: "collect"` 下 `ok:true` 但 `errorCount > 0` 的批量响应。
+- `outputResultShapeQuickReference` 是输出结果形态速查目录，可用 section `output-catalog` 单独请求。它的 `summaryType: "output-result-shape-quick-reference"`，覆盖正常 `subset` 输出、单 WOFF2 fallback、`copy-original` 记录、单字体 `skipped`、批量 `skippedExisting` / `skippedByManifest`、dry-run 计划跳过，以及 `batchErrorMode: "collect"` 下 `ok:true` 但 `errorCount > 0` 的批量响应。
 - `ok:true` 只表示 `inspect_split_output` 调用完成，不代表输出结构通过。
 - 包含 `font-organization-manifest.json` 的目录是整理暂存，而不是生成后的拆分输出。
 - `includeFiles:false` 和 `includeFamilies:false` 只省略大数组，不会跳过结构审计。
@@ -219,7 +219,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 - `errorResponseCatalog` 解释 MCP 错误文本何时是 JSON、何时只是普通文本。带 `details` 的错误包含 `ok: false`、`name`、`errorType`、`error` 和 `details`；没有 `details` 的普通错误保持简短文本。
 - `errorType` 是 agent 最短路由字段；如果存在 `details.summaryType`，会优先使用它作为 `errorType`。
   `FontSplitConfigurationError` 的 `errorType` 是 `configuration-error`；`BatchSplitError` 的 `errorType` 是 `batch-split-error`，继续前应检查 `details.errors[]` 和 `details.summary`。
-- `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或 `sections: ["field-catalog"]` 时返回。它解释 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`stagingDirectoryDecision`、`outputStructureDecision`、`auditStatus`、`recommendedNextActions` 等关键字段。
+- `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或 `sections: ["field-catalog"]` 时返回。它解释 `ok`、`performedSplit`、`usedFallback`、`skipped`、`skipReason`、`skippedExisting`、`skippedByManifest`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`stagingDirectoryDecision`、`outputStructureDecision`、`auditStatus`、`recommendedNextActions` 等关键字段。
   它用于降低 agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险，也用于避免把 `organize_font_directory.outputDir` 误当作已经生成的拆分输出。
 
 `get_runtime_status` 也是只读工具。它会检查：
@@ -479,7 +479,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 - `unsupportedFileDecision`：批量扫描中忽略文件的快速判断，说明是否存在被忽略文件、是否包含压缩包、是否有 `.zip` / `.txt` 之外的噪声，以及这些文件是否会被解压、复制或拆分。
 - `unsupportedFileSummary`：批量扫描中所有已扫描但被忽略的非字体文件摘要，包含精确 `unsupportedFileSummary.byExtension[]`、概览 `unsupportedFileSummary.byCategory[]`、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、无扩展 `<none>` 计数、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。
 - `includeResults`：是否在批量响应中返回每个字体的 `results[]` 详情；默认 `true`。设为 `false` 时仍返回汇总统计、错误列表和 `resultsIncluded: false`，适合全量字体库处理。
-- `dryRun`：只执行扫描、去重、命名和 skip 判断，不调用 `split_font`，也不写任何输出文件。`includeResults: true` 时返回 `planned[]` 计划清单。
+- `dryRun`：只执行扫描、去重、命名和 skip 判断，不调用 `split_font`，也不写任何输出文件。`includeResults: true` 时返回 `planned[]` 计划清单；其中 `planned[].wouldProcess` 表示该条目在真实写入时是否会处理，`planned[].skipReason` 解释 dry-run 为什么计划跳过该条目。
 
 ### 4.11.1 `debugBatchDecisions`（批量调试专用）
 
@@ -777,9 +777,9 @@ split-meta.json
 | `outputMode` | `subset` / `single-woff2` / `copy-original` |
 | `resultType` | 更细的结果类型 |
 | `performedSplit` | 是否真正执行了多子集分割 |
-| `usedFallback` | 是否使用 fallback 输出 |
-| `skipped` | 是否主动绕过分割器 |
-| `skipReason` | 绕过或 fallback 的原因 |
+| `usedFallback` | 是否使用单 WOFF2 fallback 输出；`copy-original` 为 `false` |
+| `skipped` | 单字体是否主动绕过正常多子集分割器；不等同于批量已有输出跳过 |
+| `skipReason` | 绕过、fallback 或 dry-run skip 计划的原因 |
 | `warnings` | 非透明行为提示 |
 | `manifestPath` | manifest 路径 |
 | `copiedOriginalPath` | 输出目录中的原字体副本路径 |
@@ -1034,9 +1034,11 @@ split-meta.json
 
 - 真正多分片
 - 单 WOFF2 fallback
-- copy-original metadata-only 处理
+- copy-original metadata/copy 处理
+- 批量已有输出被 `skipMode: "manifest"` 复用
+- `batchErrorMode: "collect"` 下批量完成但 `errorCount > 0`
 
-必须结合 `outputMode` / `resultType` 判断。
+必须结合 `outputMode` / `resultType` / `skipped` / `skipReason` / `skippedExisting` / `errorCount` 判断。
 
 ---
 

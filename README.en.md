@@ -214,8 +214,9 @@ This is the entry-level reading order, not a replacement for field definitions i
 |-------------|---------|-----------|
 | `outputMode: "subset"`, `performedSplit: true` | Normal web-font subset output was generated. | After a real write, audit structure with `inspect_split_output`. |
 | `outputMode: "single-woff2"`, `usedFallback: true` | Normal multi-subset output did not happen; the result fell back to one WOFF2. | Disclose the fallback and inspect `warnings[]`. |
-| `outputMode: "copy-original"`, `usedFallback: true` | No web-font split output was generated; the original font was copied/registered. | Do not treat it as a normal split result; check the manifest and `resultType`. |
-| `skipped: true` or `skipReason` | This run did not reprocess the font, usually because of manifest / existing-output skip logic. | Check `skipMode`, `skipReason`, and audit the existing output. |
+| `outputMode: "copy-original"`, `skipped: true`, `usedFallback: false` | No web-font split output was generated; the original font was copied/registered. | Do not treat it as a normal split result; check the manifest, `resultType`, and `skipReason`. |
+| `skipped: true` with `skipReason` | Single-font processing intentionally bypassed normal multi-subset splitting, such as for small-glyph fallback or copy-original. | Interpret it with `outputMode` and `usedFallback`; do not confuse it with batch existing-output skips. |
+| `skippedExisting > 0` or `planned[].wouldProcess: false` | Batch skip logic accepted existing output or a dry-run planned to skip that entry. | Check `skipMode`, `skippedByManifest`, `planned[].skipReason`, and audit existing output. |
 | `ok: true` but `errorCount > 0` | The batch completed according to its error policy, but some fonts still failed. | Inspect `batchErrorMode`, `errorCount`, and `errors[]`. |
 
 ## Installation

@@ -138,11 +138,20 @@ export async function runApiDocsSmoke() {
       'inputDirectoryDecision',
       'inputDirectoryDecision.directoryOrganizationSafety',
       'directoryOrganizationQuickAnswer.directoryOrganizationSafety',
+      'skipMode',
       'batchGroupBy',
       'batchNamingMode',
       'batchDedupeMode',
       'batchErrorMode',
       'batchDecision',
+      'skipped',
+      'skipReason',
+      'skippedExisting',
+      'skippedByManifest',
+      'reprocessedBecauseSourceChanged',
+      'reprocessedBecauseOptionsChanged',
+      'planned[].wouldProcess',
+      'planned[].skipReason',
       'organizationDecision',
       'sourceDestructive',
       'writesSourceTree',
@@ -324,11 +333,21 @@ export async function runBehaviorDocsSmoke() {
     !readmeZh.includes('## 输出形态速查')
     || !readmeZh.includes('`outputMode: "single-woff2"`')
     || !readmeZh.includes('`outputMode: "copy-original"`')
+    || !readmeZh.includes('`skippedExisting > 0`')
+    || !readmeZh.includes('`planned[].wouldProcess: false`')
     || !readmeEn.includes('## Output Shape Quick Check')
     || !readmeEn.includes('`outputMode: "single-woff2"`')
     || !readmeEn.includes('`outputMode: "copy-original"`')
+    || !readmeEn.includes('`skippedExisting > 0`')
+    || !readmeEn.includes('`planned[].wouldProcess: false`')
   ) {
     throw new Error('Expected README files to provide an output shape quick check for non-intuitive success results.');
+  }
+  if (
+    readmeZh.includes('`outputMode: "copy-original"`、`usedFallback: true`')
+    || readmeEn.includes('`outputMode: "copy-original"`, `usedFallback: true`')
+  ) {
+    throw new Error('README output shape quick check must not describe copy-original as usedFallback true.');
   }
 
   for (const [label, text] of [
@@ -480,6 +499,14 @@ export async function runBehaviorDocsSmoke() {
     '`outputMode`',
     '`performedSplit`',
     '`usedFallback`',
+    '`skipped`',
+    '`skipReason`',
+    '`skippedExisting`',
+    '`skippedByManifest`',
+    '`reprocessedBecauseSourceChanged`',
+    '`reprocessedBecauseOptionsChanged`',
+    '`planned[].wouldProcess`',
+    '`planned[].skipReason`',
     '`ok: true`',
     '`splitFailureAction`',
     '`smallGlyphAction`',
@@ -513,7 +540,7 @@ export async function runBehaviorDocsSmoke() {
     ok: true,
     toolCount: guidance.tools?.length || 0,
     documentedWorkflowPresetCount: guidance.workflowPresets?.length || 0,
-    checkedHighRiskTokenCount: 49,
+    checkedHighRiskTokenCount: 57,
     checkedWarningCodeCount: 11,
     checkedDebugEventCount: 5,
   }, null, 2));
