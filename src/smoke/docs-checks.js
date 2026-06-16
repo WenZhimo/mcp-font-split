@@ -190,6 +190,10 @@ export async function runApiDocsSmoke() {
     assertDocsContain('tool safety quick reference', '`toolSafetyQuickReference`');
     assertDocsContain('tool safety moved/deleted/rewrite field', '`sourceFilesMovedDeletedOrRewritten`');
     assertDocsContain('tool safety default write field', '`defaultWritesFiles`');
+    assertDocsContain('first input preflight example', '`first-input-preflight-example`');
+    assertDocsContain('first input preflight inspect tool', '"tool": "inspect_font_inputs"');
+    assertDocsContain('first input preflight compact files flag', '"includeFiles": false');
+    assertDocsContain('first input preflight directory safety field', '`inputDirectoryDecision.directoryOrganizationSafety`');
     assertDocsContain('guidance directory safety example', '`guidance-directory-organization-safety-example`');
     assertDocsContain('input directory safety example', '`input-directory-organization-safety-example`');
     assertDocsContain('directory safety example helper', '"helperTool": "organize_font_directory"');

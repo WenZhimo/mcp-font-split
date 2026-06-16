@@ -90,6 +90,25 @@ Safety and directory helpers:
 - `recommendedWorkflowPlan` composes safe template IDs into ordered phases such as preflight, layout decision, batch preview, reviewed write, and output audit. It is a route map, not a substitute for checking each tool response.
 - `nextToolDecisionSummary` is the compact "which tool next?" index. Its `workflowQuickStart` includes `workflowQuickStart.recommendedCallExample`, and `quickStartCallExamples[]` provide minimal placeholder args for common routes.
 
+### `first-input-preflight-example`
+
+For a rich, mixed, or unfamiliar font directory, start with a read-only input preflight before planning organization or batch writes:
+
+```json
+{
+  "tool": "inspect_font_inputs",
+  "arguments": {
+    "inputDir": "fonts",
+    "maxFiles": 50000,
+    "includeFiles": false
+  }
+}
+```
+
+Read these fields first: `inputCountGuide`, `inputDirectoryDecision`, `inputDirectoryDecision.directoryOrganizationSafety`, `layout`, `unsupportedFileDecision`, `unsupportedFileSummary`, `recommendedBatchPreviewArgs`, and `maxFilesHit`.
+
+Non-intuitive behavior: this call does not write files, organize directories, extract archives, copy ignored files, or split fonts. `includeFiles: false` intentionally omits per-font details for compact large-directory scans; rerun with `includeFiles: true` only when a narrowed review needs per-file evidence. If the directory layout looks mismatched, use `inputDirectoryDecision.directoryOrganizationSafety.safePreviewArgs` or `inputDirectoryDecision.safeOrganizationPreviewArgs` for an `organize_font_directory` safe preview, then review that response before any copy-only staging write.
+
 ### `guidance-directory-organization-safety-example`
 
 `get_agent_guidance.directoryOrganizationQuickAnswer.directoryOrganizationSafety` is the preflight version of the directory safety answer. It is a response-shape example, not a command to run:

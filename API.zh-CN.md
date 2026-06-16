@@ -90,6 +90,25 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 - `recommendedWorkflowPlan` 把安全模板 ID 编排成输入预检、目录形态决策、批量预览、审查后写入和输出审计等阶段。它是路线图，不替代每次工具响应检查。
 - `nextToolDecisionSummary` 是“下一步该调用哪个工具？”的紧凑索引。它的 `workflowQuickStart` 包含 `workflowQuickStart.recommendedCallExample`，`quickStartCallExamples[]` 提供常见路线的最小占位参数。
 
+### `first-input-preflight-example`
+
+对于内容丰富、混合或陌生的字体目录，先做一次只读输入预检，再决定是否整理目录或批量写入：
+
+```json
+{
+  "tool": "inspect_font_inputs",
+  "arguments": {
+    "inputDir": "fonts",
+    "maxFiles": 50000,
+    "includeFiles": false
+  }
+}
+```
+
+先读这些字段：`inputCountGuide`、`inputDirectoryDecision`、`inputDirectoryDecision.directoryOrganizationSafety`、`layout`、`unsupportedFileDecision`、`unsupportedFileSummary`、`recommendedBatchPreviewArgs` 和 `maxFilesHit`。
+
+非直觉行为：这个调用不会写文件、不会整理目录、不会解压压缩包、不会复制忽略文件，也不会拆分字体。`includeFiles: false` 会有意省略逐字体详情，适合大型目录的紧凑扫描；只有缩小到需要逐文件证据的范围时，再用 `includeFiles: true` 重跑。如果目录结构看起来不匹配，使用 `inputDirectoryDecision.directoryOrganizationSafety.safePreviewArgs` 或 `inputDirectoryDecision.safeOrganizationPreviewArgs` 做 `organize_font_directory` safe preview，然后先审查该响应，再考虑任何 copy-only 暂存写入。
+
 ### `guidance-directory-organization-safety-example`
 
 `get_agent_guidance.directoryOrganizationQuickAnswer.directoryOrganizationSafety` 是目录安全答案的预检版本。下面是响应形状示例，不是要直接执行的命令：
