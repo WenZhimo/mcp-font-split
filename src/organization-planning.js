@@ -7,6 +7,7 @@ import {
   resolveBatchFamilyDirName,
   sanitizeDirName,
 } from './batch.js';
+import { uniqueStrings } from './guidance-workflows.js';
 import { buildSuggestedBatchPreviewArgs } from './suggested-args.js';
 
 export function getOrganizationDedupeKey(entry, dedupeMode) {
@@ -334,6 +335,185 @@ export function buildSourceLayoutDecisionChecklist({
           'maxFilesHit',
         ],
       },
+    ],
+  };
+}
+
+export function buildSourceLayoutMismatchSummary({
+  options,
+  layout,
+  safetySummary,
+  organizationDecision,
+  recommendedBatchPreviewArgs,
+  outputDirRelative,
+  effectiveDedupeMode,
+  warnings,
+}) {
+  const warningCodes = new Set((warnings || []).map((warning) => warning.code));
+  const requestedBatchGroupBy = options.batchGroupBy || 'auto';
+  const recommendedBatchGroupBy = layout.recommendedBatchOptions?.batchGroupBy || null;
+  const effectiveBatchGroupByForReview = requestedBatchGroupBy === 'auto'
+    ? recommendedBatchGroupBy
+    : requestedBatchGroupBy;
+  const requestedGroupingMatchesRecommendation = requestedBatchGroupBy === 'auto'
+    || requestedBatchGroupBy === recommendedBatchGroupBy;
+
+  const mismatchReasons = [];
+  const reviewReasons = [];
+  const layoutNotes = [];
+
+  if (layout.layoutKind === 'mixed') {
+    mismatchReasons.push('mixed-root-and-nested-fonts');
+    reviewReasons.push('mixed-layout-review-required');
+    layoutNotes.push('Fonts were found both at the input root and inside nested directories.');
+  }
+  if (!requestedGroupingMatchesRecommendation) {
+    mismatchReasons.push('requested-grouping-differs-from-detected-layout');
+    reviewReasons.push('requested-grouping-review-required');
+  }
+  if (layout.layoutKind === 'flat') {
+    layoutNotes.push('Flat sources have no source-directory family signal, so metadata-family grouping is the usual recommendation.');
+  }
+  if (!options.parseFonts && effectiveBatchGroupByForReview === 'font-family') {
+    reviewReasons.push('metadata-grouping-not-parsed');
+  }
+  if (warningCodes.has('input-scan-truncated')) {
+    reviewReasons.push('input-scan-truncated');
+  }
+  if (warningCodes.has('invalid-fonts-skipped')) {
+    reviewReasons.push('invalid-fonts-skipped');
+  }
+  if (warningCodes.has('duplicate-fonts-skipped')) {
+    reviewReasons.push('duplicates-skipped');
+  }
+  if (warningCodes.has('output-inside-input')) {
+    reviewReasons.push('output-tree-inside-input-tree');
+  }
+
+  const mismatchDetected = mismatchReasons.length > 0;
+  const sourceLayoutMatchesRecommendedGrouping = !mismatchDetected
+    && requestedGroupingMatchesRecommendation
+    && layout.layoutKind !== 'mixed'
+    && layout.layoutKind !== 'empty';
+  const confidence = warningCodes.has('input-scan-truncated')
+    ? 'incomplete'
+    : !options.parseFonts && effectiveBatchGroupByForReview === 'font-family'
+      ? 'provisional-until-font-parsing'
+      : mismatchDetected ? 'review-required' : 'high';
+
+  let directStatus = 'safe-preview-available';
+  let directReason = 'Preview split_font_batch on the original input before any reviewed write.';
+  if (layout.layoutKind === 'empty' || organizationDecision.route === 'no-copyable-fonts') {
+    directStatus = 'not-applicable';
+    directReason = 'No copyable supported fonts are available for direct batch preview.';
+  } else if (organizationDecision.route === 'rerun-with-font-parsing') {
+    directStatus = 'available-but-rerun-organization-first';
+    directReason = 'Metadata-sensitive grouping or dedupe is provisional until organize_font_directory is rerun with font parsing.';
+  } else if (organizationDecision.route === 'decide-on-invalid-fonts') {
+    directStatus = 'available-after-invalid-font-decision';
+    directReason = 'Decide whether invalid supported-extension files should be preserved before treating direct preview as complete.';
+  } else if (organizationDecision.route === 'review-mixed-layout') {
+    directStatus = 'review-required';
+    directReason = 'Mixed root and nested fonts can make direct grouping surprising; review the safe-preview plan before writing.';
+  } else if (organizationDecision.route === 'preview-organized-output') {
+    directStatus = 'use-organized-output';
+    directReason = 'A copy-only staging directory was written; preview that organized output before splitting.';
+  } else if (mismatchDetected) {
+    directStatus = 'review-required';
+    directReason = 'The requested grouping differs from the detected layout recommendation; review the safe-preview plan before writing.';
+  }
+
+  let stagingNeed = 'optional';
+  let stagingReason = 'Copy-only staging is optional; use it only when the user wants a cleaner source-like directory before splitting.';
+  if (layout.layoutKind === 'empty' || organizationDecision.route === 'no-copyable-fonts') {
+    stagingNeed = 'not-applicable';
+    stagingReason = 'There are no copyable supported fonts for a staging directory.';
+  } else if (!options.dryRun && organizationDecision.route === 'preview-organized-output') {
+    stagingNeed = 'already-written-copy-only';
+    stagingReason = 'This call already copied selected fonts into outputDir; inspect or batch-preview that staged output next.';
+  } else if (organizationDecision.route === 'rerun-with-font-parsing' || organizationDecision.route === 'decide-on-invalid-fonts') {
+    stagingNeed = 'defer-until-review';
+    stagingReason = 'Resolve the preferred organization decision before running a copy-only staging write.';
+  } else if (!mismatchDetected && layout.layoutKind !== 'mixed') {
+    stagingNeed = 'not-required-for-splitting';
+    stagingReason = 'The original input can be previewed directly; staging is only for users who want a cleaner copied directory.';
+  }
+  const copyOnlyStagingSafePreviewArgs = stagingNeed === 'already-written-copy-only'
+    ? organizationDecision.safeBatchPreviewArgs || null
+    : null;
+
+  const decisionChecklist = buildSourceLayoutDecisionChecklist({
+    options,
+    safetySummary,
+    organizationDecision,
+    directStatus,
+    directReason,
+    recommendedBatchPreviewArgs,
+    stagingNeed,
+    stagingReason,
+    outputDirRelative,
+    warningCodes,
+  });
+
+  return {
+    summaryType: 'source-layout-mismatch',
+    appliesToTool: 'organize_font_directory',
+    currentLayoutKind: layout.layoutKind,
+    requestedBatchGroupBy,
+    recommendedBatchGroupBy,
+    effectiveBatchGroupByForReview,
+    requestedGroupingMatchesRecommendation,
+    sourceLayoutMatchesRecommendedGrouping,
+    mismatchDetected,
+    mismatchReasons,
+    reviewRecommended: reviewReasons.length > 0,
+    reviewReasons: uniqueStrings(reviewReasons),
+    layoutNotes,
+    confidence,
+    directOriginalInput: {
+      status: directStatus,
+      previewTool: 'split_font_batch',
+      previewRequiredBeforeWrite: true,
+      safePreviewArgs: directStatus === 'use-organized-output' ? null : recommendedBatchPreviewArgs,
+      reason: directReason,
+    },
+    copyOnlyStaging: {
+      need: stagingNeed,
+      outputDir: outputDirRelative,
+      writeBehavior: options.dryRun ? 'no-write-until-dryRun-false' : 'copy-only-outputDir',
+      sourceDestructive: false,
+      sourceFilesPreserved: true,
+      sourceFilesMovedDeletedOrRewritten: false,
+      writesSourceTree: safetySummary.writesSourceTree,
+      outputTreeInsideInputTree: safetySummary.outputTreeInsideInputTree,
+      mayOverwriteOutputTree: safetySummary.mayOverwriteOutputTree,
+      nextActionId: organizationDecision.optionalStagingActionId || (
+        organizationDecision.route === 'preview-organized-output'
+          ? 'preview-batch-split-organized-output'
+          : null
+      ),
+      suggestedArgsField: copyOnlyStagingSafePreviewArgs
+        ? 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs'
+        : null,
+      safePreviewArgs: copyOnlyStagingSafePreviewArgs,
+      reason: stagingReason,
+    },
+    decisionChecklist,
+    policySnapshot: {
+      requestedBatchDedupeMode: options.batchDedupeMode,
+      effectiveBatchDedupeMode: effectiveDedupeMode,
+      batchNamingMode: options.batchNamingMode,
+    },
+    successCriteria: [
+      'Treat this summary as routing guidance, not proof of success.',
+      'Before writing split output, run split_font_batch with safe-preview arguments and inspect planned paths, warnings, maxFilesHit, and errors.',
+      'Before copy-only staging, review planActionSummary and plan[] when available; if plan[] was omitted, rerun the organization dry-run with includePlan:true.',
+      'After any reviewed batch write, run inspect_split_output and require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, and maxFilesHit false.',
+    ],
+    nonIntuitiveBehavior: [
+      'copyOnlyStaging is never source-destructive: dryRun:false copies selected fonts to outputDir and does not move, delete, or rewrite source fonts.',
+      'A direct original-input batch preview is usually enough when the user only wants split output; staging is for a cleaner copied source layout.',
+      'requestedGroupingMatchesRecommendation only compares policy shape; it does not prove that every font family name or output path is correct.',
     ],
   };
 }
