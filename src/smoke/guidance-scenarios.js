@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import { GUIDANCE_WORKFLOWS, getAgentGuidance } from '../font-split.js';
+import { buildDirectoryOrganizationSafety } from '../directory-organization-safety.js';
 import {
   assertBatchPolicyGuide,
   assertDirectoryRouteInspectFields,
@@ -235,6 +236,9 @@ async function runAgentGuidanceSmoke() {
   const toolSafetyQuickReference = result.toolSafetyQuickReference || {};
   const safetyEntryByTool = new Map((toolSafetyQuickReference.tools || []).map((item) => [item.tool, item]));
   const organizerSafety = safetyEntryByTool.get('organize_font_directory');
+  const canonicalOrganizerSafety = buildDirectoryOrganizationSafety({
+    appliesToTool: 'get_agent_guidance',
+  });
   const batchSafety = safetyEntryByTool.get('split_font_batch');
   const singleSafety = safetyEntryByTool.get('split_font');
   const inspectSafety = safetyEntryByTool.get('inspect_font_inputs');
@@ -245,12 +249,24 @@ async function runAgentGuidanceSmoke() {
     || inspectSafety?.defaultWritesFiles !== false
     || inspectSafety?.sourceDestructive !== false
     || organizerSafety?.defaultWritesFiles !== false
-    || organizerSafety?.reviewedWriteMode !== 'copy-only-outputDir'
-    || organizerSafety?.sourceDestructive !== false
-    || organizerSafety?.sourceFilesMovedDeletedOrRewritten !== false
+    || organizerSafety?.defaultMode !== canonicalOrganizerSafety.helperToolDefaultMode
+    || organizerSafety?.reviewedWriteMode !== canonicalOrganizerSafety.helperToolWriteMode
+    || organizerSafety?.safePreviewArgs?.inputDir !== canonicalOrganizerSafety.safePreviewArgs.inputDir
+    || organizerSafety?.safePreviewArgs?.outputDir !== canonicalOrganizerSafety.safePreviewArgs.outputDir
+    || organizerSafety?.safePreviewArgs?.workflowPreset !== canonicalOrganizerSafety.safePreviewArgs.workflowPreset
+    || organizerSafety?.sourceDestructive !== canonicalOrganizerSafety.sourceDestructive
+    || organizerSafety?.sourceFilesPreserved !== canonicalOrganizerSafety.sourceFilesPreserved
+    || organizerSafety?.sourceFilesMovedDeletedOrRewritten !== canonicalOrganizerSafety.sourceFilesMovedDeletedOrRewritten
     || organizerSafety?.sourceBackupRequired !== false
+    || organizerSafety?.outputRole !== canonicalOrganizerSafety.outputDirRole
+    || organizerSafety?.isSplitOutput !== canonicalOrganizerSafety.isSplitOutput
+    || organizerSafety?.inspectAfterCopyTool !== canonicalOrganizerSafety.inspectAfterCopyTool
+    || organizerSafety?.previewAfterCopyTool !== canonicalOrganizerSafety.previewAfterCopyTool
+    || organizerSafety?.auditAfterSplitWriteTool !== canonicalOrganizerSafety.auditAfterSplitWriteTool
     || !organizerSafety?.mustInspectFields?.includes('sourceSafetyDecision')
     || !organizerSafety?.mustInspectFields?.includes('safetySummary')
+    || !Array.isArray(organizerSafety?.nonIntuitiveBehavior)
+    || !canonicalOrganizerSafety.nonIntuitiveBehavior.every((item) => organizerSafety.nonIntuitiveBehavior.includes(item))
     || batchSafety?.defaultWritesFiles !== true
     || batchSafety?.safePreviewArgs?.workflowPreset !== 'safe-preview'
     || batchSafety?.sourceDestructive !== false

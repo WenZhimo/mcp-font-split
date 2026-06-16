@@ -8,6 +8,7 @@ import {
   WORKFLOW_PRESETS,
   WORKFLOW_PRESET_NAMES,
 } from './catalogs.js';
+import { buildDirectoryOrganizationSafety } from './directory-organization-safety.js';
 
 function uniqueAllowedValues(values, allowed) {
   const allowedSet = new Set(allowed);
@@ -114,6 +115,37 @@ export function buildUnsupportedFileCategoryCatalog() {
   );
 }
 
+function buildOrganizerToolSafetyQuickReference() {
+  const directorySafety = buildDirectoryOrganizationSafety({
+    appliesToTool: 'get_agent_guidance',
+  });
+  return {
+    tool: directorySafety.helperTool,
+    defaultWritesFiles: directorySafety.writesFilesBeforeReview,
+    defaultMode: directorySafety.helperToolDefaultMode,
+    reviewedWriteMode: directorySafety.helperToolWriteMode,
+    safePreviewArgs: directorySafety.safePreviewArgs,
+    reviewedWriteArgs: {
+      ...directorySafety.safePreviewArgs,
+      workflowPreset: 'reviewed-write',
+    },
+    sourceDestructive: directorySafety.sourceDestructive,
+    sourceFilesPreserved: directorySafety.sourceFilesPreserved,
+    sourceFilesMovedDeletedOrRewritten: directorySafety.sourceFilesMovedDeletedOrRewritten,
+    sourceBackupRequired: directorySafety.sourceDestructive === true,
+    writeScope: 'outputDir-only-when-reviewed-write-or-dryRun-false',
+    writeBehavior: directorySafety.writeBehavior,
+    outputRole: directorySafety.outputDirRole,
+    isSplitOutput: directorySafety.isSplitOutput,
+    outputAuditRequiredAfterWrite: directorySafety.isSplitOutput,
+    inspectAfterCopyTool: directorySafety.inspectAfterCopyTool,
+    previewAfterCopyTool: directorySafety.previewAfterCopyTool,
+    auditAfterSplitWriteTool: directorySafety.auditAfterSplitWriteTool,
+    mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'operationMode', 'stagingDirectoryDecision', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'planActionSummary'],
+    nonIntuitiveBehavior: directorySafety.nonIntuitiveBehavior,
+  };
+}
+
 export function buildToolSafetyQuickReference() {
   return {
     summaryType: 'tool-safety-quick-reference',
@@ -147,22 +179,7 @@ export function buildToolSafetyQuickReference() {
         mustInspectFields: ['inputCountGuide', 'inputDirectoryDecision', 'supportedFontCount', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
         nonIntuitiveBehavior: 'It counts supported font files and ignored files but never extracts archives or writes organization/split output.',
       },
-      {
-        tool: 'organize_font_directory',
-        defaultWritesFiles: false,
-        defaultMode: 'safe-preview-plan-only',
-        reviewedWriteMode: 'copy-only-outputDir',
-        safePreviewArgs: { workflowPreset: 'safe-preview' },
-        reviewedWriteArgs: { workflowPreset: 'reviewed-write' },
-        sourceDestructive: false,
-        sourceFilesMovedDeletedOrRewritten: false,
-        sourceBackupRequired: false,
-        writeScope: 'outputDir-only-when-reviewed-write-or-dryRun-false',
-        outputRole: 'organized-font-source-staging',
-        outputAuditRequiredAfterWrite: false,
-        mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'operationMode', 'stagingDirectoryDecision', 'sourceLayoutMismatchSummary', 'organizationWarnings', 'planActionSummary'],
-        nonIntuitiveBehavior: 'dryRun:false copies selected fonts into outputDir; outputDir is source-like staging, not final split output.',
-      },
+      buildOrganizerToolSafetyQuickReference(),
       {
         tool: 'split_font',
         defaultWritesFiles: true,
