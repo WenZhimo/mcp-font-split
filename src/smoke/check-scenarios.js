@@ -10,9 +10,17 @@ async function runCheckCompactSmoke() {
   if (packageJson.scripts?.['check:syntax'] !== 'node scripts/check-syntax.js') {
     throw new Error('compact check smoke: expected check:syntax to use scripts/check-syntax.js.');
   }
-  const syntaxCheckScript = await fs.readFile('scripts/check-syntax.js', 'utf8');
-  if (!syntaxCheckScript.includes("'scripts/run-check-compact.js'")) {
-    throw new Error('compact check smoke: expected scripts/check-syntax.js to syntax-check scripts/run-check-compact.js.');
+  const { stdout: syntaxListStdout, stderr: syntaxListStderr } = await execFileAsync(process.execPath, ['scripts/check-syntax.js', '--list-json'], {
+    cwd: process.cwd(),
+  });
+  if (syntaxListStderr.trim() !== '') {
+    throw new Error('compact check smoke: expected syntax file list to keep stderr empty.');
+  }
+  const syntaxList = JSON.parse(syntaxListStdout);
+  for (const expectedSyntaxFile of ['scripts/run-check-compact.js', 'src/font-identity.js', 'src/runtime-status.js']) {
+    if (!syntaxList.files?.includes(expectedSyntaxFile)) {
+      throw new Error(`compact check smoke: expected scripts/check-syntax.js to syntax-check ${expectedSyntaxFile}.`);
+    }
   }
 
   const parseCompactJson = (stdout, context) => {
