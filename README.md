@@ -208,6 +208,16 @@
 
 这些字段是入口级阅读顺序，不替代 API 文档里的字段定义。
 
+## 输出形态速查
+
+| 看到的字段 | 含义 | 下一步 |
+|------------|------|--------|
+| `outputMode: "subset"`、`performedSplit: true` | 正常生成 web-font 分片。 | 真实写入后继续用 `inspect_split_output` 审计结构。 |
+| `outputMode: "single-woff2"`、`usedFallback: true` | 没有正常多分片，退化为单个 WOFF2。 | 向用户说明 fallback，并检查 `warnings[]`。 |
+| `outputMode: "copy-original"`、`usedFallback: true` | 没有生成 web-font 分片，只复制/登记原字体。 | 不要当成正常拆分结果；检查 manifest 和 `resultType`。 |
+| `skipped: true` 或 `skipReason` | 本次没有重新处理，通常是 manifest / existing-output 跳过。 | 检查 `skipMode`、`skipReason` 和已有输出审计。 |
+| `ok: true` 但 `errorCount > 0` | 批量按错误策略完成，但仍有单字体失败。 | 检查 `batchErrorMode`、`errorCount` 和 `errors[]`。 |
+
 ## 安装
 
 ```sh

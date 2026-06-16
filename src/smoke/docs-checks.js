@@ -317,6 +317,16 @@ export async function runBehaviorDocsSmoke() {
   ) {
     throw new Error('Expected README files to provide a batch customization quick check.');
   }
+  if (
+    !readmeZh.includes('## 输出形态速查')
+    || !readmeZh.includes('`outputMode: "single-woff2"`')
+    || !readmeZh.includes('`outputMode: "copy-original"`')
+    || !readmeEn.includes('## Output Shape Quick Check')
+    || !readmeEn.includes('`outputMode: "single-woff2"`')
+    || !readmeEn.includes('`outputMode: "copy-original"`')
+  ) {
+    throw new Error('Expected README files to provide an output shape quick check for non-intuitive success results.');
+  }
 
   for (const [label, text] of [
     ['README.md', readmeZh],

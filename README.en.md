@@ -208,6 +208,16 @@ For complete arguments, response fields, and error shapes, see the [API Referenc
 
 This is the entry-level reading order, not a replacement for field definitions in the API docs.
 
+## Output Shape Quick Check
+
+| Fields seen | Meaning | Next step |
+|-------------|---------|-----------|
+| `outputMode: "subset"`, `performedSplit: true` | Normal web-font subset output was generated. | After a real write, audit structure with `inspect_split_output`. |
+| `outputMode: "single-woff2"`, `usedFallback: true` | Normal multi-subset output did not happen; the result fell back to one WOFF2. | Disclose the fallback and inspect `warnings[]`. |
+| `outputMode: "copy-original"`, `usedFallback: true` | No web-font split output was generated; the original font was copied/registered. | Do not treat it as a normal split result; check the manifest and `resultType`. |
+| `skipped: true` or `skipReason` | This run did not reprocess the font, usually because of manifest / existing-output skip logic. | Check `skipMode`, `skipReason`, and audit the existing output. |
+| `ok: true` but `errorCount > 0` | The batch completed according to its error policy, but some fonts still failed. | Inspect `batchErrorMode`, `errorCount`, and `errors[]`. |
+
 ## Installation
 
 ```sh
