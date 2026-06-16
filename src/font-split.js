@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { StaticWasm, fontSplit } from 'cn-font-split/dist/wasm/index.mjs';
 import {
@@ -9,7 +8,6 @@ import {
   BATCH_GROUP_BY_MODES,
   BATCH_NAMING_MODES,
   FONT_EXTENSIONS,
-  FORMAT_PRIORITY,
   FORMAT_PRIORITY_ORDER,
   GUIDANCE_COMPACT_SECTION_NAMES,
   GUIDANCE_DETAIL_LEVELS,
@@ -64,6 +62,13 @@ import {
   scanFilesRecursive,
   summarizeFiles,
 } from './file-scan.js';
+import {
+  appendCollisionSuffix,
+  buildBatchOutputNames,
+  buildSourceSuffix,
+  compareBatchDedupeRepresentative,
+  sanitizeDirName,
+} from './batch.js';
 import {
   MANIFEST_VERSION,
   buildSplitManifest,
@@ -6324,31 +6329,6 @@ function buildFontSplitConfig(input, outDir, args) {
   return config;
 }
 
-function sanitizeDirName(name) {
-  return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim();
-}
-
-function appendCollisionSuffix(baseName, index) {
-  return index === 0 ? baseName : `${baseName}-${index}`;
-}
-
-function buildSourceSuffix(inputRelativePath, extension) {
-  const normalizedInput = inputRelativePath.replaceAll('\\', '/');
-  const sourceHash = createHash('sha1').update(normalizedInput).digest('hex').slice(0, 8);
-  const extensionLabel = extension.replace(/^\./, '') || 'font';
-  return `${extensionLabel}-${sourceHash}`;
-}
-
-function buildBatchOutputNames({ inputRelativePath, fontBaseName, fontFileName }) {
-  const extension = path.extname(fontFileName);
-  const suffix = buildSourceSuffix(inputRelativePath, extension);
-  const splitDirName = sanitizeDirName(`${fontBaseName}--${suffix}`);
-  return {
-    splitDirName,
-    copiedOriginalFileName: `${splitDirName}${extension}`,
-  };
-}
-
 async function listExistingSplitDirNames(resolvedOutDir, fontBaseName) {
   let entries;
   try {
@@ -6461,18 +6441,6 @@ async function inspectInputFontFile(file) {
       error: error instanceof Error ? error.message : String(error),
     };
   }
-}
-
-function compareBatchDedupeRepresentative(candidate, existing) {
-  const candidateExt = path.extname(candidate).toLowerCase();
-  const existingExt = path.extname(existing).toLowerCase();
-  const priorityDelta = (FORMAT_PRIORITY[candidateExt] ?? 9) - (FORMAT_PRIORITY[existingExt] ?? 9);
-  if (priorityDelta !== 0) return priorityDelta;
-  return toRelativeWorkspacePath(candidate).localeCompare(
-    toRelativeWorkspacePath(existing),
-    undefined,
-    { numeric: true },
-  );
 }
 
 function buildDirectoryLayoutSummary({ inputDir, allFiles, fontFiles }) {
