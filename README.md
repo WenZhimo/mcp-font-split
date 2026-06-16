@@ -63,30 +63,13 @@ README 只作为入口和常见工作流索引；字段级细节以 API 文档�
 关键默认行为：
 
 - 所有路径都限制在 `FONT_SPLIT_ROOT` 内；相对路径基于该根目录解析。如果未设置该变量，默认使用 MCP Server 进程启动时的当前工作目录。工具响应和 `recommendedNextActions[].suggestedArgs` 中会用 `.` 表示工作区根目录，不会用空字符串表示根目录。
-- 对 AI 编程助理来说，当工作流不明确时应先调用 `get_agent_guidance`。它默认返回紧凑指南：推荐工具顺序、默认策略、路径规则、`toolSafetyQuickReference` 工具安全速查表、`toolOptionCatalog` 工具选项目录、`outputStructureCatalog` 输出结构审计目录、必须检查的响应字段、完成验证清单、`errorResponseCatalog`，以及用于解读本地真实语料 smoke 输出的 `localVerificationOutputGuide`。响应里的 `guidanceView` 会说明本次包含和省略了哪些 section。
-- `get_agent_guidance` 会返回 `projectStatusNotice`，把“仍在完善中、尚未正式发布”变成机器可读策略：接口、默认值、响应字段和目录整理策略都可能变化；自动化时应以当前代码、实时 MCP schema、`get_agent_guidance` 和当前 API 文档为准，不需要为了未发布字段保留前向兼容冗余。
-- 对维护本包的 agent，`get_agent_guidance.verificationChecklist[]` 包含 `local-compact-check-passed` 和 `local-real-corpus-suite-passed`：前者指向 `npm run check:compact`，用于低噪声读取普通本地门禁；后者指向 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`，作为影响功能行为的改动完成前的本机真实语料可靠性门禁。
-- `get_agent_guidance` 会返回 `configurationRecipes[]`，把常见意图映射成 preset-first 参数，例如保留全部源字体、按源目录分组、按字体 metadata 分组、快速结构扫描、copy-only 暂存整理或大库审查后写入。配方只是安全起点，仍必须运行预览/写入工具，检查列出的 `inspectFields`，并满足 `successCriteria`。
-- `get_agent_guidance` 会返回 `batchCustomizationQuickReference[]`，这是比 `batchPolicyGuide` 更短的批量自定义速查表：把“保留每个源字体”“按源目录/metadata 分组”“使用裸名或来源后缀”“收集错误”等用户意图映射到最小 `overrideArgs`、可复制的 `safe-preview` / `reviewed-write` 参数、必须检查的字段和非直觉行为。
-- `get_agent_guidance` 会返回 `directoryOrganizationQuickAnswer`，直接回答“有没有目录整理工具、会不会破坏源目录”。答案是：使用 `organize_font_directory`；默认 `workflowPreset: "safe-preview"` 只做无写入计划；审查后 `reviewed-write` 也只是 copy-only 写入 `outputDir`，不会移动、删除或重写源字体，且该 `outputDir` 是源目录式暂存，不是最终拆分输出。
-- `get_agent_guidance` 会返回 `toolSafetyQuickReference`，用一张紧凑表汇总 7 个公开工具的 `defaultWritesFiles`、`sourceDestructive`、`sourceFilesMovedDeletedOrRewritten`、写入范围、源文件是否需要备份，以及实际调用后必须检查的响应字段。它用于快速回答“哪个工具会写文件、是否会移动/删除/重写源字体”；写入类工具完成后仍要检查实际响应里的 `sourceSafetyDecision`、`safetySummary` 和输出审计结果。
-- `get_agent_guidance` 会返回 `batchPolicyGuide`，这是批量策略自定义指南，覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个选项值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前的 `successCriteria`。
-- `get_agent_guidance` 默认还会返回 `toolOptionCatalog`，这是高影响输入参数的机器可读目录。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的默认值、允许值、安全写入语义、非直觉行为，以及改写参数后应检查哪些响应字段；只想看它时可请求 `sections: ["option-catalog"]`。
-- `get_agent_guidance` 默认还会返回 `fontIdentityBasisCatalog`，解释 `identityBasis` 和 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 里的取值、OpenType name ID 来源、可信度，以及是否能支撑语义字体等价判断；只想看这部分时可请求 `sections: ["identity-catalog"]`。
-- `get_agent_guidance` 默认还会返回 `outputStructureCatalog`，解释 `inspect_split_output` 的 `outputRoleDecision`、审计状态、`structureSummary.layoutKind`、`structureSummary.issues[].code`、输出模式和容易误读的通过条件；只想看这部分时可请求 `sections: ["output-catalog"]`。解释输出审计前先看它，不要把 `ok: true` 当成输出结构已经通过。
-- `get_agent_guidance` 还会返回 `unsupportedFileCategoryCatalog`，解释 `unsupportedFileSummary.byCategory[]` 中 `archive`、`document`、`unsupported-font` 等分类的代表扩展名和处理行为；每个工具响应里的 `unsupportedFileDecision` 会给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则提供证据，压缩包只会被报告，不会被解压、复制或拆分。
-- 输入扫描类工具会返回 `inputCountGuide`，用一个紧凑对象解释扫描文件数、支持字体数、忽略文件数、`maxFilesHit` 是否导致计数不完整、文件明细是否被故意省略，以及非字体文件的处理方式。把真实语料计数当作完整结论前应先看它。
-- `inspect_font_inputs` 还会返回 `inputDirectoryDecision`、`layout` 和 `recommendedBatchPreviewArgs`。这是无写入的第一步 triage：它会提示应调高 `maxFiles`、先处理坏字体、直接做 `split_font_batch` safe-preview，还是先做非破坏性的 `organize_font_directory` safe-preview；它不是整理计划或拆分成功证明。返回的安全预览参数会通过 `recommendedBatchPreviewArgs.maxFiles` 保留本次扫描上限，复制下一步调用时不会意外退回默认值。
-- `get_agent_guidance` 还会返回 `directoryHandlingModeCatalog`，解释每个 `layoutDecision.directoryHandling.recommendedMode` 取值，包括它何时出现、下一步建议、是否会在复核前写文件、源目录安全性、必须检查的字段和容易误解的行为。
-- `get_agent_guidance` 还会返回 `directoryWorkflowDecisionMatrix[]`，这是机器可读的目录工作流决策表，用于在直接批量拆分、dry-run 整理、copy-only 整理和结构优先计划之间做选择。决策表和 `directoryWorkflowExamples[]` 示例也会优先使用 `workflowPreset`，只额外列出路径、规模或目录形态导致的覆盖参数，并提供必须检查的字段和 `successCriteria`；完整示例里还包含 flat/nested/mixed/output-inside-input 的 `sourceLayoutMismatchSummary` 对照，以及 `copy-only-staging-to-audited-split` 这条从整理预览、copy-only 暂存、暂存目录批量预览、reviewed-write 到 `inspect_split_output` 审计的完整路线。
-- `get_agent_guidance` 包含 `safeInvocationTemplates[]`，提供运行时检查、单字体处理、输入预检、目录不匹配整理计划、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和紧凑输出审计等可复制起步调用。每个模板都会声明是否写文件、是否可能修改源文件、必须检查的 `inspectFields` 和继续前要满足的 `successCriteria`；模板会尽量保持最小参数，`workflowPreset` 已提供的默认项可从 `workflowPresets[]` 查看。
-- `get_agent_guidance` 包含 `recommendedWorkflowPlan`，这是当前 `workflow` 的有序路线图。它会引用安全模板 ID，把输入预检、目录形态决策、预览、审查后写入和输出审计串起来；每个步骤和决策点都会列出 `inspectFields` 与 `successCriteria`，但仍不替代实际工具响应检查。
-- `get_agent_guidance.nextToolDecisionSummary` 是更短的“下一步该调用哪个工具”索引：它会按 setup、单字体处理、输入预检、目录结构判断、copy-only 暂存、批量预览、审查后写入和输出审计给出首选工具与模板 ID。其 `workflowQuickStart` 会直接给出当前 `workflow` 推荐的第一条可复制调用，`quickStartCallExamples[]` 则由 `safeInvocationTemplates[]` 派生，用于给出最常见路线的最小调用参数；它只用于快速路由，不能替代实际工具响应字段和 `successCriteria`。
-- 当 agent 只想快速知道目录整理工作流的下一步时，可调用 `get_agent_guidance` 并传入 `workflow: "organize"` 与 `sections: ["workflow"]`，然后读取 `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`。对于目录结构不确定的来源，这个推荐首步应是 `organize_font_directory` 的 `workflowPreset: "safe-preview"`：不写文件、`sourceDestructive: false`，只生成整理/预览路线。
-- `get_agent_guidance` 会返回 `errorResponseCatalog`，说明什么时候应把 MCP 错误文本当作 JSON 解析，以及如何按 `errorType: "configuration-error"` 路由 `FontSplitConfigurationError`、按 `errorType: "batch-split-error"` 路由 `BatchSplitError`，以及如何处理普通非结构化错误。显式传入的无效配置会被拒绝，而不是静默回退；需要默认行为时请省略该选项，而不是传入无效枚举、布尔或数字值。
-- 需要错误响应、warning code、响应字段或工具选项的完整机器可读目录时，调用 `get_agent_guidance` 并设置 `detailLevel: "full"`，或只请求 `sections: ["error-catalog", "warning-catalog", "field-catalog", "option-catalog"]`。
-- 当安装或运行环境不确定时，使用 `get_runtime_status`；它会只读检查解析后的工作区、Node engine 兼容性、包版本、cn-font-split 运行时版本和 WASM 文件，并返回便于 agent 执行/提示的 `recommendedActions[]`。
-- 当源目录是扁平、混合或与预期 family 分组不一致时，先用 `organize_font_directory` 的默认 `dryRun: true` 生成整理计划。它对源目录非破坏：不会移动或删除源文件；真正执行时也只是复制选中的字体到 `outputDir`。响应里的 `sourceSafetyDecision` 是第一层源安全结论，先看它，再看 `safetySummary` 和详细 warning。如果不确定该直接对原目录做批量预览，还是先复制到暂存目录，调用 `get_agent_guidance` 并请求 `sections: ["examples"]`，查看 `source-layout-mismatch-comparison`；如果用户明确想先得到干净暂存目录，再查看 `copy-only-staging-to-audited-split`。
+- 工作流不明确时先调用 `get_agent_guidance`。README 只概述入口风险；完整 catalog、`inspectFields` 和 `successCriteria` 请看 API、BEHAVIOR 或 `get_agent_guidance` 的指定 `sections`。
+- 本项目仍在完善中；`projectStatusNotice` 会把接口、默认值、响应字段和目录整理策略可能变化这一点变成机器可读提示。自动化时应以当前代码、实时 MCP schema、`get_agent_guidance` 和 API 文档为准。
+- 维护本包时，普通本地门禁是 `npm run check:compact`；涉及功能行为的改动还应运行 `npm run smoke:real-corpus-suite -- <font-corpus-dir>`。
+- `organize_font_directory` 默认只做 `safe-preview`，不会写文件；审查后的写入也是 copy-only 到 `outputDir`，不会移动、删除或重写源字体。该 `outputDir` 是源目录式暂存，不是最终拆分输出。
+- 写入类工具完成后，不要只看 `ok`。至少检查 `sourceSafetyDecision`、`safetySummary`、`recommendedNextActions[]`、`successCriteria`，以及必要时的 `inspect_split_output` 输出审计。
+- 真实语料或大目录计数应先看 `inputCountGuide`、`unsupportedFileDecision` 和 `unsupportedFileSummary`。压缩包和非字体文件会被报告为忽略项，不会被自动解压、复制或拆分。
+- 显式传入的无效配置会被拒绝，而不是静默回退；需要默认行为时请省略该选项，而不是传入无效枚举、布尔或数字值。
 - 批量扫描会跳过依赖目录、已生成输出目录、`__MACOSX` 和 AppleDouble `._*` 资源叉文件。
 - `.woff` / `.woff2` 输入会先解压成 sfnt-like 数据，再进入处理流程。
 - 批量模式会按照 `batchDedupeMode` 去重；默认 `font-identity` 会在任意格式之间比较等价字体身份，并按 `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff` 的优先级保留一个代表。
