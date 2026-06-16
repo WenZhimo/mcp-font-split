@@ -4,559 +4,187 @@
 
 > **AI-Generated Code Disclaimer**
 >
-> This project is generated and maintained with AI coding assistants. The author makes no warranties of any kind regarding this code and assumes no responsibility for its use. It is provided "AS IS" without warranty of any kind.
+> This project is generated and maintained with AI coding assistants. The author makes no warranties of any kind and assumes no responsibility for its use. It is provided "AS IS" without warranty of any kind.
 
 > [!CAUTION]
 > **Project status: actively being refined and not formally released yet.**
 >
-> Interfaces, defaults, response fields, directory-organization policy, and documentation may change at any time. When integrating or automating, treat the current repository code, `get_agent_guidance` response, and API docs as authoritative.
+> Interfaces, defaults, response fields, directory-organization policy, and documentation may change at any time. When integrating or automating, treat the current repository code, live MCP schema, `get_agent_guidance`, and API docs as authoritative.
 
 ---
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that wraps [cn-font-split](https://github.com/KonghaYao/cn-font-split) as agent-callable tools for font subsetting and web-font generation.
+An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that wraps [cn-font-split](https://github.com/KonghaYao/cn-font-split) as agent-callable tools for font splitting, batch processing, directory organization, and output audits.
 
 > [!WARNING]
-> Before using this tool, read the full behavior and risk notes in [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md). This wrapper contains policy choices around batch grouping, incremental skipping, WOFF normalization, fallback output, and metadata manifests.
+> Before using this tool, read the full behavior and risk notes in [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md). This README is only an entry point for workflows and key risks; field-level details belong in the [API Reference](./API.md).
 
 ## Documentation Map
 
 | Need | Start here |
 |------|------------|
-| Understand the project, installation, and common calls | This README: Features, Important behavior summary, Examples, Installation |
+| Understand the project, installation, and common calls | This README |
 | Check MCP tool arguments, response fields, and field semantics | [API Reference](./API.md); Chinese version: [API 参考](./API.zh-CN.md) |
-| Review high-risk behavior around batch dedupe, directory organization, output audits, and fallbacks | [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md) |
-| Let an AI agent choose the next tool and safe arguments | Call `get_agent_guidance`, then inspect the returned `successCriteria` and `inspectFields` |
-| Maintain this project and verify changes | Run `npm run check:compact`; for behavior changes also run `npm run smoke:real-corpus-suite -- <font-corpus-dir>` |
-
-This README is an entry point and workflow index. Field-level details belong in the API docs; high-risk and non-intuitive behavior belongs in the behavior notes.
+| Review high-risk behavior around batch dedupe, directory organization, fallbacks, and output audits | [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md) |
+| Let an AI agent choose the next tool and safe arguments | Call `get_agent_guidance`, then inspect `inspectFields` and `successCriteria` |
+| Maintain the project and verify changes | `npm run check:compact`; for behavior changes also run `npm run smoke:real-corpus-suite -- <font-corpus-dir>` |
 
 ## Features
 
-- Split TTF/OTF/TTC/OTC/WOFF/WOFF2 fonts into web-font output files.
-- Batch-process font directories under the configured workspace.
-- Preflight input directories to find invalid font-like files before large batch runs.
-- Plan or copy-organize source font directories into a cleaner staging layout when the source structure does not match the desired batch grouping.
-- Provide `get_agent_guidance` so AI coding assistants can choose a safe workflow from machine-readable guidance, safe invocation templates, a tool safety quick reference, a tool option catalog, a font identity basis catalog, an output-structure audit catalog, error-response shapes, warning-code meanings, and response-field meanings. It returns compact guidance by default, with section-based access to full catalogs.
-- Provide `get_runtime_status` so agents can verify workspace, Node engine compatibility, package versions, and WASM availability before processing.
-- Preserve original font files in the output family directory.
-- Write `split-meta.json` manifests for processed fonts.
-- Inspect output directories with flat file stats and structured family/font summaries.
-- Run cross-platform through the cn-font-split WASM backend.
+- Split TTF/OTF/TTC/OTC/WOFF/WOFF2 fonts into web-font output.
+- Scan, preflight, and batch-process font directories.
+- Plan or copy-organize source directories when the source layout is messy.
+- Use manifests for incremental skipping and output audits.
+- Provide `get_agent_guidance` so AI agents can choose safe workflows from machine-readable guidance.
+- Provide a real-corpus smoke suite for representative reliability checks over complex local font collections.
 
 ## Tools
 
-| Tool | Description |
-|------|-------------|
-| `get_agent_guidance` | Return AI-agent-oriented workflow guidance, path rules, defaults, `toolSafetyQuickReference`, a tool option catalog, `fontIdentityBasisCatalog`, `outputStructureCatalog`, response fields to check, and a verification checklist. It is compact by default; use `detailLevel` / `sections` to request full catalogs or focused sections such as `sections: ["identity-catalog"]` or `sections: ["output-catalog"]`. |
-| `get_runtime_status` | Return read-only diagnostics for workspace, Node engine compatibility, package versions, platform, cn-font-split runtime, and WASM availability. |
-| `split_font` | Process one font file. Depending on options, it may create subset WOFF2 chunks, a single WOFF2 fallback, or a copy-original metadata entry. |
-| `inspect_font_inputs` | Scan input fonts without writing output; reports parse status, identity keys, glyph counts, invalid font-like files, source layout, and the first route recommendation. |
-| `split_font_batch` | Scan a directory, deduplicate according to `batchDedupeMode`, group fonts into family directories, and process each selected font. |
-| `organize_font_directory` | Plan or copy-organize source fonts into a staging directory. Defaults to `dryRun: true`; never moves or deletes source files. |
-| `inspect_split_output` | Summarize output files, check `outputRoleDecision` for the directory role first, and classify family/font entries using `split-meta.json` when available. |
+| Tool | Purpose |
+|------|---------|
+| `get_agent_guidance` | Return agent-oriented workflow guidance, a tool safety quick reference, field checklists, catalogs, and recommended call templates. |
+| `get_runtime_status` | Read-only diagnostics for workspace, Node engine, package versions, platform, and WASM availability. |
+| `inspect_font_inputs` | Scan an input directory without writing output; reports counts, invalid fonts, ignored files, layout, and the recommended first step. |
+| `organize_font_directory` | Plan or copy-organize source fonts; defaults to dry-run and never moves, deletes, or rewrites source fonts. |
+| `split_font` | Process one font; output may be normal subset output, a single WOFF2 fallback, or a copy-original metadata entry. |
+| `split_font_batch` | Batch scan, dedupe, name, skip existing output, and process fonts. |
+| `inspect_split_output` | Audit generated split output for directory role, manifest coverage, and structure issues. |
 
-## Important behavior summary
+## Common Workflows
 
-> [!WARNING]
-> `ok: true` means the tool completed the selected policy. It does **not** always mean that multi-subset splitting happened. Prefer `resultType`, `outputMode`, `performedSplit`, `usedFallback`, `skipped`, and `warnings` when interpreting results.
+### 1. Let the Agent Orient Itself
 
-Key defaults and policy choices:
+```json
+{
+  "tool": "get_agent_guidance",
+  "arguments": {
+    "workflow": "batch",
+    "detailLevel": "compact"
+  }
+}
+```
 
-- Paths are restricted to `FONT_SPLIT_ROOT`; relative paths are resolved from that root. If it is not set, the server defaults to the current working directory used to start the MCP Server. Tool responses and `recommendedNextActions[].suggestedArgs` use `.` for the workspace root, never an empty string.
-- Call `get_agent_guidance` first when the workflow is unclear. This README only summarizes entry-level risks; full catalogs, `inspectFields`, and `successCriteria` belong in the API, behavior notes, or focused `get_agent_guidance` `sections`.
-- The project is still being refined. `projectStatusNotice` makes that policy machine-readable: interfaces, defaults, response fields, and directory-organization behavior may change, so automation should trust the current code, live MCP schema, `get_agent_guidance`, and API docs.
-- For maintainers, the standard local gate is `npm run check:compact`; behavior-affecting changes should also run `npm run smoke:real-corpus-suite -- <font-corpus-dir>`.
-- `organize_font_directory` defaults to `safe-preview` and writes nothing. Reviewed writes are copy-only into `outputDir`; source fonts are not moved, deleted, or rewritten. That `outputDir` is source-like staging, not final split output.
-- After any write-capable tool, do not trust `ok` alone. Inspect `sourceSafetyDecision`, `safetySummary`, `recommendedNextActions[]`, `successCriteria`, and, when applicable, an `inspect_split_output` audit.
-- For real corpora or large directories, inspect `inputCountGuide`, `unsupportedFileDecision`, and `unsupportedFileSummary` before treating counts as complete. Archives and non-font files are reported as ignored inputs; they are not extracted, copied, or split automatically.
-- Invalid explicit configuration values are rejected instead of silently falling back; omit an option to use its default rather than passing an invalid enum, boolean, or numeric value.
-- Batch scanning skips dependencies, generated output directories, `__MACOSX`, and AppleDouble `._*` resource-fork files.
+When layout, write risk, or the next tool is unclear, inspect `recommendedWorkflowPlan`, `nextToolDecisionSummary`, `toolSafetyQuickReference`, and `responseFieldsToCheck`.
+
+### 2. Preflight an Input Directory
+
+```json
+{
+  "tool": "inspect_font_inputs",
+  "arguments": {
+    "inputDir": "fonts",
+    "maxFiles": 50000,
+    "includeFiles": false
+  }
+}
+```
+
+Start with `inputCountGuide`, `inputDirectoryDecision`, `unsupportedFileDecision`, `unsupportedFileSummary`, `layout`, and `maxFilesHit`. Archives and non-font files are reported as ignored inputs; they are not extracted, copied, or split automatically.
+
+### 3. Batch Safe Preview
+
+```json
+{
+  "tool": "split_font_batch",
+  "arguments": {
+    "inputDir": "fonts",
+    "outputRoot": "split-output",
+    "workflowPreset": "safe-preview",
+    "limit": 50000,
+    "maxFiles": 50000
+  }
+}
+```
+
+Confirm `dryRun: true`, `batchWarnings[]`, `dedupeDecisionSummary`, `batchPolicySummary`, `sourceSafetyDecision`, `recommendedNextActions[]`, and `errors[]` before deciding to write.
+
+### 4. Reviewed Write and Output Audit
+
+```json
+{
+  "tool": "split_font_batch",
+  "arguments": {
+    "inputDir": "fonts",
+    "outputRoot": "split-output",
+    "workflowPreset": "reviewed-write",
+    "limit": 50000,
+    "maxFiles": 50000
+  }
+}
+```
+
+After writing, run:
+
+```json
+{
+  "tool": "inspect_split_output",
+  "arguments": {
+    "outDir": "split-output",
+    "maxFiles": 200000,
+    "includeFiles": false,
+    "includeFamilies": false
+  }
+}
+```
+
+Treat the output as audited only when `outputRoleDecision.auditAppliesToThisDirectory !== false`, `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false`.
+
+### 5. Organize the Source Layout When Needed
+
+```json
+{
+  "tool": "organize_font_directory",
+  "arguments": {
+    "inputDir": "fonts",
+    "workflowPreset": "safe-preview",
+    "includePlan": true,
+    "maxFiles": 50000
+  }
+}
+```
+
+The organizer returns a plan by default. Even with `reviewed-write`, it performs copy-only staging into `outputDir`; that output is source-like staging, not final split output. Inspect the staging directory with `inspect_font_inputs`, then run `split_font_batch` safe-preview.
+
+## Key Risks
+
+- `ok: true` only means the selected policy completed. It does not always mean normal multi-subset output happened. Prefer `resultType`, `outputMode`, `performedSplit`, `usedFallback`, `skipped`, and `warnings`.
+- Paths are restricted to `FONT_SPLIT_ROOT`; tool responses use `.` for the workspace root.
+- After any write-capable tool, do not trust `ok` alone. Inspect `sourceSafetyDecision`, `safetySummary`, `recommendedNextActions[]`, and, when applicable, an `inspect_split_output` audit.
+- `organize_font_directory` never moves, deletes, or rewrites source fonts; its `outputDir` is copy-only source staging.
+- `split_font_batch` defaults to `batchNamingMode: "numeric-suffix"`: bare names first, stable `-1`, `-2`, etc. only on real collisions.
+- `batchDedupeMode: "same-path"` is path/stem-level dedupe; `batchDedupeMode: "font-identity"` compares font identity across formats.
+- `font-identity` uses OpenType name IDs 16/17 first, then falls back to name IDs 1/2, name ID 4, and name ID 6; `glyphCount` is diagnostic only and should not split equivalent OTF/TTF/WOFF inputs.
 - `.woff` and `.woff2` inputs are decompressed to sfnt-like data before processing.
-- Batch mode deduplicates fonts according to `batchDedupeMode`; by default `font-identity` keeps one representative for equivalent fonts across formats using the priority `.otf` → `.ttf` → `.woff2` → `.ttc` → `.otc` → `.woff`.
-- Batch grouping defaults to `batchGroupBy: "auto"`, which preserves the directory-first behavior for nested inputs.
-- Batch naming defaults to `batchNamingMode: "numeric-suffix"`: bare `fontBaseName` first, then stable `-1`, `-2`, `-3` only on real collisions.
-- Equivalent OTF/TTF pairs are deduplicated in batch mode when they resolve to the same font identity, keeping only one representative.
-- Batch processing never moves, deletes, or rewrites source font files: `sourceDestructive` should stay `false`, and `sourceSafetyDecision.sourceBackupRequired` should be `false`. If `outputRoot` is inside `inputDir`, real writes still land inside the input tree, so inspect `sourceSafetyDecision`, `writesSourceTree`, and `outputTreeInsideInputTree` before describing the run as source-tree no-write.
-- Batch incremental skipping defaults to `skipMode: "manifest"`, which compares source files and effective options through `split-meta.json`.
-- Use `skipMode: "force"` only when reprocessing is intentional; default manifest skipping is the safe incremental path.
-- Batch error handling defaults to `batchErrorMode: "fail-after"`, which finishes selected fonts and then upgrades any per-font error to a batch error.
-- Oversized `kern` stripping is opt-in via `oversizedKernAction: "strip"`.
-- Split-failure single-WOFF2 fallback is opt-in via `splitFailureAction: "single-woff2"`.
-- Small glyph fonts are controlled by `smallGlyphAction`: `subset`, `single-woff2`, or `copy-original`.
-
-## Output layout
-
-Normal subset output:
-
-```text
-split-output/
-  <FamilyName>/
-    <OriginalFontFile> or <OriginalFontFile-1>  # copied original font when needed
-    <FontBaseName>/ or <FontBaseName-1>/        # processed output directory only on true collision
-      *.woff2
-      result.css
-      index.html?               # when testHtml=true
-      reporter.bin?             # when reporter=true and subset output is produced
-      index.proto?              # produced by the core splitter on normal subset paths
-      split-meta.json           # manifest for this run
-```
-
-Single-WOFF2 fallback output:
-
-```text
-split-output/
-  <FamilyName>/
-    <OriginalFontFile> or <OriginalFontFile-1>
-    <FontBaseName>/ or <FontBaseName-1>/
-      <FontBaseName>.woff2
-      result.css
-      index.html?
-      split-meta.json
-```
-
-Small-font `copy-original` output:
-
-```text
-split-output/
-  <FamilyName>/
-    <OriginalFontFile> or <OriginalFontFile-1>
-    <FontBaseName>/ or <FontBaseName-1>/
-      split-meta.json
-```
-
-In batch mode, the bare name is used first. Only true collisions allocate stable numeric suffixes (`-1`, `-2`, ...), and those suffixes are reused on reruns through manifest matching.
-
-`copy-original` intentionally does not generate `.woff2` or `result.css`; it records that the font was handled and skipped from subsetting.
-
-Organized staging output from `organize_font_directory`:
-
-```text
-organized-fonts/
-  <GroupName>/
-    <OriginalFontFile> or <OriginalFontFile-1>
-  font-organization-manifest.json   # only when dryRun=false
-```
-
-This staging layout is not a split result and does not contain CSS. It is a copy-only helper for preparing a source directory before a later `split_font_batch` run.
-The organizer response also includes `stagingDirectoryDecision`, which explicitly labels `outputDir` as source-like staging (`isSplitOutput: false`) and points agents to `inspect_font_inputs`, then `split_font_batch` safe-preview, and only later `inspect_split_output` after generated split output exists. If a staging directory containing `font-organization-manifest.json` is accidentally passed to `inspect_split_output`, the response sets `outputRoleDecision.isSplitOutput` to `false`, changes `auditStatus` to `action-required`, and emits the `organized-staging-not-split-output` warning.
-
-## Common Source Layouts
-
-Use `organize_font_directory` when the source layout is unclear, flat, mixed, or different from the family grouping you want. Start with its default `dryRun: true`; this only returns a plan and safety summary.
-
-Flat vendor dump:
-
-```text
-fonts/
-  BrandSans-Regular.ttf
-  BrandSans-Bold.otf
-  readme.txt
-```
-
-Recommended first call:
-
-```json
-{
-  "inputDir": "fonts",
-  "dryRun": true,
-  "parseFonts": true,
-  "includePlan": true
-}
-```
-
-This lets the tool read font metadata and recommend `batchGroupBy`. If the plan is good, prefer copying `recommendedBatchPreviewArgs` into `split_font_batch` for a safe-preview run on the original directory. `recommendedBatchOptions` is only a policy fragment, not a complete safe invocation by itself. Run copy-only organization into `organized-fonts` only when the user wants a cleaner staging source.
-
-Archive-per-family folders:
-
-```text
-fonts/
-  BrandSans/
-    Regular.ttf
-    Bold.ttf
-  OtherSerif/
-    Regular.otf
-```
-
-This usually can go straight to `split_font_batch` dry-run with `batchGroupBy: "source-dir"`. Use the organizer only if the user explicitly wants a copied staging directory.
-
-Mixed root and nested fonts:
-
-```text
-fonts/
-  LooseDisplay.ttf
-  BrandSans/
-    Regular.ttf
-  OtherSerif/
-    Regular.otf
-```
-
-This is the easiest layout to misread. Call `organize_font_directory` with `dryRun: true` first and inspect `safetySummary`, `layout.layoutKind`, `sourceLayoutMismatchSummary`, `recommendedBatchOptions`, `recommendedBatchPreviewArgs`, `organizationWarnings`, `sourceDestructive`, `writesSourceTree`, and `outputTreeInsideInputTree`.
-
-Large or noisy library first pass:
-
-```json
-{
-  "inputDir": "fonts",
-  "dryRun": true,
-  "parseFonts": false,
-  "includePlan": false
-}
-```
-
-Use this only to learn the directory shape quickly. Because font parsing is skipped, `validFontCount` and `invalidFontCount` are `null`, `glyphCount` is unavailable, and identity dedupe falls back to a path-based mode. Rerun with `parseFonts: true` before trusting invalid-font counts, metadata family grouping, or identity dedupe.
-
-## Key options
-
-### Single-font and batch processing options
-
-| Option | Values | Default | Meaning |
-|--------|--------|---------|---------|
-| `oversizedKernAction` | `preserve`, `strip` | `preserve` | Detect oversized `kern` tables by default; only remove them when explicitly set to `strip`. |
-| `smallGlyphAction` | `subset`, `single-woff2`, `copy-original` | `subset` | Decide what to do when `glyphCount <= smallGlyphThreshold`. |
-| `smallGlyphThreshold` | positive integer | `50` | Glyph-count threshold for small-font policy decisions. |
-| `splitFailureAction` | `error`, `single-woff2` | `error` | Surface cn-font-split failures by default; optionally recover with a single WOFF2 fallback. |
-
-`smallGlyphAction` details:
-
-- `subset`: still try normal cn-font-split processing.
-- `single-woff2`: generate one WOFF2 file plus CSS instead of chunks.
-- `copy-original`: copy the source font into the output family directory, create the font output directory, write `split-meta.json`, and do not generate web-font files.
-
-### Batch-only options
-
-| Option | Values | Default | Meaning |
-|--------|--------|---------|---------|
-| `workflowPreset` | `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | unset | Named configuration preset expanded before batch/organization options; omit it to use raw tool defaults, and explicit options still override preset values. |
-| `skipMode` | `manifest`, `force` | `manifest` | Choose how batch mode decides whether output is already current. |
-| `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | Choose the family directory naming strategy for batch mode. |
-| `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix` | `numeric-suffix` | Choose how batch mode names per-font output directories when collisions exist. |
-| `batchDedupeMode` | `none`, `same-path`, `font-identity` | `font-identity` | Choose pre-processing dedupe; `same-path` is path/stem-level, while `font-identity` is semantic identity across formats. |
-| `batchErrorMode` | `collect`, `fail-fast`, `fail-after` | `fail-after` | Choose whether per-font errors are collected in the response or thrown for automation. |
-| `limit` | positive integer, MCP max `50000` | `20` | Maximum fonts to process after dedupe. Raise it explicitly for full-library runs. |
-| `maxFiles` | positive integer, MCP max `50000` | `5000` | Maximum source files to scan before filtering fonts. |
-| `includeResults` | `true`, `false` | `true` | Include per-font result objects. Set `false` for large runs that only need summary counters and errors. |
-| `dryRun` | `true`, `false` | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
-
-`skipMode` details:
-
-- `manifest`: skip only when `split-meta.json` matches source path, source size, source mtime, effective options, manifest version, and tool version.
-- `force`: never skip existing output.
-
-`workflowPreset` details:
-
-- `safe-preview`: no-write preview. In batch mode this applies safe defaults such as `dryRun: true`, `includeResults: true`, `skipMode: "manifest"`, and `batchErrorMode: "fail-after"`; in organization mode it parses fonts and returns the full plan.
-- `reviewed-write`: real write settings after a preview has been reviewed. Batch mode writes split output; organization mode performs copy-only writes into `outputDir` and still does not modify source files.
-- `structure-first`: no-write structure/path-oriented first pass for very large or noisy directories; batch mode uses `same-path` dedupe, and organization mode skips font metadata parsing.
-- `source-layout`: prefer source directories as family/group names, useful for archive-per-family folder layouts.
-- `metadata-family`: prefer internal font family metadata, useful for flat vendor dumps.
-- `preserve-all`: disable pre-processing dedupe while keeping `numeric-suffix` naming, useful when every source font file must be kept.
-
-Presets are starting points, not locked configurations. Omit `workflowPreset` when you want raw tool defaults. For example, `{"workflowPreset":"safe-preview","batchDedupeMode":"none"}` keeps the no-write preview behavior but disables dedupe.
-
-Batch and organization responses include `configurationTrace`, which explains whether each high-impact configuration value came from the raw tool default, the `workflowPreset` default, or an explicit argument in the same call. It also lists `explicitOverrideFields[]` and `presetDefaultFields[]`; when an agent needs to explain why a safe-preview option was enabled/disabled or whether an explicit value overrode the preset, inspect this field first.
-
-In batch mode, the output directory key is the bare `fontBaseName` unless another source has already claimed it. In that case the tool allocates a stable numeric suffix and reuses it on later reruns by manifest source matching.
-
-`batchGroupBy` details:
-
-- `auto`: nested fonts use the first source-directory segment; root-level fonts use internal family metadata.
-- `source-dir`: always use the first source-directory segment when available.
-- `font-family`: always use internal font family metadata when available, with basename fallback.
-
-`batchNamingMode` details:
-
-- `plain`: always use the bare `fontBaseName` and original filename, without automatic collision suffixes.
-- `numeric-suffix`: use the bare name first, then allocate stable `-1`, `-2`, ... suffixes only when another source has already claimed that name.
-- `source-suffix`: append a source-derived `--<ext>-<hash8>` suffix to make outputs distinct even before a collision occurs.
-
-`batchDedupeMode` details:
-
-- `none`: do not deduplicate before processing.
-- `same-path`: deduplicate only multi-format files that share the same source path stem; it is fast/path-level and does not detect semantic equivalents across directories.
-- `font-identity`: deduplicate equivalent fonts across formats by comparing normalized font identity and keeping the highest-priority representative. The key first uses OpenType name IDs 16/17 (typographic family/subfamily), falls back to name IDs 1/2 (family/subfamily) when a complete typographic pair is not available, then falls back to name ID 4 (full name), name ID 6 (PostScript name), or family-only; glyph count is diagnostic only and does not split otherwise equivalent OTF/TTF/WOFF inputs. `identityBasis` reports the actual source, such as `typographic-family-subfamily` or `opentype-family-subfamily`.
-- If identity extraction fails, dedupe falls back to a path-based key and leaves the actual failure for the processing phase and `batchErrorMode`.
-
-Use `dedupeDecisionSummary` for a compact read on the dedupe pass. It reports requested/effective mode, key strategy, skipped duplicate count, identity-key gaps, path fallback, parsing limitations, representative format priority, and capped `identityEvidenceSummary` basis counts and duplicate examples. If `pathFallbackUsed` or `dedupeLimitedByParsing` is true, disclose that semantic identity dedupe was limited.
-When explaining `identityBasis` or `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts`, look up `get_agent_guidance.fontIdentityBasisCatalog` first; low-confidence or path-fallback bases should not be described as complete semantic dedupe evidence.
-
-`batchErrorMode` details:
-
-- `collect`: keep processing and return `ok: true` with `errors[]` and `errorCount`; use it only when the caller will inspect the error list.
-- `fail-fast`: throw on the first per-font error.
-- `fail-after`: keep processing selected fonts, then throw if any per-font errors occurred.
-
-When `fail-fast` or `fail-after` throws through MCP, the error text is JSON containing `ok: false`, `name`, `errorType`, `error`, and `details`; AI agents should route on `errorType: "batch-split-error"` first, then parse `details.errors[]` and `details.summary`.
-
-## Result interpretation
-
-`split_font` returns explicit classification fields:
-
-- `outputMode`: `subset`, `single-woff2`, or `copy-original`
-- `resultType`: `subset`, `single-woff2-small-glyph`, `single-woff2-split-failure`, `single-woff2`, or `copy-original-small-glyph`
-- `performedSplit`: true only when multi-subset splitting was performed
-- `usedFallback`: true for single-WOFF2 fallback paths
-- `skipped`: true when the splitter was intentionally bypassed
-- `skipReason`: reason for bypass/fallback, when present
-- `warnings`: human-readable notes about non-transparent behavior
-- `manifestPath` / `manifestWritten`: manifest output status
-
-`inspect_font_inputs` is a no-write preflight for source directories:
-
-- `inputCountGuide`: compact guide for interpreting scanned counts, `maxFilesHit`, `filesIncluded`, and unsupported-file handling
-- `inputDirectoryDecision`: first-step directory route hint for rescanning, reviewing invalid fonts, direct batch safe-preview, or non-destructive organization safe-preview
-- `layout`: `empty`, `flat`, `nested`, or `mixed`, plus the recommended batch grouping policy
-- `recommendedBatchPreviewArgs`: copyable no-write `split_font_batch` preview arguments that preserve the current scan cap as `recommendedBatchPreviewArgs.maxFiles`
-- `supportedFontCount`, `validFontCount`, `invalidFontCount`
-- `unsupportedFileDecision`: quick triage derived from `unsupportedFileSummary`, including whether ignored files exist, whether archives are present, whether noise extends beyond `.zip` / `.txt`, and whether those files will be extracted, copied, or split
-- `unsupportedFileSummary`: summary of all ignored non-font files, including exact `unsupportedFileSummary.byExtension[]`, overview `unsupportedFileSummary.byCategory[]`, handling-aware `unsupportedFileSummary.categoryDetails[]`, overall `unsupportedFileSummary.handlingSummary`, `<none>` counts for extensionless files, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`
-- `missingIdentityCount`
-- `maxFilesHit`: true only when more files exist beyond `maxFiles`
-- `inspectionWarningCount`, `inspectionWarnings[]` with machine-readable `code` and `message`
-- `invalidFonts[]`
-- optional `files[]` entries with `container`, `identity`, `identityKey`, `identityBasis`, and `glyphCount`
-
-`split_font_batch` additionally returns aggregate counters such as:
-
-- `resultsIncluded`: whether per-font `results[]` objects are present
-- `inputCountGuide`, `scannedFileCount`, `maxFiles`, `maxFilesHit`
-- `unsupportedFileDecision`: quick triage for ignored files, archives, broader non-font noise, and the fact that unsupported files are not extracted, copied, or split
-- `unsupportedFileSummary`: summary of all scanned ignored non-font files, including exact `unsupportedFileSummary.byExtension[]`, overview `unsupportedFileSummary.byCategory[]`, handling-aware `unsupportedFileSummary.categoryDetails[]`, overall `unsupportedFileSummary.handlingSummary`, `<none>` counts for extensionless files, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`; archives are categorized as `archive` and still ignored
-- `dryRun`, `plannedCount`, `wouldProcessCount`, `planIncluded`
-- `batchWarningCount`, `batchWarnings[]` with machine-readable `code` and `message`
-- `batchPolicySummary`: compact summary of the grouping, naming, dedupe, and error policies selected for this call, including the relevant `batchPolicyGuide` success criteria
-- `batchDecision`: compact main-route recommendation for the batch response, distinguishing dry-run review, maxFiles rerun, error inspection, output audit, existing-output skips, and empty-batch branches
-- `batchErrorMode`, `errorCount`, `errors[]`
-- `sourceSafetyDecision`: first-pass source-safety triage. It says whether source fonts are moved/deleted/rewritten, whether a source backup is required, whether files are written, whether output is inside the input tree, and whether a post-write output audit is required; it does not replace the detailed `safetySummary`.
-- `safetySummary`: source/output safety summary for the batch call. Check `sourceSafetyDecision` first, then use this field to decide whether the call writes files or affects the source tree; source font files are preserved, and writes are limited to `outputRoot`.
-- `sourceDestructive`: should always be `false` for batch mode
-- `writesSourceTree`: true only when a real batch write places `outputRoot` inside `inputDir`
-- `writesOutputTree`: true when `dryRun: false`
-- `outputTreeInsideInputTree`: whether `outputRoot` is inside or equal to `inputDir`; future broad scans can reprocess generated output when this is true
-- `mayOverwriteOutputTree`: true for non-dry-run calls with selected fonts, meaning existing files under `outputRoot` may be replaced
-- `skippedExisting`, `skippedByManifest`
-- `reprocessedBecauseSourceChanged`, `reprocessedBecauseOptionsChanged`
-- `processingSummary.subsetOutputs`
-- `processingSummary.singleWoff2Outputs`
-- `processingSummary.copyOriginalOutputs`
-- `processingSummary.smallGlyphDowngrades`
-- `processingSummary.smallGlyphCopyOriginals`
-- `processingSummary.failureFallbacks`
-
-Treat `batchDecision` as a route hint, not proof of success. It helps agents choose the next branch; before continuing, still inspect `batchWarnings[]`, `errors[]`, `recommendedNextActions[]`, and output audit fields when output was written.
-
-`organize_font_directory` returns a source-safety summary plus an optional copy plan:
-
-- `sourceSafetyDecision`: first-pass source-safety triage. For the organizer, `sourceBackupRequired` should be `false` because it never moves, deletes, or rewrites source fonts; `dryRun: false` is still copy-only into `outputDir`.
-- `safetySummary`: compact source/output safety summary. Check `sourceSafetyDecision` first, then use this field to decide whether the organizer writes files or can affect the source tree; it confirms source preservation and scopes any overwrite risk to `outputDir`.
-- `operationMode`: `plan-only` for default dry-run, or `copy-only` when `dryRun: false`
-- `sourceDestructive`: always `false`
-- `writesSourceTree`: true only when a real copy writes `outputDir` inside `inputDir`
-- `writesOutputTree`: true only when `dryRun: false`
-- `outputTreeInsideInputTree`: whether `outputDir` is inside or equal to `inputDir`; future broad scans can reprocess organized copies when this is true
-- `mayOverwriteOutputTree`: true only when `dryRun: false` and `overwriteExisting: true`
-- `sourceFilesPreserved`: always `true`
-- `parsedFontMetadata`: false when `parseFonts: false`; then `validFontCount` / `invalidFontCount` are `null`
-- `effectiveBatchDedupeMode`, `dedupeLimitedByParsing`: explain whether identity dedupe was available
-- `dedupeDecisionSummary`: compact dedupe explanation with effective mode, path fallback, parsing limits, skipped duplicate count, representative priority, and capped `identityEvidenceSummary`
-- `batchPolicySummary`: compact summary of the grouping, naming, and dedupe policies selected for this organization call; when `parseFonts: false` limits identity dedupe, `effectiveValues.batchDedupeMode` shows the actual fallback
-- `layoutDecision`: top-level compact route summary with `shortAnswer`, `layoutKind`, recommended grouping, main route, source-safety signals, direct original-input preview status, and copy-only staging status. Start with `layoutDecision.directoryHandling`; it gives a `recommendedMode` and `shortAnswer` for whether to preview the original input, use copy-only staging, or switch to an organized output as the next input. It is useful for the agent's first "where next?" decision, not proof that organization or splitting succeeded.
-- `stagingDirectoryDecision`: compact decision for the organizer `outputDir`; it says whether the directory is only planned, ready as source-like staging, blocked by errors, already occupied by existing targets, or empty/no-op. It also states `isSplitOutput: false`, so inspect it with `inspect_font_inputs`, preview it with `split_font_batch` safe-preview, and reserve `inspect_split_output` for generated split output after a later write.
-- `directoryWorkflowSummary`: response-local navigation summary for layout review, safe batch preview, optional copy-only staging, reviewed batch write, and required output audit. It repeats source-safety signals, route choice, `planVisibility`, `workflowSteps[]`, success criteria, and non-intuitive behavior notes; no-write `split_font_batch` preview steps use `directoryWorkflowSummary.workflowSteps[].suggestedArgsField` to point at the canonical field that supplied the copyable args.
-- `sourceLayoutMismatchSummary`: compact answer to the common layout question: current layout vs recommended grouping, whether direct original-input safe preview is available, whether copy-only staging is not required / optional / already written, and why staging is source-non-destructive. After a copy-only write, `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` is the copyable `split_font_batch` safe-preview call for the organized output and preserves the current `maxFiles`; the `copy-only-staging` checklist item also repeats it as `sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs`. Its `sourceLayoutMismatchSummary.decisionChecklist` gives agents a shorter checklist for source safety, direct preview readiness, copy-only staging need, plan visibility, warning review, and post-write output audit. Directory-routing `inspectFields`, `mustInspectFields`, and `responseFields` that list `sourceLayoutMismatchSummary` also list `sourceLayoutMismatchSummary.decisionChecklist`.
-- `directoryWorkflowSummary.planVisibility`: explains whether detailed `plan[]` entries are present. When `includePlan: false`, `plan[]` is omitted, but `planActionSummary`, `layoutDecision`, `layoutDecision.directoryHandling`, `organizationDecision`, `sourceLayoutMismatchSummary`, `recommendedNextActions[]`, `organizationWarnings[]`, `layout`, `safetySummary`, and `batchPolicySummary` remain useful for large-directory triage; rerun with its `rerunWithPlanArgs` before writing when exact per-file targets matter.
-- `inputCountGuide`: compact guide for interpreting scanned source counts, count completeness, and unsupported-file handling before trusting an organization plan
-- `unsupportedFileDecision`: quick triage for ignored files, archives, broader non-font noise, and whether those files will be extracted, copied, or split
-- `unsupportedFileSummary`: summary of all ignored non-font files, including exact `unsupportedFileSummary.byExtension[]`, overview `unsupportedFileSummary.byCategory[]`, handling-aware `unsupportedFileSummary.categoryDetails[]`, overall `unsupportedFileSummary.handlingSummary`, `<none>` counts for extensionless files, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`; inspect it first when the source tree mixes fonts with archives, images, docs, or generated assets
-- `layout.layoutKind`: `empty`, `flat`, `nested`, or `mixed`
-- `recommendedBatchOptions`: a suggested follow-up `split_font_batch` policy fragment for the detected layout; not a complete safe invocation
-- `recommendedBatchPreviewArgs`: copyable no-write `split_font_batch` preview args containing `inputDir`, `workflowPreset: "safe-preview"`, the necessary layout overrides, and `recommendedBatchPreviewArgs.maxFiles` for the current scan cap
-- `recommendedNextActionCount`, `recommendedNextActions[]`: machine-readable follow-up actions for agents, each with an `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, optional `recommendedNextActions[].suggestedArgsField`, `inspectFields`, and `successCriteria`. `suggestedArgsField` points to the canonical response field behind the copyable args, such as `batchDecision.reviewedWriteArgs`, `batchDecision.auditArgs`, `recommendedBatchPreviewArgs`, or `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`. Organization follow-up actions that rescan a directory preserve the current scan cap as `recommendedNextActions[].suggestedArgs.maxFiles`.
-- `organizationDecision`: compact main-route recommendation for the organizer response, distinguishing rerun, font parsing, invalid-font, original-layout preview, mixed-layout review, and organized-output preview branches
-- `organizationWarningCount`, `organizationWarnings[]` with machine-readable `code` and `message`
-- `planActionSummary`: always returned; counts plan actions such as `would-copy`, `copied`, `skipped-duplicate`, `skipped-invalid`, `skipped-target-exists`, and `error`, even when `includePlan: false`
-- optional `plan[]` entries with `source`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`
-
-Treat `layoutDecision`, `layoutDecision.directoryHandling`, `stagingDirectoryDecision`, `organizationDecision`, `directoryWorkflowSummary`, `sourceLayoutMismatchSummary`, and `sourceLayoutMismatchSummary.decisionChecklist` as route hints, not proof of success. They help agents choose the next branch; before continuing, still inspect `recommendedNextActions[]`, `organizationWarnings[]`, `planActionSummary`, `directoryWorkflowSummary.planVisibility`, and `plan[]` when available.
-Treat `recommendedNextActions[]` as a checklist, not automation. Agents should still inspect the action's `inspectFields` and satisfy `successCriteria` before continuing or reporting completion, especially when an action recommends writing files, auditing output, or rerunning with different scan/parsing limits. `suggestedArgs` prefer `workflowPreset` and only keep overrides that differ from that preset; when an action includes `recommendedNextActions[].suggestedArgsField`, use it first to confirm which stable response field supplied the args. For organization actions that rescan source or staging directories, `recommendedNextActions[].suggestedArgs.maxFiles` preserves the current scan cap unless the action is explicitly asking for a higher cap. Batch dry-runs can return `run-reviewed-batch-write`; real batch writes can return `audit-split-output`, whose suggested next tool is `inspect_split_output`.
-Treat `planActionSummary` as a compact overview, not approval to write files without reviewing the detailed plan when it is included.
-
-`inspect_split_output` keeps flat file stats and adds structured output inventory:
-
-- When explaining audit statuses, layouts, or issue codes, look up `get_agent_guidance.outputStructureCatalog` first. Its `layoutKinds` explain `structureSummary.layoutKind`, `issueCodes` explain `structureSummary.issues[].code`, and `outputModes` explain required-file differences for `subset`, `single-woff2`, and `copy-original`.
-- `maxFiles` can raise or lower the output scan cap; it defaults to `200000` so large batch outputs are not truncated during inspection.
-- `maxFilesHit` is true only when more output files exist beyond `maxFiles`.
-- `outputRoleDecision` is the first directory-role decision. If `outDir` contains `font-organization-manifest.json`, it is classified as `organized-font-source-staging` with `auditAppliesToThisDirectory: false`; inspect that directory with `inspect_font_inputs`, then run `split_font_batch` safe-preview instead of treating it as a passed split-output audit.
-- `outputStructureDecision` is the quick decision route derived from `outputRoleDecision`, `auditStatus`, `auditBlockingReasons`, `maxFilesHit`, and `structureSummary`; inspect `status`, `recommendedAction`, `blockingReasonCodes`, and `issueCodes` first.
-- `auditStatus` is the compact audit gate: `pass`, `action-required`, or `incomplete`. Treat a real output audit as complete only when it is `pass`.
-- `auditPassed` is a boolean shortcut for `auditStatus === "pass"`.
-- `auditBlockingReasons[]` lists machine-readable blockers; structure blockers include `issueCodes` from `structureSummary.issues[]`.
-- `includeFiles: false` omits flat `files[]` while keeping summary counters.
-- `includeFamilies: false` omits structured `families[]` while keeping family and output-mode counters.
-- `inspectionWarningCount` and `inspectionWarnings[]` summarize truncation, omitted detail arrays, missing manifests, structure issues, and staging-directory misuse with machine-readable `code` values.
-- `structureSummary` checks whether the output directory matches the documented structure; after real batch writes, call `inspect_split_output` and require `outputRoleDecision.auditAppliesToThisDirectory !== false`, `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false` before treating an output tree as free of stray files, missing manifests, or missing files required by the declared output mode.
-- `copy-original` entries require only `split-meta.json`; they intentionally do not generate CSS or WOFF2 files, so those missing files are not automatically structure failures for that mode.
-- `familyCount`
-- `fontEntryCount`
-- `manifestCount`
-- `subsetOutputCount`
-- `singleWoff2OutputCount`
-- `copyOriginalOutputCount`
-- `missingManifestCount`
-- `families[]`
-
-## Examples
-
-Conservative single-font behavior:
-
-```json
-{
-  "fontPath": "SomeFamily/SomeFont.ttf"
-}
-```
-
-Tolerant single-font behavior:
-
-```json
-{
-  "fontPath": "SomeFamily/SomeFont.ttf",
-  "oversizedKernAction": "strip",
-  "smallGlyphAction": "single-woff2",
-  "splitFailureAction": "single-woff2"
-}
-```
-
-Small-font copy-original behavior:
-
-```json
-{
-  "fontPath": "SomeFamily/AsciiOnly.ttf",
-  "smallGlyphAction": "copy-original"
-}
-```
-
-Recommended batch behavior for archive-per-family source folders:
-
-```json
-{
-  "inputDir": ".",
-  "outputRoot": "split-output",
-  "batchGroupBy": "source-dir",
-  "batchNamingMode": "numeric-suffix",
-  "batchDedupeMode": "font-identity",
-  "skipMode": "manifest",
-  "smallGlyphAction": "copy-original"
-}
-```
-
-Full-library batch run with compact response:
-
-```json
-{
-  "inputDir": ".",
-  "outputRoot": "split-output",
-  "limit": 50000,
-  "maxFiles": 50000,
-  "includeResults": false,
-  "batchNamingMode": "numeric-suffix",
-  "batchDedupeMode": "font-identity",
-  "skipMode": "manifest",
-  "splitFailureAction": "single-woff2"
-}
-```
-
-Preview a full-library run without writing files:
-
-```json
-{
-  "inputDir": ".",
-  "outputRoot": "split-output",
-  "limit": 50000,
-  "maxFiles": 50000,
-  "dryRun": true,
-  "includeResults": true,
-  "batchNamingMode": "numeric-suffix",
-  "batchDedupeMode": "font-identity",
-  "skipMode": "manifest"
-}
-```
-
-Preview a non-destructive directory organization plan:
-
-```json
-{
-  "inputDir": ".",
-  "outputDir": "organized-fonts",
-  "dryRun": true,
-  "includePlan": true,
-  "batchGroupBy": "auto",
-  "batchNamingMode": "numeric-suffix",
-  "batchDedupeMode": "font-identity"
-}
-```
-
-Preview a fast structure-only organization plan without reading font metadata:
-
-```json
-{
-  "inputDir": ".",
-  "outputDir": "organized-fonts",
-  "dryRun": true,
-  "parseFonts": false,
-  "includePlan": true
-}
-```
-
-Apply the reviewed copy-only organization plan:
-
-```json
-{
-  "inputDir": ".",
-  "outputDir": "organized-fonts",
-  "dryRun": false,
-  "batchGroupBy": "auto",
-  "batchNamingMode": "numeric-suffix",
-  "batchDedupeMode": "font-identity",
-  "overwriteExisting": false
-}
-```
-
-Metadata-driven batch grouping:
-
-```json
-{
-  "inputDir": ".",
-  "outputRoot": "split-output",
-  "batchGroupBy": "font-family",
-  "batchNamingMode": "numeric-suffix",
-  "batchDedupeMode": "font-identity",
-  "skipMode": "manifest"
-}
-```
-
-Use bare names with path-level dedupe only:
-
-```json
-{
-  "inputDir": ".",
-  "outputRoot": "split-output",
-  "batchNamingMode": "plain",
-  "batchDedupeMode": "same-path"
-}
-```
-
-Disable dedupe entirely:
-
-```json
-{
-  "inputDir": ".",
-  "outputRoot": "split-output",
-  "batchDedupeMode": "none"
-}
-```
+- Invalid explicit configuration values are rejected instead of silently falling back. Omit an option to use its default.
+- If `outputRoot` is inside `inputDir`, real writes still land inside the input tree; inspect `writesSourceTree` and `outputTreeInsideInputTree` before calling the run source-tree no-write.
+
+## Common Options
+
+| Option | Entry-Level Meaning |
+|--------|---------------------|
+| `workflowPreset` | `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all`. A starting point; explicit options still override it. |
+| `batchGroupBy` | `auto`, `source-dir`, `font-family`. Chooses source structure or font metadata for family grouping. |
+| `batchNamingMode` | `plain`, `numeric-suffix`, `source-suffix`. Default is `numeric-suffix`. |
+| `batchDedupeMode` | `none`, `same-path`, `font-identity`. Default is `font-identity`. |
+| `batchErrorMode` | `collect`, `fail-fast`, `fail-after`. Default is `fail-after`. |
+| `dryRun` | `true` previews; `false` writes. |
+| `limit` / `maxFiles` | Control batch size and scan bounds. Large directories usually need explicit higher values. |
+| `includeResults` | Set to `false` for large batches when summaries, warnings, and errors are enough. |
+
+For complete arguments, response fields, and error shapes, see the [API Reference](./API.md).
+
+## Reading Results
+
+| Tool | Check First |
+|------|-------------|
+| `split_font` | `outputMode`, `resultType`, `performedSplit`, `usedFallback`, `skipReason`, `warnings` |
+| `inspect_font_inputs` | `inputCountGuide`, `inputDirectoryDecision`, `unsupportedFileSummary`, `layout` |
+| `split_font_batch` | `batchDecision`, `batchWarnings`, `batchPolicySummary`, `dedupeDecisionSummary`, `recommendedNextActions`, `sourceSafetyDecision`, `safetySummary` |
+| `organize_font_directory` | `layoutDecision`, `sourceSafetyDecision`, `stagingDirectoryDecision`, `recommendedNextActions` |
+| `inspect_split_output` | `outputRoleDecision`, `outputStructureDecision`, `auditStatus`, `auditPassed`, `structureSummary` |
+
+This is the entry-level reading order, not a replacement for field definitions in the API docs.
 
 ## Installation
-
-Requires Node.js 18 or newer.
 
 ```sh
 git clone https://github.com/WenZhimo/mcp-font-split.git
@@ -564,18 +192,15 @@ cd mcp-font-split
 npm install
 ```
 
-If lifecycle scripts are disabled in your environment, install dependencies and then download the cn-font-split WASM backend:
+The `cn-font-split` WASM assets are prepared by the `postinstall` script. You can also run:
 
 ```sh
-npm install --ignore-scripts
 npm run install:wasm
 ```
 
-Use `npm run install:wasm -- --version 7.6.8` when you need to pin a specific cn-font-split runtime release.
-
 ## Usage
 
-### As MCP Server
+### As an MCP Server
 
 ```sh
 claude mcp add font-split -- node "/path/to/mcp-font-split/src/server.js"
@@ -588,101 +213,32 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` is a safe standalone batch helper for agents and maintainers. Real runs default to `workflowPreset: "reviewed-write"`; `--dry-run` or `FONT_SPLIT_DRY_RUN=true` uses `workflowPreset: "safe-preview"`. Positional arguments are `inputDir`, `outputRoot`, `limit`, and `maxFiles`; the same values can be supplied with `FONT_SPLIT_INPUT_DIR`, `FONT_SPLIT_OUTPUT_ROOT`, `FONT_SPLIT_LIMIT`, `FONT_SPLIT_MAX_FILES`, and `FONT_SPLIT_WORKFLOW_PRESET`. `FONT_SPLIT_WORKFLOW_PRESET` only accepts `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, and `preserve-all`; `default` is not valid, so omit the variable when you want the helper's default behavior. Environment overrides only replace preset defaults when explicitly set: `FONT_SPLIT_DRY_RUN`, `FONT_SPLIT_INCLUDE_RESULTS`, `FONT_SPLIT_SKIP_MODE`, `FONT_SPLIT_BATCH_GROUP_BY`, `FONT_SPLIT_BATCH_NAMING_MODE`, `FONT_SPLIT_BATCH_DEDUPE_MODE`, `FONT_SPLIT_BATCH_ERROR_MODE`, `FONT_SPLIT_SPLIT_FAILURE_ACTION`, and `FONT_SPLIT_CHUNK_SIZE`. Invalid enum-like, boolean, or numeric configuration values fail with `BatchRunConfigurationError` and return allowed values or the expected type instead of silently falling back; enum-like env errors also return `details.source: "env"`, `details.targetField`, and `details.allowedValues` so agents can map the environment variable back to the core tool option. Positional `limit` / `maxFiles` must also be positive integers. It prints `batchWarnings[]` codes/messages in the console summary; `npm run smoke:batch-run` verifies the `--dry-run`, `FONT_SPLIT_WORKFLOW_PRESET`, invalid preset rejection, invalid env rejection, invalid numeric positional rejection, and `FONT_SPLIT_INCLUDE_RESULTS` override paths.
+`batch:run` is a safe batch entry point for agents and maintainers. By default it uses `reviewed-write`; `--dry-run` or `FONT_SPLIT_DRY_RUN=true` uses `safe-preview`. `FONT_SPLIT_WORKFLOW_PRESET=default` is rejected because `default` is not valid; invalid preset rejection, invalid environment values, and invalid positional numbers fail with `BatchRunConfigurationError` and include `errorType`, allowed values, or the expected type. enum-like, boolean, or numeric values are rejected instead of silently falling back when invalid. Use `--json` or `FONT_SPLIT_JSON=true` for stable JSON output.
 
-Use `--json` or `FONT_SPLIT_JSON=true` when an agent or script needs stable parsing. JSON mode suppresses progress and human summaries; stdout is `{ ok: true, runner, options, result }` on success, or `{ ok: false, runner, options, name, errorType, error, details? }` on failure while the process still exits nonzero. `errorType` is the shortest routing field: configuration failures use `configuration-error`, and batch processing failures use `batch-split-error`. For large runs where the agent only needs status, counts, warnings, errors, and follow-up actions, use `--json-summary` or `FONT_SPLIT_JSON_SUMMARY=true`; it omits potentially large `planned[]` / `results[]` details and returns `{ ok, runner, options, summary }` or a compact error summary with `errorType`.
-
-### Smoke checks
+### Verification
 
 ```sh
 npm run check
 npm run check:compact
-npm run check:syntax
-npm run check:smoke
-npm run smoke
-npm run smoke:agent-guidance
-npm run smoke:runtime-status
-npm run smoke:incremental
-npm run smoke:font-inputs
-npm run smoke:scan-limits
-npm run smoke:organize
-npm run smoke:organize-copy
-npm run smoke:organize-valid
-npm run smoke:organize-structure
-npm run smoke:organize-output-inside
-npm run smoke:batch-run
-npm run smoke:batch-dry-run
-npm run smoke:batch-defaults
-npm run smoke:real-corpus-suite -- <font-corpus-dir>
-npm run smoke:real-corpus-readonly -- <font-corpus-dir>
-npm run smoke:real-corpus-targets -- <font-corpus-dir>
-npm run smoke:real-corpus-integration -- <font-corpus-dir>
-npm run smoke:inspect-compact
-npm run smoke:mcp-error
+npm run --silent check:compact -- --json
 npm run smoke:api-docs
 npm run smoke:behavior-docs
-npm run smoke:inspect
-npm run smoke:small-copy-original
+npm run smoke:real-corpus-suite -- <font-corpus-dir>
 ```
 
-`npm run check` is the recommended agent/CI entry point. It runs syntax checks plus smoke scenarios that create their own tiny inputs and do not require a real font library. Use `npm run check:compact` when an agent needs lower-noise output; it runs the same syntax/smoke gates, prints only step summaries and `compact-check-result` on success, and returns failed-step stdout/stderr tails on failure. Use `npm run --silent check:compact -- --json` when an agent needs pure JSON.
+`npm run check` is the recommended AI-agent / CI entry point. `check:compact` is the low-noise syntax + smoke gate. `smoke:real-corpus-suite` is a representative reliability gate over a real local corpus, not per-font or per-directory manual acceptance. It distinguishes full-root scan counts from representative sample counts and reports archives as ignored files rather than extracting them.
 
-`smoke:real-corpus-suite` is the recommended local real-corpus reliability gate after a functionality-affecting change, and is not included in `npm run check`. `get_agent_guidance.localVerificationOutputGuide` is the machine-readable companion for interpreting this local command output. The suite runs the read-only full-root preview, `smoke:real-corpus-targets`, and `smoke:real-corpus-integration` in order, covering full-corpus compact scanning, representative read-only sampling, directory-organization preview, source-safety decisions, source-layout mismatch summaries, copy-only organization writes, single-font splitting, batch writes, and output-structure audits. It defaults to compact output: each child check prints only success status, elapsed time, a human-readable `real-corpus suite summary`, and a low-noise final JSON summary; the JSON `humanSummary` repeats those short lines for agents. The final JSON also includes top-level `reliabilityGateDecision` and `corpusCountGuide`: check `reliabilityGateDecision.status`, `reliabilityGatePassed`, `blockingReasonCodes`, `fullCorpusFontCountField`, and `targetCountsAreFullCorpusCounts` first, then use `corpusCountGuide.fullCorpus` / `corpusCountGuide.representativeTargets` to distinguish full-corpus scan counts from representative target counts. `status: "pass"` means the representative feature chain passed, not that every font directory was manually accepted. The final `testScope` splits the scope into `corpusScan` (full root scan), `targetSampling` (fixed regression targets plus adaptive representative samples), and `representativeWriteAudit` (one real write/audit sample), while `coverageSummary` directly reports corpus font/ignored-file counts, selected target counts, selected targets, representative write audit status, and a `functionalCoverage[]` checklist with large evidence omitted; its `input-count-guide`, `input-directory-decision`, `source-safety-decision`, `source-layout-mismatch-summary`, and `layout-decision-route-summary` entries confirm that real-corpus paths actually checked `inputCountGuide`, `inputDirectoryDecision`, `sourceSafetyDecision`, `sourceLayoutMismatchSummary`, and `layoutDecision` count completeness, first-step directory routing, source preservation, layout matching, direct preview, route-summary, and copy-only source-safety semantics. `coverageSummary.toolCoverageSummary` further rolls up `functionalCoverage[].toolPaths` into public MCP tool coverage; `allRequiredToolsCovered: true` means `get_agent_guidance`, `get_runtime_status`, `inspect_font_inputs`, `organize_font_directory`, `split_font`, `split_font_batch`, and `inspect_split_output` were exercised through full-root scanning, representative samples, or the bounded write/audit path, but still not as per-font or per-directory acceptance. The default JSON keeps only `runSummaries[]` for child checks and uses `omittedDetailFields` to mark omitted child-run details and large evidence. Add `--verbose`, or set `FONT_SPLIT_REAL_CORPUS_SUITE_VERBOSE=true`, to include full child output. It uses a rich real corpus to prove the feature chain, not to manually accept every font directory. Optional arguments are `<font-corpus-dir> [maxFiles] [targetLimit] [integrationLimit] [sampleCount] [--verbose]`.
+## Environment Variables
 
-The real-corpus suite `functionalCoverage[]` also includes `staging-directory-decision`: it proves representative paths inspected `stagingDirectoryDecision`, so the organizer `outputDir` is interpreted as source-like staging rather than generated split output.
+| Variable | Meaning |
+|----------|---------|
+| `FONT_SPLIT_ROOT` | Font workspace root. If unset, defaults to the current working directory used to start the MCP Server. |
+| `FONT_SPLIT_WASM_PATH` | Optional custom `libffi-wasm32-wasip1.wasm` runtime path. |
 
-`coverageSummary.archiveHandlingScope` makes archive scope explicit: archive files are counted in ignored-file coverage, but archives are not extracted and fonts inside archives are not counted as covered fonts. To validate archive-internal fonts, extract the archives outside this tool first, then rerun the suite against the extracted directory tree.
+## Credits
 
-`localVerificationOutputGuide.completionReportGuide` gives agents a final-report checklist after the local gates pass. Use its `requiredClaims[]` and `conciseReportTemplate[]` to report the compact check, representative real-corpus status, full-root supported font count, ignored-file coverage, archive handling scope, functional coverage, and representative output audit. Respect `forbiddenClaims[]`: do not claim every font or every directory was manually accepted, and do not imply archives were extracted.
-
-`coverageSummary.unsupportedFileCategoryCoverage` separately reports ignored-file coverage, including category count, extension count, and how many extension types are beyond `.zip` / `.txt`; `coverageSummary.outputStructureAuditSummary` separately reports representative single-font and batch-write `outputRoleDecision`, `outputStructureDecision`, `auditStatus`, `auditPassed`, and `structureSummary.conforms`. These fields make it quick to confirm ignored-file stats are not archive/text-only, archive-internal fonts were not overstated as tested, the audited directory actually applies to output auditing, and the generated output directory structure was actually audited.
-
-`smoke:real-corpus-readonly` is an explicit read-only check for a local real font corpus, and is not included in `npm run check`. It treats the supplied directory as `FONT_SPLIT_ROOT`, first runs `inspect_font_inputs` against the corpus root with `includeFiles:false`, then auto-selects a sample directory containing fonts for `structure-first` `organize_font_directory` and no-write `split_font_batch` preview checks. It verifies broad `unsupportedFileSummary`, `sourceLayoutMismatchSummary`, `recommendedBatchPreviewArgs`, batch `recommendedNextActions`, and safety fields without creating an output directory. The optional second argument selects the sample directory; the optional third argument overrides `maxFiles` (default `50000`). This check uses a noisy real corpus to cover discovery, counting, and preview behavior; it is not a per-directory acceptance audit.
-
-`smoke:real-corpus-targets` is a read-only targeted regression and adaptive sampling check for a real corpus. By default it keeps `aexpective`, `tiny5`, `agu_display`, and `architectural` as fixed regression points, then automatically selects additional representative top-level font directories from the corpus root, favoring larger font counts, more format variety, noisier ignored-file mixes, and WOFF/WOFF2-heavy inputs. It verifies directory-layout recommendations, `font-identity` dedupe, default naming without `source-suffix`, no unexpected numeric suffixes for fixed regression samples, and `run-reviewed-batch-write` follow-up actions without creating output directories. Its goal is to exercise the feature chain in a rich real environment, not to audit every corpus directory one by one. Optional arguments are `<font-corpus-dir> [comma-separated-targets|auto] [maxFiles] [limit] [sampleCount]`; the default `sampleCount` is `10`, and can also be set with `FONT_SPLIT_REAL_CORPUS_TARGET_SAMPLE_COUNT`.
-
-`smoke:real-corpus-integration` is the explicit representative write/audit integration check for a local real font corpus, and is not included in `npm run check`. It checks runtime status and agent guidance, scans the corpus root compactly, selects one real sample directory, then runs directory-organization dry-run, directory-organization copy-only write, single-font `split_font` write, batch dry-run, batch reviewed-write, and `inspect_split_output` output audits. It only clears and recreates a generated `.font-split-*` output root under the supplied corpus directory; it never moves, deletes, or rewrites source fonts. Optional arguments are `<font-corpus-dir> [sample-input-dir] [output-root] [maxFiles] [limit]`; the default output root is `font-split-mcp/.font-split-real-corpus-integration-output`.
-
-`smoke:api-docs` starts the MCP server, reads the live tool schema, and checks that `API.md` / `API.zh-CN.md` cover every tool, input argument, `get_agent_guidance` section, `workflowPreset`, and key safety/audit field. It is included in `npm run check` to prevent implementation changes from silently drifting away from the API docs.
-
-`smoke:behavior-docs` checks that `BEHAVIOR.zh-CN.md` covers the current tool inventory, `workflowPreset` values, key safety/audit fields, batch debug events, and high-risk warning codes. It is included in `npm run check` to prevent the behavior notes from missing counterintuitive or agent-risky behavior.
-
-`smoke:small-copy-original` exercises the `copy-original` small-font policy. `smoke:incremental` also prints a sample `splitDir` so you can verify the collision-safe batch naming stays stable across reruns.
-
-### Environment variables
-
-| Variable | Description |
-|----------|-------------|
-| `FONT_SPLIT_ROOT` | Font workspace root directory. Set this explicitly for your own font location; if unset, the server defaults to the current working directory used to start the MCP Server. If the caller is an AI agent, it should ask the user which directory to use instead of guessing or hard-coding a local private path. |
-| `FONT_SPLIT_WASM_PATH` | Optional absolute or relative path to a custom `libffi-wasm32-wasip1.wasm` runtime. If unset, the bundled `cn-font-split/dist` path under this package's dependencies is used. |
-
-## Credits & Acknowledgments
-
-This project is a thin MCP wrapper around the following open-source projects:
-
-- **[cn-font-split](https://github.com/KonghaYao/cn-font-split)** by [KonghaYao](https://github.com/KonghaYao) — the core font subsetting engine. Licensed under [Apache License 2.0](https://github.com/KonghaYao/cn-font-split/blob/release/LICENSE).
-- **[@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk)** by Anthropic — the MCP server SDK. Licensed under [MIT License](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/LICENSE).
-
-The WASM binary (`libffi-wasm32-wasip1.wasm`) used at runtime is built and distributed by the cn-font-split project under Apache-2.0.
+This project wraps [cn-font-split](https://github.com/KonghaYao/cn-font-split); the core font-splitting capability comes from that project.
 
 ## License
 
-This project is licensed under the [Apache License 2.0](./LICENSE).
-
-```
-Copyright 2025 WenZhimo
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
-
----
+This project uses the [Apache License 2.0](./LICENSE). Also respect the licenses of its dependencies.
