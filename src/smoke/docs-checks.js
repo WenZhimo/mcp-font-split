@@ -189,6 +189,12 @@ export async function runApiDocsSmoke() {
     assertDocsContain('tool safety quick reference', '`toolSafetyQuickReference`');
     assertDocsContain('tool safety moved/deleted/rewrite field', '`sourceFilesMovedDeletedOrRewritten`');
     assertDocsContain('tool safety default write field', '`defaultWritesFiles`');
+    assertDocsContain('guidance directory safety example', '`guidance-directory-organization-safety-example`');
+    assertDocsContain('input directory safety example', '`input-directory-organization-safety-example`');
+    assertDocsContain('directory safety example helper', '"helperTool": "organize_font_directory"');
+    assertDocsContain('directory safety example default mode', '"helperToolDefaultMode": "safe-preview-plan-only"');
+    assertDocsContain('directory safety example source non-destructive flag', '"sourceFilesMovedDeletedOrRewritten": false');
+    assertDocsContain('directory safety example staging role', '"outputDirRole": "organized-font-source-staging"');
     assertDocsContain('real corpus suite command', '`npm run smoke:real-corpus-suite -- <font-corpus-dir>`');
     assertDocsContain('real corpus reliability gate decision', '`reliabilityGateDecision`');
     assertDocsContain('real corpus suite test scope', '`testScope`');

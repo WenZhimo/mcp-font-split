@@ -89,6 +89,30 @@ Safety and directory helpers:
 - `recommendedWorkflowPlan` composes safe template IDs into ordered phases such as preflight, layout decision, batch preview, reviewed write, and output audit. It is a route map, not a substitute for checking each tool response.
 - `nextToolDecisionSummary` is the compact "which tool next?" index. Its `workflowQuickStart` includes `workflowQuickStart.recommendedCallExample`, and `quickStartCallExamples[]` provide minimal placeholder args for common routes.
 
+### `guidance-directory-organization-safety-example`
+
+`get_agent_guidance.directoryOrganizationQuickAnswer.directoryOrganizationSafety` is the preflight version of the directory safety answer. It is a response-shape example, not a command to run:
+
+```json
+{
+  "summaryType": "directory-organization-safety",
+  "appliesToTool": "get_agent_guidance",
+  "helperTool": "organize_font_directory",
+  "safePreviewArgs": {
+    "inputDir": "<font-source-dir>",
+    "outputDir": "<organized-output-dir>",
+    "workflowPreset": "safe-preview"
+  },
+  "helperToolDefaultMode": "safe-preview-plan-only",
+  "helperToolWriteMode": "copy-only-outputDir",
+  "writesFilesBeforeReview": false,
+  "sourceDestructive": false,
+  "sourceFilesMovedDeletedOrRewritten": false,
+  "outputDirRole": "organized-font-source-staging",
+  "isSplitOutput": false
+}
+```
+
 Catalogs for interpreting responses:
 
 - `fontIdentityBasisCatalog` is returned by default and with `sections: ["identity-catalog"]`. It explains `identityBasis` values emitted by `inspect_font_inputs` and summarized by `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts`.
@@ -262,6 +286,34 @@ Use the compact input decision fields in this order:
 - `byCategory[]` uses coarse categories for agent triage: `archive`, `document`, `image`, `web`, `metadata`, `signature`, `unsupported-font`, `extensionless`, and `other`.
 - `categoryDetails[]` repeats the meaning, representative extensions, and handling behavior for categories present in this scan.
 - `handlingSummary.archivesExtracted` is always `false`; unsupported files remain ignored.
+
+### `input-directory-organization-safety-example`
+
+`inspect_font_inputs.inputDirectoryDecision.directoryOrganizationSafety` is the same safety contract attached to a real input scan. It adds scan-local values such as `inputDir` and `maxFiles`:
+
+```json
+{
+  "summaryType": "directory-organization-safety",
+  "appliesToTool": "inspect_font_inputs",
+  "helperTool": "organize_font_directory",
+  "safePreviewArgs": {
+    "inputDir": "fonts",
+    "outputDir": "organized-fonts",
+    "workflowPreset": "safe-preview",
+    "maxFiles": 50000
+  },
+  "helperToolDefaultMode": "safe-preview-plan-only",
+  "helperToolWriteMode": "copy-only-outputDir",
+  "writesFilesBeforeReview": false,
+  "sourceDestructive": false,
+  "sourceFilesMovedDeletedOrRewritten": false,
+  "outputDirRole": "organized-font-source-staging",
+  "isSplitOutput": false,
+  "inspectAfterCopyTool": "inspect_font_inputs",
+  "previewAfterCopyTool": "split_font_batch",
+  "auditAfterSplitWriteTool": "inspect_split_output"
+}
+```
 
 ## `split_font_batch`
 

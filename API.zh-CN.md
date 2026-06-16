@@ -89,6 +89,30 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 - `recommendedWorkflowPlan` 把安全模板 ID 编排成输入预检、目录形态决策、批量预览、审查后写入和输出审计等阶段。它是路线图，不替代每次工具响应检查。
 - `nextToolDecisionSummary` 是“下一步该调用哪个工具？”的紧凑索引。它的 `workflowQuickStart` 包含 `workflowQuickStart.recommendedCallExample`，`quickStartCallExamples[]` 提供常见路线的最小占位参数。
 
+### `guidance-directory-organization-safety-example`
+
+`get_agent_guidance.directoryOrganizationQuickAnswer.directoryOrganizationSafety` 是目录安全答案的预检版本。下面是响应形状示例，不是要直接执行的命令：
+
+```json
+{
+  "summaryType": "directory-organization-safety",
+  "appliesToTool": "get_agent_guidance",
+  "helperTool": "organize_font_directory",
+  "safePreviewArgs": {
+    "inputDir": "<font-source-dir>",
+    "outputDir": "<organized-output-dir>",
+    "workflowPreset": "safe-preview"
+  },
+  "helperToolDefaultMode": "safe-preview-plan-only",
+  "helperToolWriteMode": "copy-only-outputDir",
+  "writesFilesBeforeReview": false,
+  "sourceDestructive": false,
+  "sourceFilesMovedDeletedOrRewritten": false,
+  "outputDirRole": "organized-font-source-staging",
+  "isSplitOutput": false
+}
+```
+
 响应解释目录：
 
 - `fontIdentityBasisCatalog` 默认返回，也可通过 `sections: ["identity-catalog"]` 聚焦请求。它解释 `inspect_font_inputs` 的 `identityBasis`，以及 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 中汇总的 basis。
@@ -262,6 +286,34 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 - `byCategory[]` 使用面向 agent 的粗分类：`archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other`。
 - `categoryDetails[]` 会为本次扫描中出现的分类重复含义、代表扩展名和处理行为。
 - `handlingSummary.archivesExtracted` 恒为 `false`。这不改变处理行为；不支持文件仍会被忽略。
+
+### `input-directory-organization-safety-example`
+
+`inspect_font_inputs.inputDirectoryDecision.directoryOrganizationSafety` 是同一安全契约在真实输入扫描响应里的版本。它会带上 `inputDir` 和 `maxFiles` 这类本次扫描相关的值：
+
+```json
+{
+  "summaryType": "directory-organization-safety",
+  "appliesToTool": "inspect_font_inputs",
+  "helperTool": "organize_font_directory",
+  "safePreviewArgs": {
+    "inputDir": "fonts",
+    "outputDir": "organized-fonts",
+    "workflowPreset": "safe-preview",
+    "maxFiles": 50000
+  },
+  "helperToolDefaultMode": "safe-preview-plan-only",
+  "helperToolWriteMode": "copy-only-outputDir",
+  "writesFilesBeforeReview": false,
+  "sourceDestructive": false,
+  "sourceFilesMovedDeletedOrRewritten": false,
+  "outputDirRole": "organized-font-source-staging",
+  "isSplitOutput": false,
+  "inspectAfterCopyTool": "inspect_font_inputs",
+  "previewAfterCopyTool": "split_font_batch",
+  "auditAfterSplitWriteTool": "inspect_split_output"
+}
+```
 
 ## `split_font_batch`
 
