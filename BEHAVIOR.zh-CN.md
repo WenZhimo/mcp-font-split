@@ -137,15 +137,39 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 `configurationRecipes[]` 是给 agent 用的配置配方表；它把“保留每个源字体”“按源目录分组”“按字体 metadata 分组”“快速结构优先扫描”“copy-only 暂存整理”“大库审查后写入”等用户意图映射到最小 preset-first 参数，并列出写入行为、源目录安全性、取舍、必须检查的 `inspectFields` 和继续前必须满足的 `successCriteria`。配方不是成功证明，不能替代实际工具响应检查。
 `batchCustomizationQuickReference[]` 是比 `batchPolicyGuide` 更短的批量自定义速查表；它覆盖保留每个源字体、按源目录分组、按字体 metadata 分组、使用裸名、显式来源后缀、收集错误等常见意图。每个条目都会给出最小 `overrideArgs`、带 `workflowPreset: "safe-preview"` 的 `previewArgs`、带 `workflowPreset: "reviewed-write"` 的 `writeArgsAfterReview`、必须检查的 `inspectFields`、继续前的 `successCriteria` 和非直觉行为。它用于快速选择常见覆盖；如果用户要求更细的策略取舍，再查看 `batchPolicyGuide` 的逐值说明。
-`directoryOrganizationQuickAnswer` 是给 agent 用的目录整理短答案；它直接说明“有目录整理工具：`organize_font_directory`，它默认 `workflowPreset: "safe-preview"` 只做无写入计划，审查后 `workflowPreset: "reviewed-write"` 也只是 copy-only 写入 `outputDir`，不会移动、删除或重写源字体”。它还会标出 `outputDir` 的角色是源目录式暂存而非最终拆分输出，并列出后续必须检查的 `sourceSafetyDecision`、`layoutDecision`、`stagingDirectoryDecision`、`sourceLayoutMismatchSummary`、`organizationWarnings` 和 `planActionSummary`。当用户只问“能否整理目录、是否破坏源目录”时先看它；需要细分 flat/nested/mixed/output-inside-input 路线时再看 `directoryWorkflowDecisionMatrix[]`、`directoryWorkflowExamples[]` 或实际整理响应。
+`directoryOrganizationQuickAnswer` 是给 agent 用的目录整理短答案。
+
+- 它直接说明“有目录整理工具：`organize_font_directory`”。
+- 它默认 `workflowPreset: "safe-preview"`，只做无写入计划。
+- 审查后 `workflowPreset: "reviewed-write"` 也只是 copy-only 写入 `outputDir`，不会移动、删除或重写源字体。
+- 它会标出 `outputDir` 的角色是源目录式暂存而非最终拆分输出。
+- 它会列出后续必须检查的 `sourceSafetyDecision`、`layoutDecision`、`stagingDirectoryDecision`、`sourceLayoutMismatchSummary`、`organizationWarnings` 和 `planActionSummary`。
+- 当用户只问“能否整理目录、是否破坏源目录”时先看它；需要细分 flat/nested/mixed/output-inside-input 路线时再看 `directoryWorkflowDecisionMatrix[]`、`directoryWorkflowExamples[]` 或实际整理响应。
 `toolSafetyQuickReference` 是给 agent 用的工具安全速查表；它覆盖 7 个公开工具，逐项列出 `defaultWritesFiles`、`sourceDestructive`、`sourceFilesMovedDeletedOrRewritten`、写入范围、源文件是否需要备份、可用的 safe-preview 参数和 `mustInspectFields`。它用于快速回答“哪个工具会写文件、会不会破坏源字体”；真实写入完成后仍要以工具响应里的 `sourceSafetyDecision`、`safetySummary`、`outputStructureDecision` 和审计字段为准。
 `batchPolicyGuide` 是给 agent 用的批量策略自定义指南；它覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。每个可选值都会说明何时使用、何时避免、必须检查哪些字段，以及继续前必须满足的 `successCriteria`。当用户想偏离默认 preset 行为时，应优先参考它选择最小显式覆盖，并先运行 safe-preview。
 `toolOptionCatalog` 是给 agent 用的工具输入选项目录，默认 compact 指南就会返回，也可用 `sections: ["option-catalog"]` 单独请求。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的高影响参数，说明默认值、允许值、写入/源安全语义、响应体量影响、非直觉行为，以及改写参数后必须检查哪些响应字段。它尤其用于避免误读 `split_font_batch.dryRun` 原始默认会写输出、`organize_font_directory.dryRun` 默认只预览、`parseFonts: false` 会限制 identity 去重，以及 `includeResults: false` / `includeFiles: false` 会故意省略大块明细。
 `fontIdentityBasisCatalog` 是给 agent 用的字体 identity basis 目录，默认 compact 指南就会返回，也可用 section `identity-catalog`（例如 `sections: ["identity-catalog"]`）单独请求。它会解释 `typographic-family-subfamily`、`opentype-family-subfamily`、`full-name`、`postscript-name`、family-only、`path-stem`、`path-fallback`、`missing` 等 basis 的 OpenType name ID 来源、置信度、是否属于语义 identity 证据，以及解释 `identityBasis` 或 `dedupeDecisionSummary.identityEvidenceSummary.identityBasisCounts` 时应采取的动作。
-`outputStructureCatalog` 是给 agent 用的输出结构审计目录，默认 compact 指南就会返回，也可用 section `output-catalog`（例如 `sections: ["output-catalog"]`）单独请求。它会解释 `outputRoleDecision`、`outputStructureDecision.status`、`auditStatus`、`structureSummary.layoutKind`、`structureSummary.issues[].code`、`subset` / `single-woff2` / `copy-original` 输出模式和通过条件。尤其要注意，`ok:true` 只表示 `inspect_split_output` 调用完成，不代表输出结构通过；包含 `font-organization-manifest.json` 的目录是整理暂存而不是生成后的拆分输出；`includeFiles:false` 和 `includeFamilies:false` 只省略大数组，不会跳过结构审计；`copy-original` 本来就不会生成 CSS 或 WOFF2。
+`outputStructureCatalog` 是给 agent 用的输出结构审计目录，默认 compact 指南就会返回，也可用 section `output-catalog`（例如 `sections: ["output-catalog"]`）单独请求。
+
+- 它会解释 `outputRoleDecision`、`outputStructureDecision.status`、`auditStatus`、`structureSummary.layoutKind`、`structureSummary.issues[].code`、`subset` / `single-woff2` / `copy-original` 输出模式和通过条件。
+- `ok:true` 只表示 `inspect_split_output` 调用完成，不代表输出结构通过。
+- 包含 `font-organization-manifest.json` 的目录是整理暂存，而不是生成后的拆分输出。
+- `includeFiles:false` 和 `includeFamilies:false` 只省略大数组，不会跳过结构审计。
+- `copy-original` 本来就不会生成 CSS 或 WOFF2。
 `unsupportedFileCategoryCatalog` 是给 agent 解释非字体噪声分类的机器可读目录；它会说明 `archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other` 的代表扩展名与处理行为。每次工具响应中的 `unsupportedFileDecision` 会先给出快速判断，`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary` 则重复当前扫描实际出现分类的处理语义。尤其要注意，`archive` 只表示“被报告的压缩包”，不会触发解压、复制或拆分。
 `directoryHandlingModeCatalog` 是给 agent 解释 `layoutDecision.directoryHandling.recommendedMode` 的机器可读目录；它会说明每个 mode 何时出现、下一步建议、是否会在复核前写文件、源目录安全性、必须检查的字段和非直觉行为。`directoryWorkflowDecisionMatrix[]` 是给 agent 用的机器可读决策表；它会把常见目录场景映射到首选工具、推荐参数、后续工具、是否默认写文件、源目录是否安全、必须检查的字段、继续前必须满足的 `successCriteria` 和非直觉行为。推荐参数会优先使用 `workflowPreset`，只保留路径、规模或目录形态造成的差异覆盖。它们不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。
-`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例，包括扁平 vendor dump、每个压缩包/家族一个目录、根目录和子目录混合、超大/嘈杂目录第一遍扫描、一个面向 flat/nested/mixed/output-inside-input 的 `sourceLayoutMismatchSummary` 对照示例，以及 `copy-only-staging-to-audited-split` 这条端到端路线：先做 `organize_font_directory` safe-preview，复核计划，再用 reviewed-write 做 copy-only 暂存，然后用 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` 对暂存目录做 `split_font_batch` safe-preview，最后 reviewed-write 并通过 `inspect_split_output` 审计。示例调用也采用 preset-first 风格，并带有 `mustInspectFields` 和 `successCriteria`。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`sourceLayoutMismatchSummary` 和 warning 字段为准。
+`directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或请求 `sections: ["examples"]` 时返回，是更具体的目录树示例：
+
+- 扁平 vendor dump
+- 每个压缩包/家族一个目录
+- 根目录和子目录混合
+- 超大/嘈杂目录第一遍扫描
+- 面向 flat/nested/mixed/output-inside-input 的 `sourceLayoutMismatchSummary` 对照示例
+- `copy-only-staging-to-audited-split` 端到端路线
+
+这条端到端路线的顺序是：先做 `organize_font_directory` safe-preview，复核计划，再用 reviewed-write 做 copy-only 暂存，然后用 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` 对暂存目录做 `split_font_batch` safe-preview，最后 reviewed-write 并通过 `inspect_split_output` 审计。
+
+示例调用也采用 preset-first 风格，并带有 `mustInspectFields` 和 `successCriteria`。它用于帮助 agent 识别用户描述的目录形态，但仍然必须以工具实际返回的 `layout`、`recommendedBatchOptions`、`recommendedBatchPreviewArgs`、`sourceLayoutMismatchSummary` 和 warning 字段为准。
 `safeInvocationTemplates[]` 是可复制的安全起步调用模板；其中包括运行时诊断、单字体处理、输入预检、源目录结构不匹配时的 dry-run 整理计划、大目录结构优先扫描、copy-only 暂存整理、批量 dry-run 预览、已审查计划后的真实批量处理和输出审计。每个模板都会声明 `writesFiles`、`sourceDestructive`、可自定义参数、必须检查的响应字段和继续前必须满足的 `successCriteria`。模板里的 `args` 会尽量保持最小；`workflowPreset` 已提供的默认项不会重复写入模板，需要完整展开时查看同一响应中的 `workflowPresets[]`。
 `nextToolDecisionSummary` 是更短的路由索引，用于回答 agent 最常见的第一问：“下一步该调用哪个工具？”它会把 setup 诊断、单字体处理、输入预检、目录结构判断、copy-only 暂存、批量预览、审查后写入和输出审计映射到首选工具，并尽量引用 `safeInvocationTemplates[]` 的模板 ID。其 `workflowQuickStart` 会针对当前 `workflow` 给出推荐的第一条可复制调用和常见备用调用；`quickStartCallExamples[]` 会从 `safeInvocationTemplates[]` 派生常见路线的最小占位参数，例如单字体处理、输入预检、目录规划、copy-only 暂存、批量预览、审查后写入和输出审计。它只是路线索引和起步参数，不是完成证明，也不能替代实际响应检查。继续前仍要检查引用模板或实际响应里的字段，并满足 `successCriteria`。
 如果 agent 只需要判断目录整理工作流的下一步，可以请求 `workflow: "organize"` 和 `sections: ["workflow"]`，然后读取 `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`；其中 `workflowQuickStart.recommendedCallExample` 是可复制的第一步调用对象。对于结构不确定的源目录，这个推荐调用应保持 `workflowPreset: "safe-preview"`、`writesFiles: false`、`sourceDestructive: false`，也就是只做 dry-run 路线判断；真正 copy-only 暂存必须来自用户意图或 dry-run 响应里的后续分支。
