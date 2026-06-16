@@ -8,7 +8,6 @@ import {
   BATCH_GROUP_BY_MODES,
   BATCH_NAMING_MODES,
   FONT_EXTENSIONS,
-  FORMAT_PRIORITY_ORDER,
   GUIDANCE_COMPACT_SECTION_NAMES,
   GUIDANCE_DETAIL_LEVELS,
   GUIDANCE_SECTION_FIELDS,
@@ -71,6 +70,7 @@ import {
   buildSourceSuffix,
   buildBatchError,
   compareBatchDedupeRepresentative,
+  buildDedupeDecisionSummary,
   logBatchDecision,
   resolveBatchFamilyDirName,
   resolveStableBatchOutputNames,
@@ -2221,128 +2221,6 @@ function buildBatchPolicySummary({ appliesToTool, workflowPreset, values, effect
       successCriteria: policy.successCriteria,
     })),
     notes: uniqueStrings([...derivedNotes, ...notes]),
-  };
-}
-
-function getDedupeIdentityBasis(identityKey, effectiveMode) {
-  if (effectiveMode === 'none') return 'not-applicable';
-  if (effectiveMode === 'same-path') return 'path-stem';
-  if (!identityKey) return 'missing';
-  if (String(identityKey).startsWith('path:')) return 'path-fallback';
-  return parseIdentityKey(identityKey)?.basis || 'unknown';
-}
-
-function buildDedupeIdentityEvidenceSummary({
-  effectiveMode,
-  identityEvidenceItems = [],
-  duplicateEvidenceItems = [],
-  maxExamples = 3,
-}) {
-  const basisCounts = new Map();
-  for (const item of identityEvidenceItems) {
-    const basis = getDedupeIdentityBasis(item.identityKey, effectiveMode);
-    basisCounts.set(basis, (basisCounts.get(basis) || 0) + 1);
-  }
-  const identityBasisCounts = [...basisCounts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([basis, count]) => ({ basis, count }));
-  const duplicateExamples = duplicateEvidenceItems.slice(0, maxExamples).map((item) => {
-    const identityBasis = getDedupeIdentityBasis(item.identityKey, effectiveMode);
-    return {
-      path: item.path,
-      duplicateOf: item.duplicateOf,
-      identityBasis,
-      ...(identityBasis !== 'path-stem' && identityBasis !== 'path-fallback' && item.identityKey
-        ? { identityKey: item.identityKey }
-        : {}),
-    };
-  });
-  const semanticBasisCount = identityBasisCounts
-    .filter((item) => !['not-applicable', 'path-stem', 'path-fallback', 'missing'].includes(item.basis))
-    .reduce((sum, item) => sum + item.count, 0);
-  const notes = [];
-  if (effectiveMode === 'none') {
-    notes.push('No identity evidence is produced because dedupe is disabled.');
-  } else if (effectiveMode === 'same-path') {
-    notes.push('Evidence is path/stem-level only and does not prove semantic font identity.');
-  } else {
-    notes.push('Identity evidence is compact: basis counts cover selected and duplicate inputs, while examples are capped.');
-    notes.push('Path fallback examples omit the raw identity key to avoid exposing resolved local paths.');
-  }
-
-  return {
-    summaryType: 'dedupe-identity-evidence',
-    available: effectiveMode !== 'none',
-    identityDedupeEvidenceAvailable: effectiveMode === 'font-identity' && semanticBasisCount > 0,
-    identityBasisCounts,
-    duplicateExampleCount: duplicateEvidenceItems.length,
-    duplicateExamples,
-    duplicateExamplesTruncated: duplicateEvidenceItems.length > duplicateExamples.length,
-    nonIntuitiveBehavior: notes,
-  };
-}
-
-function buildDedupeDecisionSummary({
-  appliesToTool,
-  requestedMode,
-  effectiveMode = requestedMode,
-  inputFontCount = 0,
-  deduplicatedCount = 0,
-  skippedDuplicateCount = 0,
-  identityKeyMissingCount = 0,
-  pathFallbackCount = 0,
-  dedupeLimitedByParsing = false,
-  identityEvidenceItems = [],
-  duplicateEvidenceItems = [],
-}) {
-  const requestedIdentity = requestedMode === 'font-identity';
-  const effectiveIdentity = effectiveMode === 'font-identity';
-  const pathFallbackUsed = requestedIdentity && (
-    dedupeLimitedByParsing
-    || pathFallbackCount > 0
-    || !effectiveIdentity
-  );
-  const keyStrategy = effectiveMode === 'none'
-    ? 'none'
-    : effectiveMode === 'same-path'
-      ? 'path-stem'
-      : 'font-identity';
-  const notes = [];
-  if (effectiveMode === 'none') {
-    notes.push('Dedupe is disabled; every supported input selected before limit remains eligible.');
-  } else if (effectiveMode === 'same-path') {
-    notes.push('Dedupe compares normalized source path stems only; it does not prove semantic font identity.');
-  } else {
-    notes.push('Dedupe compares normalized font identity and keeps the highest-priority representative format.');
-  }
-  if (dedupeLimitedByParsing) {
-    notes.push('Requested identity dedupe could not run because font metadata parsing was skipped.');
-  }
-  if (pathFallbackCount > 0) {
-    notes.push('Some fonts lacked a usable identity key and fell back to source path stem keys.');
-  }
-
-  return {
-    summaryType: 'dedupe-decision-summary',
-    appliesToTool,
-    requestedMode,
-    effectiveMode,
-    keyStrategy,
-    inputFontCount,
-    deduplicatedCount,
-    skippedDuplicateCount,
-    identityKeyMissingCount,
-    pathFallbackCount,
-    dedupeLimitedByParsing,
-    pathFallbackUsed,
-    identityDedupeAvailable: effectiveIdentity && !dedupeLimitedByParsing,
-    representativePriority: FORMAT_PRIORITY_ORDER,
-    identityEvidenceSummary: buildDedupeIdentityEvidenceSummary({
-      effectiveMode,
-      identityEvidenceItems,
-      duplicateEvidenceItems,
-    }),
-    nonIntuitiveBehavior: notes,
   };
 }
 
