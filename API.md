@@ -270,7 +270,17 @@ When the source directory shape is uncertain:
 
 Presets are expanded first; any explicit argument in the same call overrides the preset value.
 
-Batch responses include `sourceSafetyDecision`, `safetySummary`, `sourceDestructive`, `writesSourceTree`, `writesOutputTree`, `outputTreeInsideInputTree`, `mayOverwriteOutputTree`, `batchPolicySummary`, `dedupeDecisionSummary`, `inputCountGuide`, `scannedFileCount`, `maxFiles`, `maxFilesHit`, `unsupportedFileDecision`, `unsupportedFileSummary`, and `batchDecision`. Inspect `sourceSafetyDecision` first for the short source-safety answer: source fonts are not moved/deleted/rewritten, `sourceBackupRequired` should be `false`, and `requiresOutputAudit` is true after real batch writes. `sourceDestructive` should always be `false`: batch processing does not move, delete, or rewrite source fonts. With `dryRun: false`, `writesOutputTree: true` means the tool writes generated files, original-font copies, and manifests under `outputRoot`, and may replace existing output files. `writesSourceTree` is true only when that real output tree is inside `inputDir`; in that case source font files are still preserved, but the input tree receives generated output. `mayOverwriteOutputTree` applies only to generated output paths. `inputCountGuide.countCompleteness` explains whether source counts are complete for the scanned root or truncated by `maxFiles`; `maxFilesHit: true` means the caller should rerun with a higher `maxFiles` before treating the summary as complete. `unsupportedFileDecision` gives a compact ignored-file route; `unsupportedFileSummary` gives exact scanned non-font evidence.
+Batch responses include `sourceSafetyDecision`, `safetySummary`, `sourceDestructive`, `writesSourceTree`, `writesOutputTree`, `outputTreeInsideInputTree`, `mayOverwriteOutputTree`, `batchPolicySummary`, `dedupeDecisionSummary`, `inputCountGuide`, `scannedFileCount`, `maxFiles`, `maxFilesHit`, `unsupportedFileDecision`, `unsupportedFileSummary`, and `batchDecision`.
+
+Read the response in this order:
+
+- Inspect `sourceSafetyDecision` first for the short source-safety answer: source fonts are not moved/deleted/rewritten, `sourceBackupRequired` should be `false`, and `requiresOutputAudit` is true after real batch writes.
+- `sourceDestructive` should always be `false`; batch processing does not move, delete, or rewrite source fonts.
+- With `dryRun: false`, `writesOutputTree: true` means the tool writes generated files, original-font copies, and manifests under `outputRoot`, and may replace existing output files.
+- `writesSourceTree` is true only when that real output tree is inside `inputDir`. In that case source font files are still preserved, but the input tree receives generated output.
+- `mayOverwriteOutputTree` applies only to generated output paths.
+- `inputCountGuide.countCompleteness` explains whether source counts are complete for the scanned root or truncated by `maxFiles`; `maxFilesHit: true` means the caller should rerun with a higher `maxFiles` before treating the summary as complete.
+- `unsupportedFileDecision` gives a compact ignored-file route; `unsupportedFileSummary` gives exact scanned non-font evidence.
 
 Batch dedupe priority is `.otf`, `.ttf`, `.woff2`, `.ttc`, `.otc`, `.woff`.
 

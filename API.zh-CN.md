@@ -270,7 +270,17 @@
 
 预设会先展开；同一次调用里显式传入的参数会覆盖预设值。
 
-批量响应会包含 `sourceSafetyDecision`、`safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree`、`mayOverwriteOutputTree`、`batchPolicySummary`、`dedupeDecisionSummary`、`inputCountGuide`、`scannedFileCount`、`maxFiles`、`maxFilesHit`、`unsupportedFileDecision`、`unsupportedFileSummary` 和 `batchDecision`。先看 `sourceSafetyDecision` 获取最短源安全结论：源字体不会被移动、删除或重写，`sourceBackupRequired` 应为 `false`，真实批量写入后 `requiresOutputAudit` 为 true。`sourceDestructive` 应始终为 `false`：批量处理不会移动、删除或重写源字体。`dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。只有当真实输出树位于 `inputDir` 内时，`writesSourceTree` 才为 `true`；此时源字体文件仍会保留，但输入目录树会新增生成输出。`mayOverwriteOutputTree` 只作用于生成输出路径。`inputCountGuide.countCompleteness` 会说明源计数是当前扫描根下完整，还是被 `maxFiles` 截断；`maxFilesHit: true` 表示调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。`unsupportedFileDecision` 给出忽略文件的压缩判断路线；`unsupportedFileSummary` 则提供精确证据。
+批量响应会包含 `sourceSafetyDecision`、`safetySummary`、`sourceDestructive`、`writesSourceTree`、`writesOutputTree`、`outputTreeInsideInputTree`、`mayOverwriteOutputTree`、`batchPolicySummary`、`dedupeDecisionSummary`、`inputCountGuide`、`scannedFileCount`、`maxFiles`、`maxFilesHit`、`unsupportedFileDecision`、`unsupportedFileSummary` 和 `batchDecision`。
+
+建议按下面顺序阅读：
+
+- 先看 `sourceSafetyDecision` 获取最短源安全结论：源字体不会被移动、删除或重写，`sourceBackupRequired` 应为 `false`，真实批量写入后 `requiresOutputAudit` 为 true。
+- `sourceDestructive` 应始终为 `false`；批量处理不会移动、删除或重写源字体。
+- `dryRun: false` 时 `writesOutputTree: true`，表示会在 `outputRoot` 下写生成文件、原字体副本和 manifest，并且可能替换已有输出文件。
+- 只有当真实输出树位于 `inputDir` 内时，`writesSourceTree` 才为 `true`。此时源字体文件仍会保留，但输入目录树会新增生成输出。
+- `mayOverwriteOutputTree` 只作用于生成输出路径。
+- `inputCountGuide.countCompleteness` 会说明源计数是当前扫描根下完整，还是被 `maxFiles` 截断；`maxFilesHit: true` 表示调用方应该调高 `maxFiles` 后重跑，再把摘要视为完整结果。
+- `unsupportedFileDecision` 给出忽略文件的压缩判断路线；`unsupportedFileSummary` 则提供精确证据。
 
 批量格式代表优先级为：`.otf`、`.ttf`、`.woff2`、`.ttc`、`.otc`、`.woff`。
 
