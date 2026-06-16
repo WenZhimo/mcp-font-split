@@ -1,4 +1,9 @@
 import path from 'node:path';
+import {
+  DIRECTORY_HANDLING_MODE_BY_ORGANIZATION_ROUTE,
+  DIRECTORY_HANDLING_MUST_INSPECT_FIELDS,
+  DIRECTORY_HANDLING_SHORT_ANSWER_BY_MODE,
+} from './catalogs.js';
 import { fileExists } from './path-utils.js';
 import {
   appendCollisionSuffix,
@@ -785,6 +790,58 @@ export function buildDirectoryWorkflowSummary({
     ],
     nonIntuitiveBehavior,
   });
+}
+
+export function buildDirectoryHandlingDecision({
+  layout,
+  safetySummary,
+  organizationDecision,
+  directOriginalInput,
+  copyOnlyStaging,
+}) {
+  const directStatus = directOriginalInput.status || null;
+  const originalInputPreviewRunnable = ['safe-preview-available', 'review-required'].includes(directStatus)
+    && Boolean(directOriginalInput.safePreviewArgs);
+  const copyOnlyStagingNeed = copyOnlyStaging.need || null;
+  const route = organizationDecision.route;
+  const recommendedMode = DIRECTORY_HANDLING_MODE_BY_ORGANIZATION_ROUTE[route] || 'review-organization-decision';
+  const useOrganizedOutput = recommendedMode === 'preview-organized-output';
+  const suggestedArgsField = useOrganizedOutput
+    ? 'organizationDecision.safeBatchPreviewArgs'
+    : originalInputPreviewRunnable
+      ? 'layoutDecision.directOriginalInput.safePreviewArgs'
+      : null;
+  const safePreviewArgs = useOrganizedOutput
+    ? organizationDecision.safeBatchPreviewArgs || null
+    : originalInputPreviewRunnable
+      ? directOriginalInput.safePreviewArgs || null
+      : null;
+
+  return {
+    summaryType: 'directory-handling-decision',
+    recommendedMode,
+    shortAnswer: DIRECTORY_HANDLING_SHORT_ANSWER_BY_MODE[recommendedMode],
+    layoutKind: layout.layoutKind,
+    recommendedBatchGroupBy: layout.recommendedBatchOptions?.batchGroupBy || null,
+    originalInputPreviewStatus: directStatus,
+    originalInputPreviewRunnable,
+    copyOnlyStagingNeed,
+    helperTool: 'organize_font_directory',
+    helperToolDefaultMode: 'dry-run-plan-only',
+    helperToolWriteMode: 'copy-only-outputDir',
+    sourceDestructive: false,
+    sourceFilesPreserved: true,
+    copyOnlyStagingIsDestructive: false,
+    copyOnlyStagingWritesWhen: 'only when organize_font_directory is called with dryRun:false',
+    writesSourceTree: safetySummary.writesSourceTree,
+    writesOutputTree: safetySummary.writesOutputTree,
+    outputTreeInsideInputTree: safetySummary.outputTreeInsideInputTree,
+    nextTool: organizationDecision.nextTool || (originalInputPreviewRunnable ? 'split_font_batch' : null),
+    nextInputDir: organizationDecision.nextInputDir || null,
+    suggestedArgsField,
+    safePreviewArgs,
+    mustInspectFields: [...DIRECTORY_HANDLING_MUST_INSPECT_FIELDS],
+  };
 }
 
 export async function resolveOrganizationGroupName({ entry, inputDir, groupingMode }) {
