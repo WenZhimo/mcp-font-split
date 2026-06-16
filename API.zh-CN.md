@@ -221,13 +221,25 @@
 | `invalidFonts[]` | 解析失败字体的紧凑清单和错误信息。 |
 | `files[]` | 可选的逐字体详情，包含扩展名、容器、身份信息、identity key、glyph count 和解析状态。 |
 
-`inputCountGuide` 是给 agent 的最短计数路线：先看 `countCompleteness`、`maxFilesHit`、`fileDetailsVisibility`、`recommendedAction` 和 `unsupportedFilesHandling`，再把源目录计数当作完整结论。`inputDirectoryDecision` 是输入预检返回的最短目录路线提示；它只是 triage，不是成功证明，写入前仍要检查 `layout`、`inspectionWarnings`、忽略文件摘要，以及后续 safe-preview 响应。`unsupportedFileDecision` 是给忽略文件的最短判断路线：先看 `status`、`totalUnsupportedFileCount`、`hasArchives`、`extensionsBeyondZipTxtCount`、`reviewRecommended`、`recommendedAction` 和 `handlingSummary`。`unsupportedFileSummary` 暴露 `unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.categoryDetails[]`、`unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。其中 `byCategory[]` 使用面向 agent 的粗分类：`archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other`。`categoryDetails[]` 会为本次扫描中出现的分类重复含义、代表扩展名和处理行为；`handlingSummary.archivesExtracted` 恒为 `false`。这不改变处理行为；不支持文件仍会被忽略。
+这些紧凑输入判断字段按下面顺序阅读：
+
+- `inputCountGuide` 是给 agent 的最短计数路线。先看 `countCompleteness`、`maxFilesHit`、`fileDetailsVisibility`、`recommendedAction` 和 `unsupportedFilesHandling`，再把源目录计数当作完整结论。
+- `inputDirectoryDecision` 是输入预检返回的最短目录路线提示。它只是 triage，不是成功证明；写入前仍要检查 `layout`、`inspectionWarnings`、忽略文件摘要，以及后续 safe-preview 响应。
+- `unsupportedFileDecision` 是给忽略文件的最短判断路线。先看 `status`、`totalUnsupportedFileCount`、`hasArchives`、`extensionsBeyondZipTxtCount`、`reviewRecommended`、`recommendedAction` 和 `handlingSummary`。
+- `unsupportedFileSummary` 暴露 `unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.categoryDetails[]`、`unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。
+- `byCategory[]` 使用面向 agent 的粗分类：`archive`、`document`、`image`、`web`、`metadata`、`signature`、`unsupported-font`、`extensionless` 和 `other`。
+- `categoryDetails[]` 会为本次扫描中出现的分类重复含义、代表扩展名和处理行为。
+- `handlingSummary.archivesExtracted` 恒为 `false`。这不改变处理行为；不支持文件仍会被忽略。
 
 ## `split_font_batch`
 
 扫描目录、去重等价字体、分组输出，并处理选中的字体。
 
-如果源目录形态不确定，先调用 `get_agent_guidance` 并设置 `sections: ["examples"]`，查看 `source-layout-mismatch-comparison`；或先运行 `organize_font_directory` 的 `workflowPreset: "safe-preview"`。在决定真实批量写入或 copy-only 暂存前，优先使用 organizer 返回的 `recommendedBatchPreviewArgs` 对原目录做无写入预览。如果用户明确希望先得到更干净的复制暂存目录，则使用 `copy-only-staging-to-audited-split` 作为检查清单：先预览整理计划，再用 `workflowPreset: "reviewed-write"` 执行 copy-only 暂存，随后用 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` 预览暂存目录的批量拆分，最后写入并审计拆分输出。
+如果源目录形态不确定：
+
+- 先调用 `get_agent_guidance` 并设置 `sections: ["examples"]`，查看 `source-layout-mismatch-comparison`；或先运行 `organize_font_directory` 的 `workflowPreset: "safe-preview"`。
+- 在决定真实批量写入或 copy-only 暂存前，优先使用 organizer 返回的 `recommendedBatchPreviewArgs` 对原目录做无写入预览。
+- 如果用户明确希望先得到更干净的复制暂存目录，则使用 `copy-only-staging-to-audited-split` 作为检查清单：先预览整理计划，再用 `workflowPreset: "reviewed-write"` 执行 copy-only 暂存，随后用 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` 预览暂存目录的批量拆分，最后写入并审计拆分输出。
 
 | 字段 | 类型 / 可选值 | 默认值 | 说明 |
 |------|---------------|--------|------|

@@ -221,13 +221,25 @@ Important result fields:
 | `invalidFonts[]` | Compact list of invalid font-like files and parse errors. |
 | `files[]` | Optional per-font entries with extension, container, identity, identity key, glyph count, and parse status. |
 
-`inputCountGuide` is the shortest count route for agents: check `countCompleteness`, `maxFilesHit`, `fileDetailsVisibility`, `recommendedAction`, and `unsupportedFilesHandling` before treating source counts as complete. `inputDirectoryDecision` is the shortest directory-route hint from input inspection; treat it as triage, not proof of success, and still inspect `layout`, `inspectionWarnings`, unsupported-file summaries, and the suggested safe-preview response before writing. `unsupportedFileDecision` is the shortest ignored-file route: check `status`, `totalUnsupportedFileCount`, `hasArchives`, `extensionsBeyondZipTxtCount`, `reviewRecommended`, `recommendedAction`, and `handlingSummary` first. `unsupportedFileSummary` exposes `unsupportedFileSummary.total`, `unsupportedFileSummary.byExtension[]`, `unsupportedFileSummary.byCategory[]`, `unsupportedFileSummary.categoryDetails[]`, `unsupportedFileSummary.handlingSummary`, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`. `byCategory[]` uses coarse categories for agent triage: `archive`, `document`, `image`, `web`, `metadata`, `signature`, `unsupported-font`, `extensionless`, and `other`. `categoryDetails[]` repeats the meaning, representative extensions, and handling behavior for categories present in this scan. `handlingSummary.archivesExtracted` is always `false`; unsupported files remain ignored.
+Use the compact input decision fields in this order:
+
+- `inputCountGuide` is the shortest count route for agents. Check `countCompleteness`, `maxFilesHit`, `fileDetailsVisibility`, `recommendedAction`, and `unsupportedFilesHandling` before treating source counts as complete.
+- `inputDirectoryDecision` is the shortest directory-route hint from input inspection. Treat it as triage, not proof of success; still inspect `layout`, `inspectionWarnings`, unsupported-file summaries, and the suggested safe-preview response before writing.
+- `unsupportedFileDecision` is the shortest ignored-file route. Check `status`, `totalUnsupportedFileCount`, `hasArchives`, `extensionsBeyondZipTxtCount`, `reviewRecommended`, `recommendedAction`, and `handlingSummary` first.
+- `unsupportedFileSummary` exposes `unsupportedFileSummary.total`, `unsupportedFileSummary.byExtension[]`, `unsupportedFileSummary.byCategory[]`, `unsupportedFileSummary.categoryDetails[]`, `unsupportedFileSummary.handlingSummary`, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`.
+- `byCategory[]` uses coarse categories for agent triage: `archive`, `document`, `image`, `web`, `metadata`, `signature`, `unsupported-font`, `extensionless`, and `other`.
+- `categoryDetails[]` repeats the meaning, representative extensions, and handling behavior for categories present in this scan.
+- `handlingSummary.archivesExtracted` is always `false`; unsupported files remain ignored.
 
 ## `split_font_batch`
 
 Scan a directory, deduplicate equivalent fonts, group outputs, and process selected fonts.
 
-If the source directory shape is uncertain, first request `get_agent_guidance` with `sections: ["examples"]` and review `source-layout-mismatch-comparison`, or run `organize_font_directory` with `workflowPreset: "safe-preview"`. Use the organizer's `recommendedBatchPreviewArgs` for a no-write original-input preview before choosing a real batch write or copy-only staging. When the intended route is to create a cleaner copied staging tree first, use `copy-only-staging-to-audited-split` as the checklist: preview the organization plan, run `organize_font_directory` with `workflowPreset: "reviewed-write"`, use `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` for the staged `split_font_batch` preview, then write and audit the split output.
+When the source directory shape is uncertain:
+
+- First request `get_agent_guidance` with `sections: ["examples"]` and review `source-layout-mismatch-comparison`, or run `organize_font_directory` with `workflowPreset: "safe-preview"`.
+- Use the organizer's `recommendedBatchPreviewArgs` for a no-write original-input preview before choosing a real batch write or copy-only staging.
+- When the intended route is to create a cleaner copied staging tree first, use `copy-only-staging-to-audited-split` as the checklist: preview the organization plan, run `organize_font_directory` with `workflowPreset: "reviewed-write"`, use `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs` for the staged `split_font_batch` preview, then write and audit the split output.
 
 | Field | Type / values | Default | Description |
 |-------|---------------|---------|-------------|
