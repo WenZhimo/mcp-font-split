@@ -3,7 +3,6 @@ import path from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { StaticWasm, fontSplit } from 'cn-font-split/dist/wasm/index.mjs';
 import {
   BATCH_DEDUPE_MODES,
@@ -27,6 +26,15 @@ import {
   WORKFLOW_PRESET_NAMES,
   WORKFLOW_PRESETS,
 } from './catalogs.js';
+import {
+  DEFAULT_WORKSPACE_ROOT,
+  PROJECT_ROOT,
+  isInside,
+  pathStatus,
+  resolveWorkspacePath,
+  toRelativeWorkspacePath,
+  workspaceRoot,
+} from './path-utils.js';
 
 export {
   BATCH_DEDUPE_MODES,
@@ -43,14 +51,18 @@ export {
   WORKFLOW_PRESET_NAMES,
 };
 
+export {
+  DEFAULT_WORKSPACE_ROOT,
+  PROJECT_ROOT,
+  resolveWorkspacePath,
+  toRelativeWorkspacePath,
+};
+
 const require = createRequire(import.meta.url);
 const woff2Decompress = require('wawoff2/decompress');
 const woff2Compress = require('wawoff2/compress');
 const packageJson = require('../package.json');
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const PROJECT_ROOT = path.resolve(__dirname, '..');
-export const DEFAULT_WORKSPACE_ROOT = path.resolve(process.cwd());
 const CN_FONT_SPLIT_PACKAGE_JSON = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/package.json');
 const CN_FONT_SPLIT_VERSION_FILE = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/dist/version');
 const MANIFEST_FILE_NAME = 'split-meta.json';
@@ -109,57 +121,6 @@ async function getWasmRuntime() {
 
 function resetWasmRuntime() {
   wasmRuntimePromise = null;
-}
-
-function workspaceRoot() {
-  return path.resolve(process.env.FONT_SPLIT_ROOT || DEFAULT_WORKSPACE_ROOT);
-}
-
-function isInside(parent, candidate) {
-  const relative = path.relative(parent, candidate);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
-export function resolveWorkspacePath(inputPath, { mustExist = false } = {}) {
-  if (typeof inputPath !== 'string' || inputPath.trim() === '') {
-    throw new Error('Path must be a non-empty string.');
-  }
-
-  const root = workspaceRoot();
-  const resolved = path.resolve(root, inputPath);
-  if (!isInside(root, resolved)) {
-    throw new Error(`Path is outside allowed font workspace: ${inputPath}`);
-  }
-
-  if (mustExist) {
-    return fs.stat(resolved).then(() => resolved);
-  }
-  return Promise.resolve(resolved);
-}
-
-export function toRelativeWorkspacePath(absolutePath) {
-  const relativePath = path.relative(workspaceRoot(), absolutePath).replaceAll(path.sep, '/');
-  return relativePath === '' ? '.' : relativePath;
-}
-
-async function pathStatus(targetPath) {
-  try {
-    const stat = await fs.stat(targetPath);
-    return {
-      exists: true,
-      isFile: stat.isFile(),
-      isDirectory: stat.isDirectory(),
-      sizeBytes: stat.size,
-    };
-  } catch (error) {
-    return {
-      exists: false,
-      isFile: false,
-      isDirectory: false,
-      sizeBytes: 0,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
 }
 
 async function readPackageVersion(packageJsonPath) {
