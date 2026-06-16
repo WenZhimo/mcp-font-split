@@ -57,6 +57,7 @@ import {
 import {
   buildDirectoryLayoutSummary,
   buildInputDirectoryDecision,
+  ensureFontFile,
   inspectInputFontFile,
 } from './input-inspection.js';
 import {
@@ -147,16 +148,6 @@ export { inspectSplitOutput } from './output-audit.js';
 export { getRuntimeStatus } from './runtime-status.js';
 
 export { getAgentGuidance } from './agent-guidance.js';
-async function ensureFontFile(fontPath) {
-  const resolved = await resolveWorkspacePath(fontPath, { mustExist: true });
-  const stat = await fs.stat(resolved);
-  if (!stat.isFile()) throw new Error(`Font path is not a file: ${fontPath}`);
-  const ext = path.extname(resolved).toLowerCase();
-  if (!FONT_EXTENSIONS.has(ext)) {
-    throw new Error(`Unsupported font extension ${ext || '(none)'} for ${fontPath}`);
-  }
-  return resolved;
-}
 
 export async function splitFont(args) {
   const startedAt = Date.now();

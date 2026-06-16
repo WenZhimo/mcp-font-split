@@ -1,6 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { toRelativeWorkspacePath } from './path-utils.js';
+import { FONT_EXTENSIONS } from './catalogs.js';
+import {
+  resolveWorkspacePath,
+  toRelativeWorkspacePath,
+} from './path-utils.js';
 import {
   buildFontIdentityKey,
   decompressWoff1,
@@ -10,6 +14,17 @@ import {
   getGlyphCount,
   parseIdentityKey,
 } from './font-identity.js';
+
+export async function ensureFontFile(fontPath) {
+  const resolved = await resolveWorkspacePath(fontPath, { mustExist: true });
+  const stat = await fs.stat(resolved);
+  if (!stat.isFile()) throw new Error(`Font path is not a file: ${fontPath}`);
+  const ext = path.extname(resolved).toLowerCase();
+  if (!FONT_EXTENSIONS.has(ext)) {
+    throw new Error(`Unsupported font extension ${ext || '(none)'} for ${fontPath}`);
+  }
+  return resolved;
+}
 
 export async function inspectInputFontFile(file) {
   const ext = path.extname(file).toLowerCase();
