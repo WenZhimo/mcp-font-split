@@ -896,9 +896,20 @@ async function runWorkflowPresetsSmoke() {
 }
 
 async function runBatchCompactSmoke() {
-  const inputDir = process.argv[3] || '0xA000';
-  const outputRoot = process.argv[4] || 'font-split-mcp/.font-split-batch-compact-output';
+  const ownsFixtureInput = process.argv[3] === undefined;
+  const inputDir = process.argv[3] || '.font-split-batch-compact-input';
+  const outputRoot = process.argv[4] || '.font-split-batch-compact-output';
   console.log('Batch compact response smoke:', inputDir, '->', outputRoot);
+  if (ownsFixtureInput) {
+    await fs.rm(inputDir, { recursive: true, force: true });
+    await fs.rm(outputRoot, { recursive: true, force: true });
+    await fs.mkdir(inputDir, { recursive: true });
+    await fs.writeFile(path.join(inputDir, 'CompactSans-Regular.ttf'), buildMinimalTtf({
+      familyName: 'Compact Sans',
+      subfamilyName: 'Regular',
+      glyphCount: 5,
+    }));
+  }
   const result = await splitFontBatch({
     inputDir,
     outputRoot,
@@ -908,6 +919,8 @@ async function runBatchCompactSmoke() {
     skipMode: 'force',
     batchNamingMode: 'numeric-suffix',
     batchDedupeMode: 'font-identity',
+    smallGlyphAction: ownsFixtureInput ? 'copy-original' : undefined,
+    smallGlyphThreshold: ownsFixtureInput ? 1000000 : undefined,
     chunkSize: 70 * 1024,
     silent: true,
   });
