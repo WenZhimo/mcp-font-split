@@ -12,9 +12,7 @@ import {
   ERROR_RESPONSE_CATALOG,
   FONT_IDENTITY_BASIS_CATALOG,
   FONT_EXTENSIONS,
-  GUIDANCE_COMPACT_SECTION_NAMES,
   GUIDANCE_DETAIL_LEVELS,
-  GUIDANCE_SECTION_FIELDS,
   GUIDANCE_SECTION_NAMES,
   GUIDANCE_WORKFLOWS,
   OVERSIZED_KERN_ACTIONS,
@@ -65,7 +63,9 @@ import {
   buildProjectStatusNotice,
   buildToolSafetyQuickReference,
   buildUnsupportedFileCategoryCatalog,
+  buildGuidanceView,
   buildWorkflowPresetCatalog,
+  selectGuidanceSections,
 } from './guidance.js';
 import {
   SAFE_INVOCATION_TEMPLATES,
@@ -167,53 +167,6 @@ export {
 
 export { inspectSplitOutput } from './output-audit.js';
 export { getRuntimeStatus } from './runtime-status.js';
-
-function uniqueAllowedValues(values, allowed) {
-  const allowedSet = new Set(allowed);
-  const seen = new Set();
-  const result = [];
-  for (const value of values) {
-    if (!allowedSet.has(value) || seen.has(value)) continue;
-    seen.add(value);
-    result.push(value);
-  }
-  return result;
-}
-
-function buildGuidanceView(args) {
-  const detailLevel = GUIDANCE_DETAIL_LEVELS.includes(args.detailLevel) ? args.detailLevel : 'compact';
-  const rawSections = Array.isArray(args.sections) ? args.sections : null;
-  const requestedSections = rawSections ? uniqueAllowedValues(rawSections, GUIDANCE_SECTION_NAMES) : null;
-  const ignoredSections = rawSections ? rawSections.filter((section) => !GUIDANCE_SECTION_NAMES.includes(section)) : [];
-  const defaultSections = detailLevel === 'compact' ? GUIDANCE_COMPACT_SECTION_NAMES : GUIDANCE_SECTION_NAMES;
-  const sectionsIncluded = requestedSections?.length ? requestedSections : defaultSections;
-  return {
-    detailLevel,
-    availableDetailLevels: GUIDANCE_DETAIL_LEVELS,
-    availableSections: GUIDANCE_SECTION_NAMES,
-    compactDefaultSections: GUIDANCE_COMPACT_SECTION_NAMES,
-    sectionsRequested: rawSections,
-    sectionsIncluded,
-    omittedSections: GUIDANCE_SECTION_NAMES.filter((section) => !sectionsIncluded.includes(section)),
-    ignoredSections,
-  };
-}
-
-function selectGuidanceSections(guidance, sectionsIncluded) {
-  const selected = {
-    ok: guidance.ok,
-    purpose: guidance.purpose,
-    workflow: guidance.workflow,
-    agentOptimized: guidance.agentOptimized,
-    guidanceView: guidance.guidanceView,
-  };
-  for (const section of sectionsIncluded) {
-    for (const fieldName of GUIDANCE_SECTION_FIELDS[section] || []) {
-      selected[fieldName] = guidance[fieldName];
-    }
-  }
-  return selected;
-}
 
 export function getAgentGuidance(args = {}) {
   const workflow = GUIDANCE_WORKFLOWS.includes(args.workflow) ? args.workflow : 'overview';
