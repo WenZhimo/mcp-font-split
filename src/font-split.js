@@ -66,6 +66,13 @@ import {
   summarizeFilesDetailed,
 } from './file-scan.js';
 import {
+  MANIFEST_VERSION,
+  buildSplitManifest,
+  manifestPathForSplitDir,
+  readSplitManifest,
+  writeSplitManifest,
+} from './split-manifest.js';
+import {
   ORGANIZATION_MANIFEST_FILE_NAME,
   buildFontEntryInspection,
   buildOutputAuditStatus,
@@ -104,8 +111,6 @@ const packageJson = require('../package.json');
 
 const CN_FONT_SPLIT_PACKAGE_JSON = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/package.json');
 const CN_FONT_SPLIT_VERSION_FILE = path.resolve(PROJECT_ROOT, 'node_modules/cn-font-split/dist/version');
-const MANIFEST_FILE_NAME = 'split-meta.json';
-const MANIFEST_VERSION = 1;
 const ORGANIZATION_MANIFEST_VERSION = 1;
 const PACKAGE_VERSION = packageJson.version;
 let wasmRuntimePromise;
@@ -6241,56 +6246,6 @@ function buildBatchError({ mode, errors, summary }) {
   return error;
 }
 
-function manifestPathForSplitDir(splitDir) {
-  return path.join(splitDir, MANIFEST_FILE_NAME);
-}
-
-async function writeSplitManifest(splitDir, manifest) {
-  await fs.writeFile(manifestPathForSplitDir(splitDir), JSON.stringify(manifest, null, 2));
-}
-
-async function readSplitManifest(splitDir) {
-  try {
-    return JSON.parse(await fs.readFile(manifestPathForSplitDir(splitDir), 'utf8'));
-  } catch (error) {
-    if (error.code === 'ENOENT') return null;
-    throw error;
-  }
-}
-
-function buildSplitManifest({ inputRelativePath, inputStat, groupName, outDirRelative, splitDirRelative, effectiveConfig, result }) {
-  return {
-    manifestVersion: MANIFEST_VERSION,
-    toolVersion: PACKAGE_VERSION,
-    source: {
-      input: inputRelativePath,
-      sizeBytes: inputStat.size,
-      mtimeMs: inputStat.mtimeMs,
-    },
-    grouping: {
-      groupName,
-      outDir: outDirRelative,
-      splitDir: splitDirRelative,
-      splitDirName: path.basename(splitDirRelative),
-    },
-    effectiveConfig,
-    result: {
-      outputMode: result.outputMode,
-      resultType: result.resultType,
-      glyphCount: result.glyphCount,
-      skipped: result.skipped,
-      skipReason: result.skipReason,
-      copiedOriginalPath: result.copiedOriginalPath,
-      decompressedFrom: result.decompressedFrom,
-      oversizedKernDetected: result.oversizedKernDetected,
-      oversizedKernStripped: result.oversizedKernStripped,
-      splitFailureFallbackApplied: result.splitFailureFallbackApplied,
-      performedSplit: result.performedSplit,
-      usedFallback: result.usedFallback,
-    },
-  };
-}
-
 async function resolveBatchFamilyDirName({ file, inputDir, groupingMode }) {
   const relativeToInput = path.relative(inputDir, file);
   const segments = relativeToInput.split(path.sep);
@@ -7204,6 +7159,7 @@ export async function splitFont(args) {
   };
 
   const manifest = buildSplitManifest({
+    toolVersion: PACKAGE_VERSION,
     inputRelativePath,
     inputStat,
     groupName,
