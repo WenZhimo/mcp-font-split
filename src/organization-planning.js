@@ -7,6 +7,7 @@ import {
   resolveBatchFamilyDirName,
   sanitizeDirName,
 } from './batch.js';
+import { buildSuggestedBatchPreviewArgs } from './suggested-args.js';
 
 export function getOrganizationDedupeKey(entry, dedupeMode) {
   if (dedupeMode === 'none') return `unique:${entry.file}`;
@@ -52,6 +53,121 @@ export function dedupeOrganizationEntries(entries, dedupeMode) {
     selected: [...byKey.values()].sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true })),
     duplicates,
   };
+}
+
+export function buildOrganizationDecision({
+  options,
+  inputDirRelative,
+  outputDirRelative,
+  maxFiles,
+  maxFilesHit,
+  layout,
+  invalidFontCount,
+  selectedFontCount,
+  copiedCount,
+  errorCount,
+  recommendedBatchPreviewArgs,
+}) {
+  const base = {
+    sourceDestructive: false,
+    writesBeforeReview: false,
+    copyOnlyStagingRequired: false,
+  };
+  const make = (decision) => ({ ...base, ...decision });
+
+  if (maxFilesHit) {
+    return make({
+      route: 'rerun-with-higher-maxFiles',
+      preferredNextActionId: 'rerun-with-higher-maxFiles',
+      nextTool: 'organize_font_directory',
+      reason: 'The source scan was truncated, so layout and copy decisions may be incomplete.',
+    });
+  }
+
+  if (!options.parseFonts) {
+    return make({
+      route: 'rerun-with-font-parsing',
+      preferredNextActionId: 'rerun-with-font-parsing',
+      nextTool: 'organize_font_directory',
+      reason: 'This was a structure-only pass; rerun with font parsing before relying on invalid-font counts, identity dedupe, or metadata family grouping.',
+    });
+  }
+
+  if (errorCount > 0) {
+    return make({
+      route: 'inspect-organization-errors',
+      preferredNextActionId: 'inspect-organization-errors',
+      nextTool: 'organize_font_directory',
+      reason: 'The organization run recorded per-file errors that need inspection before continuing.',
+    });
+  }
+
+  if (selectedFontCount === 0) {
+    if (invalidFontCount > 0 && !options.copyInvalidFonts) {
+      return make({
+        route: 'decide-on-invalid-fonts',
+        preferredNextActionId: 'decide-on-invalid-fonts',
+        nextTool: 'organize_font_directory',
+        reason: 'Only invalid supported-extension files were available for the current policy; decide whether preserving broken font-like files is intentional.',
+      });
+    }
+    return make({
+      route: 'no-copyable-fonts',
+      preferredNextActionId: null,
+      nextTool: null,
+      reason: layout.layoutKind === 'empty'
+        ? 'No supported font files were found in the scanned input.'
+        : 'No fonts were selected for the current organization policy.',
+    });
+  }
+
+  if (!options.dryRun) {
+    if (copiedCount > 0) {
+      return make({
+        route: 'preview-organized-output',
+        preferredNextActionId: 'preview-batch-split-organized-output',
+        nextTool: 'split_font_batch',
+        nextInputDir: outputDirRelative,
+        safeBatchPreviewArgs: buildSuggestedBatchPreviewArgs({
+          inputDir: outputDirRelative,
+          recommendedBatchOptions: layout.recommendedBatchOptions,
+          extraArgs: { maxFiles },
+        }),
+        reason: 'A copy-only staging directory was written; inspect or preview that organized output before splitting.',
+      });
+    }
+    return make({
+      route: 'review-existing-targets',
+      preferredNextActionId: 'inspect-organized-output',
+      nextTool: 'inspect_font_inputs',
+      nextInputDir: outputDirRelative,
+      reason: 'No files were copied by this write run, likely because output targets already existed or the plan selected no copy actions.',
+    });
+  }
+
+  if (layout.layoutKind === 'mixed') {
+    return make({
+      route: 'review-mixed-layout',
+      preferredNextActionId: 'review-mixed-layout-grouping',
+      nextTool: 'split_font_batch',
+      nextInputDir: inputDirRelative,
+      safeBatchPreviewArgs: recommendedBatchPreviewArgs,
+      copyOnlyStagingRequired: 'optional',
+      optionalStagingActionId: 'copy-organized-staging-directory',
+      reason: 'Fonts exist both at the input root and inside subdirectories; review grouping before direct splitting or staging.',
+    });
+  }
+
+  return make({
+    route: 'preview-original-layout',
+    preferredNextActionId: 'preview-batch-split-original-layout',
+    nextTool: 'split_font_batch',
+    nextInputDir: inputDirRelative,
+    safeBatchPreviewArgs: recommendedBatchPreviewArgs,
+    copyOnlyStagingRequired: 'optional',
+    optionalStagingActionId: 'copy-organized-staging-directory',
+    reason: 'The current layout has copyable fonts; preview split_font_batch on the original input before any real batch write, and only copy a staging directory if the user wants one.',
+  });
 }
 
 export async function resolveOrganizationGroupName({ entry, inputDir, groupingMode }) {
