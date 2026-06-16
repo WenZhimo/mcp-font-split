@@ -26,7 +26,7 @@
 | `src/input-preflight.js`、`src/input-*.js` | `inspect_font_inputs` 运行时编排、输入扫描、输入目录判断、忽略文件摘要和目录结构预检。 |
 | `src/organization-runtime.js`、`src/organization-*.js` | `organize_font_directory` 运行时编排、copy-only 计划、manifest 和目录路线判断。 |
 | `src/output-audit.js` | `inspect_split_output` 输出目录角色判断和结构审计。 |
-| `src/guidance*.js`、`src/catalogs.js`、`src/tool-response-field-catalog.js`、`src/tool-option-catalog.js`、`src/diagnostic-catalogs.js`、`src/font-identity-basis-catalog.js` | 面向 AI agent 的机器可读指南、字段目录、警告目录、选项目录和示例。`src/catalogs.js` 保留公共目录聚合与 re-export，体量较大的响应字段目录、选项目录、诊断目录和 identity basis 目录放在独立文件。 |
+| `src/guidance*.js`、`src/catalogs.js`、`src/tool-response-field-catalog.js`、`src/tool-option-catalog.js`、`src/diagnostic-catalogs.js`、`src/font-identity-basis-catalog.js`、`src/output-structure-catalog.js` | 面向 AI agent 的机器可读指南、字段目录、警告目录、选项目录和示例。`src/catalogs.js` 保留公共目录聚合与 re-export，体量较大的响应字段目录、选项目录、诊断目录、identity basis 目录和输出结构目录放在独立文件。 |
 | `src/smoke/` | 本地验证场景。涉及用户可见行为、字段契约或真实语料解释时，应优先补这里的 smoke guard。 |
 
 ## 事实来源规则
