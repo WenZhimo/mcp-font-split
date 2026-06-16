@@ -315,9 +315,13 @@ export async function runBehaviorDocsSmoke() {
     !readmeZh.includes('## 目录结构不匹配速查')
     || !readmeZh.includes('不会移动、删除或重写源字体')
     || !readmeZh.includes('不是最终 web-font 拆分结果')
+    || !readmeZh.includes('`font-organization-manifest.json`')
+    || !readmeZh.includes('`organized-font-source-staging`')
     || !readmeEn.includes('## Source Layout Mismatch Quick Check')
     || !readmeEn.includes('never moves, deletes, or rewrites source fonts')
     || !readmeEn.includes('not final web-font split output')
+    || !readmeEn.includes('`font-organization-manifest.json`')
+    || !readmeEn.includes('`organized-font-source-staging`')
   ) {
     throw new Error('Expected README files to provide a prominent non-destructive source layout mismatch quick check.');
   }

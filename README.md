@@ -39,6 +39,7 @@
 5. 对整理后的暂存目录重新执行 `inspect_font_inputs`，再进入 `split_font_batch` safe-preview 和最终输出审计。
 
 非直觉点：`organize_font_directory` 的输出是“整理后的源目录暂存”，不是最终 web-font 拆分结果；最终结果仍必须由 `split_font_batch` 写出，并用 `inspect_split_output` 审计目录结构。
+如果这个暂存目录里有 `font-organization-manifest.json`，`inspect_split_output` 会把它识别为 `organized-font-source-staging`，这时它仍然是暂存目录，不是最终拆分输出。
 
 ## 功能
 

@@ -39,6 +39,7 @@ If fonts came from multiple websites, extracted archives, vendor dumps, or a mix
 5. Run `inspect_font_inputs` on the organized staging directory, then continue with `split_font_batch` safe-preview and final output audit.
 
 Non-intuitive behavior: `organize_font_directory` produces organized source-like staging, not final web-font split output. Final output must still be written by `split_font_batch` and audited with `inspect_split_output`.
+If that staging directory contains `font-organization-manifest.json`, `inspect_split_output` will identify it as `organized-font-source-staging`; it is still staging, not final split output.
 
 ## Features
 
