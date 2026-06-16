@@ -1,0 +1,351 @@
+import path from 'node:path';
+
+export const ORGANIZATION_MANIFEST_FILE_NAME = 'font-organization-manifest.json';
+
+export function buildOutputRoleDecision({ outDirRelative, relativeEntries, maxFiles }) {
+  const organizationManifest = relativeEntries.find((file) => file.relativePath === ORGANIZATION_MANIFEST_FILE_NAME);
+  if (organizationManifest) {
+    return {
+      summaryType: 'output-role-decision',
+      status: 'not-split-output',
+      detectedRole: 'organized-font-source-staging',
+      isSplitOutput: false,
+      auditAppliesToThisDirectory: false,
+      organizationManifestPath: organizationManifest.path,
+      shortAnswer: 'This directory looks like organize_font_directory outputDir staging, not generated split output.',
+      recommendedAction: 'inspect-staging-as-input-then-batch-preview',
+      suggestedInspectInputArgs: {
+        inputDir: outDirRelative,
+        includeFiles: false,
+        maxFiles,
+      },
+      suggestedBatchPreviewArgs: {
+        inputDir: outDirRelative,
+        workflowPreset: 'safe-preview',
+        maxFiles,
+      },
+      mustInspectFields: ['outputRoleDecision', 'inspectionWarnings', 'auditBlockingReasons', 'structureSummary'],
+      nonIntuitiveBehavior: [
+        'organize_font_directory writes font-organization-manifest.json in outputDir, but that outputDir is source-like staging.',
+        'inspect_split_output audits generated split output from split_font or split_font_batch, not organizer staging trees.',
+      ],
+    };
+  }
+
+  return {
+    summaryType: 'output-role-decision',
+    status: 'audit-target',
+    detectedRole: 'generated-split-output-or-unknown',
+    isSplitOutput: null,
+    auditAppliesToThisDirectory: true,
+    organizationManifestPath: null,
+    shortAnswer: 'No organizer manifest was detected; continue with the split-output structure audit.',
+    recommendedAction: 'continue-output-structure-audit',
+    mustInspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'structureSummary'],
+    nonIntuitiveBehavior: [
+      'No organizer manifest means this is not recognized as organize_font_directory staging, but output validity still depends on outputStructureDecision and structureSummary.',
+    ],
+  };
+}
+
+export function buildOutputInspectionWarnings({ maxFilesHit, maxFiles, includeFiles, includeFamilies, missingManifestCount, structureIssueCount, outputRoleDecision }) {
+  const warnings = [];
+  const push = (code, message) => warnings.push({ code, message });
+
+  if (maxFilesHit) {
+    push('output-scan-truncated', `Output inspection hit maxFiles (${maxFiles}); rerun with a higher maxFiles before treating the audit as complete.`);
+  }
+  if (!includeFiles) {
+    push('output-files-omitted', 'Flat files[] entries are omitted because includeFiles is false.');
+  }
+  if (!includeFamilies) {
+    push('output-families-omitted', 'Structured families[] entries are omitted because includeFamilies is false.');
+  }
+  if (missingManifestCount > 0) {
+    push('missing-manifests', `${missingManifestCount} output entries were inferred without split-meta.json manifests.`);
+  }
+  if (structureIssueCount > 0) {
+    push('output-structure-issues', `${structureIssueCount} output structure issue(s) were detected; inspect structureSummary before treating the output as valid.`);
+  }
+  if (outputRoleDecision?.isSplitOutput === false) {
+    push('organized-staging-not-split-output', 'The inspected directory contains font-organization-manifest.json, so it looks like organize_font_directory staging rather than generated split output.');
+  }
+
+  return warnings;
+}
+
+export function buildOutputAuditStatus({ maxFilesHit, maxFiles, structureSummary, outputRoleDecision }) {
+  const auditBlockingReasons = [];
+  if (outputRoleDecision?.isSplitOutput === false) {
+    auditBlockingReasons.push({
+      code: 'not-split-output',
+      message: 'The inspected directory appears to be organize_font_directory staging, not generated split output.',
+      issueCodes: ['organized-staging-not-split-output'],
+      recommendedAction: outputRoleDecision.recommendedAction,
+      organizationManifestPath: outputRoleDecision.organizationManifestPath,
+    });
+  }
+  if (maxFilesHit) {
+    auditBlockingReasons.push({
+      code: 'output-scan-truncated',
+      message: `Output inspection hit maxFiles (${maxFiles}); rerun with a higher maxFiles before treating the audit as complete.`,
+    });
+  }
+  if (structureSummary?.conforms !== true) {
+    auditBlockingReasons.push({
+      code: 'output-structure-issues',
+      message: 'Output structure issues were detected; inspect structureSummary before treating the output as valid.',
+      issueCodes: (structureSummary?.issues || []).map((issue) => issue.code),
+    });
+  }
+
+  const auditStatus = maxFilesHit
+    ? 'incomplete'
+    : auditBlockingReasons.length > 0 ? 'action-required' : 'pass';
+  return {
+    auditStatus,
+    auditPassed: auditStatus === 'pass',
+    auditBlockingReasons,
+  };
+}
+
+export function buildOutputStructureDecision({
+  auditStatusSummary,
+  maxFilesHit,
+  maxFiles,
+  structureSummary,
+  outputRoleDecision,
+}) {
+  const auditStatus = auditStatusSummary.auditStatus;
+  const auditPassed = auditStatusSummary.auditPassed === true;
+  const auditBlockingReasons = auditStatusSummary.auditBlockingReasons || [];
+  const blockingReasonCodes = auditBlockingReasons.map((reason) => reason.code).filter(Boolean);
+  const issueCodes = [
+    ...new Set([
+      ...auditBlockingReasons.flatMap((reason) => reason.issueCodes || []),
+      ...(structureSummary?.issues || []).map((issue) => issue.code),
+    ].filter(Boolean)),
+  ];
+  const recommendedAction = outputRoleDecision?.isSplitOutput === false
+    ? outputRoleDecision.recommendedAction
+    : auditStatus === 'pass'
+    ? 'continue'
+    : maxFilesHit
+      ? 'rerun-inspect-split-output-with-higher-maxFiles'
+      : 'inspect-structureSummary-issues';
+
+  return {
+    summaryType: 'output-structure-decision',
+    status: auditStatus,
+    auditPassed,
+    structureConforms: structureSummary?.conforms === true,
+    reviewRecommended: auditStatus !== 'pass',
+    recommendedAction,
+    maxFiles,
+    maxFilesHit: Boolean(maxFilesHit),
+    blockingReasonCodes,
+    issueCodes,
+    outputRole: outputRoleDecision?.detectedRole,
+    isSplitOutput: outputRoleDecision?.isSplitOutput ?? null,
+    auditAppliesToThisDirectory: outputRoleDecision?.auditAppliesToThisDirectory !== false,
+    layoutKind: structureSummary?.layoutKind,
+    issueCount: structureSummary?.issueCount || 0,
+    unexpectedFileCount: structureSummary?.unexpectedFileCount || 0,
+    unexpectedDepthFileCount: structureSummary?.unexpectedDepthFileCount || 0,
+    manifestCoverageOk: structureSummary?.manifestCoverageOk === true,
+    manifestCount: structureSummary?.manifestCount || 0,
+    fontEntryCount: structureSummary?.fontEntryCount || 0,
+    missingManifestCount: structureSummary?.missingManifestCount || 0,
+    outputModeCounts: structureSummary?.outputModeCounts || {},
+    evidenceFields: ['outputRoleDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
+    passCriteria: 'Require outputRoleDecision.auditAppliesToThisDirectory not false, outputStructureDecision.status pass, auditStatus pass, auditPassed true, structureSummary.conforms true, maxFilesHit false, and no action-required inspectionWarnings before treating output as structurally valid.',
+    nonIntuitiveBehavior: 'ok:true means the output directory inspection ran; it does not by itself mean the output structure passed. Check outputStructureDecision.status before reporting completion.',
+  };
+}
+
+export function inferLegacyResultType(fontEntry) {
+  if (fontEntry.manifest?.result?.resultType) return fontEntry.manifest.result.resultType;
+  if (!fontEntry.hasCss && fontEntry.hasManifest) return 'copy-original-small-glyph';
+  if (!fontEntry.hasCss) return 'unknown';
+  if (fontEntry.hasReporter || fontEntry.hasProto || fontEntry.woff2Count > 1) return 'subset';
+  if (fontEntry.woff2Count === 1) return 'single-woff2';
+  return 'unknown';
+}
+
+export function buildFontEntryInspection(groupName, splitDirName, originalFiles, outputFiles, manifest) {
+  const byExtension = {};
+  for (const file of outputFiles) {
+    byExtension[file.extension || '(none)'] = (byExtension[file.extension || '(none)'] || 0) + 1;
+  }
+  const woff2Count = byExtension['.woff2'] || 0;
+  const hasCss = outputFiles.some((file) => path.basename(file.path) === 'result.css');
+  const hasHtml = outputFiles.some((file) => path.basename(file.path) === 'index.html');
+  const hasReporter = outputFiles.some((file) => path.basename(file.path) === 'reporter.bin');
+  const hasProto = outputFiles.some((file) => path.basename(file.path) === 'index.proto');
+  const resultType = inferLegacyResultType({ manifest, hasCss, hasReporter, hasProto, woff2Count });
+  return {
+    groupName,
+    fontBaseName: splitDirName,
+    splitDir: outputFiles[0] ? outputFiles[0].path.split('/').slice(0, -1).join('/') : null,
+    originalFiles,
+    outputFiles,
+    fileCount: outputFiles.length,
+    byExtension,
+    woff2Count,
+    hasCss,
+    hasHtml,
+    hasReporter,
+    hasProto,
+    hasManifest: Boolean(manifest),
+    manifest,
+    outputMode: manifest?.result?.outputMode || (resultType === 'subset' ? 'subset' : resultType.startsWith('single-woff2') ? 'single-woff2' : resultType === 'copy-original-small-glyph' ? 'copy-original' : 'unknown'),
+    resultType,
+  };
+}
+
+export function relativePathInside(baseRelativePath, itemRelativePath) {
+  if (baseRelativePath === '.') return itemRelativePath;
+  if (itemRelativePath === baseRelativePath) return '';
+  const prefix = `${baseRelativePath}/`;
+  return itemRelativePath.startsWith(prefix) ? itemRelativePath.slice(prefix.length) : itemRelativePath;
+}
+
+export function relativePathDepth(relativePath) {
+  return relativePath.split('/').filter(Boolean).length;
+}
+
+export function buildOutputStructureSummary({
+  outDirRelative,
+  files,
+  families,
+  fontEntryCount,
+  manifestCount,
+  missingManifestCount,
+}) {
+  const classifiedPaths = new Set();
+  const originalDepthCounts = {};
+  const outputModeCounts = {};
+  const entryIssueExamples = [];
+  let unknownOutputModeCount = 0;
+  let webOutputMissingCount = 0;
+  let copyOriginalExtraOutputCount = 0;
+
+  const recordOriginalDepth = (file) => {
+    const depth = relativePathDepth(relativePathInside(outDirRelative, file.path));
+    originalDepthCounts[depth] = (originalDepthCounts[depth] || 0) + 1;
+  };
+
+  for (const family of families) {
+    for (const originalFile of family.originalFiles || []) {
+      classifiedPaths.add(originalFile.path);
+      recordOriginalDepth(originalFile);
+    }
+
+    for (const entry of family.fontEntries || []) {
+      const outputMode = entry.outputMode || 'unknown';
+      outputModeCounts[outputMode] = (outputModeCounts[outputMode] || 0) + 1;
+      for (const outputFile of entry.outputFiles || []) classifiedPaths.add(outputFile.path);
+
+      if (!['subset', 'single-woff2', 'copy-original'].includes(outputMode)) {
+        unknownOutputModeCount++;
+        entryIssueExamples.push({
+          code: 'unknown-output-mode',
+          familyName: entry.groupName,
+          fontBaseName: entry.fontBaseName,
+          outputMode,
+        });
+        continue;
+      }
+
+      if ((outputMode === 'subset' || outputMode === 'single-woff2') && (!entry.hasCss || entry.woff2Count === 0)) {
+        webOutputMissingCount++;
+        entryIssueExamples.push({
+          code: 'web-output-missing',
+          familyName: entry.groupName,
+          fontBaseName: entry.fontBaseName,
+          outputMode,
+          hasCss: entry.hasCss,
+          woff2Count: entry.woff2Count,
+        });
+      }
+
+      if (outputMode === 'copy-original' && (entry.hasCss || entry.woff2Count > 0)) {
+        copyOriginalExtraOutputCount++;
+        entryIssueExamples.push({
+          code: 'copy-original-extra-output',
+          familyName: entry.groupName,
+          fontBaseName: entry.fontBaseName,
+          hasCss: entry.hasCss,
+          woff2Count: entry.woff2Count,
+        });
+      }
+    }
+  }
+
+  const rootOriginalCount = originalDepthCounts[1] || 0;
+  const familyTreeOriginalCount = originalDepthCounts[2] || 0;
+  const unexpectedOriginalDepthCount = Object.entries(originalDepthCounts)
+    .filter(([depth]) => depth !== '1' && depth !== '2')
+    .reduce((count, [, value]) => count + value, 0);
+
+  const layoutKind = files.length === 0
+    ? 'empty'
+    : rootOriginalCount > 0 && familyTreeOriginalCount === 0 && unexpectedOriginalDepthCount === 0
+      ? 'single-family'
+      : familyTreeOriginalCount > 0 && rootOriginalCount === 0 && unexpectedOriginalDepthCount === 0
+        ? 'family-tree'
+        : rootOriginalCount > 0 && familyTreeOriginalCount > 0
+          ? 'mixed'
+          : 'unknown';
+
+  const depthIssueFiles = [];
+  for (const file of files) {
+    const depth = relativePathDepth(relativePathInside(outDirRelative, file.path));
+    if (
+      (layoutKind === 'single-family' && depth > 2)
+      || (layoutKind === 'family-tree' && (depth === 1 || depth > 3))
+    ) {
+      depthIssueFiles.push(file);
+    }
+  }
+
+  const unexpectedFiles = files.filter((file) => !classifiedPaths.has(file.path));
+  const issues = [];
+  const pushIssue = (code, message, count) => {
+    if (count > 0) issues.push({ code, message, count });
+  };
+
+  pushIssue('empty-output', 'No output files were found.', files.length === 0 ? 1 : 0);
+  pushIssue('mixed-output-layout', 'Original font files appear at both root and family-directory depths.', layoutKind === 'mixed' ? 1 : 0);
+  pushIssue('unknown-output-layout', 'The output tree does not match the expected single-family or family-tree layout.', layoutKind === 'unknown' ? 1 : 0);
+  pushIssue('unexpected-original-depth', 'Original font files were detected at unexpected path depths.', unexpectedOriginalDepthCount);
+  pushIssue('unexpected-output-files', 'Files were found outside recognized family/font-entry output locations.', unexpectedFiles.length);
+  pushIssue('unexpected-output-depth', 'Files were found at path depths outside the documented output structure.', depthIssueFiles.length);
+  pushIssue('missing-manifests', 'Some font entries do not include split-meta.json and were conservatively inferred from file structure.', missingManifestCount);
+  pushIssue('unknown-output-mode', 'Some font entries have an unknown output mode.', unknownOutputModeCount);
+  pushIssue('web-output-missing', 'Some subset or single-WOFF2 entries are missing result.css or WOFF2 files.', webOutputMissingCount);
+  pushIssue('copy-original-extra-output', 'Some copy-original entries unexpectedly contain generated CSS or WOFF2 files.', copyOriginalExtraOutputCount);
+
+  const maxExamples = 20;
+  return {
+    conforms: issues.length === 0,
+    layoutKind,
+    familyCount: families.length,
+    fontEntryCount,
+    manifestCount,
+    missingManifestCount,
+    manifestCoverageOk: manifestCount === fontEntryCount,
+    classifiedFileCount: classifiedPaths.size,
+    unexpectedFileCount: unexpectedFiles.length,
+    unexpectedFileExamples: unexpectedFiles
+      .slice(0, maxExamples)
+      .map((file) => file.path),
+    unexpectedFileExamplesTruncated: unexpectedFiles.length > maxExamples,
+    unexpectedDepthFileCount: depthIssueFiles.length,
+    outputModeCounts,
+    entryIssueExamples: entryIssueExamples.slice(0, maxExamples),
+    entryIssueExamplesTruncated: entryIssueExamples.length > maxExamples,
+    issueCount: issues.length,
+    issues,
+  };
+}
