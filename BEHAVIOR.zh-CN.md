@@ -196,6 +196,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 - `directoryOrganizationQuickAnswer` 是目录整理短答案。它说明 `organize_font_directory` 可用、默认 `workflowPreset: "safe-preview"`、审查后 `workflowPreset: "reviewed-write"` 也只是 copy-only 写入 `outputDir`，不会移动、删除或重写源字体。
 - `directoryOrganizationQuickAnswer` 还会标出 `outputDir` 是源目录式暂存，并列出必须检查的 `sourceSafetyDecision`、`layoutDecision`、`stagingDirectoryDecision`、`sourceLayoutMismatchSummary`、`organizationWarnings` 和 `planActionSummary`。
 - `directoryOrganizationQuickAnswer.directoryOrganizationSafety` 与 `inputDirectoryDecision.directoryOrganizationSafety` 使用同一安全契约；前者适合还没跑输入预检时快速回答，后者适合在 `inspect_font_inputs` 当前响应中结合真实目录证据继续决策。
+- `toolResponseFieldCatalog` 会分别列出这两个嵌套安全字段，避免 agent 把指南级占位参数和当前输入目录的真实 `safePreviewArgs` 混为一谈。
 - `directoryHandlingModeCatalog` 解释 `layoutDecision.directoryHandling.recommendedMode` 的 mode 含义、下一步建议、写入安全性、必查字段和非直觉行为。
 - `directoryWorkflowDecisionMatrix[]` 把常见目录场景映射到首选工具、推荐参数、后续工具、写入安全、源目录安全、`successCriteria` 和非直觉行为。
   它不能替代工具实际响应检查，尤其不能跳过 `organizationWarnings[]`、`batchWarnings[]`、`maxFilesHit`、`errorCount` 等字段。

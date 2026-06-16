@@ -208,8 +208,11 @@ async function runAgentGuidanceSmoke() {
   }
   if (
     !result.responseFieldsToCheck?.includes('directoryOrganizationQuickAnswer')
+    || !result.responseFieldsToCheck?.includes('directoryOrganizationQuickAnswer.directoryOrganizationSafety')
     || result.toolResponseFieldCatalog?.directoryOrganizationQuickAnswer?.sourceTools?.[0] !== 'get_agent_guidance'
+    || result.toolResponseFieldCatalog?.['directoryOrganizationQuickAnswer.directoryOrganizationSafety']?.sourceTools?.[0] !== 'get_agent_guidance'
     || !result.toolResponseFieldCatalog?.directoryOrganizationQuickAnswer?.agentAction?.includes('safe-preview')
+    || !result.toolResponseFieldCatalog?.['directoryOrganizationQuickAnswer.directoryOrganizationSafety']?.agentAction?.includes('inspect_font_inputs')
   ) {
     throw new Error('Expected agent guidance to expose directoryOrganizationQuickAnswer as the compact directory safety answer.');
   }
@@ -832,6 +835,8 @@ async function runAgentGuidanceSmoke() {
     stagingDirectoryDecision: 'organize_font_directory',
     directoryHandlingModeCatalog: 'get_agent_guidance',
     directoryOrganizationQuickAnswer: 'get_agent_guidance',
+    'directoryOrganizationQuickAnswer.directoryOrganizationSafety': 'get_agent_guidance',
+    'inputDirectoryDecision.directoryOrganizationSafety': 'inspect_font_inputs',
     sourceLayoutMismatchSummary: 'organize_font_directory',
     'sourceLayoutMismatchSummary.decisionChecklist': 'organize_font_directory',
     'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs': 'organize_font_directory',

@@ -962,6 +962,11 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Compact first-pass route after input inspection: whether to rerun the scan, review invalid fonts, preview batch splitting directly, or run a non-destructive organization preview first.',
     agentAction: 'Use this as a no-write triage hint only. Inspect layout, recommendedBatchPreviewArgs, unsupported file summaries, and inspectionWarnings before splitting or organizing.',
   },
+  'inputDirectoryDecision.directoryOrganizationSafety': {
+    sourceTools: ['inspect_font_inputs'],
+    meaning: 'Scan-local directory organization safety contract. It names organize_font_directory, gives no-write safePreviewArgs with the current inputDir and maxFiles, and states that reviewed organization is copy-only staging rather than final split output.',
+    agentAction: 'Use this when input inspection has already run; copy safePreviewArgs for a no-write organization preview, then inspect the organizer response before any reviewed copy or split write.',
+  },
   dryRun: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Whether the call only planned work instead of writing output.',
@@ -1181,6 +1186,11 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Short answer for whether this package has a directory organization helper and whether that helper can modify source font files.',
     agentAction: 'Use this first when the user asks what to do with mismatched source directory layouts; start with its safe-preview args, then inspect source safety, layout, warnings, and plan evidence before any reviewed copy.',
+  },
+  'directoryOrganizationQuickAnswer.directoryOrganizationSafety': {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Guidance-level directory organization safety contract. It gives the same non-destructive helper summary as inputDirectoryDecision.directoryOrganizationSafety before a concrete input scan exists.',
+    agentAction: 'Use this before inspect_font_inputs when the user asks whether a directory organizer exists or whether it can change source files; after input inspection, prefer inputDirectoryDecision.directoryOrganizationSafety for scan-local args.',
   },
   batchPolicySummary: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],

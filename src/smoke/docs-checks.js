@@ -136,6 +136,7 @@ export async function runApiDocsSmoke() {
       'inputCountGuide',
       'inputDirectoryDecision',
       'inputDirectoryDecision.directoryOrganizationSafety',
+      'directoryOrganizationQuickAnswer.directoryOrganizationSafety',
       'batchGroupBy',
       'batchNamingMode',
       'batchDedupeMode',

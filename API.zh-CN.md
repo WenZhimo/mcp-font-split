@@ -81,6 +81,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
   写入类工具实际运行后，仍要检查真实响应里的 `sourceSafetyDecision`、`safetySummary`、`outputStructureDecision` 和相关审计字段。
 - `directoryOrganizationQuickAnswer` 是源目录结构不匹配问题的紧凑答案。它指向 `organize_font_directory`，第一步使用 `workflowPreset: "safe-preview"`，并说明审查后的写入只是 copy-only 到 `outputDir`，不会移动、删除或重写源字体。其内嵌的 `directoryOrganizationSafety` 与 `inputDirectoryDecision.directoryOrganizationSafety` 使用同一安全契约，方便 agent 在输入预检前后读到一致的非破坏性答案。
   整理出的 `outputDir` 是源目录式暂存，不是最终拆分输出。
+- `toolResponseFieldCatalog` 会分别解释 `directoryOrganizationQuickAnswer.directoryOrganizationSafety` 和 `inputDirectoryDecision.directoryOrganizationSafety`，方便 agent 区分自己读到的是指南级占位参数，还是带真实扫描上下文的参数。
 - `directoryHandlingModeCatalog` 解释 `layoutDecision.directoryHandling.recommendedMode`，包括 `meaning`、`whenSeen`、`recommendedNextStep`、`writesFilesBeforeReview`、`sourceDestructive`、`mustInspectFields` 和 `nonIntuitiveBehavior`。
 - `directoryWorkflowDecisionMatrix[]` 列出常见目录场景。每个条目包含 `id`、`useWhen`、`firstTool`、写入/源安全标记、`recommendedOptions`、可选后续参数、`mustInspectFields`、`successCriteria` 和 `nonIntuitiveBehavior`。
 - `directoryWorkflowExamples[]` 在 `detailLevel: "full"` 或 `sections: ["examples"]` 时返回。它覆盖扁平 vendor dump、每个压缩包/家族一个目录、混合目录、大型嘈杂扫描、`sourceLayoutMismatchSummary`，以及 `copy-only-staging-to-audited-split` 路线。
