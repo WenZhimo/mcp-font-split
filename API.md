@@ -400,14 +400,28 @@ Directory-routing `inspectFields`, `mustInspectFields`, and `responseFields` tha
 | `layout.layoutKind` | `empty`, `flat`, `nested`, or `mixed`. Mixed means fonts exist both at the input root and below subdirectories. |
 | `recommendedBatchOptions` | Suggested `split_font_batch` policy fragment for the detected layout. Nested or mixed inputs usually recommend `batchGroupBy: "source-dir"`; flat inputs usually recommend `font-family`. This is not a complete safe invocation by itself. |
 | `recommendedBatchPreviewArgs` | Copyable no-write `split_font_batch` preview arguments for the detected layout. It includes `inputDir`, `workflowPreset: "safe-preview"`, layout-specific overrides such as `batchGroupBy`, and `recommendedBatchPreviewArgs.maxFiles` for the current scan cap. Prefer this before any real batch write. |
-| `recommendedNextActionCount` / `recommendedNextActions[]` | Machine-readable follow-up actions for agents. Batch dry-runs may suggest `run-reviewed-batch-write`; real batch writes may suggest `audit-split-output` with `inspect_split_output` args. Entries include `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, optional `recommendedNextActions[].suggestedArgsField`, `inspectFields`, and `successCriteria`. `suggestedArgsField` points to the canonical response field behind mirrored args, such as `batchDecision.reviewedWriteArgs`, `batchDecision.auditArgs`, `recommendedBatchPreviewArgs`, or `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`. `suggestedArgs` prefer `workflowPreset` and only keep overrides that differ from that preset. Organization follow-up actions that rescan a directory preserve the current scan cap as `recommendedNextActions[].suggestedArgs.maxFiles`, except for explicit higher-cap reruns. |
+| `recommendedNextActionCount` / `recommendedNextActions[]` | Machine-readable follow-up actions for agents. Inspect each entry's `id`, `priority`, `tool`, `reason`, `inspectFields`, and `successCriteria` before continuing. |
 | `organizationDecision` | Compact route recommendation for the organizer response. It names the preferred branch, such as `rerun-with-font-parsing`, `decide-on-invalid-fonts`, `preview-original-layout`, `review-mixed-layout`, or `preview-organized-output`, and points at the preferred next action when one exists. |
 | `organizationWarningCount` / `organizationWarnings[]` | Machine-readable notices such as `organization-dry-run`, `organization-writes-output`, `output-overwrite-enabled`, `mixed-layout-detected`, `invalid-fonts-skipped`, and `output-inside-input`. |
 | `planActionSummary` | Always returned. Counts planned actions by `action`, including `would-copy`, `copied`, `skipped-duplicate`, `skipped-invalid`, `skipped-target-exists`, `would-skip-target-exists`, and `error`. Use this when `includePlan: false` omits detailed entries. |
 | `plan[]` | Optional per-font copy/skip entries. Copy entries include `source`, `target`, `targetPath`, `groupName`, `action`, `identityKey`, and `glyphCount`. |
 | `organizationManifestPath` | Written only when `dryRun: false`; points to `font-organization-manifest.json` in `outputDir`. |
 
-`unsupportedFileDecision` is the quick route; `unsupportedFileSummary` is the evidence route. `unsupportedFileSummary` uses the same subfields as `inspect_font_inputs`: `unsupportedFileSummary.total`, `unsupportedFileSummary.byExtension[]`, `unsupportedFileSummary.byCategory[]`, `unsupportedFileSummary.categoryDetails[]`, `unsupportedFileSummary.handlingSummary`, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`. `archive` files such as `.zip` are reported but not extracted, copied, or split; this is also visible as `unsupportedFileDecision.handlingSummary.archivesExtracted: false` and `unsupportedFileSummary.handlingSummary.archivesExtracted: false`.
+`recommendedNextActions[]` is a checklist, not an executor:
+
+- Batch dry-runs may suggest `run-reviewed-batch-write`.
+- Real batch writes may suggest `audit-split-output` with `inspect_split_output` args.
+- Entries include `id`, `priority`, `tool`, `reason`, optional `suggestedArgs`, optional `recommendedNextActions[].suggestedArgsField`, `inspectFields`, and `successCriteria`.
+- `suggestedArgsField` points to the canonical response field behind mirrored args, such as `batchDecision.reviewedWriteArgs`, `batchDecision.auditArgs`, `recommendedBatchPreviewArgs`, or `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`.
+- `suggestedArgs` prefer `workflowPreset` and only keep overrides that differ from that preset.
+- Organization follow-up actions that rescan a directory preserve the current scan cap as `recommendedNextActions[].suggestedArgs.maxFiles`, except for explicit higher-cap reruns.
+
+Use ignored-file fields like this:
+
+- `unsupportedFileDecision` is the quick route.
+- `unsupportedFileSummary` is the evidence route.
+- `unsupportedFileSummary` uses the same subfields as `inspect_font_inputs`: `unsupportedFileSummary.total`, `unsupportedFileSummary.byExtension[]`, `unsupportedFileSummary.byCategory[]`, `unsupportedFileSummary.categoryDetails[]`, `unsupportedFileSummary.handlingSummary`, `unsupportedFileSummary.examples[]`, and `unsupportedFileSummary.examplesTruncated`.
+- `archive` files such as `.zip` are reported but not extracted, copied, or split. This is also visible as `unsupportedFileDecision.handlingSummary.archivesExtracted: false` and `unsupportedFileSummary.handlingSummary.archivesExtracted: false`.
 
 Non-intuitive behavior to watch:
 
@@ -419,7 +433,12 @@ Non-intuitive behavior to watch:
 
 Use `parseFonts: true` when you need trustworthy invalid-font counts, glyph counts, internal family names, or cross-format identity dedupe. Use `parseFonts: false` only for a quick structural first pass over a very large or noisy tree. In that mode, `font-parsing-skipped` should be treated as a warning that the plan is incomplete for metadata-sensitive decisions.
 
-Common `recommendedNextActions[].id` values include batch actions such as `run-reviewed-batch-write`, `audit-split-output`, `rerun-batch-with-higher-maxFiles`, and `inspect-batch-errors`, plus organization actions such as `review-plan-before-writing`, `preview-batch-split-original-layout`, `copy-organized-staging-directory`, `inspect-organized-output`, `preview-batch-split-organized-output`, `rerun-with-font-parsing`, `rerun-with-higher-maxFiles`, `decide-on-invalid-fonts`, `review-mixed-layout-grouping`, and `avoid-reprocessing-organized-copies`. These are guidance, not proof of success; agents must still inspect the listed `inspectFields` and satisfy `successCriteria`. When `recommendedNextActions[].suggestedArgsField` is present, use it to explain which stable response field supplied the copyable args before running the next call.
+Common `recommendedNextActions[].id` values include:
+
+- Batch actions: `run-reviewed-batch-write`, `audit-split-output`, `rerun-batch-with-higher-maxFiles`, and `inspect-batch-errors`.
+- Organization actions: `review-plan-before-writing`, `preview-batch-split-original-layout`, `copy-organized-staging-directory`, `inspect-organized-output`, `preview-batch-split-organized-output`, `rerun-with-font-parsing`, `rerun-with-higher-maxFiles`, `decide-on-invalid-fonts`, `review-mixed-layout-grouping`, and `avoid-reprocessing-organized-copies`.
+- These are guidance, not proof of success; agents must still inspect the listed `inspectFields` and satisfy `successCriteria`.
+- When `recommendedNextActions[].suggestedArgsField` is present, use it to explain which stable response field supplied the copyable args before running the next call.
 
 `layoutDecision`, `layoutDecision.directoryHandling`, `stagingDirectoryDecision`, `organizationDecision`, `directoryWorkflowSummary`, `sourceLayoutMismatchSummary`, and `sourceLayoutMismatchSummary.decisionChecklist` are compact route hints, not proof that the route is complete. Use them to choose the branch, then inspect `recommendedNextActions[]`, `organizationWarnings[]`, `planActionSummary`, `directoryWorkflowSummary.planVisibility`, and `plan[]` when available.
 

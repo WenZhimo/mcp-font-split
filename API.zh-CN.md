@@ -400,14 +400,28 @@
 | `layout.layoutKind` | `empty`、`flat`、`nested` 或 `mixed`。`mixed` 表示输入根目录和子目录里都发现了字体。 |
 | `recommendedBatchOptions` | 根据目录形态建议的 `split_font_batch` 策略片段；嵌套或混合目录通常建议 `batchGroupBy: "source-dir"`，扁平目录通常建议 `font-family`。它本身不是完整安全调用。 |
 | `recommendedBatchPreviewArgs` | 可直接复制的 `split_font_batch` 无写入预览参数，包含 `inputDir`、`workflowPreset: "safe-preview"`、`batchGroupBy` 等目录形态覆盖项，以及保留本次扫描上限的 `recommendedBatchPreviewArgs.maxFiles`。真实批量写入前优先使用它。 |
-| `recommendedNextActionCount` / `recommendedNextActions[]` | 面向 agent 的机器可读后续动作。批量 dry-run 可能建议 `run-reviewed-batch-write`；真实批量写入可能建议 `audit-split-output`，并附带 `inspect_split_output` 参数。每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs`、可选 `recommendedNextActions[].suggestedArgsField`、`inspectFields` 和 `successCriteria`。`suggestedArgsField` 指向这组可复制参数对应的权威响应字段，例如 `batchDecision.reviewedWriteArgs`、`batchDecision.auditArgs`、`recommendedBatchPreviewArgs` 或 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`。`suggestedArgs` 会优先使用 `workflowPreset`，只保留相对该 preset 的差异覆盖。目录整理后续动作如果会重新扫描目录，会通过 `recommendedNextActions[].suggestedArgs.maxFiles` 保留本次扫描上限；只有显式要求调高上限的重跑动作例外。 |
+| `recommendedNextActionCount` / `recommendedNextActions[]` | 面向 agent 的机器可读后续动作。继续前检查每项的 `id`、`priority`、`tool`、`reason`、`inspectFields` 和 `successCriteria`。 |
 | `organizationDecision` | 整理响应的紧凑主线路由建议。它会给出 `rerun-with-font-parsing`、`decide-on-invalid-fonts`、`preview-original-layout`、`review-mixed-layout` 或 `preview-organized-output` 等分支，并在可用时指向首选后续动作。 |
 | `organizationWarningCount` / `organizationWarnings[]` | 摘要级提示，例如 `organization-dry-run`、`organization-writes-output`、`output-overwrite-enabled`、`mixed-layout-detected`、`invalid-fonts-skipped`、`output-inside-input`。 |
 | `planActionSummary` | 始终返回。按 `action` 统计计划动作数量，包括 `would-copy`、`copied`、`skipped-duplicate`、`skipped-invalid`、`skipped-target-exists`、`would-skip-target-exists` 和 `error`。当 `includePlan: false` 省略明细时，用它快速判断计划形态。 |
 | `plan[]` | 可选的逐字体复制/跳过计划。复制条目包含 `source`、`target`、`targetPath`、`groupName`、`action`、`identityKey` 和 `glyphCount`。 |
 | `organizationManifestPath` | 仅在 `dryRun: false` 时写入，指向 `outputDir` 中的 `font-organization-manifest.json`。 |
 
-`unsupportedFileDecision` 是快速路线，`unsupportedFileSummary` 是证据路线。`unsupportedFileSummary` 使用与 `inspect_font_inputs` 相同的子字段：`unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.categoryDetails[]`、`unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`；`.zip` 等 `archive` 文件只会被报告，不会被解压、复制或拆分，这一点也会体现为 `unsupportedFileDecision.handlingSummary.archivesExtracted: false` 和 `unsupportedFileSummary.handlingSummary.archivesExtracted: false`。
+`recommendedNextActions[]` 是检查清单，不会自动执行：
+
+- 批量 dry-run 可能建议 `run-reviewed-batch-write`。
+- 真实批量写入可能建议 `audit-split-output`，并附带 `inspect_split_output` 参数。
+- 每项包含 `id`、`priority`、`tool`、`reason`、可选 `suggestedArgs`、可选 `recommendedNextActions[].suggestedArgsField`、`inspectFields` 和 `successCriteria`。
+- `suggestedArgsField` 指向这组可复制参数对应的权威响应字段，例如 `batchDecision.reviewedWriteArgs`、`batchDecision.auditArgs`、`recommendedBatchPreviewArgs` 或 `sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs`。
+- `suggestedArgs` 会优先使用 `workflowPreset`，只保留相对该 preset 的差异覆盖。
+- 目录整理后续动作如果会重新扫描目录，会通过 `recommendedNextActions[].suggestedArgs.maxFiles` 保留本次扫描上限；只有显式要求调高上限的重跑动作例外。
+
+忽略文件字段按下面方式阅读：
+
+- `unsupportedFileDecision` 是快速路线。
+- `unsupportedFileSummary` 是证据路线。
+- `unsupportedFileSummary` 使用与 `inspect_font_inputs` 相同的子字段：`unsupportedFileSummary.total`、`unsupportedFileSummary.byExtension[]`、`unsupportedFileSummary.byCategory[]`、`unsupportedFileSummary.categoryDetails[]`、`unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]` 和 `unsupportedFileSummary.examplesTruncated`。
+- `.zip` 等 `archive` 文件只会被报告，不会被解压、复制或拆分。这一点也会体现为 `unsupportedFileDecision.handlingSummary.archivesExtracted: false` 和 `unsupportedFileSummary.handlingSummary.archivesExtracted: false`。
 
 需要特别注意的非直觉行为：
 
@@ -419,7 +433,12 @@
 
 当你需要可信的坏字体数量、glyph count、内部 family 名或跨格式 identity 去重时，使用 `parseFonts: true`。只有在超大或嘈杂目录上先快速了解结构时，才使用 `parseFonts: false`。此时 `font-parsing-skipped` 应被视为警告：这个计划不适合直接支撑依赖字体元数据的判断。
 
-常见 `recommendedNextActions[].id` 包括批量动作 `run-reviewed-batch-write`、`audit-split-output`、`rerun-batch-with-higher-maxFiles`、`inspect-batch-errors`，以及整理动作 `review-plan-before-writing`、`preview-batch-split-original-layout`、`copy-organized-staging-directory`、`inspect-organized-output`、`preview-batch-split-organized-output`、`rerun-with-font-parsing`、`rerun-with-higher-maxFiles`、`decide-on-invalid-fonts`、`review-mixed-layout-grouping` 和 `avoid-reprocessing-organized-copies`。这些是后续行动建议，不是成功证明；agent 仍必须检查每项列出的 `inspectFields`，并满足 `successCriteria`。当存在 `recommendedNextActions[].suggestedArgsField` 时，先用它说明这组可复制参数来自哪个稳定响应字段，再执行下一步调用。
+常见 `recommendedNextActions[].id` 包括：
+
+- 批量动作：`run-reviewed-batch-write`、`audit-split-output`、`rerun-batch-with-higher-maxFiles` 和 `inspect-batch-errors`。
+- 整理动作：`review-plan-before-writing`、`preview-batch-split-original-layout`、`copy-organized-staging-directory`、`inspect-organized-output`、`preview-batch-split-organized-output`、`rerun-with-font-parsing`、`rerun-with-higher-maxFiles`、`decide-on-invalid-fonts`、`review-mixed-layout-grouping` 和 `avoid-reprocessing-organized-copies`。
+- 这些是后续行动建议，不是成功证明；agent 仍必须检查每项列出的 `inspectFields`，并满足 `successCriteria`。
+- 当存在 `recommendedNextActions[].suggestedArgsField` 时，先用它说明这组可复制参数来自哪个稳定响应字段，再执行下一步调用。
 
 `layoutDecision`、`layoutDecision.directoryHandling`、`organizationDecision`、`directoryWorkflowSummary`、`sourceLayoutMismatchSummary` 和 `sourceLayoutMismatchSummary.decisionChecklist` 是压缩路线提示，不是路线已经完成的证明。用它们选择下一步分支后，仍要检查 `recommendedNextActions[]`、`organizationWarnings[]`、`planActionSummary`、`directoryWorkflowSummary.planVisibility`，以及可用时的 `plan[]`。
 
