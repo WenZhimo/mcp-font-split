@@ -18,8 +18,13 @@ import {
   isInsidePath,
 } from './assertions.js';
 import {
+  buildCompactOutputStructureAuditSummary,
+  buildCompactRealCorpusCoverageSummary,
   buildRealCorpusCountGuide,
+  buildRealCorpusReliabilityGateDecision,
+  buildRealCorpusSuiteFinalOutput,
   buildRealCorpusSuiteHumanSummary,
+  summarizeRealCorpusSuiteRun,
 } from './real-corpus-report.js';
 
 const execFileAsync = promisify(execFile);
@@ -1208,255 +1213,11 @@ function buildRealCorpusSuiteCoverageSummary(runs, suiteOptions = {}) {
   };
 }
 
-function buildCompactOutputStructureAuditSummary(summary = {}) {
-  return {
-    summaryType: summary.summaryType,
-    sampleInputDir: summary.sampleInputDir,
-    outputRoot: summary.outputRoot,
-    singleOutputRoleDecisionStatus: summary.singleOutputRoleDecision?.status,
-    singleOutputRoleAuditApplies: summary.singleOutputRoleDecision?.auditAppliesToThisDirectory,
-    singleOutputStructureDecisionStatus: summary.singleOutputStructureDecision?.status,
-    singleAuditStatus: summary.singleAuditStatus,
-    singleAuditPassed: summary.singleAuditPassed,
-    singleStructureConforms: summary.singleStructureConforms,
-    singleStructureLayoutKind: summary.singleStructureLayoutKind,
-    singleManifestCoverageOk: summary.singleManifestCoverageOk,
-    singleStructureIssueCount: summary.singleStructureIssueCount,
-    batchOutputRoleDecisionStatus: summary.batchOutputRoleDecision?.status,
-    batchOutputRoleAuditApplies: summary.batchOutputRoleDecision?.auditAppliesToThisDirectory,
-    batchOutputStructureDecisionStatus: summary.batchOutputStructureDecision?.status,
-    batchAuditStatus: summary.batchAuditStatus,
-    batchAuditPassed: summary.batchAuditPassed,
-    batchStructureConforms: summary.batchStructureConforms,
-    batchStructureLayoutKind: summary.batchStructureLayoutKind,
-    batchManifestCoverageOk: summary.batchManifestCoverageOk,
-    batchStructureIssueCount: summary.batchStructureIssueCount,
-  };
-}
-
-function buildCompactRealCorpusCoverageSummary(coverageSummary = {}) {
-  return {
-    summaryType: 'real-corpus-suite-compact-coverage',
-    testStrategy: coverageSummary.testStrategy,
-    perDirectoryAcceptanceAudit: coverageSummary.perDirectoryAcceptanceAudit,
-    corpusSupportedFontCount: coverageSummary.corpusSupportedFontCount,
-    corpusUnsupportedFileCount: coverageSummary.corpusUnsupportedFileCount,
-    corpusMaxFilesHit: coverageSummary.corpusMaxFilesHit,
-    selectedTargetCount: coverageSummary.selectedTargetCount,
-    availableTargetCount: coverageSummary.availableTargetCount,
-    selectedTargets: coverageSummary.selectedTargets,
-    fixedRegressionTargets: coverageSummary.fixedRegressionTargets,
-    representativeWriteSample: coverageSummary.testScope?.representativeWriteAudit?.sampleInputDir,
-    unsupportedFileCategoryCoverage: coverageSummary.unsupportedFileCategoryCoverage,
-    archiveHandlingScope: coverageSummary.archiveHandlingScope,
-    toolCoverageSummary: coverageSummary.toolCoverageSummary,
-    outputStructureAuditSummary: buildCompactOutputStructureAuditSummary(coverageSummary.outputStructureAuditSummary),
-    functionalCoverage: (coverageSummary.functionalCoverage || []).map((item) => ({
-      id: item.id,
-      covered: item.covered,
-      toolPaths: item.toolPaths,
-      evidenceOmitted: true,
-    })),
-    omittedDetailFields: [
-      'coverageSummary.functionalCoverage[].evidence',
-      'coverageSummary.outputStructureAuditSummary.singleOutputRoleDecision',
-      'coverageSummary.outputStructureAuditSummary.singleOutputStructureDecision',
-      'coverageSummary.outputStructureAuditSummary.batchOutputRoleDecision',
-      'coverageSummary.outputStructureAuditSummary.batchOutputStructureDecision',
-    ],
-    detailHint: 'Rerun with --verbose to include full per-child summaries and coverage evidence.',
-  };
-}
-
-function buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary) {
-  const functionalCoverage = coverageSummary.functionalCoverage || [];
-  const uncoveredFunctionalCoverageIds = functionalCoverage
-    .filter((item) => item.covered !== true)
-    .map((item) => item.id)
-    .filter(Boolean);
-  const outputAudit = coverageSummary.outputStructureAuditSummary || {};
-  const archiveHandlingScope = coverageSummary.archiveHandlingScope || {};
-  const toolCoverageSummary = coverageSummary.toolCoverageSummary || {};
-  const targetSampling = coverageSummary.testScope?.targetSampling || {};
-  const corpusScan = coverageSummary.testScope?.corpusScan || {};
-  const writeAudit = coverageSummary.testScope?.representativeWriteAudit || {};
-  const blockingReasonCodes = [];
-
-  if (coverageSummary.perDirectoryAcceptanceAudit !== false || humanSummary?.perDirectoryAcceptanceAudit !== false) {
-    blockingReasonCodes.push('scope-ambiguous');
-  }
-  if (coverageSummary.corpusMaxFilesHit === true || corpusScan.maxFilesHit === true) {
-    blockingReasonCodes.push('corpus-scan-truncated');
-  }
-  if (!(coverageSummary.corpusSupportedFontCount > 0)) {
-    blockingReasonCodes.push('no-supported-fonts-found');
-  }
-  if (!(coverageSummary.unsupportedFileCategoryCoverage?.categoryCount > 0)) {
-    blockingReasonCodes.push('ignored-file-coverage-missing');
-  }
-  if (!(coverageSummary.unsupportedFileCategoryCoverage?.extensionsBeyondZipTxtCount > 0)) {
-    blockingReasonCodes.push('ignored-file-extension-coverage-too-narrow');
-  }
-  if (
-    archiveHandlingScope.summaryType !== 'archive-handling-scope'
-    || archiveHandlingScope.archivesCountedAsIgnored !== true
-    || archiveHandlingScope.archivesExtracted !== false
-    || archiveHandlingScope.archiveContentsScanned !== false
-    || archiveHandlingScope.archiveInternalFontsCovered !== false
-  ) {
-    blockingReasonCodes.push('archive-handling-scope-ambiguous');
-  }
-  if (!(coverageSummary.selectedTargetCount > 0)) {
-    blockingReasonCodes.push('target-sampling-empty');
-  }
-  if (
-    !Array.isArray(coverageSummary.selectedTargets)
-    || !DEFAULT_REAL_CORPUS_TARGETS.every((target) => coverageSummary.selectedTargets.includes(target))
-  ) {
-    blockingReasonCodes.push('fixed-regression-targets-missing');
-  }
-  if (uncoveredFunctionalCoverageIds.length > 0 || functionalCoverage.length === 0) {
-    blockingReasonCodes.push('functional-coverage-gaps');
-  }
-  if (toolCoverageSummary.allRequiredToolsCovered !== true) {
-    blockingReasonCodes.push('tool-coverage-gaps');
-  }
-  if (
-    outputAudit.singleOutputRoleDecision?.auditAppliesToThisDirectory !== true
-    || outputAudit.batchOutputRoleDecision?.auditAppliesToThisDirectory !== true
-    || outputAudit.singleOutputStructureDecision?.status !== 'pass'
-    || outputAudit.batchOutputStructureDecision?.status !== 'pass'
-    || outputAudit.singleStructureConforms !== true
-    || outputAudit.batchStructureConforms !== true
-    || writeAudit.singleAuditPassed !== true
-    || writeAudit.batchAuditPassed !== true
-  ) {
-    blockingReasonCodes.push('representative-output-audit-failed');
-  }
-
-  const status = blockingReasonCodes.includes('corpus-scan-truncated')
-    ? 'incomplete'
-    : (blockingReasonCodes.length === 0 ? 'pass' : 'action-required');
-  const recommendedAction = status === 'pass'
-    ? 'continue'
-    : (status === 'incomplete' ? 'rerun-real-corpus-suite-with-higher-maxFiles' : 'inspect-coverageSummary-and-runs');
-
-  return {
-    summaryType: 'real-corpus-reliability-gate-decision',
-    status,
-    reliabilityGatePassed: status === 'pass',
-    recommendedAction,
-    representativeReliabilityGate: true,
-    perDirectoryAcceptanceAudit: false,
-    perFontManualAudit: false,
-    blockingReasonCodes,
-    uncoveredFunctionalCoverageIds,
-    fullCorpusFontCountField: 'testScope.corpusScan.supportedFontCount',
-    targetCountsAreFullCorpusCounts: false,
-    targetCountFields: [
-      'testScope.targetSampling.fixedRegressionTargetCount',
-      'testScope.targetSampling.selectedTargetCount',
-    ],
-    archiveHandlingScopeField: 'coverageSummary.archiveHandlingScope',
-    archiveCount: archiveHandlingScope.archiveCount,
-    archivesExtracted: archiveHandlingScope.archivesExtracted,
-    archiveInternalFontsCovered: archiveHandlingScope.archiveInternalFontsCovered,
-    corpusSupportedFontCount: corpusScan.supportedFontCount,
-    corpusUnsupportedFileCount: corpusScan.unsupportedFileCount,
-    fixedRegressionTargetCount: targetSampling.fixedRegressionTargetCount,
-    selectedTargetCount: targetSampling.selectedTargetCount,
-    availableTargetCount: targetSampling.availableTargetCount,
-    coveredFunctionalCoverageCount: functionalCoverage.filter((item) => item.covered === true).length,
-    totalFunctionalCoverageCount: functionalCoverage.length,
-    coveredRequiredToolCount: toolCoverageSummary.coveredRequiredToolCount,
-    requiredToolCount: toolCoverageSummary.requiredToolCount,
-    allRequiredToolsCovered: toolCoverageSummary.allRequiredToolsCovered === true,
-    uncoveredTools: toolCoverageSummary.uncoveredTools || [],
-    representativeWriteSample: writeAudit.sampleInputDir,
-    singleOutputRoleDecisionStatus: outputAudit.singleOutputRoleDecision?.status,
-    singleOutputRoleAuditApplies: outputAudit.singleOutputRoleDecision?.auditAppliesToThisDirectory,
-    batchOutputRoleDecisionStatus: outputAudit.batchOutputRoleDecision?.status,
-    batchOutputRoleAuditApplies: outputAudit.batchOutputRoleDecision?.auditAppliesToThisDirectory,
-    singleOutputStructureDecisionStatus: outputAudit.singleOutputStructureDecision?.status,
-    batchOutputStructureDecisionStatus: outputAudit.batchOutputStructureDecision?.status,
-    evidenceFields: [
-      'humanSummary',
-      'testScope',
-      'coverageSummary.functionalCoverage',
-      'coverageSummary.toolCoverageSummary',
-      'coverageSummary.unsupportedFileCategoryCoverage',
-      'coverageSummary.archiveHandlingScope',
-      'coverageSummary.outputStructureAuditSummary',
-    ],
-    passCriteria: 'Require a complete full-root corpus scan, selected target sampling, all functionalCoverage entries covered, all required public MCP tools covered by toolCoverageSummary, archiveHandlingScope.archiveInternalFontsCovered false, representative single and batch outputRoleDecision.auditAppliesToThisDirectory true, outputStructureDecision.status pass, structureSummary.conforms true, and perDirectoryAcceptanceAudit false.',
-    nonIntuitiveBehavior: 'status pass means the representative real-corpus feature chain passed; it is not a per-directory acceptance audit, target counts such as 4 or 10 are not the full corpus font count, and archives are counted as ignored files rather than extracted.',
-  };
-}
-
 function printRealCorpusSuiteHumanSummary(humanSummary) {
   console.log('\n--- real-corpus suite summary ---');
   for (const line of humanSummary.lines || []) {
     console.log(line);
   }
-}
-
-function summarizeRealCorpusSuiteRun(run = {}) {
-  return {
-    scenario: run.scenario,
-    ok: run.ok,
-    elapsedMs: run.elapsedMs,
-    stdoutBytes: run.stdoutBytes,
-    stderrBytes: run.stderrBytes,
-    outputIncluded: run.outputIncluded,
-  };
-}
-
-function buildRealCorpusSuiteFinalOutput({
-  verbose,
-  corpusRoot,
-  maxFiles,
-  targetLimit,
-  integrationLimit,
-  sampleCount,
-  reliabilityGateDecision,
-  humanSummary,
-  corpusCountGuide,
-  coverageSummary,
-  runs,
-}) {
-  const output = {
-    ok: true,
-    purpose: 'Representative reliability gate over a local real font corpus; not a per-directory acceptance audit.',
-    outputMode: verbose ? 'verbose' : 'compact',
-    corpusRoot,
-    maxFiles,
-    targetLimit,
-    integrationLimit,
-    sampleCount,
-    reliabilityGateDecision,
-    corpusCountGuide,
-    humanSummary,
-    testScope: coverageSummary.testScope,
-    coverageSummary: verbose ? coverageSummary : buildCompactRealCorpusCoverageSummary(coverageSummary),
-    runSummaries: (runs || []).map(summarizeRealCorpusSuiteRun),
-  };
-
-  if (verbose) {
-    output.runs = runs;
-    output.omittedDetailFields = [];
-  } else {
-    output.omittedDetailFields = [
-      'runs',
-      'coverageSummary.functionalCoverage[].evidence',
-      'coverageSummary.outputStructureAuditSummary.singleOutputRoleDecision',
-      'coverageSummary.outputStructureAuditSummary.singleOutputStructureDecision',
-      'coverageSummary.outputStructureAuditSummary.batchOutputRoleDecision',
-      'coverageSummary.outputStructureAuditSummary.batchOutputStructureDecision',
-    ];
-    output.verboseCommandHint = 'Rerun the same command with --verbose to include child run summaries and detailed coverage evidence.';
-  }
-
-  return output;
 }
 
 async function runSmokeSubprocess(args, label, { verbose = false } = {}) {
@@ -1750,7 +1511,9 @@ async function runRealCorpusSuiteSmoke() {
   });
   const humanSummary = buildRealCorpusSuiteHumanSummary(coverageSummary);
   const corpusCountGuide = buildRealCorpusCountGuide(coverageSummary, humanSummary);
-  const reliabilityGateDecision = buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary);
+  const reliabilityGateDecision = buildRealCorpusReliabilityGateDecision(coverageSummary, humanSummary, {
+    fixedRegressionTargets: DEFAULT_REAL_CORPUS_TARGETS,
+  });
   const ignoredCoverageLine = (humanSummary.lines || []).find((line) => line.includes('Ignored-file coverage')) || '';
   const missingIgnoredCategories = (coverageSummary.unsupportedFileCategoryCoverage?.categories || [])
     .filter((category) => !ignoredCoverageLine.includes(category));
