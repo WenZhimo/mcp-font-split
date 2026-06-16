@@ -363,6 +363,124 @@ export async function compressWoff2(buffer) {
   return new Uint8Array(result);
 }
 
+export function inspectOversizedKern(buffer, thresholdRatio = 0.8) {
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const magic = view.getUint32(0);
+  if (magic === 0x774F4646 || magic === 0x774F4632 || magic === 0x74746366) {
+    return {
+      supported: false,
+      hasKern: false,
+      kernBytes: 0,
+      fontBytes: buffer.byteLength,
+      ratio: 0,
+      thresholdRatio,
+      oversized: false,
+    };
+  }
+
+  const numTables = view.getUint16(4);
+  for (let i = 0; i < numTables; i++) {
+    const off = 12 + i * 16;
+    const tag = String.fromCharCode(buffer[off], buffer[off + 1], buffer[off + 2], buffer[off + 3]);
+    if (tag !== 'kern') continue;
+    const kernBytes = view.getUint32(off + 12);
+    const ratio = buffer.byteLength > 0 ? kernBytes / buffer.byteLength : 0;
+    return {
+      supported: true,
+      hasKern: true,
+      kernBytes,
+      fontBytes: buffer.byteLength,
+      ratio,
+      thresholdRatio,
+      oversized: ratio >= thresholdRatio,
+    };
+  }
+
+  return {
+    supported: true,
+    hasKern: false,
+    kernBytes: 0,
+    fontBytes: buffer.byteLength,
+    ratio: 0,
+    thresholdRatio,
+    oversized: false,
+  };
+}
+
+export function stripOversizedKern(buffer) {
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const magic = view.getUint32(0);
+  if (magic === 0x774F4646 || magic === 0x774F4632 || magic === 0x74746366) {
+    return { buffer, stripped: false };
+  }
+
+  const numTables = view.getUint16(4);
+  let kernIndex = -1;
+  let kernLength = 0;
+
+  for (let i = 0; i < numTables; i++) {
+    const off = 12 + i * 16;
+    const tag = String.fromCharCode(buffer[off], buffer[off + 1], buffer[off + 2], buffer[off + 3]);
+    if (tag === 'kern') {
+      kernIndex = i;
+      kernLength = view.getUint32(off + 12);
+      break;
+    }
+  }
+
+  if (kernIndex === -1 || kernLength < buffer.byteLength * 0.8) {
+    return { buffer, stripped: false };
+  }
+
+  // Rebuild sfnt without kern table
+  const newNumTables = numTables - 1;
+  const headerSize = 12 + newNumTables * 16;
+  const tables = [];
+
+  for (let i = 0; i < numTables; i++) {
+    if (i === kernIndex) continue;
+    const off = 12 + i * 16;
+    const tableOffset = view.getUint32(off + 8);
+    const tableLength = view.getUint32(off + 12);
+    tables.push({
+      tag: buffer.slice(off, off + 4),
+      checksum: view.getUint32(off + 4),
+      data: buffer.slice(tableOffset, tableOffset + tableLength),
+    });
+  }
+
+  let totalSize = headerSize;
+  for (const t of tables) {
+    totalSize += t.data.byteLength;
+    totalSize += (4 - (totalSize % 4)) % 4;
+  }
+
+  const result = new Uint8Array(totalSize);
+  const rv = new DataView(result.buffer);
+  rv.setUint32(0, magic);
+  rv.setUint16(4, newNumTables);
+  let sr = 1, es = 0;
+  while (sr * 2 <= newNumTables) { sr *= 2; es++; }
+  sr *= 16;
+  rv.setUint16(6, sr);
+  rv.setUint16(8, es);
+  rv.setUint16(10, newNumTables * 16 - sr);
+
+  let dataOffset = headerSize;
+  for (let i = 0; i < tables.length; i++) {
+    const recOff = 12 + i * 16;
+    result.set(tables[i].tag, recOff);
+    rv.setUint32(recOff + 4, tables[i].checksum);
+    rv.setUint32(recOff + 8, dataOffset);
+    rv.setUint32(recOff + 12, tables[i].data.byteLength);
+    result.set(tables[i].data, dataOffset);
+    dataOffset += tables[i].data.byteLength;
+    dataOffset += (4 - (dataOffset % 4)) % 4;
+  }
+
+  return { buffer: result, stripped: true };
+}
+
 export function getGlyphCount(buffer) {
   const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   const magic = view.getUint32(0);
