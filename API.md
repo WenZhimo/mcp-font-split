@@ -24,11 +24,46 @@ Return machine-readable usage guidance for AI coding assistants.
 | `detailLevel` | `compact`, `full` | `compact` | Response size. `compact` keeps the workflow-critical sections and omits bulky catalogs/examples; `full` returns every guidance section. |
 | `sections` | array of section names | unset | Focused section filter. When set, it overrides the default section set from `detailLevel`. |
 
-The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available. By default the response is compact: it includes workspace path rules, supported extensions, `projectStatusNotice`, default policies, `configurationRecipes[]`, `batchCustomizationQuickReference[]`, `toolSafetyQuickReference`, `directoryOrganizationQuickAnswer`, `batchPolicyGuide`, `toolOptionCatalog`, `fontIdentityBasisCatalog`, `outputStructureCatalog`, `unsupportedFileCategoryCatalog`, `directoryHandlingModeCatalog`, recommended batch and organization options, response fields to inspect, a verification checklist, `errorResponseCatalog`, `localVerificationOutputGuide`, `directoryWorkflowDecisionMatrix[]`, `safeInvocationTemplates[]`, `nextToolDecisionSummary`, `recommendedWorkflowPlan`, and a recommended tool order. AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
+The response always includes `guidanceView`, which tells the caller which sections were included, which sections were omitted, and which section names are available.
+
+By default the response is compact:
+
+- workspace path rules
+- supported extensions
+- `projectStatusNotice`
+- default policies
+- `configurationRecipes[]`
+- `batchCustomizationQuickReference[]`
+- `toolSafetyQuickReference`
+- `directoryOrganizationQuickAnswer`
+- `batchPolicyGuide`
+- `toolOptionCatalog`
+- `fontIdentityBasisCatalog`
+- `outputStructureCatalog`
+- `unsupportedFileCategoryCatalog`
+- `directoryHandlingModeCatalog`
+- recommended batch and organization options
+- response fields to inspect
+- a verification checklist
+- `errorResponseCatalog`
+- `localVerificationOutputGuide`
+- `directoryWorkflowDecisionMatrix[]`
+- `safeInvocationTemplates[]`
+- `nextToolDecisionSummary`
+- `recommendedWorkflowPlan`
+- a recommended tool order
+
+AI agents should call this first when they need to choose a workflow instead of guessing from local paths or stale assumptions.
 
 Use `detailLevel: "full"` when the agent needs every catalog and example in one response. Use `sections` when it only needs specific data, for example `["error-catalog", "warning-catalog", "field-catalog", "option-catalog", "identity-catalog", "output-catalog"]`. Available sections are reported in `guidanceView.availableSections`.
 
-For a minimal routing response, request `workflow: "organize"` with `sections: ["workflow"]` and inspect `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`. The nested `workflowQuickStart.recommendedCallExample` object is the copyable first call. For an uncertain source directory, that recommended call is the no-write `organize_font_directory` safe preview (`workflowPreset: "safe-preview"`), with `writesFiles: false` and `sourceDestructive: false`. Use its `alternateCallExamples[]` only after the user asks for staging or the inspected response requires a different branch.
+For a minimal routing response:
+
+- request `workflow: "organize"` with `sections: ["workflow"]`
+- inspect `nextToolDecisionSummary.workflowQuickStart.recommendedCallExample`
+- use the nested `workflowQuickStart.recommendedCallExample` object as the copyable first call
+- for an uncertain source directory, the recommended call is the no-write `organize_font_directory` safe preview (`workflowPreset: "safe-preview"`), with `writesFiles: false` and `sourceDestructive: false`
+- use `alternateCallExamples[]` only after the user asks for staging or the inspected response requires a different branch
 
 `projectStatusNotice` records the pre-release change policy in machine-readable form. It says the project is actively being refined, `formalRelease` is false, response fields/defaults/directory policy may change, and unreleased forward-compatibility shims should be removed when they add noise or contradict current behavior. Agents should treat the current repository code, live MCP schema, `get_agent_guidance`, `API.md` / `API.zh-CN.md`, and `BEHAVIOR.zh-CN.md` as authoritative.
 
