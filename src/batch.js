@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { FORMAT_PRIORITY } from './catalogs.js';
+import { extractFontFamily } from './font-identity.js';
 import { fileExists, toRelativeWorkspacePath } from './path-utils.js';
 import { MANIFEST_VERSION, readSplitManifest } from './split-manifest.js';
 import { stableStringify } from './stable-json.js';
@@ -114,6 +115,23 @@ export function buildBatchError({ mode, errors, summary }) {
   error.name = 'BatchSplitError';
   error.details = { mode, errors, summary };
   return error;
+}
+
+export async function resolveBatchFamilyDirName({ file, inputDir, groupingMode }) {
+  const relativeToInput = path.relative(inputDir, file);
+  const segments = relativeToInput.split(path.sep);
+  if (groupingMode === 'source-dir') {
+    return segments.length > 1 ? segments[0] : path.basename(file, path.extname(file));
+  }
+
+  const inputBytes = new Uint8Array(await fs.readFile(file));
+  const metadataFamily = extractFontFamily(inputBytes) || path.basename(file, path.extname(file));
+  if (groupingMode === 'font-family') {
+    return metadataFamily;
+  }
+
+  if (segments.length > 1) return segments[0];
+  return metadataFamily;
 }
 
 export async function shouldSkipExistingOutput({

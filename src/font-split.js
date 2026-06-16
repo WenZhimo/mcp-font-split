@@ -70,6 +70,7 @@ import {
   buildBatchError,
   compareBatchDedupeRepresentative,
   logBatchDecision,
+  resolveBatchFamilyDirName,
   resolveStableBatchOutputNames,
   sanitizeDirName,
   shouldSkipExistingOutput,
@@ -6231,23 +6232,6 @@ function buildPlanActionSummary(plan) {
     total: plan.length,
     byAction,
   };
-}
-
-async function resolveBatchFamilyDirName({ file, inputDir, groupingMode }) {
-  const relativeToInput = path.relative(inputDir, file);
-  const segments = relativeToInput.split(path.sep);
-  if (groupingMode === 'source-dir') {
-    return segments.length > 1 ? segments[0] : path.basename(file, path.extname(file));
-  }
-
-  const inputBytes = new Uint8Array(await fs.readFile(file));
-  const metadataFamily = extractFontFamily(inputBytes) || path.basename(file, path.extname(file));
-  if (groupingMode === 'font-family') {
-    return metadataFamily;
-  }
-
-  if (segments.length > 1) return segments[0];
-  return metadataFamily;
 }
 
 function buildFontSplitConfig(input, outDir, args) {
