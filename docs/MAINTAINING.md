@@ -18,9 +18,9 @@ This document is for maintainers and AI agents taking over the repository. It do
 | File or directory | Responsibility |
 |-------------------|----------------|
 | `src/server.js` | MCP schema and public tool descriptions. Confirm input types and user-visible tool wording here. |
-| `src/font-split.js` | Runtime facade that keeps `splitFontBatch` orchestration, and re-exports `splitFont`, `inspectFontInputs`, `organizeFontDirectory`, guidance, runtime, and status helpers. It is still heavy and should keep getting thinner in small slices. |
+| `src/font-split.js` | Runtime facade that re-exports `splitFont`, `splitFontBatch`, `inspectFontInputs`, `organizeFontDirectory`, guidance, runtime, and status helpers. Keep this file light; new runtime boundaries should live in dedicated modules. |
 | `src/config.js` | Defaults, workflow presets, explicit option validation, and configuration traces. |
-| `src/batch.js` | Batch naming, dedupe, skip checks, batch decisions, and debug decision logs. |
+| `src/batch-runtime.js`, `src/batch.js` | `split_font_batch` runtime orchestration, batch scanning, naming, dedupe, skip checks, batch decisions, and debug decision logs. |
 | `src/font-identity.js` | Font identity, OpenType name data, WOFF/WOFF2 decompression, glyph and kern helpers. |
 | `src/single-runtime.js`, `src/single-split-output.js`, `src/split-config.js` | `split_font` single-font runtime orchestration, fallback / copy-original output writing, and cn-font-split config generation. |
 | `src/input-preflight.js`, `src/input-*.js` | `inspect_font_inputs` runtime orchestration, input scanning, source layout preflight, ignored-file summaries, and input decisions. |
