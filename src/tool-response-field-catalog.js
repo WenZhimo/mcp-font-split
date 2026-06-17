@@ -18,6 +18,12 @@ import {
   RESULT_SHAPE_RESPONSE_FIELD_CATALOG,
 } from './result-shape-response-field-catalog.js';
 import {
+  SHARED_DRY_RUN_RESPONSE_FIELD_CATALOG,
+  SHARED_PLAN_VISIBILITY_RESPONSE_FIELD_CATALOG,
+  SHARED_RECOMMENDED_NEXT_ACTIONS_RESPONSE_FIELD_CATALOG,
+  WORKFLOW_SCAN_LIMIT_RESPONSE_FIELD_CATALOG,
+} from './workflow-action-response-field-catalog.js';
+import {
   COMPACT_CHECK_RESPONSE_FIELD_CATALOG,
   REAL_CORPUS_CHECK_RESPONSE_FIELD_CATALOG,
 } from './local-verification-response-field-catalog.js';
@@ -84,11 +90,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
   ...REAL_CORPUS_CHECK_RESPONSE_FIELD_CATALOG,
   ...GUIDANCE_SAFE_WORKFLOW_FIELD_CATALOG,
   ...BATCH_DECISION_RESPONSE_FIELD_CATALOG,
-  maxFilesHit: {
-    sourceTools: ['inspect_font_inputs', 'split_font_batch', 'organize_font_directory', 'inspect_split_output'],
-    meaning: 'True when a scan stopped at maxFiles before covering all files.',
-    agentAction: 'Rerun with a higher maxFiles before trusting counts, plans, or audits.',
-  },
+  ...WORKFLOW_SCAN_LIMIT_RESPONSE_FIELD_CATALOG,
   inputDirectoryDecision: {
     sourceTools: ['inspect_font_inputs'],
     meaning: 'Compact first-pass route after input inspection: whether to rerun the scan, review invalid fonts, preview batch splitting directly, or run a non-destructive organization preview first.',
@@ -99,11 +101,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Scan-local directory organization safety contract. It names organize_font_directory, gives no-write safePreviewArgs with the current inputDir and maxFiles, and states that reviewed organization is copy-only staging rather than final split output.',
     agentAction: 'Use this when input inspection has already run; copy safePreviewArgs for a no-write organization preview, then inspect the organizer response before any reviewed copy or split write.',
   },
-  dryRun: {
-    sourceTools: ['split_font_batch', 'organize_font_directory'],
-    meaning: 'Whether the call only planned work instead of writing output.',
-    agentAction: 'Confirm this explicitly because split_font_batch defaults to false while organize_font_directory defaults to true.',
-  },
+  ...SHARED_DRY_RUN_RESPONSE_FIELD_CATALOG,
   ...BATCH_PLAN_RESPONSE_FIELD_CATALOG,
   skippedDuplicates: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
@@ -121,21 +119,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
     agentAction: 'Use as a compact signal that inspectionWarnings needs attention.',
   },
   ...ORGANIZATION_WARNING_RESPONSE_FIELD_CATALOG,
-  recommendedNextActions: {
-    sourceTools: ['split_font_batch', 'organize_font_directory'],
-    meaning: 'Machine-readable follow-up checklist for batch and directory organization workflows. Each action includes inspectFields and successCriteria; actions with copyable args may also include suggestedArgs and, when those args mirror another response field, suggestedArgsField.',
-    agentAction: 'Treat as guidance, inspect each action inspectFields, and satisfy successCriteria before proceeding or reporting completion. Prefer suggestedArgsField when present to cite the canonical args source; when suggestedArgs.maxFiles is present, preserve it unless intentionally changing the scan cap.',
-  },
-  'recommendedNextActions[].suggestedArgsField': {
-    sourceTools: ['split_font_batch', 'organize_font_directory'],
-    meaning: 'Canonical response field that supplied a recommended next action suggestedArgs object, such as batchDecision.reviewedWriteArgs, batchDecision.auditArgs, recommendedBatchPreviewArgs, or sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs.',
-    agentAction: 'Use this pointer before copying recommendedNextActions[].suggestedArgs so you know whether the action mirrors a reviewed-write route, an output audit route, direct original-input preview args, or organized staging safe-preview args.',
-  },
-  'recommendedNextActions[].suggestedArgs.maxFiles': {
-    sourceTools: ['organize_font_directory'],
-    meaning: 'Current scan cap copied into organization follow-up actions that rescan source or staging directories. The explicit higher-cap rerun action may use a placeholder instead.',
-    agentAction: 'Keep this value when copying suggestedArgs into the next inspect_font_inputs, organize_font_directory, or split_font_batch call so the follow-up covers the same bounded scan scope.',
-  },
+  ...SHARED_RECOMMENDED_NEXT_ACTIONS_RESPONSE_FIELD_CATALOG,
   ...ORGANIZATION_OPERATION_RESPONSE_FIELD_CATALOG,
   ...GUIDANCE_DIRECTORY_HANDLING_FIELD_CATALOG,
   ...ORGANIZATION_DIRECTORY_WORKFLOW_RESPONSE_FIELD_CATALOG,
@@ -173,11 +157,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   ...GUIDANCE_DIRECTORY_WORKFLOW_FIELD_CATALOG,
   ...BATCH_RESULT_RESPONSE_FIELD_CATALOG,
-  planIncluded: {
-    sourceTools: ['split_font_batch', 'organize_font_directory'],
-    meaning: 'Whether per-item planned actions are included.',
-    agentAction: 'If false, use summary fields or rerun with includeResults/includePlan true before detailed review.',
-  },
+  ...SHARED_PLAN_VISIBILITY_RESPONSE_FIELD_CATALOG,
   ...SHARED_BATCH_WORKFLOW_RESPONSE_FIELD_CATALOG,
   ...BATCH_SKIP_MODE_RESPONSE_FIELD_CATALOG,
   ...SHARED_BATCH_MODE_RESPONSE_FIELD_CATALOG,
