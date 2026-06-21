@@ -22,6 +22,7 @@
 | `src/config.js` | 默认值、preset、显式配置校验和 configuration trace。无效配置拒绝语义应从这里和 `src/server.js` 一起验证。 |
 | `src/batch-runtime.js`、`src/batch.js` | `split_font_batch` 运行时编排、批量扫描、命名、去重、skip、batch decision 和调试日志。 |
 | `src/font-identity.js` | 字体身份、name table、WOFF/WOFF2 解包、glyph/kern 相关逻辑。 |
+| `src/font-identity-response-field-catalog.js` | 字体 identity 响应字段条目，包括 `identityBasis`。 |
 | `src/single-runtime.js`、`src/single-split-output.js`、`src/split-config.js` | `split_font` 单字体运行时编排、fallback / copy-original 输出写入和 cn-font-split 配置生成。 |
 | `src/input-preflight.js`、`src/input-*.js` | `inspect_font_inputs` 运行时编排、输入扫描、输入目录判断、忽略文件摘要和目录结构预检。 |
 | `src/organization-runtime.js`、`src/organization-*.js` | `organize_font_directory` 运行时编排、copy-only 计划、manifest 和目录路线判断。 |

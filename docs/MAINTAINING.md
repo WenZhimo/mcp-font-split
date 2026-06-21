@@ -22,6 +22,7 @@ This document is for maintainers and AI agents taking over the repository. It do
 | `src/config.js` | Defaults, workflow presets, explicit option validation, and configuration traces. |
 | `src/batch-runtime.js`, `src/batch.js` | `split_font_batch` runtime orchestration, batch scanning, naming, dedupe, skip checks, batch decisions, and debug decision logs. |
 | `src/font-identity.js` | Font identity, OpenType name data, WOFF/WOFF2 decompression, glyph and kern helpers. |
+| `src/font-identity-response-field-catalog.js` | Font identity response field entries, including `identityBasis`. |
 | `src/single-runtime.js`, `src/single-split-output.js`, `src/split-config.js` | `split_font` single-font runtime orchestration, fallback / copy-original output writing, and cn-font-split config generation. |
 | `src/input-preflight.js`, `src/input-*.js` | `inspect_font_inputs` runtime orchestration, input scanning, source layout preflight, ignored-file summaries, and input decisions. |
 | `src/organization-runtime.js`, `src/organization-*.js` | `organize_font_directory` runtime orchestration, copy-only organization planning, organization manifests, and source-layout route decisions. |

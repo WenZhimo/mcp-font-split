@@ -60,6 +60,9 @@ import {
   SHARED_BATCH_WORKFLOW_RESPONSE_FIELD_CATALOG,
 } from './batch-policy-response-field-catalog.js';
 import {
+  FONT_IDENTITY_RESPONSE_FIELD_CATALOG,
+} from './font-identity-response-field-catalog.js';
+import {
   ORGANIZATION_DIRECTORY_WORKFLOW_RESPONSE_FIELD_CATALOG,
   ORGANIZATION_OPERATION_RESPONSE_FIELD_CATALOG,
   ORGANIZATION_PARSING_RESPONSE_FIELD_CATALOG,
@@ -124,11 +127,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
   ...GUIDANCE_BATCH_RECOMMENDATION_FIELD_CATALOG,
   ...SHARED_BATCH_POLICY_RESPONSE_FIELD_CATALOG,
   ...GUIDANCE_IDENTITY_FIELD_CATALOG,
-  identityBasis: {
-    sourceTools: ['inspect_font_inputs'],
-    meaning: 'Machine-readable basis used to build a font identity key, such as typographic-family-subfamily, opentype-family-subfamily, full-name, postscript-name, family-only, or a fallback basis.',
-    agentAction: 'Look up this value in fontIdentityBasisCatalog before claiming semantic equivalence or explaining dedupe results.',
-  },
+  ...FONT_IDENTITY_RESPONSE_FIELD_CATALOG,
   ...SHARED_BATCH_IDENTITY_EVIDENCE_RESPONSE_FIELD_CATALOG,
   ...GUIDANCE_CONFIGURATION_FIELD_CATALOG,
   ...SOURCE_LAYOUT_RESPONSE_FIELD_CATALOG,
