@@ -34,6 +34,9 @@ import {
   SOURCE_INPUT_SCAN_RESPONSE_FIELD_CATALOG,
 } from './source-input-response-field-catalog.js';
 import {
+  INPUT_PREFLIGHT_ROUTE_RESPONSE_FIELD_CATALOG,
+} from './input-preflight-response-field-catalog.js';
+import {
   SOURCE_SAFETY_SUMMARY_RESPONSE_FIELD_CATALOG,
   SOURCE_SAFETY_WRITE_SCOPE_RESPONSE_FIELD_CATALOG,
 } from './source-safety-response-field-catalog.js';
@@ -94,16 +97,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
   ...GUIDANCE_SAFE_WORKFLOW_FIELD_CATALOG,
   ...BATCH_DECISION_RESPONSE_FIELD_CATALOG,
   ...WORKFLOW_SCAN_LIMIT_RESPONSE_FIELD_CATALOG,
-  inputDirectoryDecision: {
-    sourceTools: ['inspect_font_inputs'],
-    meaning: 'Compact first-pass route after input inspection: whether to rerun the scan, review invalid fonts, preview batch splitting directly, or run a non-destructive organization preview first.',
-    agentAction: 'Use this as a no-write triage hint only. Inspect layout, recommendedBatchPreviewArgs, unsupported file summaries, and inspectionWarnings before splitting or organizing.',
-  },
-  'inputDirectoryDecision.directoryOrganizationSafety': {
-    sourceTools: ['inspect_font_inputs'],
-    meaning: 'Scan-local directory organization safety contract. It names organize_font_directory, gives no-write safePreviewArgs with the current inputDir and maxFiles, and states that reviewed organization is copy-only staging rather than final split output.',
-    agentAction: 'Use this when input inspection has already run; copy safePreviewArgs for a no-write organization preview, then inspect the organizer response before any reviewed copy or split write.',
-  },
+  ...INPUT_PREFLIGHT_ROUTE_RESPONSE_FIELD_CATALOG,
   ...SHARED_DRY_RUN_RESPONSE_FIELD_CATALOG,
   ...BATCH_PLAN_RESPONSE_FIELD_CATALOG,
   skippedDuplicates: {
