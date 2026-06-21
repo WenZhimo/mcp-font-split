@@ -34,6 +34,9 @@ import {
   SOURCE_INPUT_SCAN_RESPONSE_FIELD_CATALOG,
 } from './source-input-response-field-catalog.js';
 import {
+  SOURCE_LAYOUT_RESPONSE_FIELD_CATALOG,
+} from './source-layout-response-field-catalog.js';
+import {
   INPUT_PREFLIGHT_ROUTE_RESPONSE_FIELD_CATALOG,
 } from './input-preflight-response-field-catalog.js';
 import {
@@ -128,21 +131,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
   },
   ...SHARED_BATCH_IDENTITY_EVIDENCE_RESPONSE_FIELD_CATALOG,
   ...GUIDANCE_CONFIGURATION_FIELD_CATALOG,
-  recommendedBatchPreviewArgs: {
-    sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
-    meaning: 'Copyable no-write split_font_batch preview arguments for the detected layout. It includes inputDir, workflowPreset safe-preview, layout-specific overrides, and the current scan maxFiles as recommendedBatchPreviewArgs.maxFiles.',
-    agentAction: 'Use this before writing batch output, then inspect safetySummary, batchWarnings, maxFilesHit, unsupportedFileDecision, unsupportedFileSummary, skippedDuplicates, and errors.',
-  },
-  layout: {
-    sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
-    meaning: 'Detected source directory shape and recommended batch grouping.',
-    agentAction: 'Use it when the source directory may not match the desired family grouping.',
-  },
-  'layout.layoutKind': {
-    sourceTools: ['inspect_font_inputs', 'organize_font_directory'],
-    meaning: 'Detected source layout kind: empty, flat, nested, or mixed.',
-    agentAction: 'Use flat or mixed as a signal to dry-run organization before direct batch splitting.',
-  },
+  ...SOURCE_LAYOUT_RESPONSE_FIELD_CATALOG,
   ...GUIDANCE_DIRECTORY_WORKFLOW_FIELD_CATALOG,
   ...BATCH_RESULT_RESPONSE_FIELD_CATALOG,
   ...SHARED_PLAN_VISIBILITY_RESPONSE_FIELD_CATALOG,
