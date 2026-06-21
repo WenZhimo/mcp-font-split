@@ -28,6 +28,9 @@ import {
   REAL_CORPUS_CHECK_RESPONSE_FIELD_CATALOG,
 } from './local-verification-response-field-catalog.js';
 import {
+  INSPECTION_WARNING_RESPONSE_FIELD_CATALOG,
+} from './inspection-warning-response-field-catalog.js';
+import {
   SOURCE_INPUT_SCAN_RESPONSE_FIELD_CATALOG,
 } from './source-input-response-field-catalog.js';
 import {
@@ -108,16 +111,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
     meaning: 'Number of equivalent fonts skipped by the selected dedupe policy.',
     agentAction: 'Inspect dedupe mode and plans when representative choice matters.',
   },
-  inspectionWarnings: {
-    sourceTools: ['inspect_font_inputs', 'inspect_split_output'],
-    meaning: 'Summary-level inspection notices with machine-readable codes.',
-    agentAction: 'Inspect before trusting source or output audit results.',
-  },
-  inspectionWarningCount: {
-    sourceTools: ['inspect_font_inputs', 'inspect_split_output'],
-    meaning: 'Number of inspectionWarnings entries.',
-    agentAction: 'Use as a compact signal that inspectionWarnings needs attention.',
-  },
+  ...INSPECTION_WARNING_RESPONSE_FIELD_CATALOG,
   ...ORGANIZATION_WARNING_RESPONSE_FIELD_CATALOG,
   ...SHARED_RECOMMENDED_NEXT_ACTIONS_RESPONSE_FIELD_CATALOG,
   ...ORGANIZATION_OPERATION_RESPONSE_FIELD_CATALOG,
