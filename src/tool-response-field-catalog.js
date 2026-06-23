@@ -11,6 +11,11 @@ import {
   GUIDANCE_WORKFLOW_PRESET_FIELD_CATALOG,
 } from './guidance-response-field-catalog.js';
 import {
+  ALL_TOOL_NAMES,
+  CORE_TOOL_LEVEL_RESPONSE_FIELD_CATALOG,
+  CORE_WORKSPACE_RESPONSE_FIELD_CATALOG,
+} from './core-response-field-catalog.js';
+import {
   RUNTIME_STATUS_NODE_FIELD_CATALOG,
   RUNTIME_STATUS_RUNTIME_FIELD_CATALOG,
 } from './runtime-status-response-field-catalog.js';
@@ -73,28 +78,12 @@ import {
   ORGANIZATION_WARNING_RESPONSE_FIELD_CATALOG,
 } from './organization-response-field-catalog.js';
 
-export const ALL_TOOL_NAMES = [
-  'get_agent_guidance',
-  'get_runtime_status',
-  'inspect_font_inputs',
-  'organize_font_directory',
-  'split_font',
-  'split_font_batch',
-  'inspect_split_output',
-];
+export { ALL_TOOL_NAMES };
 
 export const TOOL_RESPONSE_FIELD_CATALOG = {
-  ok: {
-    sourceTools: ALL_TOOL_NAMES,
-    meaning: 'Tool-level success flag. It means the selected policy completed, not necessarily that a normal multi-subset split happened.',
-    agentAction: 'Inspect tool-specific outcome, warning, truncation, and error fields before claiming success.',
-  },
+  ...CORE_TOOL_LEVEL_RESPONSE_FIELD_CATALOG,
   ...RUNTIME_STATUS_NODE_FIELD_CATALOG,
-  workspace: {
-    sourceTools: ['get_agent_guidance', 'get_runtime_status'],
-    meaning: 'Resolved FONT_SPLIT_ROOT workspace and configuration status.',
-    agentAction: 'Confirm paths are inside the intended workspace before reading or writing local fonts.',
-  },
+  ...CORE_WORKSPACE_RESPONSE_FIELD_CATALOG,
   ...GUIDANCE_HEADER_FIELD_CATALOG,
   ...RUNTIME_STATUS_RUNTIME_FIELD_CATALOG,
   ...SOURCE_INPUT_SCAN_RESPONSE_FIELD_CATALOG,
