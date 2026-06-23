@@ -1,15 +1,13 @@
 import {
-  OUTPUT_AUDIT_MINIMUM_PASS_TEXT,
   OUTPUT_AUDIT_PASS_CONDITIONS_TEXT,
-  OUTPUT_AUDIT_VALID_OUTPUT_CRITERIA,
 } from './output-audit-criteria.js';
 import {
-  SOURCE_PREFLIGHT_METADATA_INSPECT_FIELDS,
   attachSourceLayoutDecisionChecklistFields,
   sourcePreflightInspectFields,
   uniqueStrings,
   withDirectoryRouteInspectFields,
 } from './guidance-inspect-fields.js';
+import { SAFE_INVOCATION_TEMPLATES } from './safe-invocation-templates.js';
 
 export { buildDirectoryOrganizationQuickAnswer } from './directory-organization-quick-answer.js';
 export {
@@ -17,151 +15,7 @@ export {
   uniqueStrings,
   withDirectoryRouteInspectFields,
 } from './guidance-inspect-fields.js';
-
-export const SAFE_INVOCATION_TEMPLATES = [
-  {
-    id: 'runtime-diagnostic',
-    tool: 'get_runtime_status',
-    useWhen: 'Setup, workspace, Node version, package version, or WASM runtime availability is uncertain.',
-    writesFiles: false,
-    sourceDestructive: false,
-    args: {},
-    customizableFields: [],
-    inspectFields: ['ok', 'recommendedActions', 'node', 'workspace', 'wasm', 'cnFontSplit'],
-    nextStep: 'Handle recommendedActions before calling tools that write output.',
-    successCriteria: 'Proceed to write-capable tools only when ok is true, or every recommendedActions item has been handled or disclosed.',
-  },
-  {
-    id: 'source-preflight-compact',
-    tool: 'inspect_font_inputs',
-    useWhen: 'The source directory is large, unfamiliar, or may contain invalid font-like files.',
-    writesFiles: false,
-    sourceDestructive: false,
-    args: {
-      inputDir: '<font-source-dir>',
-      maxFiles: 50000,
-      includeFiles: false,
-    },
-    customizableFields: ['inputDir', 'maxFiles', 'includeFiles'],
-    inspectFields: SOURCE_PREFLIGHT_METADATA_INSPECT_FIELDS,
-    nextStep: 'Use inputDirectoryDecision plus inputDirectoryDecision.directoryOrganizationSafety to choose between rerun, invalid-font review, direct batch safe-preview, or non-destructive organization safe-preview.',
-    successCriteria: 'Require maxFilesHit false before trusting counts, resolve or disclose invalid fonts and missing identities, then follow inputDirectoryDecision and directoryOrganizationSafety before any write.',
-  },
-  {
-    id: 'single-font-process',
-    tool: 'split_font',
-    useWhen: 'The user named exactly one known supported font file and wants generated split output.',
-    writesFiles: true,
-    sourceDestructive: false,
-    args: {
-      fontPath: '<font-file>',
-      outDir: '<split-output-root>',
-    },
-    customizableFields: ['fontPath', 'outDir', 'fontFamily', 'fontWeight', 'fontStyle', 'smallGlyphAction', 'splitFailureAction'],
-    inspectFields: ['resultType', 'outputMode', 'performedSplit', 'usedFallback', 'warnings', 'manifestPath'],
-    nextStep: 'Run inspect_split_output on outDir before reporting structural success.',
-    successCriteria: 'manifestPath must exist; disclose any fallback, copy-original, or non-subset outputMode, then require an inspect_split_output audit before reporting completion.',
-  },
-  {
-    id: 'directory-mismatch-plan',
-    tool: 'organize_font_directory',
-    useWhen: 'The source directory is flat, mixed, unfamiliar, or does not match the desired family grouping.',
-    writesFiles: false,
-    sourceDestructive: false,
-    args: {
-      inputDir: '<font-source-dir>',
-      workflowPreset: 'safe-preview',
-    },
-    customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode'],
-    inspectFields: withDirectoryRouteInspectFields(['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'operationMode', 'layout', 'recommendedBatchOptions', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'plan']),
-    nextStep: 'Use recommendedBatchPreviewArgs for a batch dry-run, or copy to a staging directory only after reviewing the plan.',
-    successCriteria: 'The organization preview must remain no-write and sourceDestructive false, with layout, route decision, plan summary, warnings, and recommendedBatchPreviewArgs reviewed before any write.',
-  },
-  {
-    id: 'structure-first-large-directory',
-    tool: 'organize_font_directory',
-    useWhen: 'The directory is very large/noisy and the agent first needs only directory shape, not metadata-sensitive decisions.',
-    writesFiles: false,
-    sourceDestructive: false,
-    args: {
-      inputDir: '<font-source-dir>',
-      workflowPreset: 'structure-first',
-    },
-    customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'includePlan'],
-    inspectFields: withDirectoryRouteInspectFields(['parsedFontMetadata', 'unparsedFontCount', 'effectiveBatchDedupeMode', 'dedupeLimitedByParsing', 'layout', 'recommendedBatchOptions']),
-    nextStep: 'Rerun with parseFonts:true before trusting invalid-font counts, glyph counts, identity dedupe, or font-family grouping.',
-    successCriteria: 'Use this result only for structure-level decisions; rerun with parseFonts true before relying on invalid-font counts, glyph counts, identity dedupe, or metadata grouping.',
-  },
-  {
-    id: 'copy-organized-staging',
-    tool: 'organize_font_directory',
-    useWhen: 'The user wants a cleaner staging directory after a dry-run organization plan has been reviewed.',
-    writesFiles: true,
-    sourceDestructive: false,
-    args: {
-      inputDir: '<font-source-dir>',
-      outputDir: 'organized-fonts',
-      workflowPreset: 'reviewed-write',
-    },
-    customizableFields: ['inputDir', 'outputDir', 'workflowPreset', 'maxFiles', 'parseFonts', 'includePlan', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'overwriteExisting'],
-    inspectFields: withDirectoryRouteInspectFields(['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'operationMode', 'copiedCount', 'organizationManifestPath', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'errorCount', 'errors']),
-    nextStep: 'Use outputDir as the next split_font_batch input only after checking organizationWarnings.',
-    successCriteria: 'The copy run must be sourceDestructive false, operationMode copy-only, errorCount zero, and copiedCount or planActionSummary must match the reviewed plan.',
-  },
-  {
-    id: 'batch-dry-run-preview',
-    tool: 'split_font_batch',
-    useWhen: 'Before writing batch split output for an unfamiliar or newly organized source directory.',
-    writesFiles: false,
-    sourceDestructive: false,
-    args: {
-      inputDir: '<font-source-dir-or-organized-outputDir>',
-      outputRoot: 'split-output',
-      workflowPreset: 'safe-preview',
-      limit: 50000,
-      maxFiles: 50000,
-    },
-    customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'includeResults', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'splitFailureAction'],
-    inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'dryRun', 'batchDecision', 'planned', 'batchWarnings', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary', 'dedupeDecisionSummary', 'skippedDuplicates', 'errorCount', 'errors'],
-    nextStep: 'If the plan is acceptable, rerun with dryRun:false; use includeResults:false for large real runs.',
-    successCriteria: 'The preview must have dryRun true, sourceDestructive false, maxFilesHit false, errorCount zero, and acceptable planned paths, warnings, naming, and dedupe decisions before writing.',
-  },
-  {
-    id: 'batch-process-reviewed-plan',
-    tool: 'split_font_batch',
-    useWhen: 'A batch dry-run has been reviewed and the user wants to write split output.',
-    writesFiles: true,
-    sourceDestructive: false,
-    args: {
-      inputDir: '<font-source-dir-or-organized-outputDir>',
-      outputRoot: 'split-output',
-      workflowPreset: 'reviewed-write',
-      limit: 50000,
-      maxFiles: 50000,
-    },
-    customizableFields: ['inputDir', 'outputRoot', 'workflowPreset', 'limit', 'maxFiles', 'skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'splitFailureAction'],
-    inspectFields: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'dryRun', 'sourceDestructive', 'writesSourceTree', 'writesOutputTree', 'outputTreeInsideInputTree', 'mayOverwriteOutputTree', 'batchDecision', 'batchWarnings', 'batchWarningCount', 'dedupeDecisionSummary', 'errorCount', 'errors', 'resultsIncluded', 'maxFilesHit', 'unsupportedFileDecision', 'unsupportedFileSummary'],
-    nextStep: `Run inspect_split_output on outputRoot before reporting completion and require ${OUTPUT_AUDIT_MINIMUM_PASS_TEXT}.`,
-    successCriteria: `The reviewed write must have dryRun false, sourceDestructive false, maxFilesHit false, errorCount zero, and a follow-up inspect_split_output audit with ${OUTPUT_AUDIT_MINIMUM_PASS_TEXT} before reporting completion.`,
-  },
-  {
-    id: 'output-audit-compact',
-    tool: 'inspect_split_output',
-    useWhen: 'After processing a batch or when auditing an existing split-output directory.',
-    writesFiles: false,
-    sourceDestructive: false,
-    args: {
-      outDir: 'split-output',
-      maxFiles: 200000,
-      includeFiles: false,
-      includeFamilies: false,
-    },
-    customizableFields: ['outDir', 'maxFiles', 'includeFiles', 'includeFamilies'],
-    inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
-    nextStep: `Require ${OUTPUT_AUDIT_PASS_CONDITIONS_TEXT}; if maxFilesHit is true or manifest/structure issues are detected, disclose uncertainty or rerun with more detail.`,
-    successCriteria: OUTPUT_AUDIT_VALID_OUTPUT_CRITERIA,
-  },
-];
+export { SAFE_INVOCATION_TEMPLATES } from './safe-invocation-templates.js';
 
 export function buildRecommendedWorkflowPlan(workflow) {
   const auditStep = {
