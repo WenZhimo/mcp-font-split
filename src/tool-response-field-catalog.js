@@ -60,6 +60,10 @@ import {
   SHARED_BATCH_WORKFLOW_RESPONSE_FIELD_CATALOG,
 } from './batch-policy-response-field-catalog.js';
 import {
+  SHARED_BATCH_DEDUPE_RESPONSE_FIELD_CATALOG,
+  SHARED_BATCH_RECOMMENDATION_RESPONSE_FIELD_CATALOG,
+} from './batch-shared-response-field-catalog.js';
+import {
   FONT_IDENTITY_RESPONSE_FIELD_CATALOG,
 } from './font-identity-response-field-catalog.js';
 import {
@@ -106,11 +110,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
   ...INPUT_PREFLIGHT_ROUTE_RESPONSE_FIELD_CATALOG,
   ...SHARED_DRY_RUN_RESPONSE_FIELD_CATALOG,
   ...BATCH_PLAN_RESPONSE_FIELD_CATALOG,
-  skippedDuplicates: {
-    sourceTools: ['split_font_batch', 'organize_font_directory'],
-    meaning: 'Number of equivalent fonts skipped by the selected dedupe policy.',
-    agentAction: 'Inspect dedupe mode and plans when representative choice matters.',
-  },
+  ...SHARED_BATCH_DEDUPE_RESPONSE_FIELD_CATALOG,
   ...INSPECTION_WARNING_RESPONSE_FIELD_CATALOG,
   ...ORGANIZATION_WARNING_RESPONSE_FIELD_CATALOG,
   ...SHARED_RECOMMENDED_NEXT_ACTIONS_RESPONSE_FIELD_CATALOG,
@@ -119,11 +119,7 @@ export const TOOL_RESPONSE_FIELD_CATALOG = {
   ...ORGANIZATION_DIRECTORY_WORKFLOW_RESPONSE_FIELD_CATALOG,
   ...SOURCE_SAFETY_WRITE_SCOPE_RESPONSE_FIELD_CATALOG,
   ...ORGANIZATION_PARSING_RESPONSE_FIELD_CATALOG,
-  recommendedBatchOptions: {
-    sourceTools: ['organize_font_directory', 'get_agent_guidance'],
-    meaning: 'Suggested split_font_batch option fragment from guidance or layout analysis. It is not a complete safe invocation by itself.',
-    agentAction: 'Prefer recommendedBatchPreviewArgs for a copyable no-write preview call after organize_font_directory; use this field only as policy overrides after reviewing layout and warnings.',
-  },
+  ...SHARED_BATCH_RECOMMENDATION_RESPONSE_FIELD_CATALOG,
   ...GUIDANCE_BATCH_RECOMMENDATION_FIELD_CATALOG,
   ...SHARED_BATCH_POLICY_RESPONSE_FIELD_CATALOG,
   ...GUIDANCE_IDENTITY_FIELD_CATALOG,
