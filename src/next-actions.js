@@ -1,7 +1,7 @@
 import {
   attachSourceLayoutDecisionChecklistFields,
   withDirectoryRouteInspectFields,
-} from './guidance-workflows.js';
+} from './guidance-inspect-fields.js';
 import {
   buildBatchAuditArgs,
   buildSuggestedBatchPreviewArgs,

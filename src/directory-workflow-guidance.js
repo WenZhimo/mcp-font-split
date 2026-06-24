@@ -1,4 +1,4 @@
-import { withDirectoryRouteInspectFields } from './guidance-workflows.js';
+import { withDirectoryRouteInspectFields } from './guidance-inspect-fields.js';
 import { OUTPUT_AUDIT_PASS_CONDITIONS_TEXT } from './output-audit-criteria.js';
 
 export function buildDirectoryWorkflowDecisionMatrix() {

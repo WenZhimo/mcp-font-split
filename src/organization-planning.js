@@ -15,7 +15,7 @@ import {
 import {
   attachSourceLayoutDecisionChecklistFields,
   uniqueStrings,
-} from './guidance-workflows.js';
+} from './guidance-inspect-fields.js';
 import {
   OUTPUT_AUDIT_COMPLETION_CRITERIA,
   OUTPUT_AUDIT_MINIMUM_PASS_TEXT,

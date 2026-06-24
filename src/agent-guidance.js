@@ -19,13 +19,11 @@ import {
   buildWorkflowPresetCatalog,
   selectGuidanceSections,
 } from './guidance.js';
-import {
-  SAFE_INVOCATION_TEMPLATES,
-  attachSourceLayoutDecisionChecklistFields,
-  buildDirectoryOrganizationQuickAnswer,
-  buildNextToolDecisionSummary,
-  buildRecommendedWorkflowPlan,
-} from './guidance-workflows.js';
+import { buildDirectoryOrganizationQuickAnswer } from './directory-organization-quick-answer.js';
+import { attachSourceLayoutDecisionChecklistFields } from './guidance-inspect-fields.js';
+import { buildNextToolDecisionSummary } from './next-tool-decision-summary.js';
+import { SAFE_INVOCATION_TEMPLATES } from './safe-invocation-templates.js';
+import { buildRecommendedWorkflowPlan } from './workflow-plan.js';
 import {
   BATCH_POLICY_GUIDE,
   buildBatchCustomizationQuickReference,
