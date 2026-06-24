@@ -22,6 +22,152 @@ const MOJIBAKE_MARKERS = [
   '乣',
 ];
 
+function assertIncludesText(label, text, token) {
+  if (!text.includes(token)) {
+    throw new Error(`${label} is missing required high-risk contract token: ${token}`);
+  }
+}
+
+function assertIncludesAnyText(label, text, tokens) {
+  if (!tokens.some((token) => text.includes(token))) {
+    throw new Error(`${label} is missing required high-risk contract token: ${tokens.join(' or ')}`);
+  }
+}
+
+function assertDocsContainTokens(docs, contractName, tokens) {
+  for (const [fileName, content] of Object.entries(docs)) {
+    for (const token of tokens) {
+      assertIncludesText(`${fileName} ${contractName}`, content, token);
+    }
+  }
+}
+
+function assertDocsContainAnyToken(docs, contractName, tokens) {
+  for (const [fileName, content] of Object.entries(docs)) {
+    assertIncludesAnyText(`${fileName} ${contractName}`, content, tokens);
+  }
+}
+
+function findGuidanceShape(guidance, shapeId) {
+  return guidance.outputResultShapeQuickReference?.resultShapes?.find((shape) => shape.id === shapeId);
+}
+
+function assertGuidanceHighRiskContracts(guidance) {
+  const organization = guidance.directoryOrganizationQuickAnswer;
+  const organizationSafety = organization?.directoryOrganizationSafety;
+  if (
+    organization?.helperTool !== 'organize_font_directory'
+    || organization?.firstCallArgs?.workflowPreset !== 'safe-preview'
+    || organization?.writeArgsAfterReview?.workflowPreset !== 'reviewed-write'
+    || organization?.writeMode !== 'copy-only-outputDir'
+    || organization?.sourceDestructive !== false
+    || organization?.sourceFilesMovedDeletedOrRewritten !== false
+    || organization?.outputDirRole !== 'organized-font-source-staging'
+    || organization?.isSplitOutput !== false
+    || organization?.nextToolAfterStaging !== 'split_font_batch'
+    || organization?.auditToolAfterSplitWrite !== 'inspect_split_output'
+    || organizationSafety?.sourceDestructive !== false
+    || organizationSafety?.sourceFilesMovedDeletedOrRewritten !== false
+    || organizationSafety?.helperToolWriteMode !== 'copy-only-outputDir'
+    || organizationSafety?.outputDirRole !== 'organized-font-source-staging'
+    || organizationSafety?.isSplitOutput !== false
+  ) {
+    throw new Error('get_agent_guidance directory organization safety contract drifted.');
+  }
+
+  const toolSafetyOrganizer = guidance.toolSafetyQuickReference?.tools?.find((tool) => tool.tool === 'organize_font_directory');
+  if (
+    toolSafetyOrganizer?.defaultWritesFiles !== false
+    || toolSafetyOrganizer?.reviewedWriteMode !== 'copy-only-outputDir'
+    || toolSafetyOrganizer?.sourceDestructive !== false
+    || toolSafetyOrganizer?.sourceFilesMovedDeletedOrRewritten !== false
+    || toolSafetyOrganizer?.outputRole !== 'organized-font-source-staging'
+    || toolSafetyOrganizer?.isSplitOutput !== false
+    || toolSafetyOrganizer?.outputAuditRequiredAfterWrite !== false
+  ) {
+    throw new Error('get_agent_guidance tool safety quick reference drifted for organize_font_directory.');
+  }
+
+  const resultShape = guidance.outputResultShapeQuickReference;
+  const copyOriginal = findGuidanceShape(guidance, 'copy-original-record');
+  const singleWoff2 = findGuidanceShape(guidance, 'single-woff2-fallback');
+  const partialErrors = findGuidanceShape(guidance, 'batch-partial-errors');
+  if (
+    resultShape?.summaryType !== 'output-result-shape-quick-reference'
+    || copyOriginal?.when?.outputMode !== 'copy-original'
+    || copyOriginal?.when?.skipped !== true
+    || copyOriginal?.when?.usedFallback !== false
+    || singleWoff2?.when?.outputMode !== 'single-woff2'
+    || singleWoff2?.when?.usedFallback !== true
+    || partialErrors?.when?.ok !== true
+    || partialErrors?.when?.errorCount !== '>0'
+  ) {
+    throw new Error('get_agent_guidance output result shape contract drifted.');
+  }
+
+  const verification = guidance.localVerificationOutputGuide;
+  if (
+    verification?.primaryDecisionField !== 'reliabilityGateDecision'
+    || !verification?.requiredOutputFields?.includes('coverageSummary.archiveHandlingScope')
+    || !verification?.passCriteria?.some((item) => item.includes('archiveInternalFontsCovered is false'))
+    || !verification?.completionReportGuide?.forbiddenClaims?.some((claim) => claim.includes('every directory'))
+    || !verification?.completionReportGuide?.forbiddenClaims?.some((claim) => claim.includes('archives were extracted'))
+  ) {
+    throw new Error('get_agent_guidance local verification scope contract drifted.');
+  }
+}
+
+function assertHighRiskDocumentationContracts({ readmeZh, readmeEn, apiDocs, behaviorDoc }) {
+  const readmeDocs = {
+    'README.md': readmeZh,
+    'README.en.md': readmeEn,
+  };
+  const apiAndBehaviorDocs = {
+    'API.md': apiDocs['API.md'],
+    'API.zh-CN.md': apiDocs['API.zh-CN.md'],
+    'BEHAVIOR.zh-CN.md': behaviorDoc,
+  };
+  const allUserDocs = {
+    ...readmeDocs,
+    ...apiAndBehaviorDocs,
+  };
+
+  assertDocsContainTokens(readmeDocs, 'source-layout quick path', [
+    'organize_font_directory',
+    'copy-only',
+    'organized-font-source-staging',
+    'split_font_batch',
+    'inspect_split_output',
+  ]);
+  assertDocsContainTokens(apiAndBehaviorDocs, 'directory organization safety fields', [
+    'sourceDestructive',
+    'sourceFilesMovedDeletedOrRewritten',
+    'copy-only',
+    'organized-font-source-staging',
+    'isSplitOutput',
+    'safe-preview',
+    'reviewed-write',
+  ]);
+  assertDocsContainTokens(allUserDocs, 'output shape warnings', [
+    'copy-original',
+    'usedFallback',
+    'errorCount',
+  ]);
+  assertDocsContainAnyToken(allUserDocs, 'ok true is not full success warning', ['ok:true', 'ok: true']);
+  assertDocsContainTokens(allUserDocs, 'real-corpus gate entry point', [
+    'smoke:real-corpus-suite',
+  ]);
+  assertDocsContainTokens(apiAndBehaviorDocs, 'real-corpus scope evidence fields', [
+    'reliabilityGateDecision',
+    'corpusCountGuide',
+    'targetCountsAreFullCorpusCounts',
+    'coverageSummary.archiveHandlingScope',
+  ]);
+  assertDocsContainTokens(apiAndBehaviorDocs, 'archive count-only handling', [
+    'archivesExtracted',
+  ]);
+}
+
 async function assertPublicDocsReadableAndLinked() {
   const markdownLinkPattern = /!?\[[^\]]+\]\(([^)]+)\)/g;
 
@@ -270,8 +416,14 @@ export async function runBehaviorDocsSmoke() {
   const behaviorDoc = await fs.readFile('BEHAVIOR.zh-CN.md', 'utf8');
   const readmeZh = await fs.readFile('README.md', 'utf8');
   const readmeEn = await fs.readFile('README.en.md', 'utf8');
+  const apiDocs = {
+    'API.md': await fs.readFile('API.md', 'utf8'),
+    'API.zh-CN.md': await fs.readFile('API.zh-CN.md', 'utf8'),
+  };
   const serverSource = await fs.readFile('src/server.js', 'utf8');
   const guidance = getAgentGuidance({ workflow: 'batch', detailLevel: 'full' });
+  assertGuidanceHighRiskContracts(guidance);
+  assertHighRiskDocumentationContracts({ readmeZh, readmeEn, apiDocs, behaviorDoc });
   const assertBehaviorContains = (label, token) => {
     if (!behaviorDoc.includes(token)) {
       throw new Error(`BEHAVIOR.zh-CN.md is missing documented ${label}: ${token}`);
@@ -546,6 +698,7 @@ export async function runBehaviorDocsSmoke() {
     ok: true,
     toolCount: guidance.tools?.length || 0,
     documentedWorkflowPresetCount: guidance.workflowPresets?.length || 0,
+    checkedHighRiskContractCount: 4,
     checkedHighRiskTokenCount: 57,
     checkedWarningCodeCount: 11,
     checkedDebugEventCount: 5,
