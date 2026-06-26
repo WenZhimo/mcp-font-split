@@ -13,12 +13,12 @@ import { workspaceRoot } from './path-utils.js';
 import {
   buildProjectStatusNotice,
   buildOutputResultShapeQuickReference,
-  buildToolSafetyQuickReference,
   buildUnsupportedFileCategoryCatalog,
   buildGuidanceView,
   buildWorkflowPresetCatalog,
   selectGuidanceSections,
 } from './guidance.js';
+import { buildToolSafetyQuickReference } from './tool-safety-quick-reference.js';
 import { buildDirectoryOrganizationQuickAnswer } from './directory-organization-quick-answer.js';
 import { attachSourceLayoutDecisionChecklistFields } from './guidance-inspect-fields.js';
 import { buildNextToolDecisionSummary } from './next-tool-decision-summary.js';
