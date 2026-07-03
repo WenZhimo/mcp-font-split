@@ -78,6 +78,57 @@ const SMOKE_SCENARIOS = new Map([
   ['small-copy-original', runSmallCopyOriginalSmoke],
 ]);
 
+const SMOKE_SCENARIO_GROUPS = Object.freeze({
+  single: ['single', 'small-copy-original'],
+  batch: [
+    'batch-incremental',
+    'batch-run-cli',
+    'batch-identity-dedupe',
+    'workflow-presets',
+    'batch-compact',
+    'batch-dry-run',
+    'batch-error-mode',
+    'batch-defaults',
+  ],
+  input: ['runtime-status', 'font-inputs', 'scan-limits', 'workspace-root-path'],
+  organize: [
+    'organize-dry-run',
+    'organize-copy',
+    'organize-valid-font',
+    'organize-structure-only',
+    'organize-output-inside-input',
+  ],
+  inspect: ['inspect', 'inspect-compact', 'inspect-structure', 'inspect-organized-staging'],
+  guidance: ['agent-guidance'],
+  docs: ['api-docs', 'behavior-docs'],
+  mcp: ['mcp-error', 'mcp-schema'],
+  localCheck: ['check-compact'],
+  realCorpus: ['real-corpus-suite', 'real-corpus-readonly', 'real-corpus-targets', 'real-corpus-integration'],
+});
+
+function assertSmokeScenarioOwnership() {
+  const ownedScenarios = new Map();
+  for (const [groupName, scenarioNames] of Object.entries(SMOKE_SCENARIO_GROUPS)) {
+    for (const scenarioName of scenarioNames) {
+      if (!SMOKE_SCENARIOS.has(scenarioName)) {
+        throw new Error(`Smoke scenario group ${groupName} references unknown scenario: ${scenarioName}`);
+      }
+      if (ownedScenarios.has(scenarioName)) {
+        throw new Error(`Smoke scenario ${scenarioName} is assigned to both ${ownedScenarios.get(scenarioName)} and ${groupName}.`);
+      }
+      ownedScenarios.set(scenarioName, groupName);
+    }
+  }
+
+  for (const scenarioName of SMOKE_SCENARIOS.keys()) {
+    if (!ownedScenarios.has(scenarioName)) {
+      throw new Error(`Smoke scenario ${scenarioName} must be assigned to exactly one scenario group.`);
+    }
+  }
+}
+
+assertSmokeScenarioOwnership();
+
 async function runSmokeScenario(scenario) {
   const runScenario = SMOKE_SCENARIOS.get(scenario);
   if (!runScenario) {
@@ -87,6 +138,7 @@ async function runSmokeScenario(scenario) {
 }
 
 export {
+  SMOKE_SCENARIO_GROUPS,
   SMOKE_SCENARIOS,
   runSmokeScenario,
 };
