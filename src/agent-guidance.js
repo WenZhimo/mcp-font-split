@@ -11,12 +11,12 @@ import {
 } from './catalogs.js';
 import { workspaceRoot } from './path-utils.js';
 import {
-  buildProjectStatusNotice,
   buildUnsupportedFileCategoryCatalog,
   buildGuidanceView,
   buildWorkflowPresetCatalog,
   selectGuidanceSections,
 } from './guidance.js';
+import { buildProjectStatusNotice } from './project-status-notice.js';
 import { buildOutputResultShapeQuickReference } from './output-result-shape-quick-reference.js';
 import { buildToolSafetyQuickReference } from './tool-safety-quick-reference.js';
 import { buildDirectoryOrganizationQuickAnswer } from './directory-organization-quick-answer.js';
