@@ -311,7 +311,77 @@ async function runInspectStructureSmoke() {
     throw new Error('Expected workflowPreset shorthand not to be stored as an output-affecting manifest config.');
   }
 
-  console.log(JSON.stringify({ clean, noisy, wrongDepth, batchWrite, batchInspect }, null, 2));
+  const numericSuffixInputDir = `${outDir}-numeric-suffix-input`;
+  const numericSuffixOutputRoot = `${outDir}-numeric-suffix-output`;
+  await fs.rm(numericSuffixInputDir, { recursive: true, force: true });
+  await fs.rm(numericSuffixOutputRoot, { recursive: true, force: true });
+  await fs.mkdir(path.join(numericSuffixInputDir, 'SourceA'), { recursive: true });
+  await fs.mkdir(path.join(numericSuffixInputDir, 'SourceB'), { recursive: true });
+  await fs.writeFile(
+    path.join(numericSuffixInputDir, 'SourceA', 'CollisionSans-Regular.ttf'),
+    buildMinimalTtf({ familyName: 'Collision Sans', subfamilyName: 'Regular', glyphCount: 5 }),
+  );
+  await fs.writeFile(
+    path.join(numericSuffixInputDir, 'SourceB', 'CollisionSans-Regular.ttf'),
+    buildMinimalTtf({ familyName: 'Collision Sans', subfamilyName: 'Regular', glyphCount: 7 }),
+  );
+  const numericSuffixWrite = await splitFontBatch({
+    inputDir: numericSuffixInputDir,
+    outputRoot: numericSuffixOutputRoot,
+    workflowPreset: 'reviewed-write',
+    batchGroupBy: 'font-family',
+    batchDedupeMode: 'same-path',
+    batchNamingMode: 'numeric-suffix',
+    smallGlyphAction: 'copy-original',
+    limit: 10,
+    maxFiles: 20,
+    silent: true,
+  });
+  const numericSuffixInspect = await inspectSplitOutput({
+    outDir: numericSuffixOutputRoot,
+    includeFiles: false,
+    includeFamilies: true,
+  });
+  const numericSuffixEntries = numericSuffixInspect.families?.[0]?.fontEntries || [];
+  const numericSuffixEntryNames = new Set(numericSuffixEntries.map((entry) => entry.fontBaseName));
+  if (
+    numericSuffixWrite.processedFontCount !== 2
+    || numericSuffixWrite.batchNamingMode !== 'numeric-suffix'
+    || numericSuffixWrite.batchDedupeMode !== 'same-path'
+    || numericSuffixInspect.auditStatus !== 'pass'
+    || numericSuffixInspect.auditPassed !== true
+    || numericSuffixInspect.outputStructureDecision?.status !== 'pass'
+    || numericSuffixInspect.structureSummary?.conforms !== true
+    || numericSuffixInspect.structureSummary?.layoutKind !== 'family-tree'
+    || numericSuffixInspect.structureSummary?.manifestCoverageOk !== true
+    || numericSuffixInspect.copyOriginalOutputCount !== 2
+    || numericSuffixEntries.length !== 2
+    || !numericSuffixEntryNames.has('CollisionSans-Regular')
+    || !numericSuffixEntryNames.has('CollisionSans-Regular-1')
+    || [...numericSuffixEntryNames].some((entryName) => entryName.includes('--'))
+  ) {
+    throw new Error('Expected reviewed numeric-suffix batch output to use bare name plus -1 only for a real same-family collision and still pass output audit.');
+  }
+  for (const entry of numericSuffixEntries) {
+    if (
+      entry.outputMode !== 'copy-original'
+      || entry.hasManifest !== true
+      || entry.hasCss !== false
+      || entry.woff2Count !== 0
+    ) {
+      throw new Error('Expected numeric-suffix collision entries to remain clean copy-original outputs without generated residue.');
+    }
+  }
+
+  console.log(JSON.stringify({
+    clean,
+    noisy,
+    wrongDepth,
+    batchWrite,
+    batchInspect,
+    numericSuffixWrite,
+    numericSuffixInspect,
+  }, null, 2));
 }
 
 async function runInspectOrganizedStagingSmoke() {
