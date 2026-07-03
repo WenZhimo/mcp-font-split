@@ -116,3 +116,18 @@ export const WORKFLOW_PRESETS = {
 };
 
 export const WORKFLOW_PRESET_NAMES = Object.keys(WORKFLOW_PRESETS);
+
+export function buildWorkflowPresetCatalog() {
+  return WORKFLOW_PRESET_NAMES.map((id) => {
+    const preset = WORKFLOW_PRESETS[id];
+    return {
+      id,
+      description: preset.description,
+      writesBatchFiles: preset.writesBatchFiles,
+      writesOrganizationFiles: preset.writesOrganizationFiles,
+      batchDefaults: preset.batch,
+      organizationDefaults: preset.organize,
+      explicitOptionsOverridePreset: true,
+    };
+  });
+}

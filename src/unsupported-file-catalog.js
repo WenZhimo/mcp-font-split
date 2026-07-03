@@ -48,3 +48,17 @@ export const UNSUPPORTED_FILE_CATEGORY_DETAILS = {
     extensions: [],
   },
 };
+
+export function buildUnsupportedFileCategoryCatalog() {
+  return Object.fromEntries(
+    Object.entries(UNSUPPORTED_FILE_CATEGORY_DETAILS).map(([category, details]) => [
+      category,
+      {
+        category,
+        extensions: details.extensions || [...(UNSUPPORTED_FILE_EXTENSION_CATEGORIES[category] || [])].sort(),
+        meaning: details.meaning,
+        handling: details.handling,
+      },
+    ]),
+  );
+}
