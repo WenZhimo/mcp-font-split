@@ -83,6 +83,20 @@ function assertReadmeEntryPointBoundary({ readmeZh, readmeEn, apiDocs, behaviorD
     }
   }
 
+  for (const [fileName, content] of Object.entries(readmeDocs)) {
+    for (const forbiddenSnippet of [
+      'OpenType name IDs 16/17',
+      'name IDs 1/2',
+      '`glyphCount`',
+      'name ID 4',
+      'name ID 6',
+    ]) {
+      if (content.includes(forbiddenSnippet)) {
+        throw new Error(`${fileName} should remain an entry point; move font-identity fallback and diagnostic field details to API / behavior docs: ${forbiddenSnippet}`);
+      }
+    }
+  }
+
   if (
     !readmeZh.includes('字段级细节以 [API 参考](./API.zh-CN.md) 为准')
     || !readmeZh.includes('完整参数、返回字段和错误形态请看 [API 参考](./API.zh-CN.md)')
@@ -567,14 +581,19 @@ export async function runBehaviorDocsSmoke() {
     }
   }
   if (
-    !readmeZh.includes('OpenType name IDs 16/17')
-    || !readmeZh.includes('name IDs 1/2')
-    || !readmeEn.includes('OpenType name IDs 16/17')
-    || !readmeEn.includes('name IDs 1/2')
+    !readmeZh.includes('具体 name table 回退规则和诊断字段请看 API / 行为文档')
+    || !readmeEn.includes('detailed name-table fallback rules and diagnostic fields belong in the API / behavior docs')
+    || !apiDocs['API.md'].includes('OpenType name IDs 16/17')
+    || !apiDocs['API.md'].includes('name IDs 1/2')
+    || !apiDocs['API.md'].includes('`glyphCount` is diagnostic only')
+    || !apiDocs['API.zh-CN.md'].includes('OpenType name IDs 16/17')
+    || !apiDocs['API.zh-CN.md'].includes('name IDs 1/2')
+    || !apiDocs['API.zh-CN.md'].includes('`glyphCount` 只用于诊断')
     || !behaviorDoc.includes('OpenType name IDs 16/17')
     || !behaviorDoc.includes('name IDs 1/2')
+    || !behaviorDoc.includes('`glyphCount` 只作为诊断信息')
   ) {
-    throw new Error('Expected README and behavior docs to explain paired OpenType name ID fallback for font-identity.');
+    throw new Error('Expected README files to stay entry-level while API and behavior docs explain paired OpenType name ID fallback for font-identity.');
   }
 
   for (const tool of guidance.tools || []) {

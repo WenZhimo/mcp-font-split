@@ -166,7 +166,7 @@ The organizer returns a plan by default. Even with `reviewed-write`, it performs
 - `organize_font_directory` never moves, deletes, or rewrites source fonts; its `outputDir` is copy-only source staging.
 - `split_font_batch` defaults to `batchNamingMode: "numeric-suffix"`: bare names first, stable `-1`, `-2`, etc. only on real collisions.
 - `batchDedupeMode: "same-path"` is path/stem-level dedupe; `batchDedupeMode: "font-identity"` compares font identity across formats.
-- `font-identity` uses OpenType name IDs 16/17 first, then falls back to name IDs 1/2, name ID 4, and name ID 6; `glyphCount` is diagnostic only and should not split equivalent OTF/TTF/WOFF inputs.
+- `font-identity` dedupes equivalent OTF/TTF/WOFF inputs across formats by font identity; detailed name-table fallback rules and diagnostic fields belong in the API / behavior docs.
 - `.woff` and `.woff2` inputs are decompressed to sfnt-like data before processing.
 - Invalid explicit configuration values are rejected instead of silently falling back. Omit an option to use its default.
 - If `outputRoot` is inside `inputDir`, real writes still land inside the input tree; inspect `writesSourceTree` and `outputTreeInsideInputTree` before calling the run source-tree no-write.

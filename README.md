@@ -166,7 +166,7 @@
 - `organize_font_directory` 不移动、不删除、不重写源字体；它写出的 `outputDir` 只是 copy-only 暂存源目录。
 - `split_font_batch` 默认 `batchNamingMode: "numeric-suffix"`：先用裸名，只有真实冲突时才加 `-1`、`-2` 等稳定数字后缀。
 - `batchDedupeMode: "same-path"` 只是路径/stem 级去重；`batchDedupeMode: "font-identity"` 会跨格式比较字体身份。
-- `font-identity` 身份键优先使用 OpenType name IDs 16/17，再回退到 name IDs 1/2、name ID 4、name ID 6；`glyphCount` 只作为诊断信息，不会把等价 OTF/TTF/WOFF 输入拆开。
+- `font-identity` 会按字体身份跨格式收敛等价 OTF/TTF/WOFF 输入；具体 name table 回退规则和诊断字段请看 API / 行为文档。
 - `.woff` / `.woff2` 输入会先解压成 sfnt-like 数据，再进入处理流程。
 - 显式传入的无效配置会被拒绝，而不是静默回退；需要默认行为时请省略该选项。
 - 如果 `outputRoot` 位于 `inputDir` 内，真实写入仍会落在输入目录树里；描述“源目录树无写入”前必须检查 `writesSourceTree` 和 `outputTreeInsideInputTree`。
