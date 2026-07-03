@@ -1,0 +1,51 @@
+export const ERROR_RESPONSE_CATALOG = {
+  configurationError: {
+    errorName: 'FontSplitConfigurationError',
+    errorType: 'configuration-error',
+    detailsSummaryType: 'configuration-error',
+    emittedWhen: 'An explicit enum, boolean, or numeric option is invalid in a direct module call or any path that reaches the core validator.',
+    mcpResponseShape: {
+      isError: true,
+      contentType: 'text',
+      jsonTextWhenDetailsPresent: true,
+      fields: ['ok', 'error', 'name', 'errorType', 'details'],
+    },
+    detailsFields: [
+      'summaryType',
+      'optionName',
+      'received',
+      'allowedValues',
+      'expectedType',
+      'min',
+      'max',
+      'defaultWhenOmitted',
+      'omitForDefaultBehavior',
+    ],
+    agentAction: 'Treat this as caller configuration failure. Do not retry the same value; either omit the option for the documented default or choose one of the allowed values / expected types.',
+    nonIntuitiveBehavior: 'Invalid explicit values are not interpreted as a request for defaults.',
+  },
+  batchSplitError: {
+    errorName: 'BatchSplitError',
+    errorType: 'batch-split-error',
+    emittedWhen: 'split_font_batch uses fail-fast or fail-after and at least one selected font fails processing.',
+    mcpResponseShape: {
+      isError: true,
+      contentType: 'text',
+      jsonTextWhenDetailsPresent: true,
+      fields: ['ok', 'error', 'name', 'errorType', 'details'],
+    },
+    detailsFields: ['mode', 'errors', 'summary'],
+    agentAction: 'Parse the JSON text, inspect every details.errors[] entry and details.summary, then resolve or disclose failures before claiming batch success.',
+  },
+  plainError: {
+    errorName: 'Error',
+    emittedWhen: 'An error has no structured details attached.',
+    mcpResponseShape: {
+      isError: true,
+      contentType: 'text',
+      plainTextWhenNoDetails: true,
+      fields: ['error-message-text'],
+    },
+    agentAction: 'Treat the text as a failure message. If structured recovery is needed, reproduce through a path that attaches details or inspect logs/context.',
+  },
+};
