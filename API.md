@@ -604,8 +604,9 @@ After real batch writes, treat the output directory as complete only when all of
 - `structureSummary.conforms: true`
 - `maxFilesHit: false`
 
-`structureSummary.conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, and `entryIssueExamples[]`.
+`structureSummary.conforms: true` means the scanned files fit the documented single-family or family-tree layout, every detected font entry has a manifest, and manifest-declared output modes have their required files. When false, inspect `issues[]`, `unexpectedFileExamples[]`, `unexpectedDepthFileExamples[]`, and `entryIssueExamples[]`.
 | `structureSummary.issues[].code` | Machine-readable structure issue code such as `missing-manifests`, `unexpected-output-files`, or `web-output-missing`; look it up in `outputStructureCatalog.issueCodes` before explaining the audit result. |
+| `structureSummary.unexpectedDepthFileExamples[]` | Example files found below or above the documented output depth; use this with `unexpectedDepthFileCount` and `unexpected-output-depth` to locate a wrong output-root level or misplaced generated files. |
 | `fontEntryCount` | Number of detected per-font output entries. |
 | `manifestCount` | Number of entries with `split-meta.json`. |
 | `missingManifestCount` | Number of entries without `split-meta.json` manifests that were conservatively inferred from file structure. |

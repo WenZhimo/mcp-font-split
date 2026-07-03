@@ -348,6 +348,10 @@ export function buildOutputStructureSummary({
       .map((file) => file.path),
     unexpectedFileExamplesTruncated: unexpectedFiles.length > maxExamples,
     unexpectedDepthFileCount: depthIssueFiles.length,
+    unexpectedDepthFileExamples: depthIssueFiles
+      .slice(0, maxExamples)
+      .map((file) => file.path),
+    unexpectedDepthFileExamplesTruncated: depthIssueFiles.length > maxExamples,
     outputModeCounts,
     entryIssueExamples: entryIssueExamples.slice(0, maxExamples),
     entryIssueExamplesTruncated: entryIssueExamples.length > maxExamples,

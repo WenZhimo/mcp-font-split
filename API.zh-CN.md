@@ -604,8 +604,9 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 - `structureSummary.conforms: true`
 - `maxFilesHit: false`
 
-`structureSummary.conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`。
+`structureSummary.conforms: true` 表示已扫描文件符合文档化的 single-family 或 family-tree 结构，每个检测到的字体条目都有 manifest，并且 manifest 声明的输出模式具备所需文件。为 false 时检查 `issues[]`、`unexpectedFileExamples[]`、`unexpectedDepthFileExamples[]` 和 `entryIssueExamples[]`。
 | `structureSummary.issues[].code` | 机器可读结构问题代码，例如 `missing-manifests`、`unexpected-output-files` 或 `web-output-missing`；解释审计结果前，应先查 `outputStructureCatalog.issueCodes`。 |
+| `structureSummary.unexpectedDepthFileExamples[]` | 位于文档化输出深度之外的示例文件；结合 `unexpectedDepthFileCount` 和 `unexpected-output-depth` 判断是否选错输出根层级，或是否有生成文件放错位置。 |
 | `fontEntryCount` | 检测到的字体输出条目数量。 |
 | `manifestCount` | 带 `split-meta.json` 的条目数量。 |
 | `missingManifestCount` | 缺少 `split-meta.json` manifest、只能从文件结构保守推断的条目数量。 |

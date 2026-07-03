@@ -132,9 +132,11 @@ async function runInspectStructureSmoke() {
   if (
     wrongDepth.structureSummary?.conforms !== false
     || wrongDepth.structureSummary?.unexpectedDepthFileCount < 1
+    || !wrongDepth.structureSummary?.unexpectedDepthFileExamples?.some((filePath) => filePath.endsWith('/extra/deep.txt'))
+    || wrongDepth.structureSummary?.unexpectedDepthFileExamplesTruncated !== false
     || !wrongDepth.structureSummary?.issues?.some((issue) => issue.code === 'unexpected-output-depth')
   ) {
-    throw new Error('Expected files below the documented output depth to fail the structure audit.');
+    throw new Error('Expected files below the documented output depth to fail the structure audit with actionable example paths.');
   }
   assertOutputAuditStatus(wrongDepth, {
     auditStatus: 'action-required',

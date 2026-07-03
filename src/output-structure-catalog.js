@@ -23,7 +23,7 @@ export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
     'action-required': {
       status: 'action-required',
       meaning: 'The scan completed but structureSummary found issues that need review.',
-      agentAction: 'Inspect outputRoleDecision, outputStructureDecision.issueCodes, auditBlockingReasons, structureSummary.issues, unexpectedFileExamples, and entryIssueExamples before reporting completion.',
+      agentAction: 'Inspect outputRoleDecision, outputStructureDecision.issueCodes, auditBlockingReasons, structureSummary.issues, unexpectedFileExamples, unexpectedDepthFileExamples, and entryIssueExamples before reporting completion.',
     },
     incomplete: {
       status: 'incomplete',
@@ -62,7 +62,7 @@ export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
       layoutKind: 'unknown',
       conforms: false,
       meaning: 'The output tree does not fit either documented single-family or family-tree layouts.',
-      agentAction: 'Inspect structureSummary.issues, unexpectedDepthFileCount, and unexpectedFileExamples before deciding whether to regenerate or move outputs.',
+      agentAction: 'Inspect structureSummary.issues, unexpectedDepthFileCount, unexpectedDepthFileExamples, and unexpectedFileExamples before deciding whether to regenerate or move outputs.',
     },
   },
   outputModes: {
@@ -112,7 +112,7 @@ export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
       code: 'unknown-output-layout',
       severity: 'action-required',
       meaning: 'The output tree does not match the expected single-family or family-tree layout.',
-      agentAction: 'Inspect unexpectedDepthFileCount and unexpectedFileExamples, then regenerate or choose the correct output root.',
+      agentAction: 'Inspect unexpectedDepthFileCount, unexpectedDepthFileExamples, and unexpectedFileExamples, then regenerate or choose the correct output root.',
     },
     'unexpected-original-depth': {
       code: 'unexpected-original-depth',
@@ -130,7 +130,7 @@ export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
       code: 'unexpected-output-depth',
       severity: 'action-required',
       meaning: 'Files were found at depths outside the documented output structure.',
-      agentAction: 'Inspect unexpectedFileExamples and confirm whether outDir points one level too high or too low.',
+      agentAction: 'Inspect unexpectedDepthFileExamples and confirm whether outDir points one level too high or too low.',
     },
     'missing-manifests': {
       code: 'missing-manifests',

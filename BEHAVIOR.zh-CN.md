@@ -949,7 +949,7 @@ split-meta.json
 - `structureSummary.conforms: true`
 - `maxFilesHit: false`
 
-若 `structureSummary.conforms` 为 false，优先查看 `outputRoleDecision`、`auditBlockingReasons[]`、`structureSummary.issues[]`、`unexpectedFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 可能出现 `output-structure-issues` 或 `organized-staging-not-split-output`。
+若 `structureSummary.conforms` 为 false，优先查看 `outputRoleDecision`、`auditBlockingReasons[]`、`structureSummary.issues[]`、`unexpectedFileExamples[]`、`unexpectedDepthFileExamples[]` 和 `entryIssueExamples[]`；同时 `inspectionWarnings[]` 可能出现 `output-structure-issues` 或 `organized-staging-not-split-output`。
 
 `copy-original` 条目是 manifest-only 的处理记录，故意不生成 web-font CSS 或 WOFF2 文件；只有 manifest 声明为 `subset` 或 `single-woff2` 却缺少对应 web 输出时，才应按 `web-output-missing` 之类的 issue 处理。
 

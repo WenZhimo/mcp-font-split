@@ -19,7 +19,7 @@ export const OUTPUT_AUDIT_RESPONSE_FIELD_CATALOG = {
   structureSummary: {
     sourceTools: ['inspect_split_output'],
     meaning: 'Machine-readable check for whether output files fit the documented split-output directory structure, including unexpected files, manifest coverage, and per-entry output-mode requirements.',
-    agentAction: 'Check outputRoleDecision and outputStructureDecision.status first, then require structureSummary.conforms true before claiming the output directory is structurally valid; inspect issues[] and unexpectedFileExamples[] when false.',
+    agentAction: 'Check outputRoleDecision and outputStructureDecision.status first, then require structureSummary.conforms true before claiming the output directory is structurally valid; inspect issues[], unexpectedFileExamples[], unexpectedDepthFileExamples[], and entryIssueExamples[] when false.',
   },
   ...GUIDANCE_OUTPUT_STRUCTURE_FIELD_CATALOG,
   'structureSummary.layoutKind': {
@@ -30,7 +30,7 @@ export const OUTPUT_AUDIT_RESPONSE_FIELD_CATALOG = {
   'structureSummary.issues[].code': {
     sourceTools: ['inspect_split_output'],
     meaning: 'Machine-readable output structure issue code, such as missing-manifests, unexpected-output-files, or web-output-missing.',
-    agentAction: 'Look up each code in outputStructureCatalog.issueCodes, then inspect unexpectedFileExamples or entryIssueExamples for evidence.',
+    agentAction: 'Look up each code in outputStructureCatalog.issueCodes, then inspect unexpectedFileExamples, unexpectedDepthFileExamples, or entryIssueExamples for evidence.',
   },
   outputRoleDecision: {
     sourceTools: ['inspect_split_output'],
