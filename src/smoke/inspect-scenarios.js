@@ -421,8 +421,23 @@ async function runInspectOrganizedStagingSmoke() {
     || !stagingAudit.outputStructureDecision?.blockingReasonCodes?.includes('not-split-output')
     || !stagingAudit.inspectionWarnings?.some((warning) => warning.code === 'organized-staging-not-split-output')
     || !stagingAudit.auditBlockingReasons?.some((reason) => reason.code === 'not-split-output')
+    || stagingAudit.structureSummary?.conforms !== false
+    || stagingAudit.structureSummary?.layoutKind !== 'unknown'
+    || stagingAudit.structureSummary?.rootLevelDiagnosis?.status !== 'unknown-root'
+    || stagingAudit.structureSummary?.rootLevelDiagnosis?.likelyCause !== 'no-recognized-original-fonts'
+    || stagingAudit.structureSummary?.manifestCoverageDiagnosis?.status !== 'incomplete'
+    || stagingAudit.structureSummary?.manifestCoverageOk !== false
+    || stagingAudit.structureSummary?.missingManifestCount < 1
+    || !stagingAudit.outputStructureDecision?.issueCodes?.includes('organized-staging-not-split-output')
+    || !stagingAudit.outputStructureDecision?.issueCodes?.includes('unknown-output-layout')
+    || !stagingAudit.structureSummary?.issues?.some((issue) => issue.code === 'missing-manifests')
+    || !stagingAudit.structureSummary?.issues?.some((issue) => issue.code === 'unknown-output-layout')
+    || !stagingAudit.structureSummary?.unexpectedFileExamples?.some((filePath) => filePath.endsWith('/font-organization-manifest.json'))
+    || !stagingAudit.structureSummary?.entryIssueExamples?.some((issue) => issue.code === 'unknown-output-mode')
+    || stagingAudit.structureSummary?.depthProfile?.layoutKind !== 'unknown'
+    || stagingAudit.structureSummary?.depthProfile?.familyTreeOriginalCount !== 0
   ) {
-    throw new Error('Expected organized staging output to be flagged as source staging, not split output.');
+    throw new Error('Expected organized staging output to be flagged as source staging with incomplete split-output structure evidence.');
   }
   console.log(JSON.stringify(stagingAudit, null, 2));
 }
