@@ -26,8 +26,8 @@ import { SAFE_INVOCATION_TEMPLATES } from './safe-invocation-templates.js';
 import { buildRecommendedWorkflowPlan } from './workflow-plan.js';
 import {
   BATCH_POLICY_GUIDE,
-  buildBatchCustomizationQuickReference,
 } from './batch.js';
+import { buildBatchCustomizationQuickReference } from './batch-customization-quick-reference.js';
 import {
   buildAgentPathRules,
   buildRecommendedWorkflowSteps,

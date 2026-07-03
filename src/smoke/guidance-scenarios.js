@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import { GUIDANCE_WORKFLOWS, getAgentGuidance } from '../font-split.js';
 import { buildDirectoryOrganizationSafety } from '../directory-organization-safety.js';
 import { buildOutputResultShapeQuickReference } from '../output-result-shape-quick-reference.js';
+import { buildBatchCustomizationQuickReference } from '../batch-customization-quick-reference.js';
 import {
   assertBatchPolicyGuide,
   assertDirectoryRouteInspectFields,
@@ -995,6 +996,10 @@ async function runAgentGuidanceSmoke() {
   }
   assertBatchPolicyGuide(result.batchPolicyGuide || []);
   const quickReferenceIds = new Set((result.batchCustomizationQuickReference || []).map((item) => item.id));
+  const expectedBatchCustomizationQuickReference = buildBatchCustomizationQuickReference();
+  if (JSON.stringify(result.batchCustomizationQuickReference) !== JSON.stringify(expectedBatchCustomizationQuickReference)) {
+    throw new Error('Expected agent guidance batchCustomizationQuickReference to match the standalone builder output.');
+  }
   for (const requiredQuickReference of ['safe-defaults', 'preserve-every-source-font', 'source-folder-families', 'metadata-family-groups', 'plain-output-names', 'source-suffix-traceability', 'collect-errors-for-report']) {
     if (!quickReferenceIds.has(requiredQuickReference)) {
       throw new Error(`Expected batchCustomizationQuickReference to include ${requiredQuickReference}.`);
