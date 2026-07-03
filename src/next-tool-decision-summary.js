@@ -1,4 +1,5 @@
 import {
+  OUTPUT_AUDIT_CORE_INSPECT_FIELDS,
   OUTPUT_AUDIT_PASS_CONDITIONS_TEXT,
 } from './output-audit-criteria.js';
 import {
@@ -127,7 +128,7 @@ export function buildNextToolDecisionSummary(workflow) {
       templateId: 'output-audit-compact',
       writesFiles: false,
       sourceDestructive: false,
-      inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary'],
+      inspectFields: [...OUTPUT_AUDIT_CORE_INSPECT_FIELDS],
       continueWhen: OUTPUT_AUDIT_PASS_CONDITIONS_TEXT,
       nextRouteAfterSuccess: 'complete',
     },

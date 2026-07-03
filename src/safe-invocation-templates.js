@@ -1,4 +1,5 @@
 import {
+  OUTPUT_AUDIT_DETAIL_INSPECT_FIELDS,
   OUTPUT_AUDIT_MINIMUM_PASS_TEXT,
   OUTPUT_AUDIT_PASS_CONDITIONS_TEXT,
   OUTPUT_AUDIT_VALID_OUTPUT_CRITERIA,
@@ -147,7 +148,7 @@ export const SAFE_INVOCATION_TEMPLATES = [
       includeFamilies: false,
     },
     customizableFields: ['outDir', 'maxFiles', 'includeFiles', 'includeFamilies'],
-    inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'maxFilesHit', 'inspectionWarnings', 'structureSummary', 'manifestCount', 'missingManifestCount', 'subsetOutputCount', 'singleWoff2OutputCount', 'copyOriginalOutputCount', 'filesIncluded', 'familiesIncluded'],
+    inspectFields: [...OUTPUT_AUDIT_DETAIL_INSPECT_FIELDS],
     nextStep: `Require ${OUTPUT_AUDIT_PASS_CONDITIONS_TEXT}; if maxFilesHit is true or manifest/structure issues are detected, disclose uncertainty or rerun with more detail.`,
     successCriteria: OUTPUT_AUDIT_VALID_OUTPUT_CRITERIA,
   },

@@ -8,6 +8,36 @@ export const OUTPUT_AUDIT_PASS_CRITERIA_LIST = Object.freeze([
   'inspectionWarnings contains no action-required output structure or truncation warnings',
 ]);
 
+export const OUTPUT_AUDIT_CORE_INSPECT_FIELDS = Object.freeze([
+  'outputRoleDecision',
+  'outputStructureDecision',
+  'auditStatus',
+  'auditPassed',
+  'auditBlockingReasons',
+  'maxFilesHit',
+  'inspectionWarnings',
+  'structureSummary',
+  'structureSummary.rootLevelDiagnosis',
+  'structureSummary.staleResidueDiagnosis',
+  'structureSummary.manifestCoverageDiagnosis',
+  'structureSummary.depthProfile',
+]);
+
+export const OUTPUT_AUDIT_SUMMARY_INSPECT_FIELDS = Object.freeze([
+  ...OUTPUT_AUDIT_CORE_INSPECT_FIELDS,
+  'manifestCount',
+  'missingManifestCount',
+  'subsetOutputCount',
+  'singleWoff2OutputCount',
+  'copyOriginalOutputCount',
+]);
+
+export const OUTPUT_AUDIT_DETAIL_INSPECT_FIELDS = Object.freeze([
+  ...OUTPUT_AUDIT_SUMMARY_INSPECT_FIELDS,
+  'filesIncluded',
+  'familiesIncluded',
+]);
+
 export const OUTPUT_AUDIT_PASS_CONDITIONS = Object.freeze([
   'outputRoleDecision.auditAppliesToThisDirectory not false',
   'outputStructureDecision.status pass',

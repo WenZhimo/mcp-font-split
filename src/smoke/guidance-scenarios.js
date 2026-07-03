@@ -793,6 +793,10 @@ async function runAgentGuidanceSmoke() {
     || !outputAuditTemplate?.inspectFields?.includes('auditPassed')
     || !outputAuditTemplate?.inspectFields?.includes('auditBlockingReasons')
     || !outputAuditTemplate?.inspectFields?.includes('structureSummary')
+    || !outputAuditTemplate?.inspectFields?.includes('structureSummary.rootLevelDiagnosis')
+    || !outputAuditTemplate?.inspectFields?.includes('structureSummary.staleResidueDiagnosis')
+    || !outputAuditTemplate?.inspectFields?.includes('structureSummary.manifestCoverageDiagnosis')
+    || !outputAuditTemplate?.inspectFields?.includes('structureSummary.depthProfile')
     || !outputAuditTemplate?.successCriteria?.includes('outputRoleDecision.auditAppliesToThisDirectory')
     || !outputAuditTemplate?.successCriteria?.includes('outputStructureDecision.status pass')
     || !outputAuditTemplate?.successCriteria?.includes('auditStatus pass')
@@ -818,7 +822,7 @@ async function runAgentGuidanceSmoke() {
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-dry-run-preview' && step.writesFiles === false && step.inspectFields?.includes('batchDecision'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'batch-process-reviewed-plan' && step.writesFiles === true && step.inspectFields?.includes('batchDecision') && step.inspectFields?.includes('dedupeDecisionSummary'))
     || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'directory-mismatch-plan' && step.inspectFields?.includes('organizationDecision'))
-    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('outputRoleDecision') && step.inspectFields?.includes('outputStructureDecision') && step.inspectFields?.includes('auditStatus') && step.inspectFields?.includes('structureSummary'))
+    || !workflowPlan.orderedSteps?.some((step) => step.templateId === 'output-audit-compact' && step.inspectFields?.includes('outputRoleDecision') && step.inspectFields?.includes('outputStructureDecision') && step.inspectFields?.includes('auditStatus') && step.inspectFields?.includes('structureSummary') && step.inspectFields?.includes('structureSummary.rootLevelDiagnosis') && step.inspectFields?.includes('structureSummary.depthProfile'))
   ) {
     throw new Error('Expected batch recommendedWorkflowPlan to order source safety preflight, preview, reviewed write, output audit, and route-decision checks.');
   }

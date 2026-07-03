@@ -2,6 +2,10 @@ import {
   sourcePreflightInspectFields,
   withDirectoryRouteInspectFields,
 } from './guidance-inspect-fields.js';
+import {
+  OUTPUT_AUDIT_DETAIL_INSPECT_FIELDS,
+  OUTPUT_AUDIT_SUMMARY_INSPECT_FIELDS,
+} from './output-audit-criteria.js';
 
 export function buildRecommendedWorkflowPlan(workflow) {
   const auditStep = {
@@ -11,7 +15,7 @@ export function buildRecommendedWorkflowPlan(workflow) {
     writesFiles: false,
     sourceDestructive: false,
     goal: 'Audit the generated output directory before reporting completion.',
-    inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'manifestCount', 'missingManifestCount'],
+    inspectFields: [...OUTPUT_AUDIT_SUMMARY_INSPECT_FIELDS],
     successCriteria: 'outputRoleDecision.auditAppliesToThisDirectory is not false, outputStructureDecision.status is pass, auditStatus is pass, auditPassed is true, structureSummary.conforms is true, maxFilesHit is false, and inspectionWarnings contain no action-required structure or truncation issues.',
   };
   const plans = {
@@ -121,7 +125,7 @@ export function buildRecommendedWorkflowPlan(workflow) {
           writesFiles: false,
           sourceDestructive: false,
           goal: 'Audit the single-font output directory when reporting generated files.',
-          inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'structureSummary', 'manifestCount', 'inspectionWarnings'],
+          inspectFields: [...OUTPUT_AUDIT_SUMMARY_INSPECT_FIELDS],
           successCriteria: 'outputRoleDecision.auditAppliesToThisDirectory is not false, outputStructureDecision.status is pass, and structureSummary.conforms is true, or any structure limitation is disclosed.',
         },
       ],
@@ -212,7 +216,7 @@ export function buildRecommendedWorkflowPlan(workflow) {
           id: 'need-details',
           when: 'A compact scan shows warnings, missing manifests, invalid fonts, or structure issues.',
           action: 'Rerun with includeFiles:true or includeFamilies:true only for the narrowed area that needs detail.',
-          inspectFields: ['outputRoleDecision', 'outputStructureDecision', 'auditStatus', 'auditPassed', 'auditBlockingReasons', 'inspectionWarnings', 'structureSummary', 'filesIncluded', 'familiesIncluded'],
+          inspectFields: [...OUTPUT_AUDIT_DETAIL_INSPECT_FIELDS],
           successCriteria: 'Detailed rerun is limited to the narrowed area and resolves or discloses the warnings, missing manifests, invalid fonts, or structure issues that prompted it.',
         },
       ],
