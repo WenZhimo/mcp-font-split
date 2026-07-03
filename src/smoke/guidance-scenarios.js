@@ -341,6 +341,16 @@ async function runAgentGuidanceSmoke() {
   ) {
     throw new Error('Expected agent guidance to tell agents to check output role, compact output structure decision, and audit status fields.');
   }
+  for (const outputStructureField of [
+    'structureSummary.rootLevelDiagnosis',
+    'structureSummary.staleResidueDiagnosis',
+    'structureSummary.manifestCoverageDiagnosis',
+    'structureSummary.depthProfile',
+  ]) {
+    if (!result.responseFieldsToCheck?.includes(outputStructureField)) {
+      throw new Error(`Expected agent guidance to recommend checking ${outputStructureField}.`);
+    }
+  }
   if (!result.responseFieldsToCheck?.includes('organizationWarnings')) {
     throw new Error('Expected agent guidance to recommend checking organization warnings.');
   }
