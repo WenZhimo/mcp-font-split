@@ -193,6 +193,48 @@ async function runInspectStructureSmoke() {
     issueCode: 'unexpected-output-depth',
   }, 'inspect-structure wrong-depth output audit');
 
+  const mixedRootDir = `${outDir}-mixed-root`;
+  await fs.rm(mixedRootDir, { recursive: true, force: true });
+  await fs.mkdir(path.join(mixedRootDir, 'FamilyC', 'FixtureMono-Regular'), { recursive: true });
+  await fs.writeFile(path.join(mixedRootDir, 'RootFamily-Regular.ttf'), 'root font');
+  await fs.writeFile(path.join(mixedRootDir, 'FamilyC', 'FixtureMono-Regular.otf'), 'family font');
+  await fs.writeFile(path.join(mixedRootDir, 'FamilyC', 'FixtureMono-Regular', 'FixtureMono-Regular.woff2'), 'family woff2');
+  await fs.writeFile(path.join(mixedRootDir, 'FamilyC', 'FixtureMono-Regular', 'result.css'), 'body{}');
+  await fs.writeFile(
+    path.join(mixedRootDir, 'FamilyC', 'FixtureMono-Regular', 'split-meta.json'),
+    JSON.stringify({
+      manifestVersion: 1,
+      toolVersion: '0.0.0',
+      result: {
+        outputMode: 'subset',
+        resultType: 'subset',
+      },
+    }, null, 2),
+  );
+  const mixedRoot = await inspectSplitOutput({
+    outDir: mixedRootDir,
+    includeFiles: false,
+    includeFamilies: false,
+  });
+  if (
+    mixedRoot.structureSummary?.conforms !== false
+    || mixedRoot.structureSummary?.layoutKind !== 'mixed'
+    || mixedRoot.structureSummary?.rootLevelDiagnosis?.status !== 'mixed-root'
+    || mixedRoot.structureSummary?.rootLevelDiagnosis?.likelyCause !== 'single-family-and-family-tree-outputs-mixed'
+    || mixedRoot.structureSummary?.depthProfile?.rootOriginalCount !== 1
+    || mixedRoot.structureSummary?.depthProfile?.familyTreeOriginalCount !== 1
+    || !mixedRoot.structureSummary?.issues?.some((issue) => issue.code === 'mixed-output-layout')
+    || !mixedRoot.outputStructureDecision?.issueCodes?.includes('mixed-output-layout')
+  ) {
+    throw new Error('Expected mixed single-family and family-tree roots to fail with mixed-root diagnosis.');
+  }
+  assertOutputAuditStatus(mixedRoot, {
+    auditStatus: 'action-required',
+    auditPassed: false,
+    reasonCode: 'output-structure-issues',
+    issueCode: 'mixed-output-layout',
+  }, 'inspect-structure mixed-root output audit');
+
   const batchInputDir = `${outDir}-batch-input`;
   const batchOutputRoot = `${outDir}-batch-output`;
   await fs.rm(batchInputDir, { recursive: true, force: true });

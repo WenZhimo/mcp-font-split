@@ -650,6 +650,12 @@ export async function inspectSplitOutput(args) {
       continue;
     }
 
+    if (relativeParts.length === 1 && FONT_EXTENSIONS.has(file.extension)) {
+      const family = ensureFamily(path.basename(outDirRelative));
+      family.originals.push(file);
+      continue;
+    }
+
     const familyName = relativeParts[0];
     if (relativeParts.length === 2 && FONT_EXTENSIONS.has(file.extension)) {
       const family = ensureFamily(familyName);
