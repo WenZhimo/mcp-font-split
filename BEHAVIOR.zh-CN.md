@@ -938,7 +938,7 @@ split-meta.json
 - 每个字体条目是否都有 `split-meta.json`
 - manifest 声明为 `subset` / `single-woff2` / `copy-original` 时是否具备对应文件
 
-`structureSummary.layoutKind` 给出检测到的布局类型；`structureSummary.rootLevelDiagnosis` 给出对当前 `outDir` 根层级的紧凑诊断，包含 `status`、`likelyCause` 和 `recommendedAction`，用于快速判断期望根、空输出、混合根、未知根或异常深度；`structureSummary.depthProfile` 给出相对 `outDir` 的文件深度分布，即使 `includeFiles: false` / `includeFamilies: false` 也会返回，适合查看具体深度证据；`structureSummary.issues[].code` 给出机器可读问题代码。
+`structureSummary.layoutKind` 给出检测到的布局类型；`structureSummary.rootLevelDiagnosis` 给出对当前 `outDir` 根层级的紧凑诊断，包含 `status`、`likelyCause` 和 `recommendedAction`，用于快速判断期望根、空输出、混合根、未知根或异常深度；`structureSummary.staleResidueDiagnosis` 给出疑似旧生成物残留诊断，用于识别游离的 `result.css`、`split-meta.json`、WOFF2 文件，或 `copy-original` 条目里残留生成输出；`structureSummary.depthProfile` 给出相对 `outDir` 的文件深度分布，即使 `includeFiles: false` / `includeFamilies: false` 也会返回，适合查看具体深度证据；`structureSummary.issues[].code` 给出机器可读问题代码。
 
 真实批量写入后，只有下面条件全都成立时，才应把输出目录视为结构合格：
 

@@ -317,6 +317,70 @@ function buildOutputRootLevelDiagnosis({
   };
 }
 
+const GENERATED_RESIDUE_FILE_NAMES = new Set([
+  'result.css',
+  'split-meta.json',
+]);
+
+function isGeneratedResidueCandidate(file) {
+  const baseName = path.basename(file.path);
+  return GENERATED_RESIDUE_FILE_NAMES.has(baseName) || file.extension === '.woff2';
+}
+
+function buildStaleResidueDiagnosis({ unexpectedFiles, entryIssueExamples, maxExamples }) {
+  const unexpectedGeneratedFiles = unexpectedFiles.filter(isGeneratedResidueCandidate);
+  const copyOriginalExtraOutputExamples = entryIssueExamples
+    .filter((issue) => issue.code === 'copy-original-extra-output');
+  const suspectedResidueCount = unexpectedGeneratedFiles.length + copyOriginalExtraOutputExamples.length;
+
+  if (suspectedResidueCount === 0) {
+    return {
+      summaryType: 'output-stale-residue-diagnosis',
+      status: 'none-detected',
+      likelyCause: 'none',
+      suspectedResidueCount: 0,
+      unexpectedGeneratedFileCount: 0,
+      copyOriginalExtraOutputCount: 0,
+      examples: [],
+      recommendedAction: 'No stale generated-output residue is suggested by the compact audit; continue with manifest and depth checks.',
+    };
+  }
+
+  const likelyCause = unexpectedGeneratedFiles.length > 0 && copyOriginalExtraOutputExamples.length > 0
+    ? 'unexpected-generated-files-and-copy-original-extra-output'
+    : unexpectedGeneratedFiles.length > 0
+      ? 'unexpected-generated-files'
+      : 'copy-original-entry-has-generated-output';
+
+  return {
+    summaryType: 'output-stale-residue-diagnosis',
+    status: 'suspected-residue',
+    likelyCause,
+    suspectedResidueCount,
+    unexpectedGeneratedFileCount: unexpectedGeneratedFiles.length,
+    copyOriginalExtraOutputCount: copyOriginalExtraOutputExamples.length,
+    examples: [
+      ...unexpectedGeneratedFiles
+        .slice(0, maxExamples)
+        .map((file) => ({
+          code: 'unexpected-generated-file',
+          path: file.path,
+        })),
+      ...copyOriginalExtraOutputExamples
+        .slice(0, Math.max(0, maxExamples - unexpectedGeneratedFiles.length))
+        .map((issue) => ({
+          code: issue.code,
+          familyName: issue.familyName,
+          fontBaseName: issue.fontBaseName,
+          hasCss: issue.hasCss,
+          woff2Count: issue.woff2Count,
+        })),
+    ],
+    examplesTruncated: suspectedResidueCount > maxExamples,
+    recommendedAction: 'Regenerate into a clean output root or remove stale generated files before treating the audit as complete.',
+  };
+}
+
 export function buildOutputStructureSummary({
   outDirRelative,
   files,
@@ -446,10 +510,16 @@ export function buildOutputStructureSummary({
     originalDepthCounts,
     maxDepth,
   });
+  const staleResidueDiagnosis = buildStaleResidueDiagnosis({
+    unexpectedFiles,
+    entryIssueExamples,
+    maxExamples,
+  });
   return {
     conforms: issues.length === 0,
     layoutKind,
     rootLevelDiagnosis,
+    staleResidueDiagnosis,
     depthProfile: {
       summaryType: 'output-depth-profile',
       layoutKind,

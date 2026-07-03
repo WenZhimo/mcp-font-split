@@ -124,6 +124,21 @@ export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
     },
     agentAction: 'Use rootLevelDiagnosis.status and likelyCause as the first compact hint, then inspect depthProfile and examples for concrete file evidence.',
   },
+  staleResidueDiagnosis: {
+    summaryType: 'output-stale-residue-diagnosis-catalog',
+    purpose: 'Explains structureSummary.staleResidueDiagnosis, the compact stale-output-residue hint derived from unexpected generated-looking files and copy-original entry issues.',
+    statuses: {
+      'none-detected': 'No unexpected generated-looking residue was detected by the compact audit.',
+      'suspected-residue': 'Unexpected generated-looking files or copy-original entries with generated output suggest stale files from an older run.',
+    },
+    likelyCauses: {
+      none: 'No stale residue signal was detected.',
+      'unexpected-generated-files': 'Files such as result.css, split-meta.json, or WOFF2 outputs were found outside recognized font-entry output locations.',
+      'copy-original-entry-has-generated-output': 'A manifest-declared copy-original entry also contains generated CSS or WOFF2 files.',
+      'unexpected-generated-files-and-copy-original-extra-output': 'Both unexpected generated-looking files and copy-original entries with generated output were detected.',
+    },
+    agentAction: 'If status is suspected-residue, inspect examples and regenerate into a clean output root or remove stale generated files before reporting structural success.',
+  },
   issueCodes: {
     'empty-output': {
       code: 'empty-output',

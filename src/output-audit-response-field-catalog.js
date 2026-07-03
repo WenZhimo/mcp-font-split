@@ -37,6 +37,11 @@ export const OUTPUT_AUDIT_RESPONSE_FIELD_CATALOG = {
     meaning: 'Compact diagnosis of whether the inspected outDir appears to be the expected split-output root, empty, mixed, unknown, or affected by unexpected depths.',
     agentAction: 'Read status, likelyCause, and recommendedAction before deciding whether to regenerate output or rerun inspect_split_output against a different root.',
   },
+  'structureSummary.staleResidueDiagnosis': {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Compact diagnosis of whether unexpected generated-looking files or copy-original entries with generated output suggest stale residue from an older run.',
+    agentAction: 'If status is suspected-residue, inspect examples and regenerate into a clean output root or remove stale generated files before treating the audit as complete.',
+  },
   'structureSummary.issues[].code': {
     sourceTools: ['inspect_split_output'],
     meaning: 'Machine-readable output structure issue code, such as missing-manifests, unexpected-output-files, or web-output-missing.',

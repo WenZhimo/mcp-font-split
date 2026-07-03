@@ -91,6 +91,9 @@ async function runInspectStructureSmoke() {
     || clean.structureSummary?.rootLevelDiagnosis?.summaryType !== 'output-root-level-diagnosis'
     || clean.structureSummary?.rootLevelDiagnosis?.status !== 'expected-root'
     || clean.structureSummary?.rootLevelDiagnosis?.likelyCause !== 'none'
+    || clean.structureSummary?.staleResidueDiagnosis?.summaryType !== 'output-stale-residue-diagnosis'
+    || clean.structureSummary?.staleResidueDiagnosis?.status !== 'none-detected'
+    || clean.structureSummary?.staleResidueDiagnosis?.suspectedResidueCount !== 0
     || clean.structureSummary?.depthProfile?.summaryType !== 'output-depth-profile'
     || clean.structureSummary?.depthProfile?.layoutKind !== 'family-tree'
     || clean.structureSummary?.depthProfile?.maxDepth !== 3
@@ -121,6 +124,7 @@ async function runInspectStructureSmoke() {
   if (
     noisy.structureSummary?.conforms !== false
     || noisy.structureSummary?.unexpectedFileCount < 1
+    || noisy.structureSummary?.staleResidueDiagnosis?.status !== 'none-detected'
     || !noisy.structureSummary?.issues?.some((issue) => issue.code === 'unexpected-output-files')
     || !noisy.inspectionWarnings?.some((warning) => warning.code === 'output-structure-issues')
   ) {
@@ -132,6 +136,22 @@ async function runInspectStructureSmoke() {
     reasonCode: 'output-structure-issues',
     issueCode: 'unexpected-output-files',
   }, 'inspect-structure noisy output audit');
+
+  await fs.writeFile(path.join(outDir, 'result.css'), 'stale generated css');
+  const staleResidue = await inspectSplitOutput({
+    outDir,
+    includeFiles: false,
+    includeFamilies: false,
+  });
+  if (
+    staleResidue.structureSummary?.staleResidueDiagnosis?.status !== 'suspected-residue'
+    || staleResidue.structureSummary?.staleResidueDiagnosis?.likelyCause !== 'unexpected-generated-files'
+    || staleResidue.structureSummary?.staleResidueDiagnosis?.unexpectedGeneratedFileCount < 1
+    || staleResidue.structureSummary?.staleResidueDiagnosis?.suspectedResidueCount < 1
+    || !staleResidue.structureSummary?.staleResidueDiagnosis?.examples?.some((example) => example.path?.endsWith('/result.css'))
+  ) {
+    throw new Error('Expected generated-looking stray files to produce a stale residue diagnosis.');
+  }
 
   await fs.mkdir(path.join(outDir, 'FamilyA', 'FixtureSans-Regular', 'extra'), { recursive: true });
   await fs.writeFile(path.join(outDir, 'FamilyA', 'FixtureSans-Regular', 'extra', 'deep.txt'), 'wrong depth');
