@@ -139,7 +139,7 @@
 }
 ```
 
-只有 `outputRoleDecision.auditAppliesToThisDirectory !== false`、`outputStructureDecision.status: "pass"`、`auditStatus: "pass"`、`auditPassed: true`、`structureSummary.conforms: true` 且 `maxFilesHit: false` 时，才把输出视为通过审计。
+只有输出目录审计明确通过、没有扫描截断，并且结构诊断确认这是合格的拆分输出时，才把结果视为完成。字段级判定请看 [API 参考](./API.zh-CN.md) 和 [行为说明](./BEHAVIOR.zh-CN.md)。
 
 ### 5. 源目录需要整理时
 
@@ -205,7 +205,7 @@
 | `inspect_font_inputs` | `inputCountGuide`、`inputDirectoryDecision`、`inputDirectoryDecision.directoryOrganizationSafety`、`unsupportedFileSummary`、`layout` |
 | `split_font_batch` | `batchDecision`、`batchWarnings`、`batchPolicySummary`、`dedupeDecisionSummary`、`recommendedNextActions`、`sourceSafetyDecision`、`safetySummary` |
 | `organize_font_directory` | `layoutDecision`、`sourceSafetyDecision`、`stagingDirectoryDecision`、`recommendedNextActions` |
-| `inspect_split_output` | `outputRoleDecision`、`outputStructureDecision`、`auditStatus`、`auditPassed`、`structureSummary` |
+| `inspect_split_output` | 输出角色判断、结构审计状态、阻塞原因、manifest 覆盖和输出结构摘要 |
 
 这些字段是入口级阅读顺序，不替代 API 文档里的字段定义。
 

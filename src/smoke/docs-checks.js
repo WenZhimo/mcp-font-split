@@ -78,6 +78,10 @@ function assertReadmeEntryPointBoundary({ readmeZh, readmeEn, apiDocs, behaviorD
       '`details.expectedType`',
       '`details.defaultWhenOmitted`',
       '`details.omitForDefaultBehavior: true`',
+      '`outputRoleDecision.auditAppliesToThisDirectory`',
+      '`outputStructureDecision.status: "pass"`',
+      '`structureSummary.conforms: true`',
+      '`auditPassed: true`',
     ]) {
       if (content.includes(forbiddenToken)) {
         throw new Error(`${fileName} should remain an entry point; move configuration-error field details to API / behavior docs: ${forbiddenToken}`);

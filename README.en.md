@@ -139,7 +139,7 @@ After writing, run:
 }
 ```
 
-Treat the output as audited only when `outputRoleDecision.auditAppliesToThisDirectory !== false`, `outputStructureDecision.status: "pass"`, `auditStatus: "pass"`, `auditPassed: true`, `structureSummary.conforms: true`, and `maxFilesHit: false`.
+Treat the run as complete only when the output audit clearly passes, the scan was not truncated, and the structure diagnostics confirm a valid split-output tree. For field-level criteria, see the [API Reference](./API.md) and [behavior guide](./BEHAVIOR.zh-CN.md).
 
 ### 5. Organize the Source Layout When Needed
 
@@ -205,7 +205,7 @@ For complete arguments, response fields, and error shapes, see the [API Referenc
 | `inspect_font_inputs` | `inputCountGuide`, `inputDirectoryDecision`, `inputDirectoryDecision.directoryOrganizationSafety`, `unsupportedFileSummary`, `layout` |
 | `split_font_batch` | `batchDecision`, `batchWarnings`, `batchPolicySummary`, `dedupeDecisionSummary`, `recommendedNextActions`, `sourceSafetyDecision`, `safetySummary` |
 | `organize_font_directory` | `layoutDecision`, `sourceSafetyDecision`, `stagingDirectoryDecision`, `recommendedNextActions` |
-| `inspect_split_output` | `outputRoleDecision`, `outputStructureDecision`, `auditStatus`, `auditPassed`, `structureSummary` |
+| `inspect_split_output` | Output role, structure audit status, blocking reasons, manifest coverage, and output structure summary |
 
 This is the entry-level reading order, not a replacement for field definitions in the API docs.
 
