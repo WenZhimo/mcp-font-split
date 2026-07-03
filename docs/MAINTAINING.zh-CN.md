@@ -90,6 +90,21 @@
 
 后续结构问题的分类、优先级和 backlog 已移到 [`docs/STRUCTURE-ACTION-PLAN.zh-CN.md`](./STRUCTURE-ACTION-PLAN.zh-CN.md)。本文档只保留代码分层、事实来源和切片完成标准。
 
+## 验证入口速查
+
+按改动表面选择验证入口。不要把这些维护者验证细节塞回 README；README 只保留用户入口和必要风险提示。
+
+| 改动类型 | 建议验证入口 | 说明 |
+|----------|--------------|------|
+| 快速通用检查 | `npm run check:syntax`；`npm run check:compact -- --json` | `check:syntax` 只做语法检查；`check:compact` 会压缩运行 syntax 和完整 smoke suite，适合收口前确认。 |
+| 文档契约检查 | `npm run smoke:api-docs`；`npm run smoke:behavior-docs` | 修改 API 字段说明、行为说明、README 边界或高风险文案时运行。 |
+| agent / guidance 契约检查 | `npm run smoke:agent-guidance` | 修改 `get_agent_guidance`、catalog、quick reference、workflow guidance 或响应字段说明时运行。 |
+| 输出目录结构检查 | `npm run smoke:inspect-structure`；`npm run smoke:inspect-organized-staging` | 修改 `inspect_split_output`、输出 layout、manifest 覆盖、旧残留诊断、整理暂存误用提示时运行。 |
+| 真实语料可靠性检查 | `npm run smoke:real-corpus-suite -- C:\Users\LENOVO\Downloads\字体` | 涉及运行时行为、输出结构、批量语义、目录安全、忽略文件解释或真实语料解释时运行；它是代表性门禁，不是逐字体人工验收。 |
+| 收口 / 提交前组合 | `npm run check:compact -- --json`；相关 targeted smoke；必要时再跑 real corpus suite | 每个切片至少跑 compact check；根据改动类型补相关 smoke。涉及运行时、输出结构、批量语义、目录安全或真实语料解释时，再跑 real corpus suite。 |
+
+`npm run check:compact -- --json` 内部运行 `check:syntax` 和完整 `check:smoke`，成功时压缩输出，失败时返回失败步骤和 stdout/stderr 尾部。调试失败时，直接重跑失败的 npm script 查看完整输出。
+
 ## 每个切片的完成标准
 
 - 只解决一个结构问题。

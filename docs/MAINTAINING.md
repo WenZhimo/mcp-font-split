@@ -90,6 +90,21 @@ This document is for maintainers and AI agents taking over the repository. It do
 
 Follow-up structural issue categories, priorities, and backlog now live in [`docs/STRUCTURE-ACTION-PLAN.md`](./STRUCTURE-ACTION-PLAN.md). This guide keeps code layering, source-of-truth rules, and slice completion standards.
 
+## Verification Entry Quick Reference
+
+Choose verification entry points by the surface changed. Keep these maintainer-level details out of README; README should stay a user entry point with only necessary risk notes.
+
+| Change type | Recommended verification | Notes |
+|-------------|--------------------------|-------|
+| Fast general checks | `npm run check:syntax`; `npm run check:compact -- --json` | `check:syntax` checks syntax only; `check:compact` runs syntax plus the full smoke suite with compact output and is the default pre-close gate. |
+| Documentation contract checks | `npm run smoke:api-docs`; `npm run smoke:behavior-docs` | Run when changing API field descriptions, behavior notes, README boundaries, or repeated high-risk prose. |
+| Agent / guidance contract checks | `npm run smoke:agent-guidance` | Run when changing `get_agent_guidance`, catalogs, quick references, workflow guidance, or response-field explanations. |
+| Output directory structure checks | `npm run smoke:inspect-structure`; `npm run smoke:inspect-organized-staging` | Run when changing `inspect_split_output`, output layouts, manifest coverage, stale-residue diagnostics, or organizer-staging misuse guidance. |
+| Real-corpus reliability checks | `npm run smoke:real-corpus-suite -- C:\Users\LENOVO\Downloads\字体` | Run when runtime behavior, output structure, batch semantics, directory safety, ignored-file interpretation, or real-corpus explanations change; this is a representative gate, not per-font manual acceptance. |
+| Close / pre-commit combination | `npm run check:compact -- --json`; relevant targeted smoke; real corpus suite when needed | Every slice should pass compact check; add targeted smoke for the changed surface. If runtime behavior, output structure, batch semantics, directory safety, or real-corpus interpretation changed, also run the real-corpus suite. |
+
+`npm run check:compact -- --json` runs `check:syntax` and the full `check:smoke` suite internally. It suppresses noisy child output on success and returns the failing step plus stdout/stderr tails on failure. When debugging, rerun the failed npm script directly for full output.
+
 ## Slice Completion Standard
 
 - Solve one structure problem.
