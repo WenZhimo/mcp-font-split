@@ -27,6 +27,11 @@ export const OUTPUT_AUDIT_RESPONSE_FIELD_CATALOG = {
     meaning: 'Detected output layout kind, such as single-family, family-tree, mixed, empty, or unknown.',
     agentAction: 'Look up this value in outputStructureCatalog.layoutKinds before deciding whether the inspected outDir points at the correct output root.',
   },
+  'structureSummary.depthProfile': {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Depth distribution for all scanned output files and original fonts, measured relative to the inspected outDir.',
+    agentAction: 'Use this with layoutKind, unexpectedDepthFileCount, and unexpectedDepthFileExamples to tell whether outDir points one level too high/low or generated files were placed below the documented structure.',
+  },
   'structureSummary.issues[].code': {
     sourceTools: ['inspect_split_output'],
     meaning: 'Machine-readable output structure issue code, such as missing-manifests, unexpected-output-files, or web-output-missing.',

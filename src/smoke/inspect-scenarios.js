@@ -88,6 +88,14 @@ async function runInspectStructureSmoke() {
   if (
     clean.structureSummary?.conforms !== true
     || clean.structureSummary?.layoutKind !== 'family-tree'
+    || clean.structureSummary?.depthProfile?.summaryType !== 'output-depth-profile'
+    || clean.structureSummary?.depthProfile?.layoutKind !== 'family-tree'
+    || clean.structureSummary?.depthProfile?.maxDepth !== 3
+    || clean.structureSummary?.depthProfile?.fileDepthCounts?.['2'] !== 2
+    || clean.structureSummary?.depthProfile?.fileDepthCounts?.['3'] !== 6
+    || clean.structureSummary?.depthProfile?.originalFontDepthCounts?.['2'] !== 2
+    || clean.structureSummary?.depthProfile?.expectedOriginalFontDepths?.[0] !== 2
+    || clean.structureSummary?.depthProfile?.expectedOutputFileDepths?.[0] !== 3
     || clean.structureSummary?.unexpectedFileCount !== 0
     || clean.structureSummary?.manifestCoverageOk !== true
   ) {
@@ -131,6 +139,9 @@ async function runInspectStructureSmoke() {
   });
   if (
     wrongDepth.structureSummary?.conforms !== false
+    || wrongDepth.structureSummary?.depthProfile?.maxDepth !== 4
+    || wrongDepth.structureSummary?.depthProfile?.fileDepthCounts?.['4'] !== 1
+    || wrongDepth.structureSummary?.depthProfile?.unexpectedDepthFileCount < 1
     || wrongDepth.structureSummary?.unexpectedDepthFileCount < 1
     || !wrongDepth.structureSummary?.unexpectedDepthFileExamples?.some((filePath) => filePath.endsWith('/extra/deep.txt'))
     || wrongDepth.structureSummary?.unexpectedDepthFileExamplesTruncated !== false

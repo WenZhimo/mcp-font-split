@@ -11,6 +11,7 @@ export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
     'ok:true means inspect_split_output ran; it is not proof that the output tree structure passed.',
     'outputRoleDecision can stop the audit when outDir is organizer staging rather than generated split output.',
     'includeFiles:false and includeFamilies:false can hide large arrays while still running structureSummary checks.',
+    'structureSummary.depthProfile is still returned in compact audits and can diagnose wrong output-root level selection without returning files[] or families[].',
     'copy-original entries intentionally do not produce result.css or WOFF2 files.',
     'missing split-meta.json manifests make entries lower confidence even when files can be inferred from structure.',
   ],
@@ -94,6 +95,22 @@ export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
       meaning: 'The entry could not be mapped to a known output mode.',
       agentAction: 'Inspect split-meta.json and file contents before reporting what was produced.',
     },
+  },
+  depthProfile: {
+    summaryType: 'output-depth-profile-catalog',
+    purpose: 'Explains structureSummary.depthProfile, which summarizes relative file depths for output-root troubleshooting.',
+    depthBase: 'Depths are relative to the inspected outDir, not the workspace root.',
+    expectedLayouts: {
+      'single-family': {
+        expectedOriginalFontDepths: [1],
+        expectedOutputFileDepths: [2],
+      },
+      'family-tree': {
+        expectedOriginalFontDepths: [2],
+        expectedOutputFileDepths: [3],
+      },
+    },
+    agentAction: 'Compare fileDepthCounts and originalFontDepthCounts with the expected layout depths before deciding whether to regenerate output or rerun inspect_split_output against a different outDir.',
   },
   issueCodes: {
     'empty-output': {

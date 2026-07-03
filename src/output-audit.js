@@ -220,6 +220,40 @@ export function relativePathDepth(relativePath) {
   return relativePath.split('/').filter(Boolean).length;
 }
 
+function incrementDepthCount(counts, depth) {
+  const key = String(depth);
+  counts[key] = (counts[key] || 0) + 1;
+}
+
+function sortedDepthCounts(counts) {
+  return Object.fromEntries(
+    Object.entries(counts)
+      .sort(([left], [right]) => Number(left) - Number(right)),
+  );
+}
+
+function expectedDepthsForLayout(layoutKind) {
+  if (layoutKind === 'single-family') {
+    return {
+      originalFontDepths: [1],
+      outputFileDepths: [2],
+      meaning: 'Single-family output keeps original fonts at the output root and generated files one level below.',
+    };
+  }
+  if (layoutKind === 'family-tree') {
+    return {
+      originalFontDepths: [2],
+      outputFileDepths: [3],
+      meaning: 'Family-tree output keeps original fonts inside family directories and generated files one level below each font entry.',
+    };
+  }
+  return {
+    originalFontDepths: [],
+    outputFileDepths: [],
+    meaning: 'No stable expected depth is available until the output layout is single-family or family-tree.',
+  };
+}
+
 export function buildOutputStructureSummary({
   outDirRelative,
   files,
@@ -230,15 +264,20 @@ export function buildOutputStructureSummary({
 }) {
   const classifiedPaths = new Set();
   const originalDepthCounts = {};
+  const fileDepthCounts = {};
   const outputModeCounts = {};
   const entryIssueExamples = [];
   let unknownOutputModeCount = 0;
   let webOutputMissingCount = 0;
   let copyOriginalExtraOutputCount = 0;
 
+  for (const file of files) {
+    incrementDepthCount(fileDepthCounts, relativePathDepth(relativePathInside(outDirRelative, file.path)));
+  }
+
   const recordOriginalDepth = (file) => {
     const depth = relativePathDepth(relativePathInside(outDirRelative, file.path));
-    originalDepthCounts[depth] = (originalDepthCounts[depth] || 0) + 1;
+    incrementDepthCount(originalDepthCounts, depth);
   };
 
   for (const family of families) {
@@ -305,8 +344,10 @@ export function buildOutputStructureSummary({
           : 'unknown';
 
   const depthIssueFiles = [];
+  let maxDepth = 0;
   for (const file of files) {
     const depth = relativePathDepth(relativePathInside(outDirRelative, file.path));
+    maxDepth = Math.max(maxDepth, depth);
     if (
       (layoutKind === 'single-family' && depth > 2)
       || (layoutKind === 'family-tree' && (depth === 1 || depth > 3))
@@ -333,9 +374,25 @@ export function buildOutputStructureSummary({
   pushIssue('copy-original-extra-output', 'Some copy-original entries unexpectedly contain generated CSS or WOFF2 files.', copyOriginalExtraOutputCount);
 
   const maxExamples = 20;
+  const expectedDepths = expectedDepthsForLayout(layoutKind);
   return {
     conforms: issues.length === 0,
     layoutKind,
+    depthProfile: {
+      summaryType: 'output-depth-profile',
+      layoutKind,
+      maxDepth,
+      fileDepthCounts: sortedDepthCounts(fileDepthCounts),
+      originalFontDepthCounts: sortedDepthCounts(originalDepthCounts),
+      expectedOriginalFontDepths: expectedDepths.originalFontDepths,
+      expectedOutputFileDepths: expectedDepths.outputFileDepths,
+      rootOriginalCount,
+      familyTreeOriginalCount,
+      unexpectedOriginalDepthCount,
+      unexpectedDepthFileCount: depthIssueFiles.length,
+      meaning: expectedDepths.meaning,
+      nonIntuitiveBehavior: 'Depths are relative to the inspected outDir; unexpected depths often mean outDir points one level too high or generated files were placed below the documented split-output shape.',
+    },
     familyCount: families.length,
     fontEntryCount,
     manifestCount,
