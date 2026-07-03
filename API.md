@@ -596,6 +596,7 @@ Important result fields:
 | `inspectionWarningCount` / `inspectionWarnings[]` | Summary-level audit notices for truncation, omitted detail arrays, missing manifests, output structure issues, and organizer-staging misuse such as `organized-staging-not-split-output`. |
 | `structureSummary` | Machine-readable output-structure audit. Use it for exact layout and manifest evidence after checking the compact audit fields. |
 | `structureSummary.layoutKind` | Detected output layout such as `single-family`, `family-tree`, `mixed`, `empty`, or `unknown`; look it up in `outputStructureCatalog.layoutKinds` before deciding whether `outDir` points at the right level. |
+| `structureSummary.rootLevelDiagnosis` | Compact diagnosis of the inspected `outDir` root level. Check `status`, `likelyCause`, and `recommendedAction` before deciding whether the root is expected, empty, mixed, unknown, or affected by unexpected file depth. |
 | `structureSummary.depthProfile` | Relative depth distribution for scanned output files and original fonts. Use `fileDepthCounts`, `originalFontDepthCounts`, and expected depth arrays to diagnose whether `outDir` points one level too high/low without enabling `includeFiles`. |
 
 After real batch writes, treat the output directory as complete only when all of these are true:

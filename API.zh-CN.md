@@ -596,6 +596,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 | `inspectionWarningCount` / `inspectionWarnings[]` | 摘要级审计提示，用于标记截断、详情数组省略、manifest 缺失、输出结构问题，以及 `organized-staging-not-split-output` 这类整理暂存目录误用。 |
 | `structureSummary` | 机器可读输出结构审计。检查紧凑审计字段后，用它查看精确布局和 manifest 证据。 |
 | `structureSummary.layoutKind` | 检测到的输出布局，例如 `single-family`、`family-tree`、`mixed`、`empty` 或 `unknown`；判断 `outDir` 是否指向正确层级前，应先查 `outputStructureCatalog.layoutKinds`。 |
+| `structureSummary.rootLevelDiagnosis` | 对当前 `outDir` 根层级的紧凑诊断。决定是否重跑审计或重新生成输出前，先看 `status`、`likelyCause` 和 `recommendedAction`，判断它是期望根、空输出、混合根、未知根，还是存在异常文件深度。 |
 | `structureSummary.depthProfile` | 已扫描输出文件和原字体的相对深度分布。无需开启 `includeFiles`，也可以用 `fileDepthCounts`、`originalFontDepthCounts` 和期望深度数组判断 `outDir` 是否高一层或低一层。 |
 
 真实批量写入后，只有下面条件全都成立时，才应把输出目录视为审计完成：

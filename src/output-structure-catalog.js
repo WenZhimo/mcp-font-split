@@ -112,6 +112,18 @@ export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
     },
     agentAction: 'Compare fileDepthCounts and originalFontDepthCounts with the expected layout depths before deciding whether to regenerate output or rerun inspect_split_output against a different outDir.',
   },
+  rootLevelDiagnosis: {
+    summaryType: 'output-root-level-diagnosis-catalog',
+    purpose: 'Explains structureSummary.rootLevelDiagnosis, the compact outDir root-level interpretation derived from layoutKind and depth evidence.',
+    statuses: {
+      'expected-root': 'The inspected outDir matches the expected single-family or family-tree root depth shape.',
+      'unexpected-depth': 'The output shape is recognizable but files appear too shallow or too deep for the documented layout.',
+      'mixed-root': 'Single-family and family-tree original depths appear together, often from merged output roots.',
+      'unknown-root': 'The inspected tree does not expose enough recognized original/output evidence for a stable layout.',
+      empty: 'No output files were found under outDir.',
+    },
+    agentAction: 'Use rootLevelDiagnosis.status and likelyCause as the first compact hint, then inspect depthProfile and examples for concrete file evidence.',
+  },
   issueCodes: {
     'empty-output': {
       code: 'empty-output',

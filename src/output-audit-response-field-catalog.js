@@ -32,6 +32,11 @@ export const OUTPUT_AUDIT_RESPONSE_FIELD_CATALOG = {
     meaning: 'Depth distribution for all scanned output files and original fonts, measured relative to the inspected outDir.',
     agentAction: 'Use this with layoutKind, unexpectedDepthFileCount, and unexpectedDepthFileExamples to tell whether outDir points one level too high/low or generated files were placed below the documented structure.',
   },
+  'structureSummary.rootLevelDiagnosis': {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Compact diagnosis of whether the inspected outDir appears to be the expected split-output root, empty, mixed, unknown, or affected by unexpected depths.',
+    agentAction: 'Read status, likelyCause, and recommendedAction before deciding whether to regenerate output or rerun inspect_split_output against a different root.',
+  },
   'structureSummary.issues[].code': {
     sourceTools: ['inspect_split_output'],
     meaning: 'Machine-readable output structure issue code, such as missing-manifests, unexpected-output-files, or web-output-missing.',

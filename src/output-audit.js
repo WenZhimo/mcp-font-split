@@ -254,6 +254,69 @@ function expectedDepthsForLayout(layoutKind) {
   };
 }
 
+function buildOutputRootLevelDiagnosis({
+  layoutKind,
+  depthIssueFiles,
+  expectedDepths,
+  fileDepthCounts,
+  originalDepthCounts,
+  maxDepth,
+}) {
+  if (layoutKind === 'empty') {
+    return {
+      summaryType: 'output-root-level-diagnosis',
+      status: 'empty',
+      likelyCause: 'empty-output',
+      recommendedAction: 'Verify outDir points to the generated output root and rerun the producing tool if needed.',
+    };
+  }
+
+  if (layoutKind === 'single-family' || layoutKind === 'family-tree') {
+    if (depthIssueFiles.length === 0) {
+      return {
+        summaryType: 'output-root-level-diagnosis',
+        status: 'expected-root',
+        likelyCause: 'none',
+        recommendedAction: 'Continue with manifest and output-mode checks before reporting structural success.',
+      };
+    }
+
+    const expectedOutputDepth = Math.max(...expectedDepths.outputFileDepths);
+    const expectedOriginalDepth = Math.min(...expectedDepths.originalFontDepths);
+    const hasTooDeepFiles = maxDepth > expectedOutputDepth;
+    const hasTooShallowFiles = Object.keys(fileDepthCounts).some((depth) => Number(depth) < expectedOriginalDepth);
+    const likelyCause = hasTooDeepFiles
+      ? 'generated-files-too-deep'
+      : hasTooShallowFiles
+        ? 'outDir-points-too-low-or-mixed-root'
+        : 'unexpected-output-depth';
+
+    return {
+      summaryType: 'output-root-level-diagnosis',
+      status: 'unexpected-depth',
+      likelyCause,
+      recommendedAction: 'Inspect unexpectedDepthFileExamples and rerun inspect_split_output against the intended split-output root, or regenerate output into a clean root.',
+    };
+  }
+
+  if (layoutKind === 'mixed') {
+    return {
+      summaryType: 'output-root-level-diagnosis',
+      status: 'mixed-root',
+      likelyCause: 'single-family-and-family-tree-outputs-mixed',
+      recommendedAction: 'Inspect whether multiple output roots were merged or rerun inspect_split_output against a single generated output root.',
+    };
+  }
+
+  const hasOriginals = Object.keys(originalDepthCounts).length > 0;
+  return {
+    summaryType: 'output-root-level-diagnosis',
+    status: 'unknown-root',
+    likelyCause: hasOriginals ? 'originals-at-unexpected-depths' : 'no-recognized-original-fonts',
+    recommendedAction: 'Inspect depthProfile, unexpectedFileExamples, and unexpectedDepthFileExamples, then choose the correct output root or regenerate output.',
+  };
+}
+
 export function buildOutputStructureSummary({
   outDirRelative,
   files,
@@ -375,9 +438,18 @@ export function buildOutputStructureSummary({
 
   const maxExamples = 20;
   const expectedDepths = expectedDepthsForLayout(layoutKind);
+  const rootLevelDiagnosis = buildOutputRootLevelDiagnosis({
+    layoutKind,
+    depthIssueFiles,
+    expectedDepths,
+    fileDepthCounts,
+    originalDepthCounts,
+    maxDepth,
+  });
   return {
     conforms: issues.length === 0,
     layoutKind,
+    rootLevelDiagnosis,
     depthProfile: {
       summaryType: 'output-depth-profile',
       layoutKind,

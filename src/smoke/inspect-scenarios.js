@@ -88,6 +88,9 @@ async function runInspectStructureSmoke() {
   if (
     clean.structureSummary?.conforms !== true
     || clean.structureSummary?.layoutKind !== 'family-tree'
+    || clean.structureSummary?.rootLevelDiagnosis?.summaryType !== 'output-root-level-diagnosis'
+    || clean.structureSummary?.rootLevelDiagnosis?.status !== 'expected-root'
+    || clean.structureSummary?.rootLevelDiagnosis?.likelyCause !== 'none'
     || clean.structureSummary?.depthProfile?.summaryType !== 'output-depth-profile'
     || clean.structureSummary?.depthProfile?.layoutKind !== 'family-tree'
     || clean.structureSummary?.depthProfile?.maxDepth !== 3
@@ -139,6 +142,8 @@ async function runInspectStructureSmoke() {
   });
   if (
     wrongDepth.structureSummary?.conforms !== false
+    || wrongDepth.structureSummary?.rootLevelDiagnosis?.status !== 'unexpected-depth'
+    || wrongDepth.structureSummary?.rootLevelDiagnosis?.likelyCause !== 'generated-files-too-deep'
     || wrongDepth.structureSummary?.depthProfile?.maxDepth !== 4
     || wrongDepth.structureSummary?.depthProfile?.fileDepthCounts?.['4'] !== 1
     || wrongDepth.structureSummary?.depthProfile?.unexpectedDepthFileCount < 1
