@@ -161,6 +161,11 @@ export function buildLocalVerificationOutputGuide() {
           reportAs: 'The bounded full-root scan supported font count.',
         },
         {
+          id: 'target-sampling-scope',
+          evidenceField: 'corpusCountGuide.representativeTargets',
+          reportAs: 'Fixed and selected target counts are representative sampling counts, not full corpus font totals.',
+        },
+        {
           id: 'ignored-file-coverage',
           evidenceField: 'coverageSummary.unsupportedFileCategoryCoverage',
           reportAs: 'Ignored-file category and extension coverage, including extensions beyond .zip/.txt.',
@@ -190,6 +195,7 @@ export function buildLocalVerificationOutputGuide() {
         'Do not claim every font was manually inspected.',
         'Do not claim every directory was accepted or individually audited.',
         'Do not treat selectedTargetCount or fixedRegressionTargetCount as the full corpus font count.',
+        'Do not answer corpus size questions from target sampling fields; use corpusCountGuide.fullCorpus.supportedFontCount or testScope.corpusScan.supportedFontCount.',
         'Do not imply archives were extracted or validated; archives are only counted as ignored files.',
         'Do not report ok:true alone as proof; cite reliabilityGateDecision.status and outputStructureAuditSummary.',
       ],

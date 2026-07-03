@@ -566,11 +566,13 @@ async function runAgentGuidanceSmoke() {
     || result.localVerificationOutputGuide?.evidenceFields?.archiveHandlingScope !== 'coverageSummary.archiveHandlingScope'
     || result.localVerificationOutputGuide?.completionReportGuide?.summaryType !== 'local-verification-completion-report-guide'
     || !result.localVerificationOutputGuide?.completionReportGuide?.requiredClaims?.some((item) => item.id === 'full-corpus-count' && item.evidenceField === 'corpusCountGuide.fullCorpus.supportedFontCount')
+    || !result.localVerificationOutputGuide?.completionReportGuide?.requiredClaims?.some((item) => item.id === 'target-sampling-scope' && item.evidenceField === 'corpusCountGuide.representativeTargets' && item.reportAs?.includes('sampling counts'))
     || !result.localVerificationOutputGuide?.completionReportGuide?.requiredClaims?.some((item) => item.id === 'archive-handling-scope' && item.evidenceField === 'coverageSummary.archiveHandlingScope')
     || !result.localVerificationOutputGuide?.completionReportGuide?.requiredClaims?.some((item) => item.id === 'tool-coverage' && item.evidenceField === 'coverageSummary.toolCoverageSummary')
     || !result.localVerificationOutputGuide?.completionReportGuide?.requiredClaims?.some((item) => item.id === 'representative-output-audit' && item.evidenceField === 'coverageSummary.outputStructureAuditSummary')
     || !result.localVerificationOutputGuide?.completionReportGuide?.forbiddenClaims?.some((item) => item.includes('every font'))
     || !result.localVerificationOutputGuide?.completionReportGuide?.forbiddenClaims?.some((item) => item.includes('every directory'))
+    || !result.localVerificationOutputGuide?.completionReportGuide?.forbiddenClaims?.some((item) => item.includes('corpus size questions') && item.includes('corpusCountGuide.fullCorpus.supportedFontCount'))
     || !result.localVerificationOutputGuide?.completionReportGuide?.forbiddenClaims?.some((item) => item.includes('archives were extracted'))
     || !result.localVerificationOutputGuide?.completionReportGuide?.conciseReportTemplate?.some((item) => item.includes('real-corpus suite'))
   ) {
