@@ -69,6 +69,8 @@ function assertReadmeEntryPointBoundary({ readmeZh, readmeEn, apiDocs, behaviorD
 
   for (const [fileName, content] of Object.entries(readmeDocs)) {
     for (const forbiddenToken of [
+      '`FontSplitConfigurationError`',
+      '`configuration-error`',
       '`details.summaryType: "configuration-error"`',
       '`details.option`',
       '`details.received`',
