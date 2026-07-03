@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import { GUIDANCE_WORKFLOWS, getAgentGuidance } from '../font-split.js';
 import { buildDirectoryOrganizationSafety } from '../directory-organization-safety.js';
+import { buildOutputResultShapeQuickReference } from '../output-result-shape-quick-reference.js';
 import {
   assertBatchPolicyGuide,
   assertDirectoryRouteInspectFields,
@@ -461,6 +462,10 @@ async function runAgentGuidanceSmoke() {
     throw new Error('Expected full guidance to expose outputStructureCatalog and response-field catalog entries.');
   }
   const outputResultShapeQuickReference = result.outputResultShapeQuickReference || {};
+  const expectedOutputResultShapeQuickReference = buildOutputResultShapeQuickReference();
+  if (JSON.stringify(outputResultShapeQuickReference) !== JSON.stringify(expectedOutputResultShapeQuickReference)) {
+    throw new Error('Expected agent guidance outputResultShapeQuickReference to match the standalone builder output.');
+  }
   const outputResultShapeIds = new Set((outputResultShapeQuickReference.resultShapes || []).map((item) => item.id));
   for (const requiredShape of ['subset-output', 'single-woff2-fallback', 'copy-original-record', 'single-font-split-skipped', 'batch-existing-output-skips', 'dry-run-existing-output-skip-plan', 'batch-partial-errors']) {
     if (!outputResultShapeIds.has(requiredShape)) {
