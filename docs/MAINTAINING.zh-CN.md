@@ -56,6 +56,26 @@
 - `BEHAVIOR.zh-CN.md` 可以详细解释非直觉行为，但不要成为唯一事实来源。
 - 修改 guidance/catalog 后，必须让 smoke 检查能证明引用字段存在且有解释。
 
+## 响应字段目录边界
+
+新增或移动响应字段说明时，先确认事实应该落在哪个 catalog，不要把所有解释堆回聚合层。
+
+| 文件 | 边界 |
+|------|------|
+| `src/tool-response-field-catalog.js` | 响应字段目录的聚合入口。这里只导入并合并各字段组，不应承载大量具体字段事实；新增字段优先放到对应专属或共享 catalog。 |
+| `src/*-response-field-catalog.js` | 工具或领域专属字段事实的主要位置。例如 `output-audit-response-field-catalog.js` 放 `inspect_split_output` 字段，`source-input-response-field-catalog.js` 放输入扫描共享字段，`batch-response-field-catalog.js` 放 `split_font_batch` 专属字段。 |
+| shared / core / result-shape / source-safety 类 catalog | 跨工具共享字段事实放这里，例如 `core-response-field-catalog.js`、`source-safety-response-field-catalog.js`、`result-shape-response-field-catalog.js`、`batch-policy-response-field-catalog.js` 和 `batch-shared-response-field-catalog.js`。 |
+| `src/guidance-response-field-catalog.js` | 只放 `get_agent_guidance` 专属字段、guidance 结构字段、guidance catalog 入口说明和 agent 工作流提示字段；不要混入某个运行时工具专属响应字段。 |
+| `src/runtime-status-response-field-catalog.js` | 只放 `get_runtime_status` 专属字段，例如 Node、包版本、WASM 和运行时可用性。 |
+| `src/catalogs.js` | 公共 catalog 聚合和 re-export 层。保持轻量，不作为事实堆放处。 |
+
+新增公开字段时，同步检查：
+
+- 实际工具响应、API 文档和 `toolResponseFieldCatalog` 的字段路径一致。
+- 如果字段属于 `get_agent_guidance`，它应从 guidance catalog 或 guidance builder 出现，并由 `npm run smoke:agent-guidance` 证明顶层路径不漂移。
+- 如果字段属于运行时工具，优先补对应 targeted smoke；字段契约或文档入口变更还要跑 `npm run smoke:api-docs`。
+- 聚合层只连接事实来源，不复制字段含义；避免同一个字段解释在多个 catalog 里各写一版。
+
 ## 结构问题行动顺序
 
 1. **收口当前切片**

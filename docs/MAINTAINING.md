@@ -56,6 +56,26 @@ This document is for maintainers and AI agents taking over the repository. It do
 - `BEHAVIOR.zh-CN.md` can explain non-intuitive behavior in depth, but it should not be the only source of a contract.
 - After changing guidance or catalogs, smoke checks should prove referenced fields exist and are explained.
 
+## Response Field Catalog Boundaries
+
+When adding or moving response-field explanations, decide which catalog owns the fact before editing. Do not move detailed field facts back into aggregate layers.
+
+| File | Boundary |
+|------|----------|
+| `src/tool-response-field-catalog.js` | Aggregated response-field catalog entry point. It should import and merge field groups, not carry large amounts of concrete field meaning. Add new fields to a tool-specific or shared catalog first. |
+| `src/*-response-field-catalog.js` | Primary home for tool-specific or domain-specific field facts. For example, `output-audit-response-field-catalog.js` owns `inspect_split_output` fields, `source-input-response-field-catalog.js` owns shared input-scan fields, and `batch-response-field-catalog.js` owns `split_font_batch`-only fields. |
+| shared / core / result-shape / source-safety catalogs | Put cross-tool shared field facts here, such as `core-response-field-catalog.js`, `source-safety-response-field-catalog.js`, `result-shape-response-field-catalog.js`, `batch-policy-response-field-catalog.js`, and `batch-shared-response-field-catalog.js`. |
+| `src/guidance-response-field-catalog.js` | Owns `get_agent_guidance`-only fields, guidance shape fields, guidance catalog entry explanations, and agent workflow guidance fields. Do not mix runtime tool-specific response fields into this file. |
+| `src/runtime-status-response-field-catalog.js` | Owns `get_runtime_status`-only fields such as Node, package, WASM, and runtime availability facts. |
+| `src/catalogs.js` | Public catalog aggregation and re-export layer. Keep it lightweight; do not use it as a fact dump. |
+
+When adding a public response field, also check:
+
+- The actual tool response, API docs, and `toolResponseFieldCatalog` use the same field path.
+- If the field belongs to `get_agent_guidance`, it appears from the guidance catalog or guidance builder, and `npm run smoke:agent-guidance` proves the top-level path did not drift.
+- If the field belongs to a runtime tool, add or reuse the relevant targeted smoke; field-contract or documentation-entry changes should also run `npm run smoke:api-docs`.
+- Aggregate layers connect fact sources; they should not duplicate field meanings that already live in owned catalogs.
+
 ## Structure Action Order
 
 1. **Close the current slice**
