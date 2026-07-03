@@ -42,6 +42,11 @@ export const OUTPUT_AUDIT_RESPONSE_FIELD_CATALOG = {
     meaning: 'Compact diagnosis of whether unexpected generated-looking files or copy-original entries with generated output suggest stale residue from an older run.',
     agentAction: 'If status is suspected-residue, inspect examples and regenerate into a clean output root or remove stale generated files before treating the audit as complete.',
   },
+  'structureSummary.manifestCoverageDiagnosis': {
+    sourceTools: ['inspect_split_output'],
+    meaning: 'Compact diagnosis of whether each detected font entry is backed by split-meta.json instead of being inferred from file structure.',
+    agentAction: 'Require status complete for strict audits; if incomplete, inspect missingManifestCount and regenerate output or review inferred entries before reporting completion.',
+  },
   'structureSummary.issues[].code': {
     sourceTools: ['inspect_split_output'],
     meaning: 'Machine-readable output structure issue code, such as missing-manifests, unexpected-output-files, or web-output-missing.',

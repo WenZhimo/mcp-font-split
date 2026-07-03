@@ -381,6 +381,42 @@ function buildStaleResidueDiagnosis({ unexpectedFiles, entryIssueExamples, maxEx
   };
 }
 
+function buildManifestCoverageDiagnosis({ fontEntryCount, manifestCount, missingManifestCount }) {
+  if (fontEntryCount === 0) {
+    return {
+      summaryType: 'output-manifest-coverage-diagnosis',
+      status: 'no-font-entries',
+      manifestCoverageOk: false,
+      manifestCount,
+      fontEntryCount,
+      missingManifestCount,
+      recommendedAction: 'Inspect layoutKind, depthProfile, and unexpected file examples before relying on manifest coverage.',
+    };
+  }
+
+  if (missingManifestCount === 0 && manifestCount === fontEntryCount) {
+    return {
+      summaryType: 'output-manifest-coverage-diagnosis',
+      status: 'complete',
+      manifestCoverageOk: true,
+      manifestCount,
+      fontEntryCount,
+      missingManifestCount,
+      recommendedAction: 'Continue with output mode, depth, and stale residue checks before reporting structural success.',
+    };
+  }
+
+  return {
+    summaryType: 'output-manifest-coverage-diagnosis',
+    status: 'incomplete',
+    manifestCoverageOk: false,
+    manifestCount,
+    fontEntryCount,
+    missingManifestCount,
+    recommendedAction: 'Regenerate output or inspect inferred entries before making strict completion claims.',
+  };
+}
+
 export function buildOutputStructureSummary({
   outDirRelative,
   files,
@@ -515,11 +551,17 @@ export function buildOutputStructureSummary({
     entryIssueExamples,
     maxExamples,
   });
+  const manifestCoverageDiagnosis = buildManifestCoverageDiagnosis({
+    fontEntryCount,
+    manifestCount,
+    missingManifestCount,
+  });
   return {
     conforms: issues.length === 0,
     layoutKind,
     rootLevelDiagnosis,
     staleResidueDiagnosis,
+    manifestCoverageDiagnosis,
     depthProfile: {
       summaryType: 'output-depth-profile',
       layoutKind,
@@ -539,7 +581,7 @@ export function buildOutputStructureSummary({
     fontEntryCount,
     manifestCount,
     missingManifestCount,
-    manifestCoverageOk: manifestCount === fontEntryCount,
+    manifestCoverageOk: manifestCoverageDiagnosis.manifestCoverageOk,
     classifiedFileCount: classifiedPaths.size,
     unexpectedFileCount: unexpectedFiles.length,
     unexpectedFileExamples: unexpectedFiles

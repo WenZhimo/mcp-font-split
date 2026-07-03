@@ -31,6 +31,14 @@ async function runInspectCompactSmoke() {
   if (compact.fileCount !== 2 || compact.familyCount < 1) {
     throw new Error('Expected compact output inspection to retain summary counts.');
   }
+  if (
+    compact.structureSummary?.manifestCoverageDiagnosis?.summaryType !== 'output-manifest-coverage-diagnosis'
+    || compact.structureSummary?.manifestCoverageDiagnosis?.status !== 'incomplete'
+    || compact.structureSummary?.manifestCoverageDiagnosis?.manifestCoverageOk !== false
+    || compact.structureSummary?.manifestCoverageDiagnosis?.missingManifestCount < 1
+  ) {
+    throw new Error('Expected compact output inspection to expose incomplete manifest coverage.');
+  }
   assertOutputAuditStatus(compact, {
     auditStatus: 'action-required',
     auditPassed: false,
@@ -94,6 +102,10 @@ async function runInspectStructureSmoke() {
     || clean.structureSummary?.staleResidueDiagnosis?.summaryType !== 'output-stale-residue-diagnosis'
     || clean.structureSummary?.staleResidueDiagnosis?.status !== 'none-detected'
     || clean.structureSummary?.staleResidueDiagnosis?.suspectedResidueCount !== 0
+    || clean.structureSummary?.manifestCoverageDiagnosis?.summaryType !== 'output-manifest-coverage-diagnosis'
+    || clean.structureSummary?.manifestCoverageDiagnosis?.status !== 'complete'
+    || clean.structureSummary?.manifestCoverageDiagnosis?.manifestCoverageOk !== true
+    || clean.structureSummary?.manifestCoverageDiagnosis?.missingManifestCount !== 0
     || clean.structureSummary?.depthProfile?.summaryType !== 'output-depth-profile'
     || clean.structureSummary?.depthProfile?.layoutKind !== 'family-tree'
     || clean.structureSummary?.depthProfile?.maxDepth !== 3

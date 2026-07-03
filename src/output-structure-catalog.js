@@ -139,6 +139,16 @@ export const OUTPUT_STRUCTURE_CATALOG = Object.freeze({
     },
     agentAction: 'If status is suspected-residue, inspect examples and regenerate into a clean output root or remove stale generated files before reporting structural success.',
   },
+  manifestCoverageDiagnosis: {
+    summaryType: 'output-manifest-coverage-diagnosis-catalog',
+    purpose: 'Explains structureSummary.manifestCoverageDiagnosis, the compact manifest coverage interpretation for detected font entries.',
+    statuses: {
+      complete: 'Every detected font entry has split-meta.json coverage.',
+      incomplete: 'One or more detected font entries were inferred from file structure because split-meta.json is missing.',
+      'no-font-entries': 'No font entries were detected, so manifest coverage cannot prove output completeness.',
+    },
+    agentAction: 'For strict output completion, require status complete; otherwise inspect missingManifestCount, entryIssueExamples, and file examples before reporting success.',
+  },
   issueCodes: {
     'empty-output': {
       code: 'empty-output',
