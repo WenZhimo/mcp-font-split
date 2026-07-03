@@ -84,6 +84,19 @@
    - 保持对忽略文件分类、压缩包只计数不解压、copy-only organization、batch preview/write、输出结构审计的覆盖。
    - 不要把 4 个 fixed targets 或 10 个 sampled targets 误读成全量字体数；全量字体数来自 `testScope.corpusScan.supportedFontCount`。
 
+## 结构问题分类行动计划
+
+后续结构问题按下面类别推进。每次只选一个类别里的一个小切片，完成验证、清理、worklog、commit/push 后再进入下一项。
+
+| 类别 | 要解决的问题 | 下一步行动 | 验证证据 |
+|------|--------------|------------|----------|
+| 文档组织 | README、英文入口、行为文档和维护者文档边界可能再次混杂。 | 保持 `README.md` 作为中文首页和快速入口，`README.en.md` 作为英文入口；配置错误、字段契约和非直觉行为继续放在 API / BEHAVIOR / 维护者文档中。 | `node src/smoke-test.js behavior-docs`、`node src/smoke-test.js api-docs`，并检查 README 没有重新变成字段参考手册。 |
+| API / guidance 组织 | `get_agent_guidance` 信息量大，catalog、quick reference 和 workflow 建议容易重复事实。 | 继续按职责抽离工具安全提示、输出结果字段说明、agent 工作流建议、配置错误说明和目录结构说明；保持顶层返回字段不变。 | `node src/smoke-test.js agent-guidance`，并确认被抽离字段仍在原顶层路径。 |
+| 输出目录结构 | 单文件、批量、跳过、去重、命名冲突后的目录形状需要稳定可审计。 | 继续增强 `inspect_split_output()` 的紧凑诊断，覆盖输出根层级、family/style/source 层级、manifest 覆盖和旧输出残留提示。 | `node src/smoke-test.js inspect-structure`、`node src/smoke-test.js inspect-organized-staging`，以及真实语料代表性写入审计。 |
+| 测试组织 | smoke、真实语料、结构审计和文档检查边界可能随着新增 guard 变模糊。 | 按行为表面维护场景归属：文档契约、guidance 契约、真实语料可靠性、输出结构、批量语义、目录整理安全；每次只移动或新增一个场景家族。 | `node scripts/check-syntax.js`、`node scripts/run-check-compact.js --json`，并检查 `src/smoke/scenarios.js` 场景名不漂移。 |
+| 真实语料覆盖 | 用户语料库有 500+ 字体目录，测试应代表真实复杂场景，而不是逐字体人工验收。 | 保持全根扫描加代表性采样：全量统计 supported/ignored，固定回归目标覆盖 `aexpective`、`tiny5`、`agu_display`、`architectural`，并保留一个 bounded write/audit 样本。 | `node src/smoke-test.js real-corpus-suite <font-corpus-dir>` 输出 full-root counts、target counts、16/16 functional coverage 和 7/7 tool coverage。 |
+| 忽略文件统计 | 忽略文件不能只看 `.zip` / `.txt`，还要兼容文档、图片、网页、签名、无扩展名和 unsupported font-like 文件。 | 继续让 runtime summary、unsupported file catalog 和真实语料 suite 同步呈现 category count、extension count、extensions beyond `.zip` / `.txt` 和 archive handling scope。 | 真实语料 suite 输出 ignored category count、extension count、`extensionsBeyondZipTxtCount`、archive count 和 archivesExtracted/archiveInternalFontsCovered 标记。 |
+
 ## 结构清理 Backlog
 
 当前切片收口后，从这个 backlog 继续。每一行都应尽量成为一个小提交，或一组边界非常接近的提交；不要把多行混到一次改动里，除非同一个 smoke guard 能证明它们都没有漂移。
