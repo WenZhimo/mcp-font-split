@@ -107,19 +107,29 @@ async function runBatchRunCliSmoke() {
   };
   const readmeText = await fs.readFile('README.md', 'utf8');
   const readmeEnText = await fs.readFile('README.en.md', 'utf8');
+  const apiText = await fs.readFile('API.md', 'utf8');
+  const apiZhText = await fs.readFile('API.zh-CN.md', 'utf8');
   if (
-    !readmeText.includes('`default` 不是有效值')
-    || !readmeText.includes('无效 preset 拒绝')
-    || !readmeText.includes('BatchRunConfigurationError')
-    || !readmeText.includes('`errorType`')
-    || !readmeText.includes('枚举型、布尔型或数字型')
-    || !readmeEnText.includes('`default` is not valid')
-    || !readmeEnText.includes('invalid preset rejection')
-    || !readmeEnText.includes('BatchRunConfigurationError')
-    || !readmeEnText.includes('`errorType`')
-    || !readmeEnText.includes('enum-like, boolean, or numeric')
+    !readmeText.includes('无效 preset、环境变量、位置参数或配置值会被拒绝')
+    || !readmeText.includes('完整 CLI 参数和错误字段以 [API 参考](./API.zh-CN.md) 为准')
+    || !readmeEnText.includes('Invalid presets, environment values, positional arguments, or configuration values are rejected')
+    || !readmeEnText.includes('complete CLI arguments and error fields belong in the [API Reference](./API.md)')
   ) {
-    throw new Error('Expected README docs to describe batch:run invalid configuration rejection.');
+    throw new Error('Expected README docs to keep batch:run invalid configuration rejection at entry-point level.');
+  }
+  if (
+    !apiZhText.includes('`default` 不是有效值')
+    || !apiZhText.includes('无效 preset 拒绝')
+    || !apiZhText.includes('`BatchRunConfigurationError`')
+    || !apiZhText.includes('`errorType`')
+    || !apiZhText.includes('枚举型、布尔型或数字型')
+    || !apiText.includes('`default` is not valid')
+    || !apiText.includes('Invalid preset rejection')
+    || !apiText.includes('`BatchRunConfigurationError`')
+    || !apiText.includes('`errorType`')
+    || !apiText.includes('enum-like, boolean, or numeric')
+  ) {
+    throw new Error('Expected API docs to describe batch:run invalid configuration rejection details.');
   }
 
   const { stdout: safePreviewStdout } = await execFileAsync(process.execPath, ['batch-run.js', inputDir, outputRoot, '1', '1', '--dry-run'], {

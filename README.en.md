@@ -249,7 +249,7 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` is a safe batch entry point for agents and maintainers. By default it uses `reviewed-write`; `--dry-run` or `FONT_SPLIT_DRY_RUN=true` uses `safe-preview`. Use `--json` or `FONT_SPLIT_JSON=true` for stable JSON output. `default` is not valid; invalid preset rejection, invalid environment values, invalid positional arguments, and enum-like, boolean, or numeric configuration errors fail with `BatchRunConfigurationError` and include `errorType`. Complete error fields belong in the [API Reference](./API.md).
+`batch:run` is a safe batch entry point for agents and maintainers. By default it uses `reviewed-write`; `--dry-run` or `FONT_SPLIT_DRY_RUN=true` uses `safe-preview`. Use `--json` or `FONT_SPLIT_JSON=true` for stable JSON output. Invalid presets, environment values, positional arguments, or configuration values are rejected; complete CLI arguments and error fields belong in the [API Reference](./API.md).
 
 ### Verification
 

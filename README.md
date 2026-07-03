@@ -249,7 +249,7 @@ npm start
 npm run batch:run -- . split-output 50000 50000 --dry-run
 ```
 
-`batch:run` 是给 agent 和维护者使用的安全批量入口。默认真实运行走 `reviewed-write`；`--dry-run` 或 `FONT_SPLIT_DRY_RUN=true` 会走 `safe-preview`。需要稳定 JSON 时用 `--json` 或 `FONT_SPLIT_JSON=true`。`default` 不是有效值；无效 preset 拒绝、无效环境变量、无效位置参数，以及枚举型、布尔型或数字型配置错误都会以 `BatchRunConfigurationError` 失败，并带 `errorType`。完整错误字段以 [API 参考](./API.zh-CN.md) 为准。
+`batch:run` 是给 agent 和维护者使用的安全批量入口。默认真实运行走 `reviewed-write`；`--dry-run` 或 `FONT_SPLIT_DRY_RUN=true` 会走 `safe-preview`。需要稳定 JSON 时用 `--json` 或 `FONT_SPLIT_JSON=true`。无效 preset、环境变量、位置参数或配置值会被拒绝；完整 CLI 参数和错误字段以 [API 参考](./API.zh-CN.md) 为准。
 
 ### 验证
 

@@ -414,6 +414,8 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 `batchErrorMode` 默认是 `fail-after`，会处理完选中的字体后，如果存在任何单字体错误就抛错。只有当调用方会主动检查 `errors[]` 和 `errorCount` 时才建议显式使用 `collect`；需要首个错误立刻失败时使用 `fail-fast`。
 当 `fail-fast` 或 `fail-after` 通过 MCP Server 抛错时，错误响应文本是 JSON，包含 `ok: false`、`name`、`errorType`、`error` 和 `details`，因此 agent 可以先按 `errorType: "batch-split-error"` 路由，再读取 `details.errors[]` 与 `details.summary`。
 
+独立的 `batch:run` CLI 在命令行边界使用同一套配置拒绝策略。`default` 不是有效值，不能作为具名 workflow preset；需要 CLI 默认行为时应省略对应选项或环境变量。无效 preset 拒绝、无效环境变量、无效位置参数，以及枚举型、布尔型或数字型配置错误都会以 `BatchRunConfigurationError` 失败，并在 JSON 模式中带 `errorType`。
+
 全量字体库的简洁响应示例：
 
 ```json

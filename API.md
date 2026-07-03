@@ -414,6 +414,8 @@ If identity extraction fails for a file, batch dedupe falls back to that file's 
 `batchErrorMode` defaults to `fail-after`, which finishes selected fonts and then throws if any per-font errors occurred. Use `collect` only when the caller will inspect `errors[]` and `errorCount` itself, or `fail-fast` to throw on the first per-font error.
 When `fail-fast` or `fail-after` throws through the MCP server, the error response text is JSON with `ok: false`, `name`, `errorType`, `error`, and `details` so agents can route on `errorType: "batch-split-error"` and still read `details.errors[]` and `details.summary`.
 
+The standalone `batch:run` CLI uses the same configuration rejection policy at the command-line boundary. `default` is not valid as a named workflow preset; omit the option or environment variable to use the CLI default. Invalid preset rejection, invalid environment values, invalid positional arguments, and enum-like, boolean, or numeric configuration errors fail with `BatchRunConfigurationError` and include `errorType` in JSON mode.
+
 Compact full-library example:
 
 ```json
