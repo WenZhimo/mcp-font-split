@@ -80,6 +80,20 @@
    - 保持对忽略文件分类、压缩包只计数不解压、copy-only organization、batch preview/write、输出结构审计的覆盖。
    - 不要把 4 个 fixed targets 或 10 个 sampled targets 误读成全量字体数；全量字体数来自 `testScope.corpusScan.supportedFontCount`。
 
+## 结构清理 Backlog
+
+当前切片收口后，从这个 backlog 继续。每一行都应尽量成为一个小提交，或一组边界非常接近的提交；不要把多行混到一次改动里，除非同一个 smoke guard 能证明它们都没有漂移。
+
+| 优先级 | 范围 | 要解决的问题 | 建议切片 | 验证证据 |
+|--------|------|--------------|----------|----------|
+| P0 | 文档入口 | README、英文 README、API 文档、行为说明和维护者文档里有重复高风险说法，容易漂移。 | 保持 `README.md` 是紧凑中文入口，`README.en.md` 是英文入口；字段级和配置错误细节放到 API / 行为文档。修改重复高风险文案前，先增加或复用 smoke guard。 | `node src/smoke-test.js behavior-docs`、`node src/smoke-test.js api-docs`，以及针对 README 的 grep/diff，证明首页仍是入口而不是字段参考。 |
+| P0 | Agent / API guidance 形态 | `get_agent_guidance` 很有价值但体积较大，后续编辑容易改变响应形态或在 guidance 模块间重复事实。 | 继续从 `src/agent-guidance.js`、`src/guidance.js` 和 catalog 聚合层抽离稳定的 quick-reference / catalog 边界，同时保持公开响应形态不变。 | `node src/smoke-test.js agent-guidance`，并确认被抽离字段仍出现在相同的顶层 guidance 路径。 |
+| P0 | 输出目录结构 | 单字体输出、批量输出、整理暂存、跳过输出、fallback / copy-original 路径都需要明确的结构审计。 | 强化 `inspect_split_output()` 和 smoke 场景，覆盖目录角色判断、`structureSummary.conforms`、manifest 覆盖、误把整理暂存当最终输出，以及输出 layout kind。 | `node src/smoke-test.js inspect-structure`、`node src/smoke-test.js inspect-organized-staging`，以及真实语料代表性写入审计中 single / batch 输出均通过。 |
+| P1 | 真实语料覆盖解释 | corpus suite 会抽样目标目录，但用户容易把小的 target 数量误读成全库字体数。 | 保持 `corpusCountGuide`、`reliabilityGateDecision` 和文档一致，清楚区分全根扫描数量与 fixed/adaptive target 数量。 | `node src/smoke-test.js real-corpus-suite <字体语料目录>` 输出全量 supported/ignored 数量、target 数量、`perDirectoryAcceptanceAudit:false` 和 16/16 功能覆盖。 |
+| P1 | 忽略文件兼容性 | 忽略文件统计不能只覆盖 `.zip` 和 `.txt`，还要覆盖文档、图片、网页文件、签名、无扩展文件和解析失败的字体状文件。 | 保持忽略文件分类目录和运行时 summary 对齐；新增类别或扩展名处理规则时补回归覆盖。 | 真实语料 suite 输出 category count、extension count、`extensionsBeyondZipTxtCount`、archive count 和 archive handling flags。 |
+| P1 | 测试组织 | smoke 场景已经很广，但继续增加行为 guard 时，场景归属边界要保持清楚。 | 按行为表面组织场景：文档契约、guidance 契约、真实语料可靠性、输出结构、批量语义、目录整理安全。每次只移动一个场景家族。 | `node scripts/check-syntax.js`、`node scripts/run-check-compact.js --json`，并确认 `src/smoke/scenarios.js` 中场景名不漂移。 |
+| P2 | 运行时模块边界 | runtime 已经开始拆分，但后续 batch、organization、input-preflight 或 output-audit 改动仍可能重新形成大而混杂的模块。 | 只抽离边界明确的行为单元，例如命名、去重、skip 检查、source safety、输出角色判断或 organization planning。避免在同一 commit 混合行为变更和结构重构。 | 被触及 runtime 表面的 targeted smoke；如果涉及批量语义、目录安全或输出结构，再跑真实语料 suite。 |
+
 ## 每个切片的完成标准
 
 - 只解决一个结构问题。
