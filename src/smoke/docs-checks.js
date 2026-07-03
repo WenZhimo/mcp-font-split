@@ -115,6 +115,64 @@ function assertReadmeEntryPointBoundary({ readmeZh, readmeEn, apiDocs, behaviorD
   }
 }
 
+function assertReadmeVerificationBoundary({ readmeZh, readmeEn, maintainerZh, maintainerEn }) {
+  const readmeDocs = {
+    'README.md': readmeZh,
+    'README.en.md': readmeEn,
+  };
+  const maintainerDocs = {
+    'docs/MAINTAINING.zh-CN.md': maintainerZh,
+    'docs/MAINTAINING.md': maintainerEn,
+  };
+
+  if (
+    !readmeZh.includes('[维护者结构指南](./docs/MAINTAINING.zh-CN.md)')
+    || !readmeEn.includes('[Maintainer Structure Guide](./docs/MAINTAINING.md)')
+  ) {
+    throw new Error('README files should link to maintainer docs for project structure and verification details.');
+  }
+
+  assertDocsContainTokens(maintainerDocs, 'verification quick reference location', [
+    'check:compact -- --json',
+    'smoke:api-docs',
+    'smoke:behavior-docs',
+    'smoke:agent-guidance',
+    'smoke:inspect-structure',
+    'smoke:inspect-organized-staging',
+    'smoke:real-corpus-suite',
+  ]);
+
+  assertIncludesText('docs/MAINTAINING.zh-CN.md verification quick reference heading', maintainerZh, '## 验证入口速查');
+  assertIncludesText('docs/MAINTAINING.md verification quick reference heading', maintainerEn, '## Verification Entry Quick Reference');
+
+  const forbiddenReadmeMatrixMarkers = [
+    '## 验证入口速查',
+    '## Verification Entry Quick Reference',
+    '| 改动类型 | 建议验证入口 | 说明 |',
+    '| Change type | Recommended verification | Notes |',
+    '快速通用检查',
+    '文档契约检查',
+    'agent / guidance 契约检查',
+    '输出目录结构检查',
+    '真实语料可靠性检查',
+    '收口 / 提交前组合',
+    'Fast general checks',
+    'Documentation contract checks',
+    'Agent / guidance contract checks',
+    'Output directory structure checks',
+    'Real-corpus reliability checks',
+    'Close / pre-commit combination',
+  ];
+
+  for (const [fileName, content] of Object.entries(readmeDocs)) {
+    for (const forbiddenMarker of forbiddenReadmeMatrixMarkers) {
+      if (content.includes(forbiddenMarker)) {
+        throw new Error(`${fileName} should link to maintainer verification docs, not inline the verification matrix: ${forbiddenMarker}`);
+      }
+    }
+  }
+}
+
 function findGuidanceShape(guidance, shapeId) {
   return guidance.outputResultShapeQuickReference?.resultShapes?.find((shape) => shape.id === shapeId);
 }
@@ -184,8 +242,9 @@ function assertGuidanceHighRiskContracts(guidance) {
   }
 }
 
-function assertHighRiskDocumentationContracts({ readmeZh, readmeEn, apiDocs, behaviorDoc }) {
+function assertHighRiskDocumentationContracts({ readmeZh, readmeEn, apiDocs, behaviorDoc, maintainerZh, maintainerEn }) {
   assertReadmeEntryPointBoundary({ readmeZh, readmeEn, apiDocs, behaviorDoc });
+  assertReadmeVerificationBoundary({ readmeZh, readmeEn, maintainerZh, maintainerEn });
 
   const readmeDocs = {
     'README.md': readmeZh,
@@ -489,10 +548,12 @@ export async function runBehaviorDocsSmoke() {
     'API.md': await fs.readFile('API.md', 'utf8'),
     'API.zh-CN.md': await fs.readFile('API.zh-CN.md', 'utf8'),
   };
+  const maintainerZh = await fs.readFile('docs/MAINTAINING.zh-CN.md', 'utf8');
+  const maintainerEn = await fs.readFile('docs/MAINTAINING.md', 'utf8');
   const serverSource = await fs.readFile('src/server.js', 'utf8');
   const guidance = getAgentGuidance({ workflow: 'batch', detailLevel: 'full' });
   assertGuidanceHighRiskContracts(guidance);
-  assertHighRiskDocumentationContracts({ readmeZh, readmeEn, apiDocs, behaviorDoc });
+  assertHighRiskDocumentationContracts({ readmeZh, readmeEn, apiDocs, behaviorDoc, maintainerZh, maintainerEn });
   const assertBehaviorContains = (label, token) => {
     if (!behaviorDoc.includes(token)) {
       throw new Error(`BEHAVIOR.zh-CN.md is missing documented ${label}: ${token}`);
