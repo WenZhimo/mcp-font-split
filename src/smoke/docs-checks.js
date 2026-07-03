@@ -48,6 +48,53 @@ function assertDocsContainAnyToken(docs, contractName, tokens) {
   }
 }
 
+function assertReadmeEntryPointBoundary({ readmeZh, readmeEn, apiDocs, behaviorDoc }) {
+  const readmeDocs = {
+    'README.md': readmeZh,
+    'README.en.md': readmeEn,
+  };
+  const apiAndBehaviorDocs = {
+    'API.md': apiDocs['API.md'],
+    'API.zh-CN.md': apiDocs['API.zh-CN.md'],
+    'BEHAVIOR.zh-CN.md': behaviorDoc,
+  };
+
+  assertDocsContainTokens(readmeDocs, 'entry-point role', [
+    'README',
+  ]);
+  assertDocsContainTokens(apiAndBehaviorDocs, 'configuration-error details live outside README', [
+    '`details.summaryType: "configuration-error"`',
+    '`FontSplitConfigurationError`',
+  ]);
+
+  for (const [fileName, content] of Object.entries(readmeDocs)) {
+    for (const forbiddenToken of [
+      '`details.summaryType: "configuration-error"`',
+      '`details.option`',
+      '`details.received`',
+      '`details.allowedValues`',
+      '`details.expectedType`',
+      '`details.defaultWhenOmitted`',
+      '`details.omitForDefaultBehavior: true`',
+    ]) {
+      if (content.includes(forbiddenToken)) {
+        throw new Error(`${fileName} should remain an entry point; move configuration-error field details to API / behavior docs: ${forbiddenToken}`);
+      }
+    }
+  }
+
+  if (
+    !readmeZh.includes('字段级细节以 [API 参考](./API.zh-CN.md) 为准')
+    || !readmeZh.includes('完整参数、返回字段和错误形态请看 [API 参考](./API.zh-CN.md)')
+    || !readmeZh.includes('README 只保留入口')
+    || !readmeEn.includes('field-level details belong in the [API Reference](./API.md)')
+    || !readmeEn.includes('For complete arguments, response fields, and error shapes, see the [API Reference](./API.md)')
+    || !readmeEn.includes('This README is only an entry point')
+  ) {
+    throw new Error('README files should explicitly route field-level and error-shape details to API docs.');
+  }
+}
+
 function findGuidanceShape(guidance, shapeId) {
   return guidance.outputResultShapeQuickReference?.resultShapes?.find((shape) => shape.id === shapeId);
 }
@@ -118,6 +165,8 @@ function assertGuidanceHighRiskContracts(guidance) {
 }
 
 function assertHighRiskDocumentationContracts({ readmeZh, readmeEn, apiDocs, behaviorDoc }) {
+  assertReadmeEntryPointBoundary({ readmeZh, readmeEn, apiDocs, behaviorDoc });
+
   const readmeDocs = {
     'README.md': readmeZh,
     'README.en.md': readmeEn,
