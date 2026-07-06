@@ -10,7 +10,7 @@
 | 你要判断的行为 | 建议先看 |
 |----------------|----------|
 | 工具能做什么、路径为什么会被拒绝 | 1-3 节 |
-| 参数默认值、无效配置、`workflowPreset` 和批量策略 | 4 节；显式传入的无效配置会被拒绝，绕过 MCP schema 时会抛出 `FontSplitConfigurationError`，并带有 `details.summaryType: "configuration-error"` |
+| 参数默认值、无效配置、`workflowPreset` 和批量策略 | 4 节；显式传入的无效配置会被拒绝，MCP schema 错误会返回 `mcp-schema-validation-error` JSON 工具错误，绕过 MCP schema 时会抛出 `FontSplitConfigurationError`，并带有 `details.summaryType: "configuration-error"` |
 | 单文件、批量、目录整理和输出审计流程 | 5-9 节 |
 | 最容易误解或需要人工复核的行为 | 10-11 节 |
 | 推荐批量参数组合 | 12 节 |
@@ -176,7 +176,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 - `batchCustomizationQuickReference[]` 是比 `batchPolicyGuide` 更短的批量自定义速查表。它给出最小 `overrideArgs`、带 `workflowPreset: "safe-preview"` 的 `previewArgs`、带 `workflowPreset: "reviewed-write"` 的 `writeArgsAfterReview`、`inspectFields`、`successCriteria` 和非直觉行为。
 - `batchPolicyGuide` 覆盖 `batchGroupBy`、`batchNamingMode`、`batchDedupeMode` 和 `batchErrorMode`。当用户想偏离默认 preset 行为时，应优先参考它选择最小显式覆盖，并先运行 safe-preview。
 - `toolOptionCatalog` 是输入侧目录，默认 compact 指南会返回，也可用 `sections: ["option-catalog"]` 单独请求。它覆盖 `split_font_batch`、`organize_font_directory`、`split_font`、`inspect_font_inputs` 和 `inspect_split_output` 的高影响参数。
-  它尤其用于避免误读 `split_font_batch.dryRun` 原始默认会写输出、`organize_font_directory.dryRun` 默认只预览、`parseFonts: false` 会限制 identity 去重，以及 `includeResults: false` / `includeFiles: false` 会省略大块明细。
+  它尤其用于避免误读 `split_font_batch.dryRun` 和 `organize_font_directory.dryRun` 的默认预览语义、`workflowPreset: "reviewed-write"` / 显式 `dryRun: false` 才会写输出、`parseFonts: false` 会限制 identity 去重，以及 `includeResults: false` / `includeFiles: false` 会省略大块明细。
 
 安全和输出解释：
 
@@ -216,9 +216,9 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 
 错误和字段目录：
 
-- `errorResponseCatalog` 解释 MCP 错误文本何时是 JSON、何时只是普通文本。带 `details` 的错误包含 `ok: false`、`name`、`errorType`、`error` 和 `details`；没有 `details` 的普通错误保持简短文本。
+- `errorResponseCatalog` 解释 MCP 错误 JSON 文本。工具错误都会包含 `ok: false` 和 `error`；结构化错误还会包含 `name`、`errorType` 和 `details`。
 - `errorType` 是 agent 最短路由字段；如果存在 `details.summaryType`，会优先使用它作为 `errorType`。
-  `FontSplitConfigurationError` 的 `errorType` 是 `configuration-error`；`BatchSplitError` 的 `errorType` 是 `batch-split-error`，继续前应检查 `details.errors[]` 和 `details.summary`。
+  MCP schema 校验错误的 `errorType` 是 `mcp-schema-validation-error`，应检查 `details.validationIssues[]`；`FontSplitConfigurationError` 的 `errorType` 是 `configuration-error`；`BatchSplitError` 的 `errorType` 是 `batch-split-error`，继续前应检查 `details.errors[]` 和 `details.summary`。
 - `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或 `sections: ["field-catalog"]` 时返回。它解释 `ok`、`performedSplit`、`usedFallback`、`skipped`、`skipReason`、`skippedExisting`、`skippedByManifest`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`stagingDirectoryDecision`、`outputStructureDecision`、`auditStatus`、`recommendedNextActions` 等关键字段。
   它用于降低 agent 误把“工具调用成功”理解成“字体已按用户想象完成处理”的风险，也用于避免把 `organize_font_directory.outputDir` 误当作已经生成的拆分输出。
 
@@ -468,7 +468,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 - `fail-fast`：遇到第一个单字体错误后立即抛出 `BatchSplitError`。
 - `fail-after`：继续处理选中的字体；如果最终存在任何单字体错误，则抛出 `BatchSplitError`，错误对象包含 `details.errors` 和 `details.summary`。
 
-通过 MCP Server 返回时，带 `details` 的错误会被序列化为 JSON 文本，包含 `ok: false`、`name`、`errorType`、`error` 和 `details`。这能让 AI agent 先按 `errorType: "batch-split-error"` 路由，再读取失败文件清单，避免只看到一句错误消息。
+通过 MCP Server 返回时，工具错误会被序列化为 JSON 文本。带 `details` 的批量错误包含 `ok: false`、`name`、`errorType`、`error` 和 `details`；MCP schema 校验错误包含 `errorType: "mcp-schema-validation-error"` 和 `details.validationIssues[]`。这能让 AI agent 先按 `errorType` 路由，再读取失败文件清单或参数校验问题，避免只看到一句错误消息。
 
 ### 4.11 `limit` / `maxFiles` / `includeResults` / `dryRun`（批量专用）
 
@@ -654,7 +654,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 
 需要特别注意：
 
-- `dryRun` 默认值与 `split_font_batch` 不同。`organize_font_directory` 默认 `true`，`split_font_batch` 默认 `false`。
+- `dryRun` 默认值与 `split_font_batch` 一样都是 `true`。真实整理或批量拆分写入需要 `workflowPreset: "reviewed-write"` 或显式 `dryRun: false`。
 - `parseFonts: false` 会跳过坏字体检测和真实 identity 去重；不要把 `invalidFontCount: null` 解读为没有坏字体。
 - 非字体文件会被忽略，但会进入 `inputCountGuide`、`unsupportedFileDecision` 和 `unsupportedFileSummary`。`inputCountGuide` 解释扫描数量是否完整、明细是否省略和忽略文件处理方式；`unsupportedFileDecision` 是快速判断，`unsupportedFileSummary` 是详细证据；后者统计所有非字体扩展名，包含 `unsupportedFileSummary.byExtension[]` 精确扩展名统计、`unsupportedFileSummary.byCategory[]` 概览分类、带处理语义的 `unsupportedFileSummary.categoryDetails[]`、总体 `unsupportedFileSummary.handlingSummary`、`unsupportedFileSummary.examples[]`、`unsupportedFileSummary.examplesTruncated` 和无扩展文件的 `<none>` 计数。
 - 扩展名像字体但解析失败的文件默认跳过；只有显式启用 `copyInvalidFonts`（例如 `copyInvalidFonts: true`）时才会纳入复制计划。

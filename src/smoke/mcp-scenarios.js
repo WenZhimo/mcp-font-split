@@ -1,3 +1,6 @@
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import {
@@ -14,6 +17,7 @@ import {
   getAgentGuidance,
 } from '../font-split.js';
 import { errorText } from '../mcp-response.js';
+import { buildMinimalTtf } from './fixtures.js';
 
 async function runMcpErrorSmoke() {
   const detailedError = new Error('batch failed');
@@ -58,10 +62,15 @@ async function runMcpErrorSmoke() {
   }
 
   const plain = errorText(new Error('plain failure'));
-  if (plain.content[0].text !== 'plain failure') {
-    throw new Error('Expected plain MCP error response to stay concise.');
+  const parsedPlain = JSON.parse(plain.content[0].text);
+  if (
+    plain.isError !== true
+    || parsedPlain.ok !== false
+    || parsedPlain.error !== 'plain failure'
+  ) {
+    throw new Error('Expected plain MCP error response to use machine-readable JSON.');
   }
-  console.log(JSON.stringify({ detailed: parsed, configuration: parsedConfiguration, plain: plain.content[0].text }, null, 2));
+  console.log(JSON.stringify({ detailed: parsed, configuration: parsedConfiguration, plain: parsedPlain }, null, 2));
 }
 
 async function runMcpSchemaSmoke() {
@@ -154,7 +163,7 @@ async function runMcpSchemaSmoke() {
     assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
     expectDescriptionIncludes('get_agent_guidance', ['projectStatusNotice', 'toolSafetyQuickReference', 'nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchCustomizationQuickReference', 'directoryOrganizationQuickAnswer', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
-    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to false', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'recommendedNextActions[].suggestedArgsField', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
+    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to true', 'workflowPreset:"reviewed-write"', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'recommendedNextActions[].suggestedArgsField', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
     expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'inputDirectoryDecision.directoryOrganizationSafety', 'without writing output', 'organize_font_directory safe-preview', 'whether it writes by default', 'whether reviewed organization can change source files', 'maxFiles', 'preserves']);
     expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'layoutDecision.directoryHandling', 'stagingDirectoryDecision', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'directoryWorkflowSummary.workflowSteps[].suggestedArgsField', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs', 'sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs', 'recommendedBatchPreviewArgs', 'recommendedNextActions', 'recommendedNextActions[].suggestedArgsField', 'suggestedArgs.maxFiles', 'maxFiles', 'preserves', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
     expectDescriptionIncludes('inspect_split_output', ['outputRoleDecision', 'font-organization-manifest.json', 'organize_font_directory staging', 'inspect_font_inputs', 'split_font_batch safe-preview', 'outputStructureDecision', 'auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
@@ -172,7 +181,100 @@ async function runMcpSchemaSmoke() {
   }
 }
 
+function parseTextJson(result, label) {
+  const text = result?.content?.find((item) => item.type === 'text')?.text;
+  if (typeof text !== 'string') {
+    throw new Error(`${label}: expected text JSON content.`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${label}: expected parseable JSON text: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function runMcpStdioCallSmoke() {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'font-split-mcp-stdio-'));
+  await fs.writeFile(
+    path.join(workspaceRoot, 'Fixture-Regular.ttf'),
+    buildMinimalTtf({ familyName: 'Fixture Sans', subfamilyName: 'Regular', glyphCount: 4 }),
+  );
+
+  const client = new Client({ name: 'mcp-stdio-call-smoke', version: '0.0.0' });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ['src/server.js'],
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      FONT_SPLIT_ROOT: workspaceRoot,
+    },
+  });
+  await client.connect(transport);
+  try {
+    const toolsResult = await client.listTools();
+    if (!toolsResult.tools.some((tool) => tool.name === 'split_font_batch')) {
+      throw new Error('Expected stdio MCP tools/list to expose split_font_batch.');
+    }
+
+    const batchResult = await client.callTool({
+      name: 'split_font_batch',
+      arguments: {
+        inputDir: '.',
+        outputRoot: 'split-output',
+        limit: 1,
+        includeResults: true,
+      },
+    });
+    const batch = parseTextJson(batchResult, 'split_font_batch stdio call');
+    if (
+      batch.ok !== true
+      || batch.dryRun !== true
+      || batch.writesOutputTree !== false
+      || batch.plannedCount !== 1
+      || batch.results
+    ) {
+      throw new Error('Expected omitted dryRun stdio batch call to stay no-write and return planned output.');
+    }
+    const outputExists = await fs.access(path.join(workspaceRoot, 'split-output')).then(() => true).catch(() => false);
+    if (outputExists) {
+      throw new Error('Expected omitted dryRun stdio batch call not to create outputRoot.');
+    }
+
+    const invalidDryRunResult = await client.callTool({
+      name: 'split_font_batch',
+      arguments: {
+        dryRun: 'false',
+      },
+    });
+    const invalidDryRun = parseTextJson(invalidDryRunResult, 'invalid dryRun stdio call');
+    if (
+      invalidDryRunResult.isError !== true
+      || invalidDryRun.ok !== false
+      || invalidDryRun.errorType !== 'mcp-schema-validation-error'
+      || invalidDryRun.details?.summaryType !== 'mcp-schema-validation-error'
+      || invalidDryRun.details?.toolName !== 'split_font_batch'
+      || !invalidDryRun.details?.validationIssues?.some((issue) => issue.path?.[0] === 'dryRun')
+    ) {
+      throw new Error('Expected invalid dryRun stdio call to return a structured MCP schema validation error result.');
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      toolCount: toolsResult.tools.length,
+      batchDryRun: batch.dryRun,
+      batchWritesOutputTree: batch.writesOutputTree,
+      plannedCount: batch.plannedCount,
+      invalidDryRunErrorType: invalidDryRun.errorType,
+    }, null, 2));
+  } finally {
+    await client.close();
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+}
+
 export {
   runMcpErrorSmoke,
   runMcpSchemaSmoke,
+  runMcpStdioCallSmoke,
 };

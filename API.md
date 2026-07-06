@@ -12,7 +12,7 @@ This server exposes seven MCP tools. All paths are resolved inside `FONT_SPLIT_R
 | Review high-risk behavior and non-intuitive defaults | [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md) |
 | See the Chinese version | [API 参考](./API.zh-CN.md) |
 
-Invalid explicit configuration values are rejected instead of silently falling back. MCP calls are guarded by the tool schema; direct module calls that bypass the MCP schema throw `FontSplitConfigurationError` with `details.summaryType: "configuration-error"`, `details.option`, `details.received`, `details.allowedValues` or `details.expectedType`, `details.defaultWhenOmitted`, and `details.omitForDefaultBehavior: true`. To use defaults, omit the option rather than passing an invalid enum, boolean, or numeric value.
+Invalid explicit configuration values are rejected instead of silently falling back. MCP calls are guarded by the tool schema; schema validation failures are returned as JSON tool errors with `errorType: "mcp-schema-validation-error"` and `details.validationIssues[]`. Direct module calls that bypass the MCP schema throw `FontSplitConfigurationError` with `details.summaryType: "configuration-error"`, `details.option`, `details.received`, `details.allowedValues` or `details.expectedType`, `details.defaultWhenOmitted`, and `details.omitForDefaultBehavior: true`. To use defaults, omit the option rather than passing an invalid enum, boolean, or numeric value.
 
 ## Directory Organization Safety Fields
 
@@ -157,8 +157,8 @@ Catalogs for interpreting responses:
 - `outputResultShapeQuickReference` is returned by default and with `sections: ["output-catalog"]`. It explains how to distinguish normal subset output, single-woff2 fallback, copy-original records, single-font skipped processing, batch existing-output skips, dry-run skip plans, and `ok:true` batch responses with `errorCount > 0`.
 - `unsupportedFileCategoryCatalog` explains `unsupportedFileSummary.byCategory[]`, representative extensions, category meaning, and handling behavior. Tool responses also include `unsupportedFileDecision`, `unsupportedFileSummary.categoryDetails[]`, and `unsupportedFileSummary.handlingSummary`.
   `archive` files are reported for awareness but are not extracted, copied, or split.
-- `errorResponseCatalog` is returned by default and with `sections: ["error-catalog"]`. Structured errors are JSON text with `ok: false`, `name`, `errorType`, `error`, and `details`.
-  `FontSplitConfigurationError` uses `errorType: "configuration-error"` from `details.summaryType`, and `BatchSplitError` uses `errorType: "batch-split-error"`.
+- `errorResponseCatalog` is returned by default and with `sections: ["error-catalog"]`. MCP tool errors are JSON text with `ok: false`, `error`, and optional `name`, `errorType`, and `details`.
+  `FontSplitConfigurationError` uses `errorType: "configuration-error"` from `details.summaryType`, MCP schema validation uses `errorType: "mcp-schema-validation-error"`, and `BatchSplitError` uses `errorType: "batch-split-error"`.
 - `warningCodeCatalog` is returned with `detailLevel: "full"` or `sections: ["warning-catalog"]`. It maps warning codes from `batchWarnings[]`, `inspectionWarnings[]`, and `organizationWarnings[]` to sources, severity, and suggested agent action.
 - `toolResponseFieldCatalog` is returned with `detailLevel: "full"` or `sections: ["field-catalog"]`. It explains fields that are easy to misread, including `ok`, `performedSplit`, `usedFallback`, `sourceDestructive`, `writesOutputTree`, `maxFilesHit`, and `recommendedNextActions`.
 
@@ -370,7 +370,7 @@ When the source directory shape is uncertain:
 | `limit` | positive integer, MCP max `50000` | `20` | Maximum fonts to process after dedupe. |
 | `maxFiles` | positive integer, MCP max `50000` | `5000` | Maximum source files to scan. |
 | `includeResults` | boolean | `true` | Include per-font `results[]`; set `false` for compact large-batch responses. |
-| `dryRun` | boolean | `false` | Preview scan, dedupe, naming, and skip decisions without writing output files. |
+| `dryRun` | boolean | `true` | Preview scan, dedupe, naming, and skip decisions without writing output files. Set `false` only after reviewing a preview, or use `workflowPreset: "reviewed-write"`. |
 | `workflowPreset` | `safe-preview`, `reviewed-write`, `structure-first`, `source-layout`, `metadata-family`, `preserve-all` | unset | Named preset applied before explicit options. Omit it to use raw tool defaults. Explicit options override preset values. |
 | `skipMode` | `manifest`, `force` | `manifest` | Existing-output skip policy. |
 | `batchGroupBy` | `auto`, `source-dir`, `font-family` | `auto` | First-level family directory strategy. |
@@ -412,7 +412,7 @@ If identity extraction fails for a file, batch dedupe falls back to that file's 
 `dedupeDecisionSummary` is the compact agent-facing explanation of the dedupe pass. It reports requested/effective mode, `keyStrategy`, `deduplicatedCount`, `skippedDuplicateCount`, `identityKeyMissingCount`, `pathFallbackUsed`, `dedupeLimitedByParsing`, `representativePriority`, and capped `identityEvidenceSummary` basis counts plus duplicate examples. If `pathFallbackUsed` or `dedupeLimitedByParsing` is true, do not claim semantic identity dedupe was fully available.
 
 `batchErrorMode` defaults to `fail-after`, which finishes selected fonts and then throws if any per-font errors occurred. Use `collect` only when the caller will inspect `errors[]` and `errorCount` itself, or `fail-fast` to throw on the first per-font error.
-When `fail-fast` or `fail-after` throws through the MCP server, the error response text is JSON with `ok: false`, `name`, `errorType`, `error`, and `details` so agents can route on `errorType: "batch-split-error"` and still read `details.errors[]` and `details.summary`.
+When `fail-fast` or `fail-after` throws through the MCP server, the error response text is JSON with `ok: false`, `name`, `errorType`, `error`, and `details` so agents can route on `errorType: "batch-split-error"` and still read `details.errors[]` and `details.summary`. MCP schema validation errors are also JSON tool errors with `errorType: "mcp-schema-validation-error"` and `details.validationIssues[]`.
 
 The standalone `batch:run` CLI uses the same configuration rejection policy at the command-line boundary. `default` is not valid as a named workflow preset; omit the option or environment variable to use the CLI default. Invalid preset rejection, invalid environment values, invalid positional arguments, and enum-like, boolean, or numeric configuration errors fail with `BatchRunConfigurationError` and include `errorType` in JSON mode.
 
@@ -551,7 +551,7 @@ Use ignored-file fields like this:
 
 Non-intuitive behavior to watch:
 
-- `dryRun` defaults to `true`, unlike `split_font_batch`, where `dryRun` defaults to `false`.
+- `dryRun` defaults to `true`, matching the safer `split_font_batch` raw default. Reviewed writes still require `workflowPreset: "reviewed-write"` or an explicit `dryRun: false`.
 - The tool copies fonts into a staging directory; it does not split fonts and does not generate CSS.
 - `parseFonts: false` is structure-only. It avoids metadata parsing, but cannot detect invalid fonts, cannot provide glyph counts, and cannot do true identity dedupe or metadata-driven family grouping.
 - Non-font files are ignored; inspect `unsupportedFileSummary` when the source tree includes archives, docs, screenshots, or generated assets. Invalid font-like files are skipped unless `copyInvalidFonts: true`.

@@ -7,7 +7,7 @@ export const ERROR_RESPONSE_CATALOG = {
     mcpResponseShape: {
       isError: true,
       contentType: 'text',
-      jsonTextWhenDetailsPresent: true,
+      jsonTextAlways: true,
       fields: ['ok', 'error', 'name', 'errorType', 'details'],
     },
     detailsFields: [
@@ -31,11 +31,30 @@ export const ERROR_RESPONSE_CATALOG = {
     mcpResponseShape: {
       isError: true,
       contentType: 'text',
-      jsonTextWhenDetailsPresent: true,
+      jsonTextAlways: true,
       fields: ['ok', 'error', 'name', 'errorType', 'details'],
     },
     detailsFields: ['mode', 'errors', 'summary'],
     agentAction: 'Parse the JSON text, inspect every details.errors[] entry and details.summary, then resolve or disclose failures before claiming batch success.',
+  },
+  mcpSchemaValidationError: {
+    errorType: 'mcp-schema-validation-error',
+    detailsSummaryType: 'mcp-schema-validation-error',
+    emittedWhen: 'The MCP SDK rejects a tools/call argument before the tool handler runs, such as a string passed for a boolean option.',
+    mcpResponseShape: {
+      isError: true,
+      contentType: 'text',
+      jsonTextAlways: true,
+      fields: ['ok', 'error', 'errorType', 'details'],
+    },
+    detailsFields: [
+      'summaryType',
+      'toolName',
+      'validationIssues',
+      'validationMessage',
+    ],
+    agentAction: 'Treat this as caller schema failure. Fix the argument type or omit the option for default behavior, then rerun the tool call.',
+    nonIntuitiveBehavior: 'This error is produced before the tool handler runs, but the server still wraps it as JSON text for machine-readable MCP consumption.',
   },
   plainError: {
     errorName: 'Error',
@@ -43,9 +62,9 @@ export const ERROR_RESPONSE_CATALOG = {
     mcpResponseShape: {
       isError: true,
       contentType: 'text',
-      plainTextWhenNoDetails: true,
-      fields: ['error-message-text'],
+      jsonTextAlways: true,
+      fields: ['ok', 'error'],
     },
-    agentAction: 'Treat the text as a failure message. If structured recovery is needed, reproduce through a path that attaches details or inspect logs/context.',
+    agentAction: 'Parse the JSON text and treat error as the failure message. If richer recovery is needed, reproduce through a path that attaches details or inspect logs/context.',
   },
 };

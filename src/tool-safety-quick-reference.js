@@ -77,8 +77,8 @@ export function buildToolSafetyQuickReference() {
       },
       {
         tool: 'split_font_batch',
-        defaultWritesFiles: true,
-        defaultMode: 'reviewed-write-required-for-real-output',
+        defaultWritesFiles: false,
+        defaultMode: 'dry-run-preview',
         safePreviewArgs: { workflowPreset: 'safe-preview' },
         reviewedWriteArgs: { workflowPreset: 'reviewed-write' },
         sourceDestructive: false,
@@ -86,7 +86,7 @@ export function buildToolSafetyQuickReference() {
         writeScope: 'outputRoot',
         outputAuditRequiredAfterWrite: true,
         mustInspectFields: ['sourceSafetyDecision', 'safetySummary', 'dryRun', 'batchDecision', 'batchWarnings', 'maxFilesHit', 'dedupeDecisionSummary', 'errorCount', 'errors', 'recommendedNextActions'],
-        nonIntuitiveBehavior: 'Raw split_font_batch defaults to dryRun:false, so agents should use workflowPreset safe-preview before any real write.',
+        nonIntuitiveBehavior: 'Raw split_font_batch defaults to dryRun:true; agents should still review the preview and use workflowPreset reviewed-write before any real output.',
       },
       {
         tool: 'inspect_split_output',

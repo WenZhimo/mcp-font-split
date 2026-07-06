@@ -12,7 +12,7 @@ import {
 } from './catalogs.js';
 
 export const RAW_BATCH_OPTION_DEFAULTS = {
-  dryRun: false,
+  dryRun: true,
   includeResults: true,
   skipMode: 'manifest',
   batchGroupBy: 'auto',

@@ -64,6 +64,7 @@
     "smoke:inspect-organized-staging": "node src/smoke-test.js inspect-organized-staging",
     "smoke:mcp-error": "node src/smoke-test.js mcp-error",
     "smoke:mcp-schema": "node src/smoke-test.js mcp-schema",
+    "smoke:mcp-stdio-call": "node src/smoke-test.js mcp-stdio-call",
     "smoke:api-docs": "node src/smoke-test.js api-docs",
     "smoke:behavior-docs": "node src/smoke-test.js behavior-docs",
     "smoke:runtime-status": "node src/smoke-test.js runtime-status",

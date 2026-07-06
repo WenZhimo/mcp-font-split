@@ -10,7 +10,7 @@ export const SHARED_DRY_RUN_RESPONSE_FIELD_CATALOG = {
   dryRun: {
     sourceTools: ['split_font_batch', 'organize_font_directory'],
     meaning: 'Whether the call only planned work instead of writing output.',
-    agentAction: 'Confirm this explicitly because split_font_batch defaults to false while organize_font_directory defaults to true.',
+    agentAction: 'Confirm this explicitly because both split_font_batch and organize_font_directory default to no-write dry-run previews; real writes require reviewed-write or explicit dryRun false.',
   },
 };
 

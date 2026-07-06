@@ -154,8 +154,10 @@ async function runAgentGuidanceSmoke() {
     || !catalogGuidance.errorResponseCatalog.configurationError?.mcpResponseShape?.fields?.includes('errorType')
     || !catalogGuidance.errorResponseCatalog.configurationError?.mcpResponseShape?.fields?.includes('details')
     || catalogGuidance.errorResponseCatalog.batchSplitError?.errorType !== 'batch-split-error'
-    || !catalogGuidance.errorResponseCatalog.batchSplitError?.mcpResponseShape?.jsonTextWhenDetailsPresent
-    || !catalogGuidance.errorResponseCatalog.plainError?.mcpResponseShape?.plainTextWhenNoDetails
+    || !catalogGuidance.errorResponseCatalog.batchSplitError?.mcpResponseShape?.jsonTextAlways
+    || catalogGuidance.errorResponseCatalog.mcpSchemaValidationError?.errorType !== 'mcp-schema-validation-error'
+    || !catalogGuidance.errorResponseCatalog.mcpSchemaValidationError?.mcpResponseShape?.fields?.includes('details')
+    || !catalogGuidance.errorResponseCatalog.plainError?.mcpResponseShape?.jsonTextAlways
   ) {
     throw new Error('Expected errorResponseCatalog to describe structured MCP error payloads and configuration errors.');
   }
@@ -269,7 +271,7 @@ async function runAgentGuidanceSmoke() {
     || !organizerSafety?.mustInspectFields?.includes('safetySummary')
     || !Array.isArray(organizerSafety?.nonIntuitiveBehavior)
     || !canonicalOrganizerSafety.nonIntuitiveBehavior.every((item) => organizerSafety.nonIntuitiveBehavior.includes(item))
-    || batchSafety?.defaultWritesFiles !== true
+    || batchSafety?.defaultWritesFiles !== false
     || batchSafety?.safePreviewArgs?.workflowPreset !== 'safe-preview'
     || batchSafety?.sourceDestructive !== false
     || batchSafety?.outputAuditRequiredAfterWrite !== true
@@ -520,7 +522,7 @@ async function runAgentGuidanceSmoke() {
     || !result.toolResponseFieldCatalog?.toolOptionCatalog
     || !result.toolOptionCatalog?.split_font_batch?.options?.workflowPreset?.allowedValues?.includes('safe-preview')
     || !result.toolOptionCatalog?.split_font_batch?.options?.workflowPreset?.allowedValues?.includes('reviewed-write')
-    || result.toolOptionCatalog?.split_font_batch?.options?.dryRun?.defaultValue !== false
+    || result.toolOptionCatalog?.split_font_batch?.options?.dryRun?.defaultValue !== true
     || !result.toolOptionCatalog?.split_font_batch?.options?.includeResults?.nonIntuitiveBehavior?.includes('Set false for large reviewed writes')
     || result.toolOptionCatalog?.organize_font_directory?.options?.dryRun?.defaultValue !== true
     || result.toolOptionCatalog?.organize_font_directory?.sourceDestructive !== false

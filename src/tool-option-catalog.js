@@ -14,14 +14,14 @@ export function buildToolOptionCatalog({
   purpose: 'Machine-readable guide to the tool input options that most often change behavior, safety, response size, or output structure.',
   useHow: [
     'Start with workflowPreset when available, then add only the smallest explicit override required by user intent.',
-    'Treat defaults as tool-specific: organize_font_directory defaults to dryRun true, while split_font_batch defaults to dryRun false.',
+    'Treat default batch and organization calls as no-write previews; real writes require reviewed-write or an explicit dryRun false.',
     'After changing an option, inspect the listed response fields before claiming the option behaved as intended.',
   ],
   readOrder: ['split_font_batch', 'organize_font_directory', 'split_font', 'inspect_font_inputs', 'inspect_split_output'],
   split_font_batch: {
     tool: 'split_font_batch',
     sourceDestructive: false,
-    writesFilesByDefault: true,
+    writesFilesByDefault: false,
     preferredSafeStart: { workflowPreset: 'safe-preview' },
     preferredReviewedWrite: { workflowPreset: 'reviewed-write' },
     inspectAfterOverride: ['sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'batchDecision', 'batchWarnings', 'dedupeDecisionSummary', 'maxFilesHit', 'errorCount', 'errors'],
@@ -34,9 +34,9 @@ export function buildToolOptionCatalog({
         inspectFields: ['workflowPreset', 'batchPolicySummary', 'sourceSafetyDecision', 'safetySummary'],
       },
       dryRun: {
-        defaultValue: false,
-        useWhen: 'Set true before unfamiliar batch writes to preview scan, dedupe, naming, and skip decisions.',
-        nonIntuitiveBehavior: 'The raw split_font_batch default can write output; safe-preview sets dryRun true for agent-safe planning.',
+        defaultValue: true,
+        useWhen: 'Keep true for unfamiliar batch runs to preview scan, dedupe, naming, and skip decisions.',
+        nonIntuitiveBehavior: 'The raw split_font_batch default is now no-write; real output requires reviewed-write or explicit dryRun false after preview review.',
         inspectFields: ['dryRun', 'sourceSafetyDecision', 'writesOutputTree', 'planned', 'batchDecision'],
       },
       includeResults: {

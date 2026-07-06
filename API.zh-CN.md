@@ -12,7 +12,7 @@
 | 查看高风险行为和非直觉默认值 | [工具完整行为说明](./BEHAVIOR.zh-CN.md) |
 | 阅读英文版 | [API Reference](./API.md) |
 
-显式传入的无效配置会被拒绝，而不是静默回退。MCP 调用会先经过工具 schema；绕过 MCP schema 直接调用模块函数时，会抛出 `FontSplitConfigurationError`，并在 `details.summaryType: "configuration-error"`、`details.option`、`details.received`、`details.allowedValues` 或 `details.expectedType`、`details.defaultWhenOmitted`、`details.omitForDefaultBehavior: true` 中给出机器可读细节。需要默认行为时应省略该选项，而不是传入无效的枚举、布尔或数字值。
+显式传入的无效配置会被拒绝，而不是静默回退。MCP 调用会先经过工具 schema；schema 校验失败会返回 JSON 工具错误，带 `errorType: "mcp-schema-validation-error"` 和 `details.validationIssues[]`。绕过 MCP schema 直接调用模块函数时，会抛出 `FontSplitConfigurationError`，并在 `details.summaryType: "configuration-error"`、`details.option`、`details.received`、`details.allowedValues` 或 `details.expectedType`、`details.defaultWhenOmitted`、`details.omitForDefaultBehavior: true` 中给出机器可读细节。需要默认行为时应省略该选项，而不是传入无效的枚举、布尔或数字值。
 
 ## 目录整理安全字段速查
 
@@ -157,8 +157,8 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 - `outputResultShapeQuickReference` 默认返回，也可通过 `sections: ["output-catalog"]` 聚焦请求。它解释如何区分正常 subset 输出、单 WOFF2 fallback、copy-original 记录、单字体绕过处理、批量已有输出跳过、dry-run 跳过计划，以及 `errorCount > 0` 的 `ok:true` 批量响应。
 - `unsupportedFileCategoryCatalog` 解释 `unsupportedFileSummary.byCategory[]`、代表性扩展名、分类含义和处理行为。工具响应也会提供 `unsupportedFileDecision`、`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary`。
   `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
-- `errorResponseCatalog` 默认返回，也可通过 `sections: ["error-catalog"]` 聚焦请求。结构化错误是 JSON 文本，包含 `ok: false`、`name`、`errorType`、`error` 和 `details`。
-  `FontSplitConfigurationError` 会从 `details.summaryType` 得到 `errorType: "configuration-error"`，`BatchSplitError` 会使用 `errorType: "batch-split-error"`。
+- `errorResponseCatalog` 默认返回，也可通过 `sections: ["error-catalog"]` 聚焦请求。MCP 工具错误是 JSON 文本，包含 `ok: false`、`error`，以及可选的 `name`、`errorType` 和 `details`。
+  `FontSplitConfigurationError` 会从 `details.summaryType` 得到 `errorType: "configuration-error"`，MCP schema 校验错误会使用 `errorType: "mcp-schema-validation-error"`，`BatchSplitError` 会使用 `errorType: "batch-split-error"`。
 - `warningCodeCatalog` 在 `detailLevel: "full"` 或 `sections: ["warning-catalog"]` 时返回。它把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的 warning code 映射到来源、严重度和建议动作。
 - `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或 `sections: ["field-catalog"]` 时返回。它解释容易误读的字段，包括 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit` 和 `recommendedNextActions`。
 
@@ -412,7 +412,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 `dedupeDecisionSummary` 是面向 agent 的紧凑去重解释。它会报告请求/实际去重模式、`keyStrategy`、`deduplicatedCount`、`skippedDuplicateCount`、`identityKeyMissingCount`、`pathFallbackUsed`、`dedupeLimitedByParsing`、`representativePriority`，以及 capped `identityEvidenceSummary` identity basis 计数和重复样例。如果 `pathFallbackUsed` 或 `dedupeLimitedByParsing` 为 true，就不要宣称语义 identity 去重已经完整可用。
 
 `batchErrorMode` 默认是 `fail-after`，会处理完选中的字体后，如果存在任何单字体错误就抛错。只有当调用方会主动检查 `errors[]` 和 `errorCount` 时才建议显式使用 `collect`；需要首个错误立刻失败时使用 `fail-fast`。
-当 `fail-fast` 或 `fail-after` 通过 MCP Server 抛错时，错误响应文本是 JSON，包含 `ok: false`、`name`、`errorType`、`error` 和 `details`，因此 agent 可以先按 `errorType: "batch-split-error"` 路由，再读取 `details.errors[]` 与 `details.summary`。
+当 `fail-fast` 或 `fail-after` 通过 MCP Server 抛错时，错误响应文本是 JSON，包含 `ok: false`、`name`、`errorType`、`error` 和 `details`，因此 agent 可以先按 `errorType: "batch-split-error"` 路由，再读取 `details.errors[]` 与 `details.summary`。MCP schema 校验错误也会以 JSON 工具错误返回，包含 `errorType: "mcp-schema-validation-error"` 和 `details.validationIssues[]`。
 
 独立的 `batch:run` CLI 在命令行边界使用同一套配置拒绝策略。`default` 不是有效值，不能作为具名 workflow preset；需要 CLI 默认行为时应省略对应选项或环境变量。无效 preset 拒绝、无效环境变量、无效位置参数，以及枚举型、布尔型或数字型配置错误都会以 `BatchRunConfigurationError` 失败，并在 JSON 模式中带 `errorType`。
 
@@ -551,7 +551,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 
 需要特别注意的非直觉行为：
 
-- `dryRun` 默认是 `true`，这与 `split_font_batch` 的默认 `dryRun: false` 不同。
+- `dryRun` 默认是 `true`，与更安全的 `split_font_batch` 原始默认一致。真实写入仍需要 `workflowPreset: "reviewed-write"` 或显式 `dryRun: false`。
 - 该工具只整理/复制字体，不会拆分字体，也不会生成 CSS。
 - `parseFonts: false` 是结构优先模式：它会跳过字体元数据解析，因此不能检测坏字体、不能提供 glyph count，也不能做真正的 identity 去重或完全基于 metadata 的 family 分组。
 - 非字体文件会被忽略；当源目录混有压缩包、文档、截图或生成产物时，先看 `unsupportedFileSummary`。扩展名像字体但解析失败的文件默认跳过，除非 `copyInvalidFonts: true`。

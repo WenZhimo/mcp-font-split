@@ -51,6 +51,45 @@ export function formatToolError(error) {
   return payload;
 }
 
+function parseMcpValidationError(message) {
+  if (typeof message !== 'string') {
+    return null;
+  }
+  const validationStart = message.indexOf('Input validation error: Invalid arguments for tool ');
+  if (validationStart < 0) {
+    return null;
+  }
+  const validationMessage = message.slice(validationStart);
+  const match = validationMessage.match(/^Input validation error: Invalid arguments for tool ([^:]+): ([\s\S]*)$/);
+  if (!match) return null;
+  const [, toolName, validationText] = match;
+  let validationIssues = null;
+  try {
+    validationIssues = JSON.parse(validationText);
+  } catch {
+    validationIssues = null;
+  }
+  return {
+    summaryType: 'mcp-schema-validation-error',
+    toolName,
+    validationIssues,
+    validationMessage: validationText,
+  };
+}
+
+export function formatMcpServerErrorMessage(message) {
+  const payload = {
+    ok: false,
+    error: message,
+  };
+  const validationDetails = parseMcpValidationError(message);
+  if (validationDetails) {
+    payload.errorType = validationDetails.summaryType;
+    payload.details = validationDetails;
+  }
+  return payload;
+}
+
 function stringifyErrorPayload(payload) {
   try {
     return JSON.stringify(payload, null, 2);
@@ -70,7 +109,20 @@ export function errorText(error) {
     content: [
       {
         type: 'text',
-        text: Object.hasOwn(payload, 'details') ? stringifyErrorPayload(payload) : payload.error,
+        text: stringifyErrorPayload(payload),
+      },
+    ],
+  };
+}
+
+export function errorMessageText(message) {
+  const payload = formatMcpServerErrorMessage(message);
+  return {
+    isError: true,
+    content: [
+      {
+        type: 'text',
+        text: stringifyErrorPayload(payload),
       },
     ],
   };

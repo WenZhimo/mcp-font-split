@@ -23,7 +23,7 @@ import {
   runInspectSmoke,
   runInspectStructureSmoke,
 } from './inspect-scenarios.js';
-import { runMcpErrorSmoke, runMcpSchemaSmoke } from './mcp-scenarios.js';
+import { runMcpErrorSmoke, runMcpSchemaSmoke, runMcpStdioCallSmoke } from './mcp-scenarios.js';
 import {
   runOrganizeCopySmoke,
   runOrganizeDryRunSmoke,
@@ -65,6 +65,7 @@ const SMOKE_SCENARIOS = new Map([
   ['inspect-organized-staging', runInspectOrganizedStagingSmoke],
   ['mcp-error', runMcpErrorSmoke],
   ['mcp-schema', runMcpSchemaSmoke],
+  ['mcp-stdio-call', runMcpStdioCallSmoke],
   ['api-docs', runApiDocsSmoke],
   ['behavior-docs', runBehaviorDocsSmoke],
   ['batch-compact', runBatchCompactSmoke],
@@ -101,7 +102,7 @@ const SMOKE_SCENARIO_GROUPS = Object.freeze({
   inspect: ['inspect', 'inspect-compact', 'inspect-structure', 'inspect-organized-staging'],
   guidance: ['agent-guidance'],
   docs: ['api-docs', 'behavior-docs'],
-  mcp: ['mcp-error', 'mcp-schema'],
+  mcp: ['mcp-error', 'mcp-schema', 'mcp-stdio-call'],
   localCheck: ['check-compact'],
   realCorpus: ['real-corpus-suite', 'real-corpus-readonly', 'real-corpus-targets', 'real-corpus-integration'],
 });

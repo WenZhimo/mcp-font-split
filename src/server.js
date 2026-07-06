@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { BATCH_DEDUPE_MODES, BATCH_ERROR_MODES, BATCH_GROUP_BY_MODES, BATCH_NAMING_MODES, GUIDANCE_DETAIL_LEVELS, GUIDANCE_SECTION_NAMES, GUIDANCE_WORKFLOWS, OVERSIZED_KERN_ACTIONS, SKIP_MODES, SMALL_GLYPH_ACTIONS, SPLIT_FAILURE_ACTIONS, WORKFLOW_PRESET_NAMES, getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
-import { errorText, jsonText } from './mcp-response.js';
+import { errorMessageText, errorText, jsonText } from './mcp-response.js';
 
 const require = createRequire(import.meta.url);
 const packageJson = require('../package.json');
@@ -53,6 +53,7 @@ const server = new McpServer({
   name: 'font-split-mcp',
   version: packageJson.version,
 });
+server.createToolError = (message) => errorMessageText(message);
 
 server.registerTool(
   'get_agent_guidance',
@@ -110,14 +111,14 @@ server.registerTool(
   'split_font_batch',
   {
     title: 'Batch split fonts under a directory',
-    description: 'Call this when the user wants to split many local font files under a directory. dryRun defaults to false and can write output files; agents should set dryRun:true with includeResults:true to preview scan, dedupe, naming, skip decisions, sourceSafetyDecision, safetySummary, configurationTrace, batchPolicySummary, outputTreeInsideInputTree, batchDecision, recommendedNextActions[].suggestedArgsField, and batchWarnings before writing. Source font files are never moved or deleted, but writesSourceTree can be true when outputRoot is inside or equal to inputDir. If the directory shape is uncertain, call get_agent_guidance sections:["examples"] and review source-layout-mismatch-comparison, or run organize_font_directory safe-preview first.',
+    description: 'Call this when the user wants to split many local font files under a directory. dryRun defaults to true, so omitted dryRun is a no-write preview with includeResults:true for scan, dedupe, naming, skip decisions, sourceSafetyDecision, safetySummary, configurationTrace, batchPolicySummary, outputTreeInsideInputTree, batchDecision, recommendedNextActions[].suggestedArgsField, and batchWarnings. To write output files, use workflowPreset:"reviewed-write" or explicitly set dryRun:false only after reviewing a preview. Source font files are never moved or deleted, but writesSourceTree can be true when outputRoot is inside or equal to inputDir. If the directory shape is uncertain, call get_agent_guidance sections:["examples"] and review source-layout-mismatch-comparison, or run organize_font_directory safe-preview first.',
     inputSchema: {
       inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
       outputRoot: z.string().optional().describe('Directory to place per-font output folders. Defaults to split-output.'),
       limit: z.number().int().positive().max(50000).optional().describe('Maximum fonts to process after dedupe. Defaults to 20.'),
       maxFiles: z.number().int().positive().max(50000).optional().describe('Maximum files to scan. Defaults to 5000.'),
       includeResults: z.boolean().optional().describe('Include per-font result objects in the response. Default: true. Set false for large batch runs that only need summary counts and errors.'),
-      dryRun: z.boolean().optional().describe('Preview scan, dedupe, naming, and skip decisions without writing output files. Default: false.'),
+      dryRun: z.boolean().optional().describe('Preview scan, dedupe, naming, and skip decisions without writing output files. Default: true. Set false only after reviewing a preview, or use workflowPreset:"reviewed-write".'),
       ...Object.fromEntries(Object.entries(SplitFontOptions).filter(([key]) => !['fontPath', 'outDir'].includes(key))),
       ...BatchPolicyOptions,
     },

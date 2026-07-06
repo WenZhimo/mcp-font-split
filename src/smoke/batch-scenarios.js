@@ -1174,7 +1174,7 @@ async function runBatchDefaultsSmoke() {
     expectedType: 'enum',
   });
 
-  let defaultThrew = false;
+  let defaultPreviewError;
   try {
     await splitFontBatch({
       inputDir,
@@ -1184,13 +1184,17 @@ async function runBatchDefaultsSmoke() {
       silent: true,
     });
   } catch (error) {
-    defaultThrew = true;
-    if (error.name !== 'BatchSplitError' || error.details?.mode !== 'fail-after') {
-      throw error;
-    }
+    defaultPreviewError = error;
   }
-  if (!defaultThrew) {
-    throw new Error('Expected default batchErrorMode to be fail-after.');
+  if (
+    defaultPreviewError?.name !== 'BatchSplitError'
+    || defaultPreviewError.details?.mode !== 'fail-after'
+    || defaultPreviewError.details?.summary?.dryRun !== true
+    || defaultPreviewError.details?.summary?.writesOutputTree !== false
+    || defaultPreviewError.details?.summary?.safetySummary?.operationMode !== 'preview-only'
+    || defaultPreviewError.details?.summary?.errorCount !== 1
+  ) {
+    throw new Error('Expected omitted dryRun splitFontBatch call to default to a no-write preview while fail-after preserves error details.');
   }
 
   const overridden = await splitFontBatch({
@@ -1199,6 +1203,7 @@ async function runBatchDefaultsSmoke() {
     limit: 2,
     maxFiles: 10,
     skipMode: 'force',
+    dryRun: false,
     batchErrorMode: 'collect',
     silent: true,
   });
@@ -1207,7 +1212,13 @@ async function runBatchDefaultsSmoke() {
   }
 
   console.log(JSON.stringify({
-    defaultThrew,
+    defaultPreviewError: {
+      name: defaultPreviewError.name,
+      mode: defaultPreviewError.details?.mode,
+      dryRun: defaultPreviewError.details?.summary?.dryRun,
+      writesOutputTree: defaultPreviewError.details?.summary?.writesOutputTree,
+      errorCount: defaultPreviewError.details?.summary?.errorCount,
+    },
     overridden: {
       skipMode: overridden.skipMode,
       batchErrorMode: overridden.batchErrorMode,
