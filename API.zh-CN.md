@@ -1,6 +1,6 @@
 # API 参考
 
-本 MCP Server 暴露 7 个工具。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。响应路径会用 `.` 表示工作区根目录，而不是空字符串；推荐后续调用参数也遵循这个规则。
+本 MCP Server 暴露 7 个工具、5 个文档 resources 和 1 个工作流 prompt。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。响应路径会用 `.` 表示工作区根目录，而不是空字符串；推荐后续调用参数也遵循这个规则。
 
 ## 如何阅读这份 API
 
@@ -13,6 +13,26 @@
 | 阅读英文版 | [API Reference](./API.md) |
 
 显式传入的无效配置会被拒绝，而不是静默回退。MCP 调用会先经过工具 schema；schema 校验失败会返回 JSON 工具错误，带 `errorType: "mcp-schema-validation-error"` 和 `details.validationIssues[]`。绕过 MCP schema 直接调用模块函数时，会抛出 `FontSplitConfigurationError`，并在 `details.summaryType: "configuration-error"`、`details.option`、`details.received`、`details.allowedValues` 或 `details.expectedType`、`details.defaultWhenOmitted`、`details.omitForDefaultBehavior: true` 中给出机器可读细节。需要默认行为时应省略该选项，而不是传入无效的枚举、布尔或数字值。
+
+## MCP 表面和响应契约
+
+工具调用会同时返回 `structuredContent` 和兼容旧客户端的 JSON 文本 `content[0].text`。新的 MCP 客户端应优先读取 `structuredContent` 来做字段级消费；只支持文本内容的客户端仍可解析 JSON 文本。工具错误也采用同样的双形态，并带 `isError: true`，因此调用方可以优先按 `structuredContent.errorType` 路由。
+
+文档 resources：
+
+| URI | 内容 |
+|-----|------|
+| `font-split://docs/readme.zh-CN` | 中文 README |
+| `font-split://docs/readme.en` | 英文 README |
+| `font-split://docs/api.en` | 英文 API 参考 |
+| `font-split://docs/api.zh-CN` | 中文 API 参考 |
+| `font-split://docs/behavior.zh-CN` | 中文行为和风险说明 |
+
+工作流 prompt：
+
+| Prompt | 用途 |
+|--------|------|
+| `safe-batch-workflow` | 生成“预检 → safe-preview → reviewed-write → 输出审计”的安全批量流程提示。可选参数：`inputDir`、`outputRoot`。 |
 
 ## 目录整理安全字段速查
 
@@ -157,7 +177,7 @@ AI agent 在不确定该走单文件、批量、预检、整理还是审计流�
 - `outputResultShapeQuickReference` 默认返回，也可通过 `sections: ["output-catalog"]` 聚焦请求。它解释如何区分正常 subset 输出、单 WOFF2 fallback、copy-original 记录、单字体绕过处理、批量已有输出跳过、dry-run 跳过计划，以及 `errorCount > 0` 的 `ok:true` 批量响应。
 - `unsupportedFileCategoryCatalog` 解释 `unsupportedFileSummary.byCategory[]`、代表性扩展名、分类含义和处理行为。工具响应也会提供 `unsupportedFileDecision`、`unsupportedFileSummary.categoryDetails[]` 和 `unsupportedFileSummary.handlingSummary`。
   `archive` 文件只会被报告用于提醒，不会被解压、复制或拆分。
-- `errorResponseCatalog` 默认返回，也可通过 `sections: ["error-catalog"]` 聚焦请求。MCP 工具错误是 JSON 文本，包含 `ok: false`、`error`，以及可选的 `name`、`errorType` 和 `details`。
+- `errorResponseCatalog` 默认返回，也可通过 `sections: ["error-catalog"]` 聚焦请求。MCP 工具错误会在 `structuredContent` 和 JSON 文本里提供同一份载荷，包含 `ok: false`、`error`，以及可选的 `name`、`errorType` 和 `details`。
   `FontSplitConfigurationError` 会从 `details.summaryType` 得到 `errorType: "configuration-error"`，MCP schema 校验错误会使用 `errorType: "mcp-schema-validation-error"`，`BatchSplitError` 会使用 `errorType: "batch-split-error"`。
 - `warningCodeCatalog` 在 `detailLevel: "full"` 或 `sections: ["warning-catalog"]` 时返回。它把 `batchWarnings[]`、`inspectionWarnings[]` 和 `organizationWarnings[]` 中的 warning code 映射到来源、严重度和建议动作。
 - `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或 `sections: ["field-catalog"]` 时返回。它解释容易误读的字段，包括 `ok`、`performedSplit`、`usedFallback`、`sourceDestructive`、`writesOutputTree`、`maxFilesHit` 和 `recommendedNextActions`。

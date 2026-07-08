@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import fs from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -55,16 +56,119 @@ const server = new McpServer({
 });
 server.createToolError = (message) => errorMessageText(message);
 
+const ToolOutputSchema = z.object({}).passthrough();
+
+const DocumentationResources = [
+  {
+    name: 'readme-zh-cn',
+    uri: 'font-split://docs/readme.zh-CN',
+    title: 'README zh-CN',
+    fileName: 'README.md',
+    description: 'Chinese project entry README.',
+  },
+  {
+    name: 'readme-en',
+    uri: 'font-split://docs/readme.en',
+    title: 'README English',
+    fileName: 'README.en.md',
+    description: 'English project entry README.',
+  },
+  {
+    name: 'api-en',
+    uri: 'font-split://docs/api.en',
+    title: 'API Reference English',
+    fileName: 'API.md',
+    description: 'English MCP tool and response field reference.',
+  },
+  {
+    name: 'api-zh-cn',
+    uri: 'font-split://docs/api.zh-CN',
+    title: 'API Reference zh-CN',
+    fileName: 'API.zh-CN.md',
+    description: 'Chinese MCP tool and response field reference.',
+  },
+  {
+    name: 'behavior-zh-cn',
+    uri: 'font-split://docs/behavior.zh-CN',
+    title: 'Behavior Notes zh-CN',
+    fileName: 'BEHAVIOR.zh-CN.md',
+    description: 'Chinese high-risk behavior and workflow notes.',
+  },
+];
+
+async function readDocumentationResource(uri, fileName) {
+  const text = await fs.readFile(new URL(`../${fileName}`, import.meta.url), 'utf8');
+  return {
+    contents: [
+      {
+        uri: uri.href,
+        mimeType: 'text/markdown',
+        text,
+      },
+    ],
+  };
+}
+
+for (const resource of DocumentationResources) {
+  server.registerResource(
+    resource.name,
+    resource.uri,
+    {
+      title: resource.title,
+      description: resource.description,
+      mimeType: 'text/markdown',
+    },
+    (uri) => readDocumentationResource(uri, resource.fileName),
+  );
+}
+
+server.registerPrompt(
+  'safe-batch-workflow',
+  {
+    title: 'Safe Batch Workflow',
+    description: 'Plan a safe inspect -> preview -> reviewed write -> audit workflow for batch font splitting.',
+    argsSchema: {
+      inputDir: z.string().optional().describe('Source font directory inside FONT_SPLIT_ROOT.'),
+      outputRoot: z.string().optional().describe('Split output root inside FONT_SPLIT_ROOT.'),
+    },
+  },
+  (args) => {
+    const inputDir = args.inputDir || '<font-source-dir>';
+    const outputRoot = args.outputRoot || '<split-output-root>';
+    return {
+      description: 'Safe workflow prompt for mcp-font-split batch runs.',
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: [
+              'Use mcp-font-split safely for a batch font split.',
+              `1. Call inspect_font_inputs with inputDir: "${inputDir}", includeFiles:false, and an appropriate maxFiles.`,
+              '2. If layout is uncertain, call organize_font_directory with workflowPreset:"safe-preview".',
+              `3. Call split_font_batch with inputDir: "${inputDir}", outputRoot: "${outputRoot}", workflowPreset:"safe-preview", includeResults:true.`,
+              '4. Inspect sourceSafetyDecision, safetySummary, batchDecision, planned, batchWarnings, maxFilesHit, dedupeDecisionSummary, errorCount, and errors.',
+              '5. Only after review, call split_font_batch with workflowPreset:"reviewed-write".',
+              `6. Audit "${outputRoot}" with inspect_split_output using includeFiles:false and includeFamilies:false before reporting success.`,
+            ].join('\n'),
+          },
+        },
+      ],
+    };
+  },
+);
+
 server.registerTool(
   'get_agent_guidance',
   {
     title: 'Get AI agent usage guidance',
-    description: 'Call this first when an AI coding assistant needs to choose a safe font-splitting workflow. It returns workspace path rules, projectStatusNotice, toolSafetyQuickReference, nextToolDecisionSummary with workflowQuickStart and quickStartCallExamples, configurationRecipes, batchCustomizationQuickReference, directoryOrganizationQuickAnswer, batchPolicyGuide, fontIdentityBasisCatalog, outputStructureCatalog, unsupportedFileCategoryCatalog, directoryHandlingModeCatalog, directoryWorkflowDecisionMatrix, directoryWorkflowExamples, safeInvocationTemplates, localVerificationOutputGuide, errorResponseCatalog, warningCodeCatalog, toolResponseFieldCatalog, recommended tool order, defaults, response fields to inspect, and successCriteria to satisfy before advancing. Use detailLevel or sections for a compact or focused response.',
+    description: 'Call first to choose a safe font-splitting workflow. Returns compact or focused guidance, safety defaults, catalogs, and response fields to inspect.',
     inputSchema: {
       workflow: z.enum(GUIDANCE_WORKFLOWS).optional().describe('Guidance focus. Default: overview.'),
       detailLevel: z.enum(GUIDANCE_DETAIL_LEVELS).optional().describe('Response detail. compact keeps workflow essentials and omits bulky catalogs/examples unless requested; full returns all guidance sections. Default: compact.'),
       sections: z.array(z.enum(GUIDANCE_SECTION_NAMES)).optional().describe('Optional focused guidance sections to return. When set, this overrides the detailLevel default section set.'),
     },
+    outputSchema: ToolOutputSchema,
   },
   async (args) => {
     try {
@@ -81,6 +185,7 @@ server.registerTool(
     title: 'Get runtime status',
     description: 'Call this when an AI coding assistant needs to diagnose setup before processing fonts. It checks the font workspace, Node engine compatibility, package versions, cn-font-split runtime details, and WASM availability without writing files, then returns recommendedActions for remediation.',
     inputSchema: {},
+    outputSchema: ToolOutputSchema,
   },
   async () => {
     try {
@@ -97,6 +202,7 @@ server.registerTool(
     title: 'Split a font into web-font chunks',
     description: 'Call this when the user wants to split one local TTF/OTF/TTC/OTC/WOFF/WOFF2 font into cn-font-split web font output files. This writes output files; inspect resultType, outputMode, performedSplit, usedFallback, warnings, and manifestPath before claiming success. All paths must stay inside the configured font workspace.',
     inputSchema: SplitFontOptions,
+    outputSchema: ToolOutputSchema,
   },
   async (args) => {
     try {
@@ -111,7 +217,7 @@ server.registerTool(
   'split_font_batch',
   {
     title: 'Batch split fonts under a directory',
-    description: 'Call this when the user wants to split many local font files under a directory. dryRun defaults to true, so omitted dryRun is a no-write preview with includeResults:true for scan, dedupe, naming, skip decisions, sourceSafetyDecision, safetySummary, configurationTrace, batchPolicySummary, outputTreeInsideInputTree, batchDecision, recommendedNextActions[].suggestedArgsField, and batchWarnings. To write output files, use workflowPreset:"reviewed-write" or explicitly set dryRun:false only after reviewing a preview. Source font files are never moved or deleted, but writesSourceTree can be true when outputRoot is inside or equal to inputDir. If the directory shape is uncertain, call get_agent_guidance sections:["examples"] and review source-layout-mismatch-comparison, or run organize_font_directory safe-preview first.',
+    description: 'Batch scan, dedupe, name, preview, or split fonts. dryRun defaults to true; write only with workflowPreset:"reviewed-write" or reviewed dryRun:false. Inspect sourceSafetyDecision, batchDecision, and batchWarnings.',
     inputSchema: {
       inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
       outputRoot: z.string().optional().describe('Directory to place per-font output folders. Defaults to split-output.'),
@@ -122,6 +228,7 @@ server.registerTool(
       ...Object.fromEntries(Object.entries(SplitFontOptions).filter(([key]) => !['fontPath', 'outDir'].includes(key))),
       ...BatchPolicyOptions,
     },
+    outputSchema: ToolOutputSchema,
   },
   async (args) => {
     try {
@@ -136,12 +243,13 @@ server.registerTool(
   'inspect_font_inputs',
   {
     title: 'Inspect input fonts before splitting',
-    description: 'Call this before large batch runs to scan supported font files, validate basic font metadata parsing, report identity keys, glyph counts, invalid font-like files, layout, recommendedBatchPreviewArgs, inputDirectoryDecision, and inputDirectoryDecision.directoryOrganizationSafety without writing output. inputDirectoryDecision gives a first-pass route for direct safe batch preview versus non-destructive organize_font_directory safe-preview. inputDirectoryDecision.directoryOrganizationSafety gives the shortest answer for whether organize_font_directory is available, whether it writes by default, and whether reviewed organization can change source files. recommendedBatchPreviewArgs preserves the current maxFiles scan cap for copyable follow-up previews.',
+    description: 'Read-only preflight for source fonts. Reports counts, ignored files, invalid font-like files, layout, identity hints, and safe next-step preview arguments.',
     inputSchema: {
       inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
       maxFiles: z.number().int().positive().max(50000).optional().describe('Maximum source files to scan. Defaults to 50000.'),
       includeFiles: z.boolean().optional().describe('Include per-font inspection entries in files[]. Default: true. Set false for compact summaries.'),
     },
+    outputSchema: ToolOutputSchema,
   },
   async (args) => {
     try {
@@ -156,7 +264,7 @@ server.registerTool(
   'organize_font_directory',
   {
     title: 'Plan or copy-organize a font directory',
-    description: 'Call this when the source font directory layout does not match the desired batch grouping. It defaults to dryRun true and is source-non-destructive: it never moves or deletes source files, and when dryRun is false it only copies selected fonts into outputDir. Inspect sourceSafetyDecision, layoutDecision.directoryHandling, stagingDirectoryDecision, safetySummary, configurationTrace, batchPolicySummary, directoryWorkflowSummary, directoryWorkflowSummary.workflowSteps[].suggestedArgsField, sourceLayoutMismatchSummary, sourceLayoutMismatchSummary.decisionChecklist, sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs, recommendedBatchPreviewArgs, recommendedNextActions, recommendedNextActions[].suggestedArgsField, and outputTreeInsideInputTree because writesSourceTree can be true when outputDir is inside or equal to inputDir. recommendedBatchPreviewArgs preserves the current maxFiles scan cap for copyable follow-up previews; after copy-only writes sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs, sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs, and the related workflowSteps suggestedArgs preserve it too; scanner follow-up recommendedNextActions[].suggestedArgs.maxFiles preserves it as well. stagingDirectoryDecision explicitly marks outputDir as source-like staging, not split output. For flat/nested/mixed/output-inside-input routing, get_agent_guidance sections:["examples"] includes source-layout-mismatch-comparison.',
+    description: 'Plan or copy-organize source fonts into source-like staging. Defaults to dryRun true, never moves/deletes source files, and copy writes only to outputDir after review.',
     inputSchema: {
       inputDir: z.string().optional().describe('Directory to scan, relative to the font workspace. Defaults to the workspace root.'),
       outputDir: z.string().optional().describe('Directory for organized copies, relative to the font workspace. Defaults to organized-fonts. Must differ from inputDir.'),
@@ -171,6 +279,7 @@ server.registerTool(
       copyInvalidFonts: z.boolean().optional().describe('Copy files with supported font extensions even when metadata parsing fails. Default: false.'),
       overwriteExisting: z.boolean().optional().describe('Allow replacing matching files in outputDir. Default: false. Source files are still never modified.'),
     },
+    outputSchema: ToolOutputSchema,
   },
   async (args) => {
     try {
@@ -192,6 +301,7 @@ server.registerTool(
       includeFiles: z.boolean().optional().describe('Include flat files[] entries in the response. Default: true. Set false for compact summaries.'),
       includeFamilies: z.boolean().optional().describe('Include structured families[] inventory in the response. Default: true. Set false for compact summaries.'),
     },
+    outputSchema: ToolOutputSchema,
   },
   async (args) => {
     try {

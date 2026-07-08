@@ -1,5 +1,6 @@
 export function jsonText(value) {
   return {
+    structuredContent: value,
     content: [
       {
         type: 'text',
@@ -106,6 +107,7 @@ export function errorText(error) {
   const payload = formatToolError(error);
   return {
     isError: true,
+    structuredContent: payload,
     content: [
       {
         type: 'text',
@@ -119,6 +121,7 @@ export function errorMessageText(message) {
   const payload = formatMcpServerErrorMessage(message);
   return {
     isError: true,
+    structuredContent: payload,
     content: [
       {
         type: 'text',

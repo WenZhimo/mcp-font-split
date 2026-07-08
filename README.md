@@ -48,6 +48,8 @@
 - 在源目录混乱时生成整理计划，或非破坏性复制到暂存源目录。
 - 使用 manifest 支持增量跳过和输出审计。
 - 提供 `get_agent_guidance`，让 AI agent 用机器可读指南选择安全工作流。
+- 提供 MCP 文档 resources 和 `safe-batch-workflow` prompt，让客户端可以直接发现项目文档和安全批量流程。
+- 工具响应同时提供 `structuredContent` 和兼容旧客户端的 JSON 文本内容。
 - 提供真实语料库 smoke suite，用复杂本地字体集合做代表性可靠性验证。
 
 ## 工具列表
@@ -61,6 +63,10 @@
 | `split_font` | 处理单个字体，可能得到正常分片、单 WOFF2 fallback 或 copy-original 登记。 |
 | `split_font_batch` | 批量扫描、去重、命名、跳过已有输出并处理字体。 |
 | `inspect_split_output` | 审计生成的拆分输出目录，检查目录角色、manifest 覆盖和结构问题。 |
+
+## MCP 资源和 Prompt
+
+除工具外，服务还通过 MCP resources 暴露 README、API 和行为说明文档；通过 `safe-batch-workflow` prompt 提供“预检 → safe-preview → reviewed-write → 输出审计”的安全批量流程提示。支持 resources / prompts 的客户端可以直接从 MCP schema 发现这些入口。
 
 ## 常见工作流
 

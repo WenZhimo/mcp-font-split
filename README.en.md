@@ -48,6 +48,8 @@ If that staging directory contains `font-organization-manifest.json`, `inspect_s
 - Plan or copy-organize source directories when the source layout is messy.
 - Use manifests for incremental skipping and output audits.
 - Provide `get_agent_guidance` so AI agents can choose safe workflows from machine-readable guidance.
+- Expose MCP documentation resources and a `safe-batch-workflow` prompt so clients can discover project docs and the safe batch route directly.
+- Return both `structuredContent` and backward-compatible JSON text content from tool calls.
 - Provide a real-corpus smoke suite for representative reliability checks over complex local font collections.
 
 ## Tools
@@ -61,6 +63,10 @@ If that staging directory contains `font-organization-manifest.json`, `inspect_s
 | `split_font` | Process one font; output may be normal subset output, a single WOFF2 fallback, or a copy-original metadata entry. |
 | `split_font_batch` | Batch scan, dedupe, name, skip existing output, and process fonts. |
 | `inspect_split_output` | Audit generated split output for directory role, manifest coverage, and structure issues. |
+
+## MCP Resources and Prompt
+
+In addition to tools, the server exposes README, API, and behavior notes as MCP resources, plus a `safe-batch-workflow` prompt for the inspect -> safe-preview -> reviewed-write -> output-audit route. MCP clients that support resources and prompts can discover these entries from the live schema.
 
 ## Common Workflows
 

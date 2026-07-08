@@ -347,6 +347,8 @@ export async function runApiDocsSmoke() {
   await client.connect(transport);
   try {
     const result = await client.listTools();
+    const resourcesResult = await client.listResources();
+    const promptsResult = await client.listPrompts();
     const guidance = getAgentGuidance({ workflow: 'batch', detailLevel: 'full' });
     for (const tool of result.tools) {
       assertDocsContain(`${tool.name} heading`, `## \`${tool.name}\``);
@@ -354,6 +356,26 @@ export async function runApiDocsSmoke() {
         assertDocsContain(`${tool.name}.${propertyName}`, `\`${propertyName}\``);
       }
     }
+    const expectedResourceUris = [
+      'font-split://docs/readme.zh-CN',
+      'font-split://docs/readme.en',
+      'font-split://docs/api.en',
+      'font-split://docs/api.zh-CN',
+      'font-split://docs/behavior.zh-CN',
+    ];
+    const resourceUris = resourcesResult.resources.map((resource) => resource.uri);
+    for (const resourceUri of expectedResourceUris) {
+      if (!resourceUris.includes(resourceUri)) {
+        throw new Error(`Expected MCP resource list to include ${resourceUri}.`);
+      }
+      assertDocsContain(`MCP resource ${resourceUri}`, `\`${resourceUri}\``);
+    }
+    if (!promptsResult.prompts.some((prompt) => prompt.name === 'safe-batch-workflow')) {
+      throw new Error('Expected MCP prompts/list to include safe-batch-workflow.');
+    }
+    assertDocsContain('MCP structured output field', '`structuredContent`');
+    assertDocsContain('MCP text compatibility field', '`content[0].text`');
+    assertDocsContain('MCP safe batch workflow prompt', '`safe-batch-workflow`');
 
     for (const sectionName of guidance.guidanceView?.availableSections || []) {
       assertDocsContain(`get_agent_guidance section ${sectionName}`, `\`${sectionName}\``);
@@ -529,6 +551,8 @@ export async function runApiDocsSmoke() {
       ok: true,
       docsChecked: Object.keys(apiDocs),
       toolCount: result.tools.length,
+      resourceCount: resourcesResult.resources.length,
+      promptCount: promptsResult.prompts.length,
       documentedSchemaPropertyCount: result.tools.reduce((count, tool) => count + Object.keys(tool.inputSchema?.properties || {}).length, 0),
       documentedGuidanceSectionCount: guidance.guidanceView?.availableSections?.length || 0,
       documentedWorkflowPresetCount: guidance.workflowPresets?.length || 0,

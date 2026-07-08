@@ -21,7 +21,7 @@
 
 ## 1. 工具能力总览
 
-当前 MCP 服务暴露 7 个工具：
+当前 MCP 服务暴露 7 个工具、5 个文档 resources 和 1 个工作流 prompt。
 
 | 工具 | 作用 |
 |------|------|
@@ -32,6 +32,10 @@
 | `split_font_batch` | 批量扫描目录、去重、分组并处理字体文件 |
 | `organize_font_directory` | 当源目录结构不适合直接批量处理时，生成整理计划，或把字体非破坏性复制到暂存目录 |
 | `inspect_split_output` | 汇总和结构化检查输出目录 |
+
+文档 resources 包括 `font-split://docs/readme.zh-CN`、`font-split://docs/readme.en`、`font-split://docs/api.en`、`font-split://docs/api.zh-CN` 和 `font-split://docs/behavior.zh-CN`。`safe-batch-workflow` prompt 用于生成“预检 → safe-preview → reviewed-write → 输出审计”的安全批量流程提示。
+
+所有工具响应都会保留兼容旧客户端的 JSON 文本 `content[0].text`，同时提供 `structuredContent` 作为字段级消费入口。工具错误也会带 `isError: true` 和结构化错误载荷，调用方应优先按 `structuredContent.errorType` 判断错误类型。
 
 `split_font` 的结果不一定是多分片 web-font。根据参数和字体状态，它可能产生：
 
@@ -216,7 +220,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 
 错误和字段目录：
 
-- `errorResponseCatalog` 解释 MCP 错误 JSON 文本。工具错误都会包含 `ok: false` 和 `error`；结构化错误还会包含 `name`、`errorType` 和 `details`。
+- `errorResponseCatalog` 解释 MCP 错误响应载荷。工具错误会在 `structuredContent` 和 JSON 文本里提供同一份信息，都会包含 `ok: false` 和 `error`；结构化错误还会包含 `name`、`errorType` 和 `details`。
 - `errorType` 是 agent 最短路由字段；如果存在 `details.summaryType`，会优先使用它作为 `errorType`。
   MCP schema 校验错误的 `errorType` 是 `mcp-schema-validation-error`，应检查 `details.validationIssues[]`；`FontSplitConfigurationError` 的 `errorType` 是 `configuration-error`；`BatchSplitError` 的 `errorType` 是 `batch-split-error`，继续前应检查 `details.errors[]` 和 `details.summary`。
 - `toolResponseFieldCatalog` 在 `detailLevel: "full"` 或 `sections: ["field-catalog"]` 时返回。它解释 `ok`、`performedSplit`、`usedFallback`、`skipped`、`skipReason`、`skippedExisting`、`skippedByManifest`、`sourceDestructive`、`writesSourceTree`、`outputTreeInsideInputTree`、`writesOutputTree`、`maxFilesHit`、`stagingDirectoryDecision`、`outputStructureDecision`、`auditStatus`、`recommendedNextActions` 等关键字段。
@@ -468,7 +472,7 @@ Agent guidance 里的常用辅助对象可以按用途阅读。
 - `fail-fast`：遇到第一个单字体错误后立即抛出 `BatchSplitError`。
 - `fail-after`：继续处理选中的字体；如果最终存在任何单字体错误，则抛出 `BatchSplitError`，错误对象包含 `details.errors` 和 `details.summary`。
 
-通过 MCP Server 返回时，工具错误会被序列化为 JSON 文本。带 `details` 的批量错误包含 `ok: false`、`name`、`errorType`、`error` 和 `details`；MCP schema 校验错误包含 `errorType: "mcp-schema-validation-error"` 和 `details.validationIssues[]`。这能让 AI agent 先按 `errorType` 路由，再读取失败文件清单或参数校验问题，避免只看到一句错误消息。
+通过 MCP Server 返回时，工具错误会同时放入 `structuredContent` 和兼容旧客户端的 JSON 文本。带 `details` 的批量错误包含 `ok: false`、`name`、`errorType`、`error` 和 `details`；MCP schema 校验错误包含 `errorType: "mcp-schema-validation-error"` 和 `details.validationIssues[]`。这能让 AI agent 先按 `errorType` 路由，再读取失败文件清单或参数校验问题，避免只看到一句错误消息。
 
 ### 4.11 `limit` / `maxFiles` / `includeResults` / `dryRun`（批量专用）
 

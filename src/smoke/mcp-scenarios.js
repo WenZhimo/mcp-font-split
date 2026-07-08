@@ -31,6 +31,7 @@ async function runMcpErrorSmoke() {
   const parsed = JSON.parse(detailed.content[0].text);
   if (
     detailed.isError !== true
+    || detailed.structuredContent?.errorType !== 'batch-split-error'
     || parsed.name !== 'BatchSplitError'
     || parsed.errorType !== 'batch-split-error'
     || parsed.details?.errors?.[0]?.file !== 'bad.ttf'
@@ -52,6 +53,7 @@ async function runMcpErrorSmoke() {
   const parsedConfiguration = JSON.parse(configuration.content[0].text);
   if (
     configuration.isError !== true
+    || configuration.structuredContent?.errorType !== 'configuration-error'
     || parsedConfiguration.name !== 'FontSplitConfigurationError'
     || parsedConfiguration.errorType !== 'configuration-error'
     || parsedConfiguration.details?.summaryType !== 'configuration-error'
@@ -65,6 +67,7 @@ async function runMcpErrorSmoke() {
   const parsedPlain = JSON.parse(plain.content[0].text);
   if (
     plain.isError !== true
+    || plain.structuredContent?.ok !== false
     || parsedPlain.ok !== false
     || parsedPlain.error !== 'plain failure'
   ) {
@@ -84,6 +87,8 @@ async function runMcpSchemaSmoke() {
   try {
     const result = await client.listTools();
     const tools = Object.fromEntries(result.tools.map((tool) => [tool.name, tool]));
+    const resourcesResult = await client.listResources();
+    const promptsResult = await client.listPrompts();
     const guidanceProps = tools.get_agent_guidance?.inputSchema?.properties || {};
     const splitFontProps = tools.split_font?.inputSchema?.properties || {};
     const batchProps = tools.split_font_batch?.inputSchema?.properties || {};
@@ -107,7 +112,15 @@ async function runMcpSchemaSmoke() {
           throw new Error(`${toolName} description is missing ${phrase}`);
         }
       }
+      if (description.length > 700) {
+        throw new Error(`${toolName} description is too long for the compact MCP schema contract.`);
+      }
     };
+    for (const tool of result.tools) {
+      if (!tool.outputSchema || tool.outputSchema.type !== 'object') {
+        throw new Error(`Expected ${tool.name} to expose an object outputSchema for structuredContent.`);
+      }
+    }
     const batchOnly = ['skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'debugBatchDecisions'];
     const leaked = batchOnly.filter((key) => Object.hasOwn(splitFontProps, key));
     const missing = batchOnly.filter((key) => !Object.hasOwn(batchProps, key));
@@ -161,18 +174,53 @@ async function runMcpSchemaSmoke() {
       assertEnumMatches(`organize_font_directory ${optionName}`, getSchemaEnumValues(organizeProps[optionName]), expectedValues);
     }
     assertEnumMatches('split_font_batch batchErrorMode', getSchemaEnumValues(batchProps.batchErrorMode), BATCH_ERROR_MODES);
-    expectDescriptionIncludes('get_agent_guidance', ['projectStatusNotice', 'toolSafetyQuickReference', 'nextToolDecisionSummary', 'workflowQuickStart', 'quickStartCallExamples', 'configurationRecipes', 'batchCustomizationQuickReference', 'directoryOrganizationQuickAnswer', 'batchPolicyGuide', 'fontIdentityBasisCatalog', 'outputStructureCatalog', 'unsupportedFileCategoryCatalog', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix', 'safeInvocationTemplates', 'localVerificationOutputGuide', 'errorResponseCatalog', 'warningCodeCatalog', 'toolResponseFieldCatalog', 'response fields to inspect', 'successCriteria', 'detailLevel', 'sections']);
+    expectDescriptionIncludes('get_agent_guidance', ['safe font-splitting workflow', 'compact or focused guidance', 'response fields to inspect']);
     expectDescriptionIncludes('split_font', ['writes output files', 'resultType', 'usedFallback']);
-    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to true', 'workflowPreset:"reviewed-write"', 'includeResults:true', 'sourceSafetyDecision', 'safetySummary', 'batchPolicySummary', 'outputTreeInsideInputTree', 'batchDecision', 'recommendedNextActions[].suggestedArgsField', 'batchWarnings', 'source-layout-mismatch-comparison', 'organize_font_directory safe-preview']);
-    expectDescriptionIncludes('inspect_font_inputs', ['layout', 'recommendedBatchPreviewArgs', 'inputDirectoryDecision', 'inputDirectoryDecision.directoryOrganizationSafety', 'without writing output', 'organize_font_directory safe-preview', 'whether it writes by default', 'whether reviewed organization can change source files', 'maxFiles', 'preserves']);
-    expectDescriptionIncludes('organize_font_directory', ['dryRun true', 'source-non-destructive', 'never moves or deletes source files', 'sourceSafetyDecision', 'layoutDecision.directoryHandling', 'stagingDirectoryDecision', 'safetySummary', 'batchPolicySummary', 'directoryWorkflowSummary', 'directoryWorkflowSummary.workflowSteps[].suggestedArgsField', 'sourceLayoutMismatchSummary', 'sourceLayoutMismatchSummary.copyOnlyStaging.safePreviewArgs', 'sourceLayoutMismatchSummary.decisionChecklist.items[].safePreviewArgs', 'recommendedBatchPreviewArgs', 'recommendedNextActions', 'recommendedNextActions[].suggestedArgsField', 'suggestedArgs.maxFiles', 'maxFiles', 'preserves', 'outputTreeInsideInputTree', 'source-layout-mismatch-comparison']);
+    expectDescriptionIncludes('split_font_batch', ['dryRun defaults to true', 'workflowPreset:"reviewed-write"', 'sourceSafetyDecision', 'batchDecision', 'batchWarnings']);
+    expectDescriptionIncludes('inspect_font_inputs', ['Read-only preflight', 'ignored files', 'safe next-step preview']);
+    expectDescriptionIncludes('organize_font_directory', ['Defaults to dryRun true', 'never moves/deletes source files', 'outputDir']);
     expectDescriptionIncludes('inspect_split_output', ['outputRoleDecision', 'font-organization-manifest.json', 'organize_font_directory staging', 'inspect_font_inputs', 'split_font_batch safe-preview', 'outputStructureDecision', 'auditStatus', 'structureSummary', 'maxFilesHit', 'inspectionWarnings', 'includeFiles:false']);
+    const resourceUris = resourcesResult.resources.map((resource) => resource.uri);
+    for (const uri of [
+      'font-split://docs/readme.zh-CN',
+      'font-split://docs/readme.en',
+      'font-split://docs/api.en',
+      'font-split://docs/api.zh-CN',
+      'font-split://docs/behavior.zh-CN',
+    ]) {
+      if (!resourceUris.includes(uri)) {
+        throw new Error(`Expected MCP resource list to include ${uri}.`);
+      }
+    }
+    const promptNames = promptsResult.prompts.map((prompt) => prompt.name);
+    if (!promptNames.includes('safe-batch-workflow')) {
+      throw new Error('Expected MCP prompts/list to include safe-batch-workflow.');
+    }
+    const apiResource = await client.readResource({ uri: 'font-split://docs/api.en' });
+    if (!apiResource.contents?.[0]?.text?.includes('split_font_batch')) {
+      throw new Error('Expected API resource to expose API.md text.');
+    }
+    const workflowPrompt = await client.getPrompt({
+      name: 'safe-batch-workflow',
+      arguments: {
+        inputDir: 'fonts',
+        outputRoot: 'split-output',
+      },
+    });
+    if (
+      !workflowPrompt.messages?.[0]?.content?.text?.includes('inspect_font_inputs')
+      || !workflowPrompt.messages?.[0]?.content?.text?.includes('workflowPreset:"reviewed-write"')
+    ) {
+      throw new Error('Expected safe-batch-workflow prompt to return the safe inspect-preview-write-audit route.');
+    }
     console.log(JSON.stringify({
       ok: true,
       guidancePropertyCount: Object.keys(guidanceProps).length,
       splitFontPropertyCount: Object.keys(splitFontProps).length,
       splitFontBatchPropertyCount: Object.keys(batchProps).length,
       organizeFontDirectoryPropertyCount: Object.keys(organizeProps).length,
+      resourceCount: resourcesResult.resources.length,
+      promptCount: promptsResult.prompts.length,
       splitFontBatchHasBatchGroupBy: Object.hasOwn(batchProps, 'batchGroupBy'),
       organizeFontDirectoryHasDryRun: Object.hasOwn(organizeProps, 'dryRun'),
     }, null, 2));
@@ -228,7 +276,8 @@ async function runMcpStdioCallSmoke() {
     });
     const batch = parseTextJson(batchResult, 'split_font_batch stdio call');
     if (
-      batch.ok !== true
+      batchResult.structuredContent?.dryRun !== true
+      || batch.ok !== true
       || batch.dryRun !== true
       || batch.writesOutputTree !== false
       || batch.plannedCount !== 1
@@ -250,6 +299,7 @@ async function runMcpStdioCallSmoke() {
     const invalidDryRun = parseTextJson(invalidDryRunResult, 'invalid dryRun stdio call');
     if (
       invalidDryRunResult.isError !== true
+      || invalidDryRunResult.structuredContent?.errorType !== 'mcp-schema-validation-error'
       || invalidDryRun.ok !== false
       || invalidDryRun.errorType !== 'mcp-schema-validation-error'
       || invalidDryRun.details?.summaryType !== 'mcp-schema-validation-error'
