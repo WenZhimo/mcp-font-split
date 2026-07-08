@@ -21,7 +21,7 @@
 
 ## 1. 工具能力总览
 
-当前 MCP 服务暴露 7 个工具、5 个文档 resources 和 1 个工作流 prompt。
+当前 MCP 服务暴露 7 个工具、6 个文档 resources 和 1 个工作流 prompt。
 
 | 工具 | 作用 |
 |------|------|
@@ -33,9 +33,11 @@
 | `organize_font_directory` | 当源目录结构不适合直接批量处理时，生成整理计划，或把字体非破坏性复制到暂存目录 |
 | `inspect_split_output` | 汇总和结构化检查输出目录 |
 
-文档 resources 包括 `font-split://docs/readme.zh-CN`、`font-split://docs/readme.en`、`font-split://docs/api.en`、`font-split://docs/api.zh-CN` 和 `font-split://docs/behavior.zh-CN`。`safe-batch-workflow` prompt 用于生成“预检 → safe-preview → reviewed-write → 输出审计”的安全批量流程提示。
+文档 resources 包括 `font-split://docs/readme.zh-CN`、`font-split://docs/readme.en`、`font-split://docs/api.en`、`font-split://docs/api.zh-CN`、`font-split://docs/behavior.zh-CN` 和 `font-split://docs/behavior.en`。`safe-batch-workflow` prompt 用于生成“预检 → safe-preview → reviewed-write → 输出审计”的安全批量流程提示。
 
 所有工具响应都会保留兼容旧客户端的 JSON 文本 `content[0].text`，同时提供 `structuredContent` 作为字段级消费入口。工具错误也会带 `isError: true` 和结构化错误载荷，调用方应优先按 `structuredContent.errorType` 判断错误类型。
+
+`get_agent_guidance.interfaceContract` 是当前响应稳定性的机器可读索引。`stable` 字段是面向 1.0 候选版本的核心机器契约，并会出现在工具 `outputSchema` 中；`diagnostic` 字段用于排障和审计，可能继续增加或变得更精确；`experimental` 字段用于预发布调试，在 `formalRelease: false` 期间可能改变或移除。
 
 `split_font` 的结果不一定是多分片 web-font。根据参数和字体状态，它可能产生：
 
@@ -106,7 +108,7 @@ FONT_SPLIT_ROOT=/path/to/your/font-workspace
 
 - `formalRelease: false`
 - 当前接口、默认值、响应字段、目录整理策略和文档都可能变化
-- 当前仓库代码、实时 MCP schema、`get_agent_guidance`、API 文档和本行为文档是权威来源
+- 当前仓库代码、实时 MCP schema、`get_agent_guidance`、`get_agent_guidance.interfaceContract`、API 文档和本行为文档是权威来源
 - 未发布字段或旧响应形状的前向兼容垫片不是目标；当这类兼容冗余增加噪声或和当前行为冲突时，应移除
 - 改动后重新运行 `get_agent_guidance` 和本地门禁
 

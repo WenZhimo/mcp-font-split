@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { BATCH_DEDUPE_MODES, BATCH_ERROR_MODES, BATCH_GROUP_BY_MODES, BATCH_NAMING_MODES, GUIDANCE_DETAIL_LEVELS, GUIDANCE_SECTION_NAMES, GUIDANCE_WORKFLOWS, OVERSIZED_KERN_ACTIONS, SKIP_MODES, SMALL_GLYPH_ACTIONS, SPLIT_FAILURE_ACTIONS, WORKFLOW_PRESET_NAMES, getAgentGuidance, getRuntimeStatus, inspectFontInputs, inspectSplitOutput, organizeFontDirectory, splitFont, splitFontBatch } from './font-split.js';
+import { MCP_TOOL_OUTPUT_SCHEMAS } from './mcp-interface-contract.js';
 import { errorMessageText, errorText, jsonText } from './mcp-response.js';
 
 const require = createRequire(import.meta.url);
@@ -56,8 +57,6 @@ const server = new McpServer({
 });
 server.createToolError = (message) => errorMessageText(message);
 
-const ToolOutputSchema = z.object({}).passthrough();
-
 const DocumentationResources = [
   {
     name: 'readme-zh-cn',
@@ -93,6 +92,13 @@ const DocumentationResources = [
     title: 'Behavior Notes zh-CN',
     fileName: 'BEHAVIOR.zh-CN.md',
     description: 'Chinese high-risk behavior and workflow notes.',
+  },
+  {
+    name: 'behavior-en',
+    uri: 'font-split://docs/behavior.en',
+    title: 'Behavior Notes English',
+    fileName: 'BEHAVIOR.en.md',
+    description: 'English high-risk behavior, stability, and workflow notes.',
   },
 ];
 
@@ -168,7 +174,7 @@ server.registerTool(
       detailLevel: z.enum(GUIDANCE_DETAIL_LEVELS).optional().describe('Response detail. compact keeps workflow essentials and omits bulky catalogs/examples unless requested; full returns all guidance sections. Default: compact.'),
       sections: z.array(z.enum(GUIDANCE_SECTION_NAMES)).optional().describe('Optional focused guidance sections to return. When set, this overrides the detailLevel default section set.'),
     },
-    outputSchema: ToolOutputSchema,
+    outputSchema: MCP_TOOL_OUTPUT_SCHEMAS.get_agent_guidance,
   },
   async (args) => {
     try {
@@ -185,7 +191,7 @@ server.registerTool(
     title: 'Get runtime status',
     description: 'Call this when an AI coding assistant needs to diagnose setup before processing fonts. It checks the font workspace, Node engine compatibility, package versions, cn-font-split runtime details, and WASM availability without writing files, then returns recommendedActions for remediation.',
     inputSchema: {},
-    outputSchema: ToolOutputSchema,
+    outputSchema: MCP_TOOL_OUTPUT_SCHEMAS.get_runtime_status,
   },
   async () => {
     try {
@@ -202,7 +208,7 @@ server.registerTool(
     title: 'Split a font into web-font chunks',
     description: 'Call this when the user wants to split one local TTF/OTF/TTC/OTC/WOFF/WOFF2 font into cn-font-split web font output files. This writes output files; inspect resultType, outputMode, performedSplit, usedFallback, warnings, and manifestPath before claiming success. All paths must stay inside the configured font workspace.',
     inputSchema: SplitFontOptions,
-    outputSchema: ToolOutputSchema,
+    outputSchema: MCP_TOOL_OUTPUT_SCHEMAS.split_font,
   },
   async (args) => {
     try {
@@ -228,7 +234,7 @@ server.registerTool(
       ...Object.fromEntries(Object.entries(SplitFontOptions).filter(([key]) => !['fontPath', 'outDir'].includes(key))),
       ...BatchPolicyOptions,
     },
-    outputSchema: ToolOutputSchema,
+    outputSchema: MCP_TOOL_OUTPUT_SCHEMAS.split_font_batch,
   },
   async (args) => {
     try {
@@ -249,7 +255,7 @@ server.registerTool(
       maxFiles: z.number().int().positive().max(50000).optional().describe('Maximum source files to scan. Defaults to 50000.'),
       includeFiles: z.boolean().optional().describe('Include per-font inspection entries in files[]. Default: true. Set false for compact summaries.'),
     },
-    outputSchema: ToolOutputSchema,
+    outputSchema: MCP_TOOL_OUTPUT_SCHEMAS.inspect_font_inputs,
   },
   async (args) => {
     try {
@@ -279,7 +285,7 @@ server.registerTool(
       copyInvalidFonts: z.boolean().optional().describe('Copy files with supported font extensions even when metadata parsing fails. Default: false.'),
       overwriteExisting: z.boolean().optional().describe('Allow replacing matching files in outputDir. Default: false. Source files are still never modified.'),
     },
-    outputSchema: ToolOutputSchema,
+    outputSchema: MCP_TOOL_OUTPUT_SCHEMAS.organize_font_directory,
   },
   async (args) => {
     try {
@@ -301,7 +307,7 @@ server.registerTool(
       includeFiles: z.boolean().optional().describe('Include flat files[] entries in the response. Default: true. Set false for compact summaries.'),
       includeFamilies: z.boolean().optional().describe('Include structured families[] inventory in the response. Default: true. Set false for compact summaries.'),
     },
-    outputSchema: ToolOutputSchema,
+    outputSchema: MCP_TOOL_OUTPUT_SCHEMAS.inspect_split_output,
   },
   async (args) => {
     try {

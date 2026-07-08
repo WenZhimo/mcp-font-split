@@ -16,6 +16,7 @@ import {
   SPLIT_FAILURE_ACTIONS,
   getAgentGuidance,
 } from '../font-split.js';
+import { MCP_STABLE_OUTPUT_FIELDS_BY_TOOL } from '../mcp-interface-contract.js';
 import { errorText } from '../mcp-response.js';
 import { buildMinimalTtf } from './fixtures.js';
 
@@ -120,6 +121,16 @@ async function runMcpSchemaSmoke() {
       if (!tool.outputSchema || tool.outputSchema.type !== 'object') {
         throw new Error(`Expected ${tool.name} to expose an object outputSchema for structuredContent.`);
       }
+      const stableFields = MCP_STABLE_OUTPUT_FIELDS_BY_TOOL[tool.name] || [];
+      const outputProperties = Object.keys(tool.outputSchema.properties || {});
+      const requiredFields = tool.outputSchema.required || [];
+      const missingOutputProperties = stableFields.filter((field) => !outputProperties.includes(field));
+      if (!requiredFields.includes('ok')) {
+        throw new Error(`${tool.name} outputSchema must require ok so clients can distinguish success and error responses.`);
+      }
+      if (missingOutputProperties.length > 0) {
+        throw new Error(`${tool.name} outputSchema is missing stable contract fields. properties: ${missingOutputProperties.join(', ') || '<none>'}.`);
+      }
     }
     const batchOnly = ['skipMode', 'batchGroupBy', 'batchNamingMode', 'batchDedupeMode', 'batchErrorMode', 'debugBatchDecisions'];
     const leaked = batchOnly.filter((key) => Object.hasOwn(splitFontProps, key));
@@ -187,6 +198,7 @@ async function runMcpSchemaSmoke() {
       'font-split://docs/api.en',
       'font-split://docs/api.zh-CN',
       'font-split://docs/behavior.zh-CN',
+      'font-split://docs/behavior.en',
     ]) {
       if (!resourceUris.includes(uri)) {
         throw new Error(`Expected MCP resource list to include ${uri}.`);

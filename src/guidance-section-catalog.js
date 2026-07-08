@@ -5,6 +5,7 @@ export const GUIDANCE_DETAIL_LEVELS = ['compact', 'full'];
 export const GUIDANCE_SECTION_NAMES = [
   'workspace',
   'tools',
+  'interface-contract',
   'defaults',
   'recommendations',
   'option-catalog',
@@ -25,6 +26,7 @@ export const GUIDANCE_SECTION_NAMES = [
 export const GUIDANCE_COMPACT_SECTION_NAMES = [
   'workspace',
   'tools',
+  'interface-contract',
   'defaults',
   'recommendations',
   'option-catalog',
@@ -42,6 +44,7 @@ export const GUIDANCE_COMPACT_SECTION_NAMES = [
 export const GUIDANCE_SECTION_FIELDS = {
   workspace: ['workspace'],
   tools: ['tools', 'toolSafetyQuickReference', 'supportedExtensions'],
+  'interface-contract': ['interfaceContract'],
   defaults: ['projectStatusNotice', 'defaultPolicies'],
   recommendations: ['recommendedBatchOptions', 'recommendedInspectOptions', 'recommendedOrganizationOptions', 'workflowPresets', 'batchCustomizationQuickReference', 'outputResultShapeQuickReference', 'batchPolicyGuide', 'configurationRecipes', 'unsupportedFileCategoryCatalog', 'fontIdentityBasisCatalog', 'outputStructureCatalog'],
   'directory-workflows': ['directoryOrganizationQuickAnswer', 'directoryHandlingModeCatalog', 'directoryWorkflowDecisionMatrix'],

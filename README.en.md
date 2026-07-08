@@ -1,6 +1,6 @@
 # mcp-font-split
 
-[中文](./README.md) | [API Reference](./API.md) | [中文 API](./API.zh-CN.md) | [Behavior Notes / 行为说明](./BEHAVIOR.zh-CN.md)
+[中文](./README.md) | [API Reference](./API.md) | [中文 API](./API.zh-CN.md) | [Behavior Notes](./BEHAVIOR.en.md) | [行为说明](./BEHAVIOR.zh-CN.md)
 
 > **AI-Generated Code Disclaimer**
 >
@@ -16,7 +16,7 @@
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that wraps [cn-font-split](https://github.com/KonghaYao/cn-font-split) as agent-callable tools for font splitting, batch processing, directory organization, and output audits.
 
 > [!WARNING]
-> Before using this tool, read the full behavior and risk notes in [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md). This README is only an entry point for workflows and key risks; field-level details belong in the [API Reference](./API.md).
+> Before using this tool, read the full behavior and risk notes in [BEHAVIOR.en.md](./BEHAVIOR.en.md). This README is only an entry point for workflows and key risks; field-level details belong in the [API Reference](./API.md).
 
 ## Documentation Map
 
@@ -24,7 +24,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 |------|------------|
 | Understand the project, installation, and common calls | This README |
 | Check MCP tool arguments, response fields, and field semantics | [API Reference](./API.md); Chinese version: [API 参考](./API.zh-CN.md) |
-| Review high-risk behavior around batch dedupe, directory organization, fallbacks, and output audits | [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md) |
+| Review high-risk behavior around batch dedupe, directory organization, fallbacks, and output audits | [BEHAVIOR.en.md](./BEHAVIOR.en.md); Chinese version: [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md) |
 | Let an AI agent choose the next tool and safe arguments | Call `get_agent_guidance`, then inspect `inspectFields` and `successCriteria` |
 | Maintain the project, understand structure, and verify changes | [Maintainer Structure Guide](./docs/MAINTAINING.md); `npm run check:compact`; for behavior changes also run `npm run smoke:real-corpus-suite -- <font-corpus-dir>` |
 
@@ -145,7 +145,7 @@ After writing, run:
 }
 ```
 
-Treat the run as complete only when the output audit clearly passes, the scan was not truncated, and the structure diagnostics confirm a valid split-output tree. For field-level criteria, see the [API Reference](./API.md) and [behavior guide](./BEHAVIOR.zh-CN.md).
+Treat the run as complete only when the output audit clearly passes, the scan was not truncated, and the structure diagnostics confirm a valid split-output tree. For field-level criteria, see the [API Reference](./API.md) and [behavior guide](./BEHAVIOR.en.md).
 
 ### 5. Organize the Source Layout When Needed
 

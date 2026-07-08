@@ -10,8 +10,16 @@ export function buildProjectStatusNotice() {
       'get_agent_guidance',
       'live MCP tool schema',
       'API.md / API.zh-CN.md',
-      'BEHAVIOR.zh-CN.md',
+      'BEHAVIOR.en.md / BEHAVIOR.zh-CN.md',
+      'get_agent_guidance.interfaceContract',
     ],
+    interfaceContractPolicy: {
+      currentContractVersion: '0.2.0',
+      stableFieldsDocumented: true,
+      stableFieldCompatibility: 'Stable fields should not be removed, renamed, or changed in type without a breaking-change note and version bump.',
+      diagnosticFieldCompatibility: 'Diagnostic fields may grow or become more precise; callers should not depend on exact membership or wording.',
+      experimentalFieldCompatibility: 'Experimental fields may change while formalRelease remains false.',
+    },
     forwardCompatibilityPolicy: {
       required: false,
       reason: 'The package is not formally released yet.',

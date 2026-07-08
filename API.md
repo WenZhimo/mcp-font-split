@@ -1,6 +1,6 @@
 # API Reference
 
-This server exposes seven MCP tools, five documentation resources, and one workflow prompt. All paths are resolved inside `FONT_SPLIT_ROOT`; if that environment variable is not set, paths are resolved from the process working directory. Response paths use `.` for the workspace root instead of an empty string, including suggested follow-up arguments.
+This server exposes seven MCP tools, six documentation resources, and one workflow prompt. All paths are resolved inside `FONT_SPLIT_ROOT`; if that environment variable is not set, paths are resolved from the process working directory. Response paths use `.` for the workspace root instead of an empty string, including suggested follow-up arguments.
 
 ## How to read this reference
 
@@ -9,7 +9,7 @@ This server exposes seven MCP tools, five documentation resources, and one workf
 | Find the right tool and high-level workflow | `get_agent_guidance` |
 | Check exact option names, defaults, and allowed values | The tool-specific sections below |
 | Understand output fields and audits | `inspect_split_output` and the output-field paragraphs in each tool section |
-| Review high-risk behavior and non-intuitive defaults | [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md) |
+| Review high-risk behavior and non-intuitive defaults | [BEHAVIOR.en.md](./BEHAVIOR.en.md); Chinese version: [BEHAVIOR.zh-CN.md](./BEHAVIOR.zh-CN.md) |
 | See the Chinese version | [API 参考](./API.zh-CN.md) |
 
 Invalid explicit configuration values are rejected instead of silently falling back. MCP calls are guarded by the tool schema; schema validation failures are returned as JSON tool errors with `errorType: "mcp-schema-validation-error"` and `details.validationIssues[]`. Direct module calls that bypass the MCP schema throw `FontSplitConfigurationError` with `details.summaryType: "configuration-error"`, `details.option`, `details.received`, `details.allowedValues` or `details.expectedType`, `details.defaultWhenOmitted`, and `details.omitForDefaultBehavior: true`. To use defaults, omit the option rather than passing an invalid enum, boolean, or numeric value.
@@ -27,12 +27,31 @@ Documentation resources:
 | `font-split://docs/api.en` | English API reference |
 | `font-split://docs/api.zh-CN` | Chinese API reference |
 | `font-split://docs/behavior.zh-CN` | Chinese behavior and risk notes |
+| `font-split://docs/behavior.en` | English behavior, stability, and risk notes |
 
 Workflow prompt:
 
 | Prompt | Purpose |
 |--------|---------|
 | `safe-batch-workflow` | Generates an inspect -> safe-preview -> reviewed-write -> output-audit route. Optional arguments: `inputDir`, `outputRoot`. |
+
+### Field Stability Tiers
+
+Guidance section name: `interface-contract`.
+
+`get_agent_guidance` returns `interfaceContract`, the machine-readable contract index for response stability. Its `version` is the current interface-contract version, and `stableOutputFieldsByTool` mirrors the stable core fields exposed as properties by each tool's MCP `outputSchema`. To keep uniform error responses valid, the public `outputSchema` requires only `ok`; when `ok:true`, the listed stable fields are the success-response contract.
+
+| Tier | Meaning | Compatibility expectation |
+|------|---------|---------------------------|
+| `stable` | Supported machine-consumption contract for 1.0 candidates. These fields appear in tool `outputSchema`. | Do not remove, rename, or change type without a breaking-change note and version bump. |
+| `diagnostic` | Troubleshooting evidence and audit detail such as warnings, summaries, catalogs, and structure diagnostics. | May grow or become more precise; callers should not require exact list membership or wording. |
+| `experimental` | Pre-release helper detail for agent iteration and local debugging. | May change or be removed while `formalRelease` remains false. |
+
+Stable fields are intentionally a core subset, not the entire response. Tool responses remain `.passthrough()` so diagnostic and experimental fields can continue to evolve without breaking older clients that consume only the stable core. New clients should prefer `structuredContent`; `content[0].text` remains JSON compatibility text.
+
+### Version Compatibility
+
+The package is still `0.x` and `projectStatusNotice.formalRelease` is `false`, so non-stable diagnostic detail can change during refinement. For the stable core, treat these as breaking changes even before 1.0: removing a tool, renaming a tool, removing or renaming a stable field, changing a stable field's type, changing a default write policy, or changing documented error `errorType` values. Additive fields, new diagnostic warnings, new resources, and stricter validation for previously invalid input are non-breaking when the stable core remains intact.
 
 ## Directory Organization Safety Fields
 

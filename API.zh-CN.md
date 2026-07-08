@@ -1,6 +1,6 @@
 # API 参考
 
-本 MCP Server 暴露 7 个工具、5 个文档 resources 和 1 个工作流 prompt。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。响应路径会用 `.` 表示工作区根目录，而不是空字符串；推荐后续调用参数也遵循这个规则。
+本 MCP Server 暴露 7 个工具、6 个文档 resources 和 1 个工作流 prompt。所有路径都会限制在 `FONT_SPLIT_ROOT` 内；如果没有设置该环境变量，则基于 MCP Server 进程启动时的当前工作目录解析。响应路径会用 `.` 表示工作区根目录，而不是空字符串；推荐后续调用参数也遵循这个规则。
 
 ## 如何阅读这份 API
 
@@ -27,12 +27,31 @@
 | `font-split://docs/api.en` | 英文 API 参考 |
 | `font-split://docs/api.zh-CN` | 中文 API 参考 |
 | `font-split://docs/behavior.zh-CN` | 中文行为和风险说明 |
+| `font-split://docs/behavior.en` | 英文行为、稳定性和风险说明 |
 
 工作流 prompt：
 
 | Prompt | 用途 |
 |--------|------|
 | `safe-batch-workflow` | 生成“预检 → safe-preview → reviewed-write → 输出审计”的安全批量流程提示。可选参数：`inputDir`、`outputRoot`。 |
+
+### 字段稳定性分层
+
+Guidance section 名称：`interface-contract`。
+
+`get_agent_guidance` 会返回 `interfaceContract`，也就是响应稳定性的机器可读契约索引。它的 `version` 是当前接口契约版本，`stableOutputFieldsByTool` 与每个工具 MCP `outputSchema` 作为 properties 暴露的稳定核心字段保持一致。为了让统一错误响应也能通过客户端校验，公开 `outputSchema` 只强制 `ok`；当 `ok:true` 时，这些稳定字段就是成功响应契约。
+
+| 层级 | 含义 | 兼容预期 |
+|------|------|----------|
+| `stable` | 面向 1.0 候选版本的机器消费契约。这些字段会出现在工具 `outputSchema` 中。 | 不应删除、重命名或改变类型；如必须改变，应记录 breaking change 并提升版本。 |
+| `diagnostic` | 排障证据和审计细节，例如 warnings、summary、catalog 和结构诊断。 | 可以增加或变得更精确；调用方不应依赖精确成员列表或文案。 |
+| `experimental` | 面向 agent 迭代和本地调试的预发布辅助细节。 | 在 `formalRelease` 仍为 false 时可能改变或移除。 |
+
+稳定字段只是核心子集，不是完整响应。工具响应仍保留 `.passthrough()`，让诊断字段和实验字段可以继续演进，同时不破坏只消费稳定核心的客户端。新客户端应优先读取 `structuredContent`；`content[0].text` 继续作为 JSON 兼容文本保留。
+
+### 版本兼容策略
+
+当前包仍处于 `0.x`，并且 `projectStatusNotice.formalRelease` 为 `false`，所以非稳定诊断细节仍可能调整。对于稳定核心，即使在 1.0 之前，也应把这些视为破坏性改动：删除工具、重命名工具、删除或重命名稳定字段、改变稳定字段类型、改变默认写入策略、改变文档化错误 `errorType`。在稳定核心不变时，新增字段、新增诊断 warning、新增 resource，以及对原本无效输入做更严格校验，都属于非破坏性改动。
 
 ## 目录整理安全字段速查
 

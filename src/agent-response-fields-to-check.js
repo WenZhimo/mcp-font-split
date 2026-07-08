@@ -9,6 +9,7 @@ export const AGENT_RESPONSE_FIELDS_TO_CHECK = [
   'cnFontSplit.runtimeVersion',
   'recommendedActions',
   'projectStatusNotice',
+  'interfaceContract',
   'toolSafetyQuickReference',
   'outputResultShapeQuickReference',
   'workflowPresets',

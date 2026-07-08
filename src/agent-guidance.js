@@ -42,6 +42,13 @@ import {
   buildDirectoryWorkflowExamples,
 } from './directory-workflow-guidance.js';
 import { buildConfigurationRecipes } from './configuration-recipes-guidance.js';
+import {
+  MCP_DIAGNOSTIC_FIELD_PATTERNS,
+  MCP_EXPERIMENTAL_FIELD_PATTERNS,
+  MCP_FIELD_STABILITY_LEVELS,
+  MCP_INTERFACE_CONTRACT_VERSION,
+  MCP_STABLE_OUTPUT_FIELDS_BY_TOOL,
+} from './mcp-interface-contract.js';
 
 export function getAgentGuidance(args = {}) {
   const workflow = GUIDANCE_WORKFLOWS.includes(args.workflow) ? args.workflow : 'overview';
@@ -61,6 +68,18 @@ export function getAgentGuidance(args = {}) {
     workflow,
     agentOptimized: true,
     guidanceView,
+    interfaceContract: {
+      summaryType: 'mcp-interface-contract',
+      version: MCP_INTERFACE_CONTRACT_VERSION,
+      fieldStabilityLevels: MCP_FIELD_STABILITY_LEVELS,
+      stableOutputFieldsByTool: MCP_STABLE_OUTPUT_FIELDS_BY_TOOL,
+      diagnosticFieldPatterns: MCP_DIAGNOSTIC_FIELD_PATTERNS,
+      experimentalFieldPatterns: MCP_EXPERIMENTAL_FIELD_PATTERNS,
+      responseTransport: {
+        preferred: 'structuredContent',
+        compatibility: 'content[0].text JSON is retained for older clients.',
+      },
+    },
     workspace: {
       root,
       fontSplitRootConfigured: configuredRoot !== null,

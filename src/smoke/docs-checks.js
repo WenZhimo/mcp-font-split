@@ -11,6 +11,7 @@ const PUBLIC_DOC_FILES = [
   'docs/MAINTAINING.md',
   'API.md',
   'API.zh-CN.md',
+  'BEHAVIOR.en.md',
   'BEHAVIOR.zh-CN.md',
 ];
 
@@ -362,6 +363,7 @@ export async function runApiDocsSmoke() {
       'font-split://docs/api.en',
       'font-split://docs/api.zh-CN',
       'font-split://docs/behavior.zh-CN',
+      'font-split://docs/behavior.en',
     ];
     const resourceUris = resourcesResult.resources.map((resource) => resource.uri);
     for (const resourceUri of expectedResourceUris) {
@@ -376,6 +378,10 @@ export async function runApiDocsSmoke() {
     assertDocsContain('MCP structured output field', '`structuredContent`');
     assertDocsContain('MCP text compatibility field', '`content[0].text`');
     assertDocsContain('MCP safe batch workflow prompt', '`safe-batch-workflow`');
+    assertDocsContain('MCP interface contract field', '`interfaceContract`');
+    assertDocsContain('MCP stable field tier', '`stable`');
+    assertDocsContain('MCP diagnostic field tier', '`diagnostic`');
+    assertDocsContain('MCP experimental field tier', '`experimental`');
 
     for (const sectionName of guidance.guidanceView?.availableSections || []) {
       assertDocsContain(`get_agent_guidance section ${sectionName}`, `\`${sectionName}\``);

@@ -9,6 +9,11 @@ export const GUIDANCE_HEADER_FIELD_CATALOG = {
     meaning: 'Machine-readable pre-release status and change policy for this package.',
     agentAction: 'Use current repository code, current get_agent_guidance, live MCP schema, and current API docs as authoritative; do not preserve stale behavior solely for forward compatibility before formal release.',
   },
+  interfaceContract: {
+    sourceTools: ['get_agent_guidance'],
+    meaning: 'Machine-readable MCP response contract index, including stability tiers and stable output fields by tool.',
+    agentAction: 'Use stableOutputFieldsByTool with live outputSchema before relying on response fields in automation; treat diagnostic and experimental fields as less stable.',
+  },
   toolSafetyQuickReference: {
     sourceTools: ['get_agent_guidance'],
     meaning: 'Compact per-tool safety table describing default writes, source-destructive behavior, copy-only modes, and fields to inspect.',
