@@ -6,10 +6,10 @@
 >
 > This project is generated and maintained with AI coding assistants. The author makes no warranties of any kind and assumes no responsibility for its use. It is provided "AS IS" without warranty of any kind.
 
-> [!CAUTION]
-> **Project status: actively being refined and not formally released yet.**
+> [!NOTE]
+> **Project status: formally released as 1.0.0.**
 >
-> Interfaces, defaults, response fields, directory-organization policy, and documentation may change at any time. When integrating or automating, treat the current repository code, live MCP schema, `get_agent_guidance`, and API docs as authoritative.
+> Stable MCP tools, defaults, documented error types, and stable response fields are now maintained as the compatibility contract. Diagnostic fields may still grow or become more precise; experimental fields are outside the stable contract. When integrating or automating, treat the current repository code, live MCP schema, `get_agent_guidance`, API docs, and release notes as authoritative.
 
 ---
 

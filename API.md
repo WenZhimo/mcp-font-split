@@ -43,15 +43,15 @@ Guidance section name: `interface-contract`.
 
 | Tier | Meaning | Compatibility expectation |
 |------|---------|---------------------------|
-| `stable` | Supported machine-consumption contract for 1.0 candidates. These fields appear in tool `outputSchema`. | Do not remove, rename, or change type without a breaking-change note and version bump. |
+| `stable` | Supported machine-consumption contract for formal 1.0 releases. These fields appear in tool `outputSchema`. | Do not remove, rename, or change type without a breaking-change note and version bump. |
 | `diagnostic` | Troubleshooting evidence and audit detail such as warnings, summaries, catalogs, and structure diagnostics. | May grow or become more precise; callers should not require exact list membership or wording. |
-| `experimental` | Pre-release helper detail for agent iteration and local debugging. | May change or be removed while `formalRelease` remains false. |
+| `experimental` | Unstable helper detail for agent iteration and local debugging. | Outside the stable contract; may change with release notes. |
 
 Stable fields are intentionally a core subset, not the entire response. Tool responses remain `.passthrough()` so diagnostic and experimental fields can continue to evolve without breaking older clients that consume only the stable core. New clients should prefer `structuredContent`; `content[0].text` remains JSON compatibility text.
 
 ### Version Compatibility
 
-The package is still `0.x` and `projectStatusNotice.formalRelease` is `false`, so non-stable diagnostic detail can change during refinement. For the stable core, treat these as breaking changes even before 1.0: removing a tool, renaming a tool, removing or renaming a stable field, changing a stable field's type, changing a default write policy, or changing documented error `errorType` values. Additive fields, new diagnostic warnings, new resources, and stricter validation for previously invalid input are non-breaking when the stable core remains intact.
+Starting with `1.0.0`, `projectStatusNotice.formalRelease` is `true`. For the stable core, treat these as breaking changes: removing a tool, renaming a tool, removing or renaming a stable field, changing a stable field's type, changing a default write policy, or changing documented error `errorType` values. Additive fields, new diagnostic warnings, new resources, and stricter validation for previously invalid input are non-breaking when the stable core remains intact.
 
 ## Directory Organization Safety Fields
 
@@ -120,8 +120,8 @@ For a minimal routing response:
 
 Key routing objects:
 
-- `projectStatusNotice` records the pre-release change policy. It says the project is actively being refined, `formalRelease` is false, and response fields/defaults/directory policy may change.
-  Treat the current repository code, live MCP schema, `get_agent_guidance`, `API.md` / `API.zh-CN.md`, and `BEHAVIOR.zh-CN.md` as authoritative.
+- `projectStatusNotice` records the formal release compatibility policy. It says `formalRelease` is true and stable tools, defaults, documented error types, and stable response fields are compatibility commitments.
+  Treat the current repository code, live MCP schema, `get_agent_guidance`, `API.md` / `API.zh-CN.md`, `BEHAVIOR.en.md` / `BEHAVIOR.zh-CN.md`, and release notes as authoritative.
 - `configurationRecipes[]` maps common user intent to preset-first calls and tradeoffs. Each recipe includes `inspectFields` and `successCriteria`; it is guidance, not proof of success.
 - `batchCustomizationQuickReference[]` is the compact entrypoint for common batch overrides. It provides `overrideArgs`, `previewArgs` with `workflowPreset: "safe-preview"`, `writeArgsAfterReview` with `workflowPreset: "reviewed-write"`, `inspectFields`, `successCriteria`, and non-intuitive behavior.
 - `outputResultShapeQuickReference` is the compact result-shape matrix. Its summary type is `output-result-shape-quick-reference`. Use it before reporting success so `ok:true` is not mistaken for normal multi-subset output; it covers `subset`, `single-woff2`, `copy-original`, single-font skipped processing, batch existing-output skips, dry-run skip plans, and batches that complete with collected errors.

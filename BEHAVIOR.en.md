@@ -37,7 +37,7 @@ Documentation resources are `font-split://docs/readme.zh-CN`, `font-split://docs
 
 Tool calls return both `structuredContent` and backward-compatible JSON text in `content[0].text`. New clients should prefer `structuredContent`; older clients can continue parsing the JSON text. Tool errors use the same dual shape with `isError: true`, so callers should route by `structuredContent.errorType` when available.
 
-`get_agent_guidance.interfaceContract` is the machine-readable stability index. `stable` fields are the core machine contract for 1.0 candidates and appear in tool `outputSchema`; `diagnostic` fields are troubleshooting and audit evidence that may grow or become more precise; `experimental` fields are pre-release helper details that may change while `formalRelease: false`.
+`get_agent_guidance.interfaceContract` is the machine-readable stability index. `stable` fields are the core machine contract for formal 1.0 releases and appear in tool `outputSchema`; `diagnostic` fields are troubleshooting and audit evidence that may grow or become more precise; `experimental` fields are unstable helper details outside the stable contract.
 
 `split_font` does not always produce normal multi-subset web-font output. Depending on options and font state, the result may be:
 
@@ -85,12 +85,12 @@ Users should explicitly configure `FONT_SPLIT_ROOT` for their font workspace. AI
 
 When an agent is unsure whether to use a single-font, batch, input-preflight, organization, or output-audit workflow, it should call `get_agent_guidance` first and inspect the relevant `successCriteria` before reporting completion.
 
-`projectStatusNotice` is the pre-release status notice:
+`projectStatusNotice` is the formal release status notice:
 
-- `formalRelease: false`
-- Interfaces, defaults, response fields, directory-organization policy, and docs may still change.
+- `formalRelease: true`
+- Stable tools, defaults, documented error types, and stable response fields are compatibility commitments.
 - Authoritative sources are current repository code, live MCP schema, `get_agent_guidance`, `get_agent_guidance.interfaceContract`, API docs, and behavior docs.
-- Compatibility shims for unreleased fields are not a goal when they add noise or conflict with current behavior.
+- Diagnostic fields may grow or become more precise, and experimental fields remain outside the stable contract.
 
 ---
 
@@ -106,9 +106,9 @@ To use default behavior, omit the option. Do not pass placeholder enum values, s
 |------|---------|---------------------------|
 | `stable` | Core machine-consumption contract exposed through `outputSchema`. | Do not remove, rename, or change type without a breaking-change note and version bump. |
 | `diagnostic` | Troubleshooting evidence, warnings, summaries, catalogs, and audit detail. | May grow or become more precise; clients should not depend on exact membership or wording. |
-| `experimental` | Pre-release helper details for agent iteration and local debugging. | May change or be removed while `formalRelease` remains false. |
+| `experimental` | Unstable helper details for agent iteration and local debugging. | Outside the stable contract; may change with release notes. |
 
-Even before 1.0, treat these as breaking changes for the stable core: removing a tool, renaming a tool, removing or renaming a stable field, changing a stable field type, changing a default write policy, or changing documented error `errorType` values. Additive fields, new diagnostic warnings, new resources, and stricter validation for previously invalid input are non-breaking when the stable core remains intact.
+Starting with 1.0.0, treat these as breaking changes for the stable core: removing a tool, renaming a tool, removing or renaming a stable field, changing a stable field type, changing a default write policy, or changing documented error `errorType` values. Additive fields, new diagnostic warnings, new resources, and stricter validation for previously invalid input are non-breaking when the stable core remains intact.
 
 ---
 

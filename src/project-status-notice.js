@@ -1,10 +1,10 @@
 export function buildProjectStatusNotice() {
   return {
     summaryType: 'project-status-notice',
-    status: 'actively-being-refined',
-    formalRelease: false,
-    stability: 'pre-release',
-    directAnswer: 'This project is still being refined and has not been formally released; interfaces, defaults, response fields, directory-organization policy, and docs may change.',
+    status: 'formal-release',
+    formalRelease: true,
+    stability: 'stable',
+    directAnswer: 'This project is formally released as 1.0.0. Stable MCP tools, defaults, documented error types, and stable response fields are treated as a compatibility contract.',
     authoritativeSources: [
       'current repository code',
       'get_agent_guidance',
@@ -18,18 +18,18 @@ export function buildProjectStatusNotice() {
       stableFieldsDocumented: true,
       stableFieldCompatibility: 'Stable fields should not be removed, renamed, or changed in type without a breaking-change note and version bump.',
       diagnosticFieldCompatibility: 'Diagnostic fields may grow or become more precise; callers should not depend on exact membership or wording.',
-      experimentalFieldCompatibility: 'Experimental fields may change while formalRelease remains false.',
+      experimentalFieldCompatibility: 'Experimental fields are outside the stable contract and may change with release notes.',
     },
     forwardCompatibilityPolicy: {
-      required: false,
-      reason: 'The package is not formally released yet.',
-      removeUnreleasedCompatibilityCruft: true,
-      avoidPreservingStaleBehavior: true,
+      required: true,
+      reason: 'The package is formally released; stable fields, documented defaults, and documented error types require compatibility discipline.',
+      removeUnreleasedCompatibilityCruft: false,
+      avoidPreservingStaleBehavior: false,
     },
-    agentAction: 'Use current code, live schema, get_agent_guidance, and current docs as authoritative. When improving this package before formal release, prefer clear current behavior over preserving stale compatibility fields.',
+    agentAction: 'Use current code, live schema, get_agent_guidance, current docs, and release notes as authoritative. Preserve stable behavior unless an intentional breaking change is documented with a version bump.',
     nonIntuitiveBehavior: [
-      'Pre-release response fields and defaults may change when that makes the tool easier to understand or safer for agents.',
-      'Compatibility shims for unreleased fields should be removed when they add noise or contradict current behavior.',
+      'Stable fields are the machine-consumption contract; diagnostic fields can grow or become more precise without being treated as breaking changes.',
+      'Experimental fields remain outside the stable contract and should not be required by clients.',
       'After updating the package, rerun get_agent_guidance instead of relying on older conversation memory.',
     ],
   };

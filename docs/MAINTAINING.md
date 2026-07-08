@@ -29,7 +29,7 @@ This document is for maintainers and AI agents taking over the repository. It do
 | `src/organization-runtime.js`, `src/organization-*.js` | `organize_font_directory` runtime orchestration, copy-only organization planning, organization manifests, and source-layout route decisions. |
 | `src/output-audit.js` | Output role detection and split-output structure audits. |
 | `src/agent-response-fields-to-check.js` | Agent-facing `get_agent_guidance.responseFieldsToCheck` checklist. Keep this focused on field names agents should inspect. |
-| `src/project-status-notice.js` | Agent-facing `get_agent_guidance.projectStatusNotice` pre-release status facts. Keep formal release status, current-source authority, and forward-compatibility policy here. |
+| `src/project-status-notice.js` | Agent-facing `get_agent_guidance.projectStatusNotice` release status facts. Keep formal release status, current-source authority, and forward-compatibility policy here. |
 | `src/tool-safety-quick-reference.js` | Agent-facing `get_agent_guidance.toolSafetyQuickReference` facts. Keep write-scope, source-destructive, and organizer-staging safety claims here. |
 | `src/output-result-shape-quick-reference.js` | Agent-facing `get_agent_guidance.outputResultShapeQuickReference` facts. Keep `ok:true`, fallback, `copy-original`, skip, and collected-error interpretation here. |
 | `src/guidance.js` | Guidance view and section selection only. Do not put catalog builders or returned guidance facts here. |
@@ -146,4 +146,4 @@ npm run smoke:real-corpus-suite -- <font-corpus-dir>
 - Do not report completion from `ok:true` alone.
 - Do not change repeated high-risk prose without a smoke guard.
 - Do not mix runtime refactors, documentation rewrites, and test framework changes in one commit.
-- Do not keep misleading compatibility paths only for forward compatibility; the project is not formally released yet.
+- Do not change stable MCP behavior without documenting the compatibility impact and updating the version appropriately.

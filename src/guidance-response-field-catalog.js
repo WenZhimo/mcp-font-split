@@ -6,8 +6,8 @@ export const GUIDANCE_HEADER_FIELD_CATALOG = {
   },
   projectStatusNotice: {
     sourceTools: ['get_agent_guidance'],
-    meaning: 'Machine-readable pre-release status and change policy for this package.',
-    agentAction: 'Use current repository code, current get_agent_guidance, live MCP schema, and current API docs as authoritative; do not preserve stale behavior solely for forward compatibility before formal release.',
+    meaning: 'Machine-readable release status and compatibility policy for this package.',
+    agentAction: 'Use current repository code, current get_agent_guidance, live MCP schema, current API docs, and release notes as authoritative; preserve stable behavior unless an intentional breaking change is documented with a version bump.',
   },
   interfaceContract: {
     sourceTools: ['get_agent_guidance'],

@@ -187,18 +187,18 @@ async function runAgentGuidanceSmoke() {
     || result.toolResponseFieldCatalog?.projectStatusNotice?.sourceTools?.[0] !== 'get_agent_guidance'
     || !result.toolResponseFieldCatalog?.projectStatusNotice?.agentAction?.includes('current')
   ) {
-    throw new Error('Expected agent guidance to expose projectStatusNotice as the pre-release change policy.');
+    throw new Error('Expected agent guidance to expose projectStatusNotice as the release compatibility policy.');
   }
   if (
     result.projectStatusNotice?.summaryType !== 'project-status-notice'
-    || result.projectStatusNotice?.formalRelease !== false
-    || result.projectStatusNotice?.forwardCompatibilityPolicy?.required !== false
-    || result.projectStatusNotice?.forwardCompatibilityPolicy?.removeUnreleasedCompatibilityCruft !== true
+    || result.projectStatusNotice?.formalRelease !== true
+    || result.projectStatusNotice?.forwardCompatibilityPolicy?.required !== true
+    || result.projectStatusNotice?.forwardCompatibilityPolicy?.removeUnreleasedCompatibilityCruft !== false
     || !result.projectStatusNotice?.authoritativeSources?.includes('get_agent_guidance')
     || !result.projectStatusNotice?.authoritativeSources?.includes('API.md / API.zh-CN.md')
-    || !result.projectStatusNotice?.nonIntuitiveBehavior?.some((item) => item.includes('may change'))
+    || !result.projectStatusNotice?.nonIntuitiveBehavior?.some((item) => item.includes('Stable fields'))
   ) {
-    throw new Error('Expected projectStatusNotice to describe pre-release status, current-source authority, and no forward-compatibility requirement.');
+    throw new Error('Expected projectStatusNotice to describe formal release status, current-source authority, and stable compatibility requirements.');
   }
   if (!result.responseFieldsToCheck?.includes('workflowPresets') || !result.responseFieldsToCheck?.includes('workflowPreset')) {
     throw new Error('Expected agent guidance to recommend checking workflow preset fields.');

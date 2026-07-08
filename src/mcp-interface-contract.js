@@ -135,7 +135,7 @@ export const MCP_INTERFACE_CONTRACT_VERSION = '0.2.0';
 
 export const MCP_FIELD_STABILITY_LEVELS = {
   stable: {
-    summary: 'Supported machine-consumption contract for 1.0 candidates.',
+    summary: 'Supported machine-consumption contract for formal 1.0 releases.',
     compatibility: 'Do not remove, rename, or change type without a breaking-change note and version bump.',
   },
   diagnostic: {
@@ -143,8 +143,8 @@ export const MCP_FIELD_STABILITY_LEVELS = {
     compatibility: 'Keep meaning stable when practical, but callers should not require exact membership or wording.',
   },
   experimental: {
-    summary: 'Pre-release helper detail for agent iteration and local debugging.',
-    compatibility: 'May change or be removed while formalRelease remains false.',
+    summary: 'Unstable helper detail for agent iteration and local debugging.',
+    compatibility: 'Outside the stable contract; may change with release notes.',
   },
 };
 
