@@ -29,7 +29,7 @@
 | `src/organization-runtime.js`、`src/organization-*.js` | `organize_font_directory` 运行时编排、copy-only 计划、manifest 和目录路线判断。 |
 | `src/output-audit.js` | `inspect_split_output` 输出目录角色判断和结构审计。 |
 | `src/agent-response-fields-to-check.js` | 面向 agent 的 `get_agent_guidance.responseFieldsToCheck` 检查清单。这里只放建议检查的字段名。 |
-| `src/project-status-notice.js` | ?? agent ? `get_agent_guidance.projectStatusNotice` ???????????????????????????????? |
+| `src/project-status-notice.js` | 面向 agent 的 `get_agent_guidance.projectStatusNotice` 发布状态事实。正式发布状态、当前事实来源和前向兼容策略放在这里。 |
 | `src/tool-safety-quick-reference.js` | 面向 agent 的 `get_agent_guidance.toolSafetyQuickReference` 安全速查事实。写入范围、是否破坏源文件和整理暂存安全结论放在这里。 |
 | `src/output-result-shape-quick-reference.js` | 面向 agent 的 `get_agent_guidance.outputResultShapeQuickReference` 输出形态速查事实。`ok:true`、fallback、`copy-original`、skip 和收集错误的解释放在这里。 |
 | `src/guidance.js` | 只负责 guidance view 构造和 section 选择。不要把 catalog builder 或返回事实放回这里。 |
@@ -151,4 +151,4 @@ npm run smoke:real-corpus-suite -- <font-corpus-dir>
 - 不要只凭 `ok:true` 报告完成。
 - 不要在没有 smoke guard 的情况下改多处重复文案。
 - 不要在同一个 commit 里混合运行时重构、文档重写和测试框架调整。
-- ??????????????????????????? MCP ???
+- 不要在未记录兼容性影响和未正确更新版本的情况下改变稳定 MCP 行为。
